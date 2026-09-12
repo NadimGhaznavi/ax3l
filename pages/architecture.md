@@ -51,7 +51,7 @@ implementation proceeds in thin, working slices.
 ### Watchdog service
 
 - Monitors the `ax3l-server` service through systemd.
-- Monitors the selected Qwen or Phi server through its `/health` endpoint.
+- Monitors the selected Qwen, Phi, or Qwen Vision server through its `/health` endpoint.
 
 ## Conversation and tool flow
 
@@ -105,7 +105,7 @@ operator as root, using `-env qa` or `-env prod` on the corresponding machine.
 
 | Service | Dev unit | Dev endpoint |
 | --- | --- | --- |
-| Qwen / Phi (one at a time) | `qwen-server-dev.service` / `phi-server-dev.service` | `http://127.0.0.1:27768/health` |
+| Qwen / Phi / Qwen Vision | `qwen-server-dev.service` / `phi-server-dev.service` / `qwenv-server-dev.service` | `http://127.0.0.1:27768/health` |
 | Ax3l | `ax3l-server-dev.service` | `http://127.0.0.1:18081/health` |
 | Reporting | `reporting-server-dev.service` | `http://127.0.0.1:18082/health` |
 | Watchdog | `watchdog-dev.service` | Reports to the systemd journal |
@@ -121,7 +121,7 @@ report queries, and workflow persistence are not implemented yet. Dev and QA use
 an explicitly labeled health-only LLM stub that provides no inference and requires
 no model or GPU. Production launches the real llama.cpp binary directly, using
 the executable path from `DLlama` and model path from `DLlama.MODEL_DIR` plus
-`DQwen.GGUF` or `DPhi.GGUF`. Qwen’s current paths
+`DQwen.GGUF`, `DPhi.GGUF`, or `DQwenV.GGUF`. Qwen’s current paths
 are `/opt/prod/llama.cpp/bin/llama-server` and
 `/opt/prod/models/Qwen3.5-4B-Q4_K_M.gguf` respectively. Phi uses `/opt/prod/models/Phi-4-mini-instruct-Q4_K_M.gguf`.
 
@@ -133,19 +133,22 @@ Use the helper to start or stop the four services together:
 
 ```sh
 scripts/services.sh -env dev start  # Qwen by default
-scripts/services.sh -env dev start -model phi  # switch to Phi
+scripts/services.sh -env dev stop
+scripts/services.sh -env dev start -model qwenv  # Qwen Vision
 scripts/services.sh -env dev stop
 ```
 
 Startup runs in this order: LLM, a seven-second wait defined by
-`DQwen.STARTUP_SECONDS` or `DPhi.STARTUP_SECONDS`, reporting, Ax3l, then watchdog. Shutdown reverses the
+the selected model’s `STARTUP_SECONDS` constant, reporting, Ax3l, then watchdog. Shutdown reverses the
 order: watchdog, Ax3l, reporting, then LLM. The wait is a fixed startup allowance
 for the selected model, not a health check. QA/prod use the same helper as root with the
 corresponding `-env` value. Service installation uses the helper for its stop/start
-sequence. The helper disables the other model and enables the selected one for
-boot. Both units share the LLM port and conflict, preventing concurrent operation.
-Installation and upgrade default to Qwen; pass `-model phi` to select Phi. Upgrade
-removes the old `llm-server` unit.
+sequence. The helper starts the selected model without checking or stopping other
+models. The three model units share the LLM port and have no concurrency guards.
+Installation and upgrade update all units together and default to starting Qwen;
+pass `-model phi` or `-model qwenv` to start another model. Upgrade removes the
+old `llm-server` unit. Qwen Vision also loads `DQwenV.MMPROJ` from
+`DLlama.MODEL_DIR` using `--mmproj` and sets `-c 4096`.
 
 `scripts/upgrade.sh -env <environment>` updates an existing installation from
 the current checkout. It validates the generated units, stops services, copies

@@ -1,6 +1,7 @@
 [Unit]
-Description=Ax3l llm-server (@ENV@)
+Description=Ax3l phi-server (@ENV@)
 After=network.target
+Conflicts=qwen-server@SUFFIX@.service
 
 [Service]
 Type=simple
@@ -9,7 +10,7 @@ Group=@USER@
 WorkingDirectory=@APP@
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONDONTWRITEBYTECODE=1
-ExecStart=@LLM_COMMAND@
+ExecStart=@PHI_COMMAND@
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=true

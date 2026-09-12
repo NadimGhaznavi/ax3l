@@ -1,6 +1,6 @@
 [Unit]
 Description=Ax3l watchdog (@ENV@)
-After=ax3l-server@SUFFIX@.service llm-server@SUFFIX@.service
+After=ax3l-server@SUFFIX@.service qwen-server@SUFFIX@.service phi-server@SUFFIX@.service
 
 [Service]
 Type=simple

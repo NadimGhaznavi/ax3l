@@ -48,6 +48,10 @@ print(*(getattr(constants, attribute) for constants in (DLlama, DAx3l, DReportMg
 PY
 )
 read -r llm_port ax3l_port report_port <<< "$ports"
+ax3l_args=
+if [[ $install_env == prod ]]; then
+    ax3l_args="--llm-url http://127.0.0.1:$llm_port --output /var/lib/ax3l/haiku"
+fi
 if [[ $install_env == dev || $install_env == qa ]]; then
     qwen_command="/usr/bin/python3 -m ax3l.server.LLMHealthStub --port $llm_port"
     phi_command=$qwen_command
@@ -112,6 +116,7 @@ for name in qwen-server phi-server qwenv-server ax3l-server reporting-server wat
         -e "s|@QWENV_COMMAND@|$qwenv_command|g" \
         -e "s|@LLM_PORT@|$llm_port|g" -e "s|@AX3L_PORT@|$ax3l_port|g" \
         -e "s|@REPORT_PORT@|$report_port|g" \
+        -e "s|@AX3L_ARGS@|$ax3l_args|g" \
         "$checkout_dir/systemd/$name.service" > "$unit_dir/$unit"
 done
 

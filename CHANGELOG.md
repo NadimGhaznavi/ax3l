@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-12 @ 09:00
+
+- Added `DSnakeLab.HAIKU_SLEEP_SECONDS` (default: 5) to configure the delay between haiku requests and their logged wait messages.
+
+- The haiku request count defaults to `DSnakeLab.HAIKU_COUNT` in `ax3l/constants/DSnakeLab.py` for manual and service runs. It is initially `0` (repeat until stopped); `--count` overrides it for manual runs.
+
+### Service startup
+
+- Production `ax3l-server` now starts the haiku loop against the local LLM while serving `/health`. Systemd supplies database credentials and a writable capture directory at `/var/lib/ax3l/haiku`. Stopping the service interrupts the loop and records conversation end. DEV/QA retain health-only startup because their model services are inference-free stubs.
+
+Deploy from the updated checkout on PROD:
+
+```bash
+scripts/upgrade.sh -env prod -model qwenv
+```
+
+The loop starts automatically; stop any manually launched loop before upgrading.
+Use `systemctl stop ax3l-server` to stop it. Jinja2 and PyMySQL must be available
+to `/usr/bin/python3`; the upgrade does not install Python dependencies.
+
 ## [0.5.0] - 2026-09-12 @ 08:52
 
 ### Reporting

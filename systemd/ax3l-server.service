@@ -10,7 +10,10 @@ WorkingDirectory=@APP@
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONDONTWRITEBYTECODE=1
 EnvironmentFile=@CONFIG@/database.env
-ExecStart=/usr/bin/python3 -m ax3l.server.Ax3lServer --port @AX3L_PORT@
+ExecStart=/usr/bin/python3 -m ax3l.server.Ax3lServer --port @AX3L_PORT@ @AX3L_ARGS@
+StateDirectory=ax3l@SUFFIX@
+KillSignal=SIGINT
+SuccessExitStatus=130
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=true

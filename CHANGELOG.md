@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-12 @ 11:10
+
 - Keep the event log available when Snake Lab is down: its status bar shows unavailable on ZeroMQ transport failures and checks again on each refresh.
 
 - Added a matching Snake Lab Server status bar above the event log, showing running simulation or idle and updating with automatic refresh.

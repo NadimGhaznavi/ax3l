@@ -1,5 +1,29 @@
 # First learning-rate iteration
 
+## MCP tools
+
+The SnakeLab MCP entry point is `python -m ax3l.app.snakelab.tools` and uses
+stdio. Register domain tool functions in `tools/server.py` with `@mcp.tool()`.
+The server currently exposes no tools; `SubmitSingleValue` is a subsequent slice.
+
+`scripts/install-services.sh` generates the installation's `mcp.json` and adds
+`--mcp-servers-config` to all three production model commands. It installs the
+MCP SDK in `<app>/.venv`, which llama-server uses to launch the MCP child process.
+Production needs Python's venv/pip support and package-index access for this step.
+DEV/QA retain their existing health-only LLM stubs.
+
+For a checkout, generate the same configuration with:
+
+```sh
+python3 scripts/generate-mcp-config.py --app /opt/dev/ax3l > tmp/mcp.json
+```
+
+Pass that file to a llama-server build supporting `--mcp-servers-config`.
+llama-server discovers the tool names through MCP. Future tool implementations
+will forward requests over ZeroMQ to Ax3l for validation and submission.
+
+## Conversation snippets
+
 LLM conversation snippets can include the golden configuration and its loss plot:
 
 ```python

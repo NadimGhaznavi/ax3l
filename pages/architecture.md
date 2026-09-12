@@ -28,13 +28,13 @@ implementation proceeds in thin, working slices.
 
 - Hosts the LLM and provides inference to Ax3l.
 - Receives context and tool definitions from Ax3l and returns model responses, including tool-call requests.
-- Tool execution belongs to Ax3l. The llama-server web interface is outside the user conversation flow.
+- Launches the SnakeLab stdio MCP server using `--mcp-servers-config`. Domain tools forward proposed actions over ZeroMQ to Ax3l, which owns validation and submission.
 - The intended systemd service launches the llama.cpp server binary directly; no Python wrapper is needed for the current responsibilities.
 
 ### MCP servers and tools
 
 - Provide capabilities behind Ax3l's API.
-- Ax3l connects to MCP servers through interface classes and controls which tools are available to the LLM.
+- The SnakeLab MCP server is registered in llama-server's `mcp.json`; domain tools live in `ax3l/app/snakelab/tools`. The registration is implemented; the submission tool and Ax3l ZeroMQ handler are the next slice.
 - Tool implementations can be added or modified behind that boundary as a slice requires them.
 
 ### MariaDB

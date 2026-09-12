@@ -94,9 +94,9 @@ PY
         printf 'Install llama.cpp at %s and the model at %s first.\n' "$llm_binary" "$model" >&2
         exit 1
     }
-    qwen_command="$llm_binary --model $qwen_model --host $llm_host --port $llm_port --metrics"
-    phi_command="$llm_binary --model $phi_model --host $llm_host --port $llm_port --metrics"
-    qwenv_command="$llm_binary --model $qwenv_model --mmproj $qwenv_mmproj -c $qwenv_context --host $llm_host --port $llm_port --metrics"
+    qwen_command="$llm_binary --model $qwen_model --host $llm_host --port $llm_port --metrics --mcp-servers-config $config_dir/mcp.json"
+    phi_command="$llm_binary --model $phi_model --host $llm_host --port $llm_port --metrics --mcp-servers-config $config_dir/mcp.json"
+    qwenv_command="$llm_binary --model $qwenv_model --mmproj $qwenv_mmproj -c $qwenv_context --host $llm_host --port $llm_port --metrics --mcp-servers-config $config_dir/mcp.json"
 fi
 
 [[ -d $install_dir && -f $config_dir/database.env ]] || {
@@ -107,6 +107,13 @@ fi
 unit_dir=$(mktemp -d)
 trap 'rm -rf -- "$unit_dir"' EXIT
 units=()
+python3 "$checkout_dir/scripts/generate-mcp-config.py" --app "$install_dir" > "$unit_dir/mcp.json"
+if [[ $install_env == prod ]]; then
+    if [[ ! -x $install_dir/.venv/bin/python ]]; then
+        python3 -m venv "$install_dir/.venv"
+    fi
+    "$install_dir/.venv/bin/python" -m pip install 'mcp>=2,<3'
+fi
 for name in qwen-server phi-server qwenv-server ax3l-server reporting-server watchdog; do
     unit="$name$suffix.service"
     units+=("$unit")
@@ -134,6 +141,9 @@ while IFS= read -r -d '' source; do
     "${system_admin[@]}" install -D -m 644 -o "$service_account" -g "$service_account" \
         -- "$source" "$install_dir/$source"
 done < <(find ax3l -type f \( -name '*.py' -o -path 'ax3l/server/templates/*.html' \) -print0)
+
+"${system_admin[@]}" install -m 644 -o "$service_account" -g "$service_account" \
+    -- "$unit_dir/mcp.json" "$config_dir/mcp.json"
 
 for unit in "${units[@]}"; do
     "${system_admin[@]}" install -m 644 -- "$unit_dir/$unit" "/etc/systemd/system/$unit"

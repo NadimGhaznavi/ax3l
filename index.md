@@ -25,3 +25,9 @@ The current phase involves setting up the environment.
 - Validate at the boundary; if the contract is broken, raise a clear error and fix the cause.
 - Keep the code lean and clean
 
+# Links
+
+- [OS Setup](/pages/os-setup.html)
+- [Driver Setup](pages/driver-setup.html)
+- [Model Setup](pages/model-setup.html)
+

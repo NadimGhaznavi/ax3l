@@ -63,6 +63,8 @@
           <td title="{{ event.name }}">{{ event_label(event.category, event.name) }}</td>
           {% if event.name == simulation_events.SUBMITTED and event.category == simulation_events.CATEGORY %}
           <td class="content">Submitted <a href="/simulations/{{ event.process_id }}/config">config</a>.</td>
+          {% elif event.prompt_text is defined %}
+          <td class="content" title="{{ event.prompt_text }}"><a href="/events/{{ event.event_id }}">{{ event.prompt_text }}</a></td>
           {% elif event.reply_text is defined %}
           <td class="content" title="{{ event.reply_text }}"><a href="/events/{{ event.event_id }}">{{ event.reply_text }}</a></td>
           {% else %}

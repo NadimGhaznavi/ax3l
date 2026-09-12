@@ -164,4 +164,4 @@ environment's units before deleting its installation and database resources.
 - Implement only the data, behavior, and modules needed by the current slice.
 - Use explicit contracts and correct types; fail fast and hard when they are violated.
 - Add complexity and handle "what ifs" when they are encountered. Do not add speculative abstractions, defensive recovery paths, or dead code.
-- Follow the [development style]({{ '/' | relative_url }}#development-style) documented on the project home page.
+- Follow the [development style in the README](../README.md#development-style).

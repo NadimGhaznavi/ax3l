@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added shared event display labels in `DEventDisplay`. The loop logs `wait_started`, displayed as `Sleep`; existing `sleep` events receive the same label. Hovering a label shows its raw event name. New sleep messages record `Sleep for seconds: (x)` using the configured interval.
+
+- Expanded the development guidance for the fixed platform, clear module responsibilities, strict DAL, and thin slices without speculative defensive code. Moved it into `README.md` and updated the homepage and architecture links.
+
 ## [0.7.3] - 2026-09-12 @ 09:42
 
 - Added the global `DAx3l.RAW_LOGS_ENABLED` flag, defaulting to `False`. The haiku loop creates no capture directories or files while disabled; database events and normal console/journal status remain available. Set it to `True` to restore raw captures. Existing captures are not deleted.

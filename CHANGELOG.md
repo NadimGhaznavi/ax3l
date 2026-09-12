@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Keep the event log available when Snake Lab is down: its status bar shows unavailable on ZeroMQ transport failures and checks again on each refresh.
+
 - Added a matching Snake Lab Server status bar above the event log, showing running simulation or idle and updating with automatic refresh.
 
 - Replaced the event log Refresh button with automatic refresh every 30 seconds, configurable through `DReportMgr.REFRESH_SECONDS`. Updates preserve scroll position and keep the current entries visible if refresh fails.

@@ -1,7 +1,7 @@
 from typing import Final
 
 class DAx3l:
-    VERSION: Final[str] = "0.7.0"
+    VERSION: Final[str] = "0.7.1"
 
     BASE_DIR: Final[str] = "/opt/prod/ax3l"
     BASE_DIR_QA: Final[str] = "/opt/qa/ax3l"

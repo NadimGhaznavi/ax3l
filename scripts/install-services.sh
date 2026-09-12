@@ -114,6 +114,7 @@ if [[ ! -x $install_dir/.venv/bin/python ]]; then
     "${system_admin[@]}" python3 -m venv "$install_dir/.venv"
 fi
 "${system_admin[@]}" "$install_dir/.venv/bin/python" -m pip install -r "$checkout_dir/requirements.txt"
+"${system_admin[@]}" "$install_dir/.venv/bin/python" "$checkout_dir/scripts/install-chrome.py" --app "$install_dir"
 for name in qwen-server phi-server qwenv-server ax3l-server reporting-server watchdog; do
     unit="$name$suffix.service"
     units+=("$unit")

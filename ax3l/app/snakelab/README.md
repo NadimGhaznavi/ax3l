@@ -12,8 +12,8 @@ belong to Ax3l, not the MCP tool.
 
 `scripts/install-services.sh` generates the installation's `mcp.json` and adds
 `--mcp-servers-config` to all three production model commands. It installs the
-MCP SDK and PyZMQ in `<app>/.venv`, which llama-server uses to launch the MCP child process.
-Production needs Python's venv/pip support and package-index access for this step.
+project requirements in `<app>/.venv`, used by both Ax3l and the MCP child process.
+Installation needs Python's venv/pip support and package-index access for this step.
 DEV/QA retain their existing health-only LLM stubs.
 
 For a checkout, generate the same configuration with:
@@ -44,7 +44,31 @@ the tool returns that payload as JSON text without changing acceptance or reject
 `DZMQ.TIMEOUT_SECONDS` bounds send and receive waits. Transport failures propagate
 as tool errors; calls are never retried automatically because a timed-out request
 may already have been processed. No database or Snake Lab submission occurs in
-the tool. The Ax3l ZeroMQ listener and validation handler are not implemented yet.
+the tool.
+
+Ax3l starts `ZMQServer` alongside its HTTP health server and keeps it available
+while the LLM request runs. Domain dispatch lives in `server/ToolHandler.py`;
+SnakeLab validation and submission live in `SubmitSingleValueHandler.py`.
+The installer assigns endpoint ports 61968 (DEV), 61969 (QA), and 61970 (PROD)
+to both the listener and the generated MCP config. `--zmq-endpoint` overrides
+the listener endpoint for manual runs.
+
+The handler verifies the exact payload fields, finite numeric values, parameter
+name, and JSON-schema constraints before building a candidate from the golden
+configuration. It changes only the selected parameter. A legal but unchanged
+configuration is rejected; `SnakeLab.is_config_unique(config)` then checks all
+stored runs through `SnakeLabDb`, regardless of status or project version.
+Equality compares the full JSON configuration, including seed, while ignoring
+object key order and equivalent numeric representations. This uses MariaDB's
+`JSON_EQUALS` (MariaDB 10.7 or newer).
+
+Illegal values return `status: rejected`, `code: invalid_value`, and an
+`InvalidValue` prompt. Duplicates return `code: duplicate_config` and a
+`NoDupesSingle` prompt. These prompt messages travel back in the MCP result;
+the handler does not start a separate LLM conversation. Accepted candidates
+return `status: ok` and their submitted `run_id`, with proposal and submission
+events logged. Golden selection is unchanged. The listener handles requests
+serially; external writers to SnakeLab are outside that serialization boundary.
 
 ## Conversation snippets
 
@@ -119,4 +143,4 @@ the captured JSON for now. Database errors stop the loop.
 The active flow performs one request and exits after recording the reply.
 Use `--output PATH` to choose the optional capture directory. PNG rendering
 requires the project's `.venv` dependencies and Chrome. Service installations
-still use system Python and require those dependencies before running this flow.
+run Ax3l from the installed `.venv`; Chrome must be installed for PNG rendering.

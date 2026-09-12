@@ -13,3 +13,5 @@ class DAx3l:
     PORT_QA: Final[int] = 28081
 
     ZMQ_ENDPOINT: Final[str] = "tcp://127.0.0.1:61970"
+    ZMQ_ENDPOINT_DEV: Final[str] = "tcp://127.0.0.1:61968"
+    ZMQ_ENDPOINT_QA: Final[str] = "tcp://127.0.0.1:61969"

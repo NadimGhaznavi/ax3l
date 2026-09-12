@@ -45,9 +45,11 @@ from ax3l.constants.DReportMgr import DReportMgr
 
 attribute = {"dev": "PORT_DEV", "qa": "PORT_QA", "prod": "PORT"}[sys.argv[1]]
 print(*(getattr(constants, attribute) for constants in (DLlama, DAx3l, DReportMgr)))
+print(getattr(DAx3l, {"dev": "ZMQ_ENDPOINT_DEV", "qa": "ZMQ_ENDPOINT_QA", "prod": "ZMQ_ENDPOINT"}[sys.argv[1]]))
 PY
 )
 read -r llm_port ax3l_port report_port <<< "$ports"
+ax3l_zmq_endpoint=${ports##*$'\n'}
 ax3l_args=
 if [[ $install_env == prod ]]; then
     ax3l_args="--llm-url http://127.0.0.1:$llm_port --output /var/lib/ax3l/haiku"
@@ -107,13 +109,11 @@ fi
 unit_dir=$(mktemp -d)
 trap 'rm -rf -- "$unit_dir"' EXIT
 units=()
-python3 "$checkout_dir/scripts/generate-mcp-config.py" --app "$install_dir" > "$unit_dir/mcp.json"
-if [[ $install_env == prod ]]; then
-    if [[ ! -x $install_dir/.venv/bin/python ]]; then
-        python3 -m venv "$install_dir/.venv"
-    fi
-    "$install_dir/.venv/bin/python" -m pip install 'mcp>=2,<3' 'pyzmq>=26,<28'
+python3 "$checkout_dir/scripts/generate-mcp-config.py" --app "$install_dir" --zmq-endpoint "$ax3l_zmq_endpoint" > "$unit_dir/mcp.json"
+if [[ ! -x $install_dir/.venv/bin/python ]]; then
+    "${system_admin[@]}" python3 -m venv "$install_dir/.venv"
 fi
+"${system_admin[@]}" "$install_dir/.venv/bin/python" -m pip install -r "$checkout_dir/requirements.txt"
 for name in qwen-server phi-server qwenv-server ax3l-server reporting-server watchdog; do
     unit="$name$suffix.service"
     units+=("$unit")
@@ -123,6 +123,7 @@ for name in qwen-server phi-server qwenv-server ax3l-server reporting-server wat
         -e "s|@QWENV_COMMAND@|$qwenv_command|g" \
         -e "s|@LLM_PORT@|$llm_port|g" -e "s|@AX3L_PORT@|$ax3l_port|g" \
         -e "s|@REPORT_PORT@|$report_port|g" \
+        -e "s|@AX3L_ZMQ_ENDPOINT@|$ax3l_zmq_endpoint|g" \
         -e "s|@AX3L_ARGS@|$ax3l_args|g" \
         "$checkout_dir/systemd/$name.service" > "$unit_dir/$unit"
 done
@@ -140,7 +141,7 @@ cd -- "$checkout_dir"
 while IFS= read -r -d '' source; do
     "${system_admin[@]}" install -D -m 644 -o "$service_account" -g "$service_account" \
         -- "$source" "$install_dir/$source"
-done < <(find ax3l -type f \( -name '*.py' -o -path 'ax3l/server/templates/*.html' \) -print0)
+done < <(find ax3l -type f \( -name '*.py' -o -name '*.schema.json' -o -path 'ax3l/server/templates/*.html' \) -print0)
 
 "${system_admin[@]}" install -m 644 -o "$service_account" -g "$service_account" \
     -- "$unit_dir/mcp.json" "$config_dir/mcp.json"

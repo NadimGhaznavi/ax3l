@@ -70,3 +70,34 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
                         result = await client.call_tool("submit_single_value", {"parameter": "learning_rate", "value": value})
                         self.assertTrue(result.is_error)
                     self.assertEqual(await server.poll(timeout=50), 0)
+
+    async def test_mcp_uses_ax3l_validation_and_submission_handler(self):
+        from unittest.mock import Mock, patch
+        from ax3l.app.snakelab.GenerateDefaultConfig import GenerateDefaultConfig
+        from ax3l.server.ToolHandler import handle_tool
+        from ax3l.zmq.ZMQServer import ZMQServer
+
+        baseline = GenerateDefaultConfig().run()
+        with patch('ax3l.server.ToolHandler.DbMgr'), patch(
+            'ax3l.app.snakelab.SubmitSingleValueHandler.EventLogDb'
+        ) as events, patch('ax3l.app.snakelab.SubmitSingleValueHandler.SnakeLab') as snake:
+            events.return_value.current_golden_config.return_value = {'process_id': 'golden-run'}
+            snake.return_value.get_config.return_value = baseline
+            snake.return_value.is_config_unique.side_effect = [False, True, False]
+            snake.return_value.submit_simulation.return_value = 'submitted-run'
+            with ZMQServer('tcp://127.0.0.1:*', handle_tool) as server:
+                entry = configuration(ROOT)['mcpServers']['snakelab']
+                entry['env']['AX3L_ZMQ_ENDPOINT'] = server.endpoint
+                async with Client(StdioServerParameters(**entry), read_timeout_seconds=10) as client:
+                    for value, expected in [(0.2, 'invalid_value'),
+                                            (baseline['training']['learning_rate'], 'duplicate_config'),
+                                            (0.004, 'duplicate_config'), (0.003, 'ok'), (0.003, 'duplicate_config')]:
+                        result = await client.call_tool('submit_single_value', {'parameter': 'learning_rate', 'value': value})
+                        payload = json.loads(result.content[0].text)
+                        self.assertEqual(payload.get('code', payload['status']), expected)
+                        if expected != 'ok':
+                            self.assertEqual(payload['prompt']['role'], 'user')
+                    snake.return_value.submit_simulation.assert_called_once()
+                    submitted = snake.return_value.submit_simulation.call_args.args[0]
+                    self.assertEqual(submitted['training']['learning_rate'], 0.003)
+                    self.assertEqual(baseline['training']['learning_rate'], 0.0021)

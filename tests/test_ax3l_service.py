@@ -59,6 +59,7 @@ class Ax3lServiceTests(unittest.TestCase):
                         "patch('ax3l.interface.SnakeLab.SnakeLab.is_simulation_running', return_value=False).start(); "
                         "patch('ax3l.interface.SnakeLab.SnakeLab.get_num_sims', return_value=1).start(); "
                         "raise SystemExit(main())", "--port", "0",
+                        "--zmq-endpoint", "tcp://127.0.0.1:*",
                         "--llm-url", f"http://127.0.0.1:{llm.server_port}",
                         "--output", str(output / "haiku"),
                     ], stdout=console, stderr=console)

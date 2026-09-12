@@ -34,7 +34,7 @@ implementation proceeds in thin, working slices.
 ### MCP servers and tools
 
 - Provide capabilities behind Ax3l's API.
-- The SnakeLab MCP server is registered in llama-server's `mcp.json`; domain tools live in `ax3l/app/snakelab/tools`. `SubmitSingleValue` forwards proposals through shared `ZMQMsg` and `ZMQClient` classes. The Ax3l ZeroMQ listener and validation handler are the next slice.
+- The SnakeLab MCP server is registered in llama-server's `mcp.json`; domain tools live in `ax3l/app/snakelab/tools`. `SubmitSingleValue` forwards proposals through shared `ZMQMsg` and `ZMQClient` classes. Ax3l's `ZMQServer` dispatches them to the domain handler, which validates legality and full-configuration uniqueness before submission.
 - Tool implementations can be added or modified behind that boundary as a slice requires them.
 
 ### MariaDB
@@ -116,8 +116,9 @@ environment suffix. Port assignments are defined in `DLlama`, `DAx3l`, and
 from the dev machine at `http://<production-host>:27770`. Other HTTP endpoints
 bind to localhost.
 
-For this slice, Ax3l and reporting implement only `/health`; conversations,
-report queries, and workflow persistence are not implemented yet. Dev and QA use
+Ax3l serves HTTP health checks and ZeroMQ tool requests, while reporting reads
+the shared event log and simulation configurations. The first conversation is
+implemented; continuing the optimization workflow remains a later slice. Dev and QA use
 an explicitly labeled health-only LLM stub that provides no inference and requires
 no model or GPU. Production launches the real llama.cpp binary directly, using
 the executable path from `DLlama` and model path from `DLlama.MODEL_DIR` plus

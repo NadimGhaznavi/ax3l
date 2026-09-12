@@ -19,6 +19,14 @@ class SnakeLabDb:
         )
         return json.loads(rows[0]["config"]) if rows else None
 
+    def is_config_unique(self, config: dict) -> bool:
+        """Compare the full config across all runs, independent of JSON key order."""
+        rows = self._db.query(
+            "SELECT 1 FROM simulation_runs WHERE JSON_EQUALS(config, %s) LIMIT 1",
+            (json.dumps(config, allow_nan=False),),
+        )
+        return not rows
+
     def get_episode_losses(self, run_id: str) -> list[tuple[int, float | None]]:
         """Read losses in episode order, preserving episodes with no training loss."""
         rows = self._db.query(

@@ -1,8 +1,12 @@
 import argparse
+import os
 from importlib import import_module
 from threading import Thread
 
 from ax3l.interface.HealthServer import HealthServer
+from ax3l.constants.DAx3l import DAx3l
+from ax3l.server.ToolHandler import handle_tool
+from ax3l.zmq.ZMQServer import ZMQServer
 
 
 def main() -> int:
@@ -10,9 +14,10 @@ def main() -> int:
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--llm-url", help="Send the first iteration to this LLM server")
     parser.add_argument("--output", default="tmp/haiku")
+    parser.add_argument("--zmq-endpoint", default=os.environ.get("AX3L_ZMQ_ENDPOINT", DAx3l.ZMQ_ENDPOINT))
     args = parser.parse_args()
     mode = "first-iteration" if args.llm_url else "skeleton"
-    with HealthServer().make_server("ax3l-server", args.port, mode) as server:
+    with ZMQServer(args.zmq_endpoint, handle_tool), HealthServer().make_server("ax3l-server", args.port, mode) as server:
         if not args.llm_url:
             server.serve_forever()
             return 0

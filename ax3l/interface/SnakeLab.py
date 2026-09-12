@@ -51,6 +51,13 @@ class SnakeLab:
         finally:
             db.close()
 
+    def is_config_unique(self, config: dict) -> bool:
+        db = DbMgr(env_prefix="SNAKELAB_DB", initialize_event_tables=False)
+        try:
+            return SnakeLabDb(db).is_config_unique(config)
+        finally:
+            db.close()
+
     def get_episode_losses(self, run_id: str) -> list[tuple[int, float | None]]:
         UUID(run_id)
         db = DbMgr(env_prefix="SNAKELAB_DB", initialize_event_tables=False)

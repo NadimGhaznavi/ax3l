@@ -91,3 +91,21 @@ class SnakeLabDbTests(unittest.TestCase):
         self.assertEqual(count, 5)
         self.assertIsInstance(count, int)
         self.assertFalse(self.db._connection.open)
+
+    def test_full_configuration_uniqueness_uses_json_values_and_all_statuses(self):
+        import json
+        from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb
+        db = DbMgr(env_prefix='SNAKELAB_DB', initialize_event_tables=False)
+        self.addCleanup(db.close)
+        db.execute('CREATE TEMPORARY TABLE simulation_runs (config JSON NOT NULL, status VARCHAR(16))')
+        dal = SnakeLabDb(db)
+        candidate = {'seed': 1970, 'training': {'learning_rate': 0.003, 'batch_size': 24}}
+        self.assertTrue(dal.is_config_unique(candidate))
+        for state in ('queued', 'running', 'completed', 'failed', 'cancelled'):
+            with self.subTest(state=state):
+                db.execute('DELETE FROM simulation_runs')
+                db.execute('INSERT INTO simulation_runs VALUES (%s, %s)', (json.dumps(candidate), state))
+                reordered = {'training': {'batch_size': 24.0, 'learning_rate': 0.003}, 'seed': 1970.0}
+                self.assertFalse(dal.is_config_unique(reordered))
+                self.assertTrue(dal.is_config_unique({**candidate, 'seed': 1971}))
+                self.assertTrue(dal.is_config_unique({'seed': 1970, 'training': {'learning_rate': 0.004, 'batch_size': 24}}))

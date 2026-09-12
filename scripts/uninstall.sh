@@ -84,7 +84,7 @@ case "$2" in
     qa) suffix=-qa ;;
     prod) suffix= ;;
 esac
-for name in watchdog ax3l-server reporting-server llm-server; do
+for name in watchdog ax3l-server reporting-server qwen-server phi-server llm-server; do
     unit="$name$suffix.service"
     if [[ -f /etc/systemd/system/$unit ]]; then
         "${system_admin[@]}" systemctl disable --now "$unit"

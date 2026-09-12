@@ -4,7 +4,7 @@ set -euo pipefail
 
 usage() {
     cat <<'HELP'
-Usage: scripts/upgrade.sh -env dev|qa|prod
+Usage: scripts/upgrade.sh -env dev|qa|prod [-model qwen|phi]
 
 Updates application modules and systemd units from the current checkout,
 then starts all four services in dependency order. Services are stopped
@@ -21,7 +21,7 @@ if [[ $# == 1 && ( $1 == -h || $1 == --help ) ]]; then
     usage
     exit 0
 fi
-if [[ $# != 2 || $1 != -env ]]; then
+if [[ ( $# != 2 && $# != 4 ) || $1 != -env ]]; then
     usage >&2
     exit 2
 fi
@@ -31,5 +31,5 @@ case "$2" in
 esac
 
 checkout_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-"$checkout_dir/scripts/install-services.sh" -env "$2"
+"$checkout_dir/scripts/install-services.sh" "$@"
 printf 'Upgraded %s from %s.\n' "$2" "$checkout_dir"

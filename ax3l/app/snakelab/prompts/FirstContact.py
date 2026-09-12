@@ -2,7 +2,7 @@ from ax3l.app.Prompt import Prompt
 
 
 class FirstContact(Prompt):
-    def __init__(self, number: int):
+    def __init__(self):
 
         MSG = (
             "This experiment is an implementation of Patrick Loeber's Famous "

@@ -11,45 +11,54 @@ import traceback
 from uuid import uuid4
 
 from ax3l.app.DbMgr import DbMgr
+from ax3l.app.Prompt import Prompt
 from ax3l.app.ConfigurationLog import ConfigurationLog
 from ax3l.app.snakelab.GenerateDefaultConfig import GenerateDefaultConfig
 from ax3l.constants.DEventCategory import DEventCategory
 
 from ax3l.app.snakelab.prompts.GenerateHaiku import GenerateHaiku
+from ax3l.app.snakelab.prompts.FirstContact import FirstContact
+from ax3l.app.snakelab.prompts.FirstContactSingle import FirstContactSingle
+from ax3l.app.snakelab.prompts.GoldenConfig import GoldenConfig
 from ax3l.constants.DSnakeLab import DSnakeLab
 from ax3l.constants.DAx3l import DAx3l
 from ax3l.interface.LLM import LLM
 from ax3l.interface.SnakeLab import SnakeLab
 
 
-def run(llm: LLM, output: Path, db: DbMgr, count: int = DSnakeLab.HAIKU_COUNT) -> None:
+def run(llm: LLM, output: Path, db: DbMgr, count: int = DSnakeLab.HAIKU_COUNT,
+        *, prompts: list[Prompt] | None = None) -> None:
     process_id = str(uuid4())
     print(f"Conversation: {process_id}", flush=True)
     conversation_id = db.log(
         DEventCategory.Conversation.STARTED, DEventCategory.Conversation.CATEGORY, "INFO",
-        f"Haiku conversation started with {llm.url}."
+        f"Conversation started with {llm.url}."
         + (f" Output: {output.resolve()}" if DAx3l.RAW_LOGS_ENABLED else ""),
         process_id=process_id,
     )
-    outcome = "Completed requested haiku turns."
+    outcome = "Completed requested conversation."
     level = "INFO"
     try:
         turn = 0
         while count == 0 or turn < count:
             turn += 1
-            prompt = GenerateHaiku(random.randint(0, 30))
+            snippets = prompts if prompts is not None else [GenerateHaiku(random.randint(0, 30))]
+            # Serialize once: the log and request must use the same snapshots.
+            messages = [json.loads(prompt.to_json()) for prompt in snippets]
             prefix = output / f"{turn:04d}"
             payload = json.dumps({
-                "messages": [json.loads(prompt.to_json())],
+                "messages": messages,
                 "stream": False,
             }, ensure_ascii=False).encode("utf-8")
             if DAx3l.RAW_LOGS_ENABLED:
                 prefix.with_suffix(".request.json").write_bytes(payload)
             print(f"{datetime.now(timezone.utc).isoformat()} Request {turn}: {llm.url}", flush=True)
-            prompt_id = db.log(
-                DEventCategory.Conversation.PROMPT, DEventCategory.Conversation.CATEGORY, "INFO", prompt.to_md(),
-                process_id=process_id, parent_event_id=conversation_id,
-            )
+            for message in messages:
+                prompt_id = db.log(
+                    DEventCategory.Conversation.PROMPT, DEventCategory.Conversation.CATEGORY,
+                    "INFO", json.dumps(message, ensure_ascii=False),
+                    process_id=process_id, parent_event_id=conversation_id,
+                )
             try:
                 status, headers, body = llm.complete(payload)
             except Exception as error:
@@ -137,15 +146,25 @@ def initialize_simulation(db: DbMgr) -> None:
             return
 
 
+def run_first_iteration(llm: LLM, output: Path, db: DbMgr) -> None:
+    # Import the renderer only for the image workflow.
+    from ax3l.app.snakelab.prompts.LossPlot import LossPlot
+
+    snake = SnakeLab()
+    while snake.is_simulation_running():
+        time.sleep(DSnakeLab.STATUS_POLL_SECONDS)
+    first_contact = FirstContact()
+    golden = GoldenConfig(db)
+    loss_plot = LossPlot(golden.run_id)
+    parameter = FirstContactSingle("learning_rate")
+    run(llm, output, db, count=1, prompts=[first_contact, golden, loss_plot, parameter])
+
+
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Ask the active LLM for haikus with a configured wait between requests.")
+    parser = argparse.ArgumentParser(description="Seed Snake Lab, wait for idle, and send the first learning-rate conversation.")
     parser.add_argument("--url", required=True, help="LLM server base URL, e.g. http://host:27770")
     parser.add_argument("--output", type=Path, default=Path("tmp/haiku"))
-    parser.add_argument("--count", type=int, default=DSnakeLab.HAIKU_COUNT,
-                        help="Override DSnakeLab.HAIKU_COUNT; 0 repeats until stopped")
     args = parser.parse_args(argv)
-    if args.count < 0:
-        parser.error("--count must be zero or positive")
     output = args.output
     with ExitStack() as captures:
         if DAx3l.RAW_LOGS_ENABLED:
@@ -159,7 +178,7 @@ def main(argv: list[str] | None = None) -> int:
             db = DbMgr()
             try:
                 initialize_simulation(db)
-                run(LLM(args.url), output, db, args.count)
+                run_first_iteration(LLM(args.url), output, db)
             finally:
                 db.close()
         except KeyboardInterrupt:

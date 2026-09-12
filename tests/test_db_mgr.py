@@ -139,7 +139,7 @@ class DbMgrTests(unittest.TestCase):
             "wait_started", "wait_ended", "prompt_sent", "reply_received",
             "conversation_ended",
         ])
-        self.assertEqual(rows[1]["content"], "Write a haiku based on the number 17.")
+        self.assertEqual(__import__("json").loads(rows[1]["content"]), {"role": "user", "content": "Write a haiku based on the number 17."})
         self.assertEqual(rows[2]["content"], body.decode())
         self.assertEqual(rows[2]["parent_event_id"], rows[1]["event_id"])
         self.assertEqual(rows[6]["parent_event_id"], rows[5]["event_id"])

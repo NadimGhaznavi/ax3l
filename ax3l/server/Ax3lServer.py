@@ -6,12 +6,12 @@ from ax3l.interface.HealthServer import HealthServer
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run Ax3l and its haiku process.")
+    parser = argparse.ArgumentParser(description="Run Ax3l and its first simulation conversation.")
     parser.add_argument("--port", type=int, required=True)
-    parser.add_argument("--llm-url", help="Start the haiku loop against this LLM server")
+    parser.add_argument("--llm-url", help="Send the first iteration to this LLM server")
     parser.add_argument("--output", default="tmp/haiku")
     args = parser.parse_args()
-    mode = "haiku" if args.llm_url else "skeleton"
+    mode = "first-iteration" if args.llm_url else "skeleton"
     with HealthServer().make_server("ax3l-server", args.port, mode) as server:
         if not args.llm_url:
             server.serve_forever()

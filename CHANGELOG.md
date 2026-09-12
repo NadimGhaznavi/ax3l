@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- The active first iteration seeds an empty Snake Lab database, waits for idle, and sends FirstContact, GoldenConfig, LossPlot, and the learning-rate introduction in one request. Each exact message snapshot is logged as a conversation-linked prompt event; the reply ends the iteration.
+
 - Reduced loss plot PNGs to 750×450 pixels, configured through `DLossPlot.WIDTH`, `HEIGHT`, and `SCALE`.
 
 - Added `LossPlot`, a dynamic PNG prompt reading per-episode losses from Snake Lab through the DAL. It embeds the PNG in the LLM message and uses `GoldenConfig.run_id` to keep both snippets tied to the same simulation.

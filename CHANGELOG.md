@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-09-12 @ 04:25
+
+### Added
+
+- Added `--metrics` switch to `llama-server` to enable it
+
 ## [0.2.1] - 2026-09-12 @ 03:28
 
 ### Fixed

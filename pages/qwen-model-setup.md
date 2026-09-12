@@ -1,5 +1,5 @@
 ---
-title: Model Setup
+title: Qwen Model Setup
 author_profile: true
 layout: single
 ---

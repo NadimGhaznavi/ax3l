@@ -5,7 +5,11 @@ from typing import Any
 
 
 def reply_content(response: dict[str, Any]) -> str:
-    return response["choices"][0]["message"]["content"]
+    message = response["choices"][0]["message"]
+    text = message.get("content") or ""
+    calls = [f"{call['function']['name']}({call['function']['arguments']})"
+             for call in message.get("tool_calls", [])]
+    return "\n".join(([text] if text else []) + calls)
 
 
 def fields(value: Any, path: str = "") -> list[tuple[str, str]]:

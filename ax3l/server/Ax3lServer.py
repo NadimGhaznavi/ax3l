@@ -10,14 +10,14 @@ from ax3l.zmq.ZMQServer import ZMQServer
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run Ax3l and its first simulation conversation.")
+    parser = argparse.ArgumentParser(description="Run Ax3l and its learning-rate optimization loop.")
     parser.add_argument("--port", type=int, required=True)
-    parser.add_argument("--llm-url", help="Send the first iteration to this LLM server")
+    parser.add_argument("--llm-url", help="Use this LLM server for optimization")
     parser.add_argument("--output", default="tmp/haiku")
     parser.add_argument("--zmq-endpoint", default=os.environ.get("AX3L_ZMQ_ENDPOINT", DAx3l.ZMQ_ENDPOINT))
     args = parser.parse_args()
-    mode = "first-iteration" if args.llm_url else "skeleton"
-    with ZMQServer(args.zmq_endpoint, handle_tool), HealthServer().make_server("ax3l-server", args.port, mode) as server:
+    mode = "optimization" if args.llm_url else "skeleton"
+    with ZMQServer(args.zmq_endpoint, handle_tool) as tool_server, HealthServer().make_server("ax3l-server", args.port, mode) as server:
         if not args.llm_url:
             server.serve_forever()
             return 0
@@ -25,7 +25,7 @@ def main() -> int:
         worker.start()
         try:
             loop = import_module("ax3l.app.snakelab.main-loop")
-            return loop.main(["--url", args.llm_url, "--output", args.output])
+            return loop.main(["--url", args.llm_url, "--output", args.output, "--zmq-endpoint", tool_server.endpoint])
         finally:
             server.shutdown()
             worker.join()

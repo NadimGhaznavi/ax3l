@@ -24,7 +24,7 @@ class HaikuLoopTests(unittest.TestCase):
                 db = Mock()
                 llm = Mock(url="http://example/v1/chat/completions")
                 llm.complete.return_value = (200, "Content-Type: application/json", b'{"choices":[]}')
-                with patch.object(DAx3l, "RAW_LOGS_ENABLED", enabled), patch.dict(main.__globals__, {"DbMgr": lambda: db, "LLM": lambda url: llm, "run_first_iteration": lambda llm, output, db: RUN(llm, output, db, count=1)}), patch("ax3l.interface.SnakeLab.SnakeLab.get_num_sims", return_value=1), patch("sys.stdout", new_callable=io.StringIO):
+                with patch.object(DAx3l, "RAW_LOGS_ENABLED", enabled), patch.dict(main.__globals__, {"DbMgr": lambda: db, "LLM": lambda url: llm, "run_optimization": lambda llm, output, db, endpoint: RUN(llm, output, db, count=1)}), patch("ax3l.interface.SnakeLab.SnakeLab.get_num_sims", return_value=1), patch("sys.stdout", new_callable=io.StringIO):
                     self.assertEqual(main(["--url", "http://example", "--output", str(output)]), 0)
                 self.assertEqual([call.args[0] for call in db.log.call_args_list], [
                     "conversation_started", "prompt_sent", "reply_received", "conversation_ended",

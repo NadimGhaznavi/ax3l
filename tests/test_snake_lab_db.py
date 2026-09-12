@@ -109,3 +109,23 @@ class SnakeLabDbTests(unittest.TestCase):
                 self.assertFalse(dal.is_config_unique(reordered))
                 self.assertTrue(dal.is_config_unique({**candidate, 'seed': 1971}))
                 self.assertTrue(dal.is_config_unique({'seed': 1970, 'training': {'learning_rate': 0.004, 'batch_size': 24}}))
+
+    def test_comparison_reads_all_runs_in_numeric_learning_rate_order(self):
+        import json
+        from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb
+        db = DbMgr(env_prefix='SNAKELAB_DB', initialize_event_tables=False)
+        self.addCleanup(db.close)
+        db.execute('''CREATE TEMPORARY TABLE simulation_runs (
+            id INT AUTO_INCREMENT PRIMARY KEY, run_id CHAR(36), config JSON,
+            status VARCHAR(16), high_score INT NULL)''')
+        ids = [str(uuid4()) for _ in range(3)]
+        for run_id, lr, score, status in zip(ids, (.01, .002, .001), (12, 9, None), ('completed', 'completed', 'failed')):
+            db.execute('INSERT INTO simulation_runs (run_id, config, status, high_score) VALUES (%s,%s,%s,%s)',
+                       (run_id, json.dumps({'training': {'learning_rate': lr}}), status, score))
+        dal = SnakeLabDb(db)
+        history = dal.get_learning_rate_history()
+        self.assertEqual([row['run_id'] for row in history], list(reversed(ids)))
+        self.assertEqual([row['learning_rate'] for row in history], [.001, .002, .01])
+        self.assertIsNone(history[0]['high_score'])
+        self.assertEqual(dal.get_run_result(ids[0])['config']['training']['learning_rate'], .01)
+        self.assertIsNone(dal.get_run_result(str(uuid4())))

@@ -54,9 +54,11 @@ class Ax3lServiceTests(unittest.TestCase):
                         "from ax3l.app.Prompt import Prompt; "
                         "golden = Prompt('Golden configuration'); "
                         "golden.run_id = 'f6e72cb3-9bcf-4669-b368-a17c656bad79'; "
-                        "patch.object(import_module('ax3l.app.snakelab.main-loop'), 'GoldenConfig', return_value=golden).start(); "
-                        "patch('ax3l.app.snakelab.prompts.LossPlot.LossPlot', return_value=Prompt('Loss fixture')).start(); "
+                        "patch.object(import_module('ax3l.app.snakelab.LearningRateLoop'), 'GoldenConfig', return_value=golden).start(); "
+                        "patch('ax3l.app.snakelab.LearningRateLoop.LossPlot', return_value=Prompt('Loss fixture')).start(); "
                         "patch('ax3l.interface.SnakeLab.SnakeLab.is_simulation_running', return_value=False).start(); "
+                        "patch('ax3l.app.EventLogDb.EventLogDb.latest_snakelab_proposal', return_value=None).start(); "
+                        "patch('ax3l.interface.SnakeLab.SnakeLab.get_run_result', return_value={'status': 'completed', 'high_score': 10}).start(); "
                         "patch('ax3l.interface.SnakeLab.SnakeLab.get_num_sims', return_value=1).start(); "
                         "raise SystemExit(main())", "--port", "0",
                         "--zmq-endpoint", "tcp://127.0.0.1:*",
@@ -80,7 +82,7 @@ class Ax3lServiceTests(unittest.TestCase):
                         console.seek(0)
                         port = re.search(r"listening on 127.0.0.1:(\d+)", console.read()).group(1)
                         with urlopen(f"http://127.0.0.1:{port}/health", timeout=3) as response:
-                            self.assertEqual(json.load(response)["mode"], "first-iteration")
+                            self.assertEqual(json.load(response)["mode"], "optimization")
                         process.send_signal(signal.SIGINT)
                         self.assertEqual(process.wait(timeout=5), 130)
                         rows = db.query("SELECT name, log_level FROM events WHERE process_id = %s ORDER BY event_id", (process_id,))

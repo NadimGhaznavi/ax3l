@@ -1,6 +1,7 @@
 """Run from the checkout: python3 -m ax3l.app.snakelab.main-loop --url URL."""
 
 import argparse
+import os
 from contextlib import ExitStack, redirect_stderr, redirect_stdout
 from datetime import datetime, timezone
 import json
@@ -10,6 +11,7 @@ import time
 import traceback
 from uuid import uuid4
 
+from ax3l.app.snakelab.LearningRateLoop import run_optimization
 from ax3l.app.DbMgr import DbMgr
 from ax3l.app.Prompt import Prompt
 from ax3l.app.ConfigurationLog import ConfigurationLog
@@ -161,9 +163,10 @@ def run_first_iteration(llm: LLM, output: Path, db: DbMgr) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Seed Snake Lab, wait for idle, and send the first learning-rate conversation.")
+    parser = argparse.ArgumentParser(description="Run the Snake Lab learning-rate optimization loop.")
     parser.add_argument("--url", required=True, help="LLM server base URL, e.g. http://host:27770")
     parser.add_argument("--output", type=Path, default=Path("tmp/haiku"))
+    parser.add_argument("--zmq-endpoint", default=os.environ.get("AX3L_ZMQ_ENDPOINT", DAx3l.ZMQ_ENDPOINT))
     args = parser.parse_args(argv)
     output = args.output
     with ExitStack() as captures:
@@ -178,7 +181,7 @@ def main(argv: list[str] | None = None) -> int:
             db = DbMgr()
             try:
                 initialize_simulation(db)
-                run_first_iteration(LLM(args.url), output, db)
+                run_optimization(LLM(args.url), output, db, args.zmq_endpoint)
             finally:
                 db.close()
         except KeyboardInterrupt:

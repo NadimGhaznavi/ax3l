@@ -27,6 +27,28 @@ class SnakeLabDb:
         )
         return not rows
 
+    def get_run_result(self, run_id: str) -> dict | None:
+        rows = self._db.query(
+            "SELECT run_id, status, high_score, config FROM simulation_runs WHERE run_id = %s",
+            (run_id,),
+        )
+        if not rows:
+            return None
+        result = rows[0]
+        result["config"] = json.loads(result["config"])
+        return result
+
+    def get_learning_rate_history(self) -> list[dict]:
+        rows = self._db.query("""
+            SELECT run_id, status, high_score,
+                   JSON_EXTRACT(config, '$.training.learning_rate') AS learning_rate
+            FROM simulation_runs
+            ORDER BY JSON_EXTRACT(config, '$.training.learning_rate') + 0, id
+        """)
+        for row in rows:
+            row["learning_rate"] = json.loads(row["learning_rate"])
+        return rows
+
     def get_episode_losses(self, run_id: str) -> list[tuple[int, float | None]]:
         """Read losses in episode order, preserving episodes with no training loss."""
         rows = self._db.query(

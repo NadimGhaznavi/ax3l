@@ -155,6 +155,20 @@ class DbMgrTests(unittest.TestCase):
                 self.db.execute("INSERT INTO event_key_values VALUES (%s, %s, %s)", (event_id, "model", "duplicate"))
         self.assertEqual(self.db.query("SELECT * FROM events WHERE process_id = %s", (self.process_id,)), [])
 
+    def test_latest_proposal_recovers_pending_run_and_comparison(self):
+        import json
+        from ax3l.app.EventLogDb import EventLogDb
+        self.db.log('proposal_accepted', 'Configuration', 'INFO', 'learning_rate: .003', process_id=self.process_id)
+        dal = EventLogDb(self.db)
+        self.assertEqual(dal.latest_snakelab_proposal(), {
+            'process_id': self.process_id, 'comparison_id': None, 'comparison': None})
+        snapshot = json.dumps({'golden_run_id': 'gold', 'latest_run_id': self.process_id,
+                               'current_golden_run_id': self.process_id, 'reason': 'High score: 11 > 10'})
+        event_id = self.db.log('configuration_compared', 'Configuration', 'INFO', snapshot, process_id=self.process_id)
+        self.db.log('proposal_accepted', 'Other', 'INFO', 'unrelated', process_id=self.process_id)
+        self.assertEqual(dal.latest_snakelab_proposal(), {
+            'process_id': self.process_id, 'comparison_id': event_id, 'comparison': snapshot})
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -39,3 +39,19 @@ class EventLogDb:
             LIMIT 1
         """, (category.CATEGORY, category.GOLDEN_CREATED))
         return rows[0] if rows else None
+
+    def latest_snakelab_proposal(self) -> dict[str, Any] | None:
+        """Recover the latest accepted run and its recorded comparison, if any."""
+        category = DEventCategory.Configuration
+        rows = self._db.query("""
+            SELECT p.process_id, c.event_id AS comparison_id, m.content AS comparison
+            FROM events p
+            LEFT JOIN events c ON c.event_id = (
+                SELECT MAX(event_id) FROM events
+                WHERE process_id = p.process_id AND category = %s AND name = %s
+            )
+            LEFT JOIN event_messages m ON m.event_id = c.event_id
+            WHERE p.category = %s AND p.name = %s
+            ORDER BY p.event_id DESC LIMIT 1
+        """, (category.CATEGORY, category.COMPARED, category.CATEGORY, category.PROPOSAL_ACCEPTED))
+        return rows[0] if rows else None

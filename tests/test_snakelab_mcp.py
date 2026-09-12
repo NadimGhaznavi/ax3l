@@ -101,3 +101,28 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
                     submitted = snake.return_value.submit_simulation.call_args.args[0]
                     self.assertEqual(submitted['training']['learning_rate'], 0.003)
                     self.assertEqual(baseline['training']['learning_rate'], 0.0021)
+
+    async def test_conversation_dispatches_discovered_tool_through_mcp_and_zmq(self):
+        from unittest.mock import Mock
+        from ax3l.app.Prompt import Prompt
+        from ax3l.app.snakelab.ToolConversation import converse
+        from ax3l.interface.SnakeLabTools import SnakeLabTools
+        from ax3l.zmq.ZMQServer import ZMQServer
+        requests = []
+        run_id = 'f6e72cb3-9bcf-4669-b368-a17c656bad79'
+        def handle(message):
+            requests.append(message.payload)
+            return {'status': 'ok', 'run_id': run_id}
+        llm = Mock(url='fixture')
+        llm.complete.return_value = (200, '', json.dumps({'choices': [{'message': {
+            'role': 'assistant', 'content': None, 'tool_calls': [{
+                'type': 'function', 'id': 'call-1', 'function': {
+                    'name': 'submit_single_value',
+                    'arguments': '{"parameter":"learning_rate","value":0.003}'}}]}}]}).encode())
+        with ZMQServer('tcp://127.0.0.1:*', handle) as server:
+            async with SnakeLabTools(server.endpoint) as tools:
+                self.assertEqual(tools.definition['function']['parameters']['properties']['parameter']['const'], 'learning_rate')
+                self.assertEqual(await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('Choose LR')]), run_id)
+        self.assertEqual(requests, [{'parameter': 'learning_rate', 'value': .003}])
+        payload = json.loads(llm.complete.call_args.args[0])
+        self.assertEqual(payload['tools'][0]['function']['name'], 'submit_single_value')

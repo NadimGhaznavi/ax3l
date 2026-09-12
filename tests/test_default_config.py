@@ -34,7 +34,7 @@ class DefaultConfigTests(unittest.TestCase):
                 snake.get_simulation_status.side_effect = ["queued", "running", "running", "completed"]
                 run = Mock()
                 with patch.dict(main.__globals__, {
-                    "DbMgr": lambda: db, "SnakeLab": lambda: snake, "run_first_iteration": run,
+                    "DbMgr": lambda: db, "SnakeLab": lambda: snake, "run_optimization": run,
                 }), patch("time.sleep") as sleep, patch("sys.stdout", new_callable=io.StringIO):
                     self.assertEqual(main(["--url", "http://example"]), 0)
                 snake.get_num_sims.assert_called_once_with()
@@ -113,7 +113,7 @@ class DefaultConfigTests(unittest.TestCase):
         snake.get_num_sims.side_effect = RuntimeError("Database unavailable")
         with patch.dict(main.__globals__, {
             "DbMgr": lambda: db, "SnakeLab": lambda: snake,
-            "run_first_iteration": run, "GenerateDefaultConfig": generator,
+            "run_optimization": run, "GenerateDefaultConfig": generator,
         }), patch("sys.stderr", new_callable=io.StringIO):
             self.assertEqual(main(["--url", "http://example"]), 1)
         generator.assert_not_called()

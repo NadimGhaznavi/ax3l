@@ -96,11 +96,10 @@ The existing haiku loop does not yet assemble these snippets.
 
 `SnakeLab().get_num_sims()` returns the number of rows in Snake Lab's
 `simulation_runs` table, across all statuses and including repeated configurations.
-Set `SNAKELAB_DB_HOST`, `SNAKELAB_DB_USER`, `SNAKELAB_DB_PASSWORD`, and
-`SNAKELAB_DB_NAME` in the calling process's environment. `SNAKELAB_DB_PORT`
-defaults to 3306. These credentials are separate from AX3L's `DB_*` settings;
-the account needs SELECT access to `simulation_runs` and `simulation_episodes`. Each call opens and
-closes its connection without initializing tables. Database errors propagate.
+Reads use Ax3l's existing `DB_*` credentials and select the `snakelab` database.
+Installation grants the Ax3l database user `SELECT` on `snakelab`.*. No separate
+SnakeLab credentials are needed. Each call opens and closes its connection without
+initializing tables. Simulation submissions still go through SnakeLab's ZMQ API.
 
 At startup, `main-loop.py` checks the simulation count. If it is zero, it
 submits the JSON spec's default configuration once and records the submission

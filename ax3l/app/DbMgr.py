@@ -12,13 +12,13 @@ from ax3l.constants.DDbMgr import DDbMgr
 
 
 class DbMgr:
-    def __init__(self, *, env_prefix: str = "DB", initialize_event_tables: bool = True):
+    def __init__(self, *, database: str | None = None, initialize_event_tables: bool = True):
         self._connection = pymysql.connect(
-            host=os.environ[f"{env_prefix}_HOST"],
-            port=int(os.environ.get(f"{env_prefix}_PORT", DDbMgr.PORT)),
-            user=os.environ[f"{env_prefix}_USER"],
-            password=os.environ[f"{env_prefix}_PASSWORD"],
-            database=os.environ[f"{env_prefix}_NAME"],
+            host=os.environ["DB_HOST"],
+            port=int(os.environ.get("DB_PORT", DDbMgr.PORT)),
+            user=os.environ["DB_USER"],
+            password=os.environ["DB_PASSWORD"],
+            database=database if database is not None else os.environ["DB_NAME"],
             charset="utf8mb4",
             cursorclass=DictCursor,
             autocommit=True,

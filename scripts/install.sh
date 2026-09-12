@@ -135,6 +135,7 @@ fi
 CREATE DATABASE IF NOT EXISTS \`$DB_NAME\`;
 CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASSWORD';
 GRANT ALL PRIVILEGES ON \`$grant_database\`.* TO '$DB_USER'@'localhost';
+GRANT SELECT ON \`snakelab\`.* TO '$DB_USER'@'localhost';
 SQL
 
 MYSQL_PWD="$DB_PASSWORD" mariadb --no-defaults --protocol=socket \

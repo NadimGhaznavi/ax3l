@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.98.3] - 2026-09-12 @ 14:39
+
+- Grant Ax3l’s database user read-only (`SELECT`) access to `snakelab` during installation and reuse its `DB_*` credentials for simulation reads. Removed the separate `snakelab.env` requirement.
+
+- Give the model service group access to the configuration directory and MCP registration on install/upgrade, fixing the root-only directory created during provisioning. Database credential file permissions are preserved.
+
+- Load external SnakeLab database settings from `snakelab.env` beside Ax3l’s `database.env`. Production upgrades validate the required settings before stopping services; the existing Ax3l credentials file remains unchanged.
+
 ## [0.98.2] - 2026-09-12 @ 14:23
 
 - Run `ax3l-server` as root to address the reported permission denial executing its installed virtual-environment Python.

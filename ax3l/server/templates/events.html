@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ax3l Event Log</title>
+  <style>
+    body { margin: 2rem; background: #f7f8fa; color: #202630; font-family: system-ui, sans-serif; }
+    header { display: flex; align-items: center; gap: 2rem; }
+    h1 { font-size: 1.5rem; }
+    button { padding: .5rem 1rem; cursor: pointer; }
+    .note { color: #505b69; }
+    .entry { padding: .75rem 0; border-bottom: 1px solid #ccd2da; font-family: monospace; }
+    .metadata { color: #505b69; overflow-wrap: anywhere; }
+    .content { margin: .3rem 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Ax3l Event Log</h1>
+    <form action="/" method="get"><button type="submit">Refresh</button></form>
+  </header>
+  <p class="note">Latest {{ events | length }} entries (up to 500), oldest first.</p>
+  <main>
+    {% for event in events %}
+    <article class="entry">
+      <div class="metadata">{{ event.occurred_at }} · #{{ event.event_id }} · {{ event.log_level }} · {{ event.category }} · {{ event.name }}</div>
+      <pre class="content">{{ event.content if event.content is not none else '' }}</pre>
+    </article>
+    {% else %}
+    <p>No events logged yet.</p>
+    {% endfor %}
+  </main>
+</body>
+</html>

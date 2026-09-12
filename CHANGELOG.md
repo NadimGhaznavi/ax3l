@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Reporting
+
+- Added a Jinja2 event-log page at `/` with chronological log lines and a Refresh button, showing the latest 500 events. `/health` remains available. Deployment includes the HTML template; the Python environment needs `Jinja2` from `requirements.txt`.
+
+To run the DEV reporting page from the checkout:
+
+```bash
+set -a
+. prod_etc/ax3l/database.env
+set +a
+python3 -m ax3l.server.ReportingServer --port 28868
+```
+
+Open `http://127.0.0.1:28868/` on that machine. Use `--host 0.0.0.0` to listen
+on the network for access from another machine.
+
 ### Added
 
 - Integrated `DbMgr.log()` into the haiku loop for linked conversation, prompt, full response, wait, and failure events. Load `DB_*` credentials before running; file capture remains available.

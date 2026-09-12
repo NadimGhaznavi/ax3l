@@ -74,6 +74,10 @@ class ModelServicesTests(unittest.TestCase):
                     units.append(str(unit))
                 result = subprocess.run(['systemd-analyze', 'verify', *units], capture_output=True, text=True)
                 self.assertEqual(result.returncode, 0, result.stderr)
+                app_unit = (Path(folder) / f'ax3l-server{suffix}.service').read_text()
+                self.assertIn(f'RuntimeDirectory=ax3l{suffix}', app_unit)
+                self.assertIn(f'Environment=XDG_CONFIG_HOME=/run/ax3l{suffix}/chrome-config', app_unit)
+                self.assertIn(f'Environment=XDG_CACHE_HOME=/run/ax3l{suffix}/chrome-cache', app_unit)
                 for model in ('qwen', 'phi', 'qwenv'):
                     content = (Path(folder) / f'{model}-server{suffix}.service').read_text()
                     self.assertNotIn('Conflicts=', content)

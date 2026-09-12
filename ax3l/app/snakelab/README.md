@@ -8,6 +8,23 @@ defaults to 3306. These credentials are separate from AX3L's `DB_*` settings;
 the account only needs SELECT access to `simulation_runs`. Each call opens and
 closes its connection without initializing tables. Database errors propagate.
 
+At startup, `main-loop.py` checks that count. When it is zero,
+`GenerateDefaultConfig` builds a complete configuration from the adjacent JSON
+spec's defaults and validates it against that spec. AX3L submits it once and
+logs `simulation_submitted` with the returned run ID as `process_id`. The log's
+“config” link opens `/simulations/<run_id>/config`, which reads the configuration
+from Snake Lab through the DAL on each request. AX3L stores no configuration copy.
+The reporting process also needs the `SNAKELAB_DB_*` environment variables.
+
+The loop polls `simulation.status` for that run every five seconds, controlled by
+`DSnakeLab.STATUS_POLL_SECONDS`, and logs `simulation_started` when it observes
+`running`. It continues sleeping and polling until the run is completed, failed,
+or cancelled, then logs that outcome and closes the simulation cycle. The start
+entry is logged only once, including across pause/resume transitions. If a
+terminal state arrives before running is observed, it logs that outcome instead.
+After the cycle closes, the existing haiku loop continues. Submission and status errors stop
+startup; submissions are never retried automatically.
+
 Raw file capture is off by default. Set `DAx3l.RAW_LOGS_ENABLED = True` in
 `ax3l/constants/DAx3l.py` to enable the capture files described below.
 When off, no haiku output directory or files are created, including under

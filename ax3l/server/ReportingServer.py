@@ -31,6 +31,21 @@ def make_server(host: str, port: int) -> HTTPServer:
             if self.path == "/health":
                 body = b'{"status":"ok","service":"reporting-server","mode":"events"}'
                 content_type = "application/json"
+            elif re.fullmatch(r"/simulations/[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}/config", self.path):
+                run_id = self.path.split("/")[2]
+                try:
+                    config = SnakeLab().get_config(run_id)
+                    if config is None:
+                        self.send_error(404, "Simulation not found")
+                        return
+                    body = templates.get_template("config.html").render(
+                        run_id=run_id, rows=fields(config),
+                    ).encode("utf-8")
+                    content_type = "text/html; charset=utf-8"
+                except Exception:
+                    traceback.print_exc()
+                    self.send_error(500, "Unable to load simulation config")
+                    return
             elif self.path == "/" or re.fullmatch(r"/events/[0-9]{1,20}", self.path):
                 try:
                     db = DbMgr()

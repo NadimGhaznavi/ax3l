@@ -43,7 +43,11 @@ class Ax3lServiceTests(unittest.TestCase):
                 output = Path(folder)
                 with (output / "service.log").open("w+") as console:
                     process = subprocess.Popen([
-                        sys.executable, "-m", "ax3l.server.Ax3lServer", "--port", "0",
+                        sys.executable, "-c",
+                        "from unittest.mock import patch; "
+                        "from ax3l.server.Ax3lServer import main; "
+                        "patch('ax3l.interface.SnakeLab.SnakeLab.get_num_sims', return_value=1).start(); "
+                        "raise SystemExit(main())", "--port", "0",
                         "--llm-url", f"http://127.0.0.1:{llm.server_port}",
                         "--output", str(output / "haiku"),
                     ], stdout=console, stderr=console)

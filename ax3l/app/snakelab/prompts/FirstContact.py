@@ -1,7 +1,7 @@
 from ax3l.app.Prompt import Prompt
 
 
-class Introduction(Prompt):
+class FirstContact(Prompt):
     def __init__(self, number: int):
 
         MSG = (

@@ -11,12 +11,14 @@ import traceback
 from uuid import uuid4
 
 from ax3l.app.DbMgr import DbMgr
+from ax3l.app.snakelab.GenerateDefaultConfig import GenerateDefaultConfig
 from ax3l.constants.DConversation import DConversation
 
 from ax3l.app.snakelab.prompts.GenerateHaiku import GenerateHaiku
 from ax3l.constants.DSnakeLab import DSnakeLab
 from ax3l.constants.DAx3l import DAx3l
 from ax3l.interface.LLM import LLM
+from ax3l.interface.SnakeLab import SnakeLab
 
 
 def run(llm: LLM, output: Path, db: DbMgr, count: int = DSnakeLab.HAIKU_COUNT) -> None:
@@ -101,6 +103,36 @@ def run(llm: LLM, output: Path, db: DbMgr, count: int = DSnakeLab.HAIKU_COUNT) -
         )
 
 
+def initialize_simulation(db: DbMgr) -> None:
+    """Submit the first simulation and wait for its cycle to finish."""
+    snake = SnakeLab()
+    if snake.get_num_sims() != 0:
+        return
+    run_id = snake.submit_simulation(GenerateDefaultConfig().run())
+    submitted_id = db.log(
+        "simulation_submitted", "SnakeLab", "INFO", "Submitted config.",
+        process_id=run_id,
+    )
+    started = False
+    while True:
+        time.sleep(DSnakeLab.STATUS_POLL_SECONDS)
+        state = snake.get_simulation_status(run_id)
+        if state == "running" and not started:
+            db.log(
+                "simulation_started", "SnakeLab", "INFO", "Simulation started running.",
+                process_id=run_id, parent_event_id=submitted_id,
+            )
+            started = True
+        if state in ("completed", "failed", "cancelled"):
+            db.log(
+                f"simulation_{state}", "SnakeLab", "ERROR" if state == "failed" else "INFO",
+                f"Simulation {state}." if started else
+                f"Simulation {state} before running status was observed.",
+                process_id=run_id, parent_event_id=submitted_id,
+            )
+            return
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Ask the active LLM for haikus with a configured wait between requests.")
     parser.add_argument("--url", required=True, help="LLM server base URL, e.g. http://host:27770")
@@ -122,6 +154,7 @@ def main(argv: list[str] | None = None) -> int:
         try:
             db = DbMgr()
             try:
+                initialize_simulation(db)
                 run(LLM(args.url), output, db, args.count)
             finally:
                 db.close()

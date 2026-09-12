@@ -49,7 +49,7 @@ class SimulationControlTests(unittest.TestCase):
             db = factory.return_value
             db.query.return_value = [{"config": '{"seed":1970}'}]
             self.assertEqual(SnakeLab().get_config(RUN_ID), {"seed": 1970})
-            factory.assert_called_once_with(env_prefix="SNAKELAB_DB", initialize_event_tables=False)
+            factory.assert_called_once_with(database="snakelab", initialize_event_tables=False)
             db.query.assert_called_once_with(
                 "SELECT config FROM simulation_runs WHERE run_id = %s", (RUN_ID,),
             )

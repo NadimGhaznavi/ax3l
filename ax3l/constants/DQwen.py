@@ -1,0 +1,5 @@
+from typing import Final
+
+class DQwen:
+    BASE_DIR: Final[str] = "/opt/prod/models"
+    GGUF: Final[str] = "Qwen3.5-4B-Q4_K_M.gguf"

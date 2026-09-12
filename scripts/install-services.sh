@@ -64,7 +64,7 @@ PY
         printf 'Install llama.cpp at %s and the model at %s first.\n' "$llm_binary" "$model" >&2
         exit 1
     }
-    llm_command="$llm_binary --model $model --host $llm_host --port $llm_port"
+    llm_command="$llm_binary --model $model --host $llm_host --port $llm_port --metrics"
 fi
 
 [[ -d $install_dir && -f $config_dir/database.env ]] || {

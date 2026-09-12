@@ -10,6 +10,8 @@ layout: single
 
 The current phase involves setting up the environment.
 
+---
+
 # Components
 
 - The `llama-server`
@@ -17,6 +19,8 @@ The current phase involves setting up the environment.
 - The Ax3l agent service
 - An Ax3l report service
 - MariaDB for data persistence
+
+---
 
 # Development Style
 
@@ -31,10 +35,18 @@ The current phase involves setting up the environment.
 - No defensive code for hypothetical failures. Add handling when an observed problem or current requirement calls for it.
 - Keep the code lean, clear, and easy to follow.
 
+---
+
 # Links
 
 - [Architecture](/pages/architecture)
 - [Scripts](/pages/scripts)
 - [OS Setup](/pages/os-setup)
 - [Driver Setup](pages/driver-setup)
-- [Model Setup](pages/model-setup)
+
+---
+
+## Models
+
+- [Qwen Model Setup](pages/qwen-model-setup)
+- [Phi Model Setup](/pages/phi-model-setup)

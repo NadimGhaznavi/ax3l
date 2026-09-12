@@ -25,7 +25,7 @@ as root without it. MariaDB must already be running for database setup/removal.
 Startup order: **LLM → wait 7 seconds → reporting → Ax3l → watchdog**.
 The delay is defined by `DQwen.STARTUP_SECONDS`. Shutdown reverses that order.
 
-Dev uses a health-only LLM stub. QA/prod service installation requires the real
+Dev and QA use a health-only LLM stub. Production service installation requires the real
 llama.cpp binary and Qwen model described in the
 [architecture]({{ '/pages/architecture' | relative_url }}).
 

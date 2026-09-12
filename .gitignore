@@ -1,4 +1,9 @@
 # Byte-compiled / optimized / DLL files
+# Disposable development installation and credentials
+/ax3l_prod/
+/prod_etc/
+/tmp/
+
 __pycache__/
 *.py[codz]
 *$py.class

@@ -1,6 +1,6 @@
 [Unit]
-Description=Ax3l llm-server (@ENV@)
-After=network.target
+Description=Ax3l watchdog (@ENV@)
+After=ax3l-server@SUFFIX@.service llm-server@SUFFIX@.service
 
 [Service]
 Type=simple
@@ -9,7 +9,7 @@ Group=@USER@
 WorkingDirectory=@APP@
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONDONTWRITEBYTECODE=1
-ExecStart=@LLM_COMMAND@
+ExecStart=/usr/bin/python3 -m ax3l.server.Watchdog --ax3l-unit ax3l-server@SUFFIX@.service --llm-health-url http://127.0.0.1:@LLM_PORT@/health
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=true

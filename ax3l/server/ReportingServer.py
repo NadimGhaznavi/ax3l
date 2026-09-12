@@ -13,6 +13,7 @@ from ax3l.app.EventLogDb import EventLogDb
 from ax3l.activity.ReplyReport import fields, reply_content
 from ax3l.constants.DEventDisplay import DEventDisplay
 from ax3l.constants.DReportMgr import DReportMgr
+from ax3l.interface.SnakeLab import SnakeLab
 
 
 def make_server(host: str, port: int) -> HTTPServer:
@@ -39,7 +40,10 @@ def make_server(host: str, port: int) -> HTTPServer:
                             for event in events:
                                 if event["name"] == DConversation.RESPONSE and event["category"] == DConversation.CATEGORY:
                                     event["reply_text"] = reply_content(json.loads(event["content"]))
-                            body = template.render(events=events).encode("utf-8")
+                            simulation_running = SnakeLab().is_simulation_running()
+                            body = template.render(
+                                events=events, simulation_running=simulation_running,
+                            ).encode("utf-8")
                         else:
                             event = log.get(int(self.path.rsplit("/", 1)[1]))
                             if event is None or event["name"] != DConversation.RESPONSE or event["category"] != DConversation.CATEGORY:

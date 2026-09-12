@@ -7,6 +7,7 @@ import unittest
 from urllib.request import urlopen
 from urllib.error import HTTPError
 from uuid import uuid4
+from unittest.mock import patch
 
 
 @unittest.skipUnless(os.environ.get("AX3L_TEST_DEV_DB") == "1", "requires DEV MariaDB")
@@ -15,6 +16,10 @@ class ReportingTests(unittest.TestCase):
         self.assertEqual(os.environ["DB_NAME"], "ax3l_dev")
         from ax3l.app.DbMgr import DbMgr
         from ax3l.server.ReportingServer import make_server
+
+        simulation = self.enterContext(patch(
+            "ax3l.server.ReportingServer.SnakeLab.is_simulation_running", return_value=False,
+        ))
 
         db = DbMgr()
         process_id = str(uuid4())
@@ -35,11 +40,15 @@ class ReportingTests(unittest.TestCase):
                 self.assertIn("&lt;script&gt;", page)
                 self.assertNotIn("<script>alert('test')</script>", page)
                 self.assertIn("Next line", page)
+                self.assertIn("Snake Lab Server: idle", page)
+                self.assertLess(page.index('class="server-bar"'), page.index('<h1>Ax3l Event Log'))
             second = f"{process_id} refreshed event"
+            simulation.return_value = True
             db.log("report_test", "System", "INFO", second, process_id=process_id)
             with urlopen(url) as response:
                 page = response.read().decode()
                 self.assertLess(page.index(second), page.index("&lt;script&gt;"))
+                self.assertIn("Snake Lab Server: running simulation", page)
             with urlopen(url + "/health") as response:
                 self.assertEqual(response.status, 200)
 

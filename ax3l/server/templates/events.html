@@ -14,12 +14,19 @@
     button:hover { background: var(--green); color: #050a06; }
     button:focus-visible { outline: 2px solid var(--green); outline-offset: 4px; }
     .note { margin: 1rem 0; padding: .6rem 1rem; border: 1px solid var(--border); color: var(--muted); }
-    main { border: 1px solid var(--border); }
-    .entry { padding: .35rem .65rem; border-bottom: 1px solid var(--border); background: #08100a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    main { border: 1px solid var(--border); overflow-x: auto; }
+    table { width: 100%; min-width: 1100px; table-layout: fixed; border-collapse: collapse; }
+    .time-col { width: 28ch; }
+    .id-col { width: 9ch; }
+    .level-col { width: 9ch; }
+    .category-col { width: 15ch; }
+    .event-col { width: 23ch; }
+    th, td { padding: .35rem .65rem; border: 1px solid var(--border); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    th { background: #0d1c11; color: var(--green); }
+    .entry { background: #08100a; }
     .entry:nth-child(even) { background: #13271a; }
-    .entry:last-child { border-bottom: 0; }
     .entry:hover { background: #1d3825; }
-    .metadata { padding-right: .65rem; margin-right: .65rem; border-right: 1px solid var(--border); color: var(--muted); }
+    .metadata { color: var(--muted); }
     .content { font: inherit; }
     .empty { margin: 0; padding: 1rem; border: 1px solid var(--border); }
     ::selection { background: var(--green); color: #050a06; }
@@ -33,13 +40,29 @@
   </header>
   <p class="note">Latest {{ events | length }} entries (up to 500), newest first.</p>
   <main>
+    <table aria-label="Event log">
+      <colgroup>
+        <col class="time-col"><col class="id-col"><col class="level-col">
+        <col class="category-col"><col class="event-col"><col>
+      </colgroup>
+      <thead>
+        <tr><th scope="col">Time</th><th scope="col">ID</th><th scope="col">Level</th><th scope="col">Category</th><th scope="col">Event</th><th scope="col">Message</th></tr>
+      </thead>
+      <tbody>
     {% for event in events %}
-    <article class="entry" title="{{ event.occurred_at }} · #{{ event.event_id }} · {{ event.log_level }} · {{ event.category }} · {{ event.name }}&#10;{{ event.content if event.content is not none else '' }}">
-      <span class="metadata">{{ event.occurred_at }} · #{{ event.event_id }} · {{ event.log_level }} · {{ event.category }} · {{ event.name }}</span><span class="content">{{ event.content if event.content is not none else '' }}</span>
-    </article>
+        <tr class="entry">
+          <td class="metadata" title="{{ event.occurred_at }}">{{ event.occurred_at }}</td>
+          <td class="metadata" title="{{ event.event_id }}">{{ event.event_id }}</td>
+          <td class="metadata" title="{{ event.log_level }}">{{ event.log_level }}</td>
+          <td title="{{ event.category }}">{{ event.category }}</td>
+          <td title="{{ event.name }}">{{ event.name }}</td>
+          <td class="content" title="{{ event.content if event.content is not none else '' }}">{{ event.content if event.content is not none else '' }}</td>
+        </tr>
     {% else %}
-    <p class="empty">No events logged yet.</p>
+        <tr><td class="empty" colspan="6">No events logged yet.</td></tr>
     {% endfor %}
+      </tbody>
+    </table>
   </main>
 </body>
 </html>

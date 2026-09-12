@@ -60,8 +60,10 @@
           <td class="metadata" title="{{ event.event_id }}">{{ event.event_id }}</td>
           <td class="metadata" title="{{ event.log_level }}">{{ event.log_level }}</td>
           <td title="{{ event.category }}">{{ event.category }}</td>
-          <td title="{{ event.name }}">{{ event_labels.get(event.name, event.name) }}</td>
-          {% if event.reply_text is defined %}
+          <td title="{{ event.name }}">{{ event_label(event.category, event.name) }}</td>
+          {% if event.name == simulation_events.SUBMITTED and event.category == simulation_events.CATEGORY %}
+          <td class="content">Submitted <a href="/simulations/{{ event.process_id }}/config">config</a>.</td>
+          {% elif event.reply_text is defined %}
           <td class="content" title="{{ event.reply_text }}"><a href="/events/{{ event.event_id }}">{{ event.reply_text }}</a></td>
           {% else %}
           <td class="content" title="{{ event.content if event.content is not none else '' }}">{{ event.content if event.content is not none else '' }}</td>

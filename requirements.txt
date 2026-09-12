@@ -1,4 +1,4 @@
-# MCP Python SDK used by the Fr3d knowledge-base tool.
+# MCP Python SDK for the SnakeLab tool server.
 mcp>=2,<3
 PyMySQL>=1.1,<2
 pyzmq>=26,<28
@@ -6,3 +6,6 @@ httpx>=0.27,<1
 jsonschema>=4.18,<5
 # Nadim-facing Reporting
 Jinja2>=3.1,<4
+# PNG chart generation (Kaleido uses the installed Chrome browser).
+plotly>=7.0,<8
+kaleido>=1.4,<2

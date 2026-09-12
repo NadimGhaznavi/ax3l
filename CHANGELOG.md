@@ -9,6 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-09-12 @ 14:14
+
+- Default installation, upgrade, and service startup to `qwenv`, with its vision projector for PNG prompts. Explicit `-model qwen|phi|qwenv` selections remain supported.
+
+- Ax3l logs each decoded MCP tool request as `tool_request_received`, including its sender, target, method, protocol version, and payload, before dispatch or validation. Unknown methods are logged too; logging failure prevents execution.
+
+- Ax3l now runs a shared ZeroMQ listener and handles single-value proposals: JSON-spec legality checks return `InvalidValue`, duplicate golden or historical configurations return `NoDupesSingle`, and legal unique candidates are submitted once. Added `is_config_unique()` to the SnakeLab DAL using full JSON equality across all runs. Deployment assigns separate DEV/QA/PROD endpoints, installs the JSON spec, and runs Ax3l from its provisioned virtual environment.
+
+- Added the SnakeLab `submit_single_value` MCP tool and shared `ZMQMsg`/`ZMQClient` boundary. The tool forwards the parameter and numeric value to Ax3l and returns its reply without domain validation or automatic retries. The Ax3l handler remains a separate step.
+
+- Added the SnakeLab stdio MCP entry point and generated `mcp.json` registration. Production Qwen, Phi, and QwenV launches pass that config to llama-server; installation provisions the MCP SDK in the application's virtual environment. Domain tools will be registered in the new server module.
+
+- The active first iteration seeds an empty Snake Lab database, waits for idle, and sends FirstContact, GoldenConfig, LossPlot, and the learning-rate introduction in one request. Each exact message snapshot is logged as a conversation-linked prompt event; the reply ends the iteration.
+
+- Reduced loss plot PNGs to 750×450 pixels, configured through `DLossPlot.WIDTH`, `HEIGHT`, and `SCALE`.
+
+- Added `LossPlot`, a dynamic PNG prompt reading per-episode losses from Snake Lab through the DAL. It embeds the PNG in the LLM message and uses `GoldenConfig.run_id` to keep both snippets tied to the same simulation.
+
+- Added Plotly and Kaleido dependencies for dynamic PNG chart generation.
+
+- Added the `GoldenConfig` dynamic prompt. Initialization and explicit refresh read the latest golden creation's run, reason, and stored Snake Lab configuration for use in an LLM conversation.
+
+- `FirstContactSingle` now accepts a JSON parameter key and builds its introduction from a readable name and the simulation spec's description.
+
+- Added `golden_config_created` in the Configuration category with a reason. Initial creation uses `Seeded database with default config.`; subsequent creations supply the parameter comparison.
+
+- Centralized log categories, event names, and display labels in `DEventCategory`, using a shared `EventCategory` class. The main loop and reporting use the catalog; existing stored event names and categories are preserved.
+
+- The Snake Lab main loop submits defaults from the JSON spec when the simulation database is empty, logs the run reference without copying its configuration, and polls every five seconds through completion. It logs the start once and the final outcome to close the cycle. The submission's config link reads its detail page directly from Snake Lab's database through the DAL.
+
+- Added `SnakeLab.get_num_sims()` to count all stored Snake Lab runs through MariaDB, using separate `SNAKELAB_DB_*` credentials without initializing external tables.
+
 ## [0.8.1] - 2026-09-12 @ 11:14
 
 - Installed the system Python ZeroMQ dependency in DEV and PROD. Services using `/usr/bin/python3` require Debian's `python3-zmq` package (`sudo apt-get install python3-zmq`) for the Snake Lab status query; listing `pyzmq` in `requirements.txt` alone does not install it.

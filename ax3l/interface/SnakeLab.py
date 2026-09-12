@@ -1,15 +1,29 @@
-"""Query the local Snake Lab control interface over ZeroMQ."""
+"""Query Snake Lab through its control interface and MariaDB database."""
 
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import zmq
 
 from ax3l.constants.DSnakeLab import DSnakeLab
+from ax3l.app.DbMgr import DbMgr
+from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb
 
 
 class SnakeLab:
     def __init__(self, endpoint: str = DSnakeLab.ENDPOINT):
         self.endpoint = endpoint
+
+    def get_num_sims(self) -> int:
+        """Return the total stored run count using SNAKELAB_DB_* credentials.
+
+        Database errors propagate. The connection is closed after each query,
+        and no tables are initialized in the Snake Lab database.
+        """
+        db = DbMgr(env_prefix="SNAKELAB_DB", initialize_event_tables=False)
+        try:
+            return SnakeLabDb(db).get_num_sims()
+        finally:
+            db.close()
 
     def is_simulation_running(self) -> bool:
         """Return whether work is running, paused, cancelling, or queued.
@@ -17,12 +31,95 @@ class SnakeLab:
         This synchronous call does not retry. Transport and protocol errors
         propagate; an unavailable server is not an idle server.
         """
+        payload = self._request("simulation.active", {})
+        if "run" not in payload:
+            raise ValueError("Snake Lab response payload must contain run")
+        run = payload["run"]
+        if run is None:
+            return False
+        if not isinstance(run, dict) or run.get("state") not in (
+            "running", "paused", "cancelling", "queued"
+        ):
+            raise ValueError("Snake Lab response has an invalid active run state")
+        return True
+
+    def get_config(self, run_id: str) -> dict | None:
+        UUID(run_id)
+        db = DbMgr(env_prefix="SNAKELAB_DB", initialize_event_tables=False)
+        try:
+            return SnakeLabDb(db).get_config(run_id)
+        finally:
+            db.close()
+
+    def get_run_result(self, run_id: str) -> dict | None:
+        UUID(run_id)
+        db = DbMgr(env_prefix="SNAKELAB_DB", initialize_event_tables=False)
+        try:
+            return SnakeLabDb(db).get_run_result(run_id)
+        finally:
+            db.close()
+
+    def get_learning_rate_history(self) -> list[dict]:
+        db = DbMgr(env_prefix="SNAKELAB_DB", initialize_event_tables=False)
+        try:
+            return SnakeLabDb(db).get_learning_rate_history()
+        finally:
+            db.close()
+
+    def find_config_run(self, config: dict) -> str | None:
+        db = DbMgr(env_prefix="SNAKELAB_DB", initialize_event_tables=False)
+        try:
+            return SnakeLabDb(db).find_config_run(config)
+        finally:
+            db.close()
+
+    def get_learning_rate_report(self, golden_run_id: str) -> list[dict]:
+        UUID(golden_run_id)
+        db = DbMgr(env_prefix="SNAKELAB_DB", initialize_event_tables=False)
+        try:
+            return SnakeLabDb(db).get_learning_rate_report(golden_run_id)
+        finally:
+            db.close()
+
+    def is_config_unique(self, config: dict) -> bool:
+        db = DbMgr(env_prefix="SNAKELAB_DB", initialize_event_tables=False)
+        try:
+            return SnakeLabDb(db).is_config_unique(config)
+        finally:
+            db.close()
+
+    def get_episode_losses(self, run_id: str) -> list[tuple[int, float | None]]:
+        UUID(run_id)
+        db = DbMgr(env_prefix="SNAKELAB_DB", initialize_event_tables=False)
+        try:
+            return SnakeLabDb(db).get_episode_losses(run_id)
+        finally:
+            db.close()
+
+    def submit_simulation(self, config: dict) -> str:
+        """Submit once and return the queued run ID; never retry a submission."""
+        payload = self._request("simulation.submit", {"config": config})
+        if payload.get("state") != "queued" or not isinstance(payload.get("run_id"), str):
+            raise ValueError("Snake Lab response has an invalid submission")
+        UUID(payload["run_id"])
+        return payload["run_id"]
+
+    def get_simulation_status(self, run_id: str) -> str:
+        UUID(run_id)
+        payload = self._request("simulation.status", {"run_id": run_id})
+        if payload.get("run_id") != run_id or payload.get("state") not in (
+            "queued", "running", "paused", "cancelling", "completed", "failed", "cancelled"
+        ):
+            raise ValueError("Snake Lab response has an invalid run status")
+        return payload["state"]
+
+    def _request(self, method: str, payload: dict) -> dict:
         request_id = str(uuid4())
         request = {
             "protocol_version": DSnakeLab.PROTOCOL_VERSION,
             "request_id": request_id,
-            "method": "simulation.active",
-            "payload": {},
+            "method": method,
+            "payload": payload,
         }
         with zmq.Context() as context:
             with context.socket(zmq.REQ) as socket:
@@ -45,13 +142,6 @@ class SnakeLab:
         if response.get("status") != "ok":
             raise ValueError("Snake Lab response has an invalid status")
         payload = response.get("payload")
-        if not isinstance(payload, dict) or "run" not in payload:
-            raise ValueError("Snake Lab response payload must contain run")
-        run = payload["run"]
-        if run is None:
-            return False
-        if not isinstance(run, dict) or run.get("state") not in (
-            "running", "paused", "cancelling", "queued"
-        ):
-            raise ValueError("Snake Lab response has an invalid active run state")
-        return True
+        if not isinstance(payload, dict):
+            raise ValueError("Snake Lab response payload must be an object")
+        return payload

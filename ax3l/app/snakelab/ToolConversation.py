@@ -1,0 +1,79 @@
+"""Run one conversation until MCP accepts a simulation submission."""
+
+import asyncio
+import json
+from uuid import uuid4
+
+from ax3l.constants.DAx3l import DAx3l
+from ax3l.constants.DEventCategory import DEventCategory as Events
+
+
+async def converse(llm, output, db, tools, prompts) -> str:
+    process_id = str(uuid4())
+    print(f"Conversation: {process_id}", flush=True)
+    conversation_id = db.log(Events.Conversation.STARTED, Events.Conversation.CATEGORY,
+                             "INFO", f"Conversation started with {llm.url}.", process_id=process_id)
+
+    def log(category, name, content, level="INFO"):
+        return db.log(name, category.CATEGORY, level, content, process_id=process_id,
+                      parent_event_id=conversation_id)
+
+    outcome, level = "Simulation submitted.", "INFO"
+    try:
+        messages = [json.loads(prompt.to_json()) for prompt in prompts]
+        for message in messages:
+            log(Events.Conversation, Events.Conversation.PROMPT, json.dumps(message, ensure_ascii=False))
+        turn = 0
+        while True:
+            turn += 1
+            payload = json.dumps({"messages": messages, "tools": [tools.definition],
+                                  "tool_choice": "required", "parallel_tool_calls": False,
+                                  "stream": False}, ensure_ascii=False).encode()
+            prefix = output / f"{process_id}-{turn:04d}"
+            if DAx3l.RAW_LOGS_ENABLED:
+                prefix.with_suffix(".request.json").write_bytes(payload)
+            try:
+                status, headers, body = await asyncio.to_thread(llm.complete, payload)
+                if DAx3l.RAW_LOGS_ENABLED:
+                    prefix.with_suffix(".response.body").write_bytes(body)
+                    prefix.with_suffix(".response.headers").write_text(f"HTTP status: {status}\n{headers}")
+                if status >= 400:
+                    raise RuntimeError(f"HTTP {status}: {body.decode(errors='replace')}")
+            except Exception as error:
+                log(Events.LLM, Events.LLM.REQUEST_FAILED, str(error), "ERROR")
+                raise
+            log(Events.Conversation, Events.Conversation.RESPONSE, body.decode(errors="backslashreplace"))
+            reply = json.loads(body)["choices"][0]["message"]
+            calls = reply.get("tool_calls", [])
+            if len(calls) != 1 or calls[0]["function"]["name"] != "submit_single_value":
+                raise ValueError("Expected exactly one submit_single_value tool call")
+            call = calls[0]
+            arguments = json.loads(call["function"]["arguments"])
+            if arguments.get("parameter") != "learning_rate":
+                raise ValueError("This conversation may only change learning_rate")
+            messages.append(reply)
+            log(Events.Tool, Events.Tool.STARTED, json.dumps(call))
+            try:
+                result = await tools.submit(arguments)
+                if result["status"] not in ("ok", "rejected"):
+                    raise RuntimeError(f"Tool submission failed: {result}")
+            except Exception as error:
+                log(Events.Tool, Events.Tool.FAILED, str(error), "ERROR")
+                raise
+            log(Events.Tool, Events.Tool.COMPLETED, json.dumps(result))
+            if result["status"] == "ok":
+                return result["run_id"]
+            # Explicit validation rejections are safe to correct. Transport failures are not retried.
+            messages.append({"role": "tool", "tool_call_id": call["id"],
+                             "content": json.dumps(result)})
+            feedback = result["prompt"]
+            messages.append(feedback)
+            log(Events.Conversation, Events.Conversation.PROMPT, json.dumps(feedback, ensure_ascii=False))
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        outcome = "Stopped by user."
+        raise
+    except BaseException as error:
+        outcome, level = f"Conversation stopped: {type(error).__name__}: {error}", "ERROR"
+        raise
+    finally:
+        log(Events.Conversation, Events.Conversation.ENDED, outcome, level)

@@ -1,11 +1,10 @@
-
-from Prompt import Prompt
+from ax3l.app.Prompt import Prompt
 
 class DynamicPrompt(Prompt):
 
-    def __init__(self, content):
-        super(content=content)
+    def __init__(self):
+        super().__init__("")
         self.refresh()
 
-    def refresh(self):
-        raise NotImplemented("Sub-classes must implement this method")
+    def refresh(self) -> None:
+        raise NotImplementedError("Subclasses must implement this method")

@@ -9,6 +9,7 @@ Group=root
 WorkingDirectory=@APP@
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=BROWSER_PATH=@APP@/.chrome/browser
 EnvironmentFile=@CONFIG@/database.env
 ExecStart=@APP@/.venv/bin/python -m ax3l.server.Ax3lServer --port @AX3L_PORT@ --zmq-endpoint @AX3L_ZMQ_ENDPOINT@ @AX3L_ARGS@
 StateDirectory=ax3l@SUFFIX@

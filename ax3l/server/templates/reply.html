@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reply #{{ event.event_id }} · Ax3l</title>
+  <style>
+    :root { color-scheme: dark; --green: #80ff98; --muted: #a0cbaa; --border: #347746; }
+    * { box-sizing: border-box; }
+    body { margin: 1.5rem auto; padding: 1rem; max-width: 1200px; background: #050a06; color: var(--green); font: 15px/1.6 "Courier New", Courier, monospace; }
+    header, section { border: 1px solid var(--border); margin-bottom: 1rem; background: #08100a; }
+    header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem; }
+    h1 { margin: 0; font-size: 1.5rem; }
+    h2 { margin: 0; padding: .6rem 1rem; border-bottom: 1px solid var(--border); background: #0d1c11; font-size: 1rem; }
+    a { color: var(--green); border: 1px solid var(--border); padding: .4rem .75rem; }
+    a:hover { background: #1d3825; }
+    a:focus-visible { outline: 2px solid var(--green); outline-offset: 3px; }
+    pre { margin: 0; padding: 1rem; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    th, td { border: 1px solid var(--border); padding: .5rem .75rem; text-align: left; vertical-align: top; overflow-wrap: anywhere; white-space: pre-wrap; }
+    th { width: 38%; color: var(--muted); font-weight: normal; }
+    tr:nth-child(even) { background: #13271a; }
+    @media (max-width: 600px) { body { margin: 0; padding: .5rem; } }
+  </style>
+</head>
+<body>
+  <header><h1>Reply #{{ event.event_id }}</h1><a href="/">Back to event log</a></header>
+  <main>
+    <section><h2>Assistant message</h2><pre>{{ reply_text }}</pre></section>
+    <section>
+      <h2>Event</h2>
+      <table aria-label="Event fields">
+        {% for key, value in event.items() if key != 'content' %}
+        <tr><th scope="row">{{ key }}</th><td>{{ value if value is not none else '—' }}</td></tr>
+        {% endfor %}
+      </table>
+    </section>
+    {% for name, rows in sections %}
+    <section>
+      <h2>{{ name | replace('_', ' ') | title }}</h2>
+      <table aria-label="{{ name }} fields">
+        {% for path, value in rows %}
+        <tr><th scope="row">{{ path }}</th><td>{{ value }}</td></tr>
+        {% endfor %}
+      </table>
+    </section>
+    {% endfor %}
+  </main>
+</body>
+</html>

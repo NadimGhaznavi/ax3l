@@ -1,6 +1,8 @@
 from typing import Final
 
 class DAx3l:
+    RAW_LOGS_ENABLED: Final[bool] = False
+
     VERSION: Final[str] = "0.7.2"
 
     BASE_DIR: Final[str] = "/opt/prod/ax3l"

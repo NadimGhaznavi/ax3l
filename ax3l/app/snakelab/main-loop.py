@@ -1,7 +1,7 @@
 """Run from the checkout: python3 -m ax3l.app.snakelab.main-loop --url URL."""
 
 import argparse
-from contextlib import redirect_stderr, redirect_stdout
+from contextlib import ExitStack, redirect_stderr, redirect_stdout
 from datetime import datetime, timezone
 import json
 from pathlib import Path
@@ -13,6 +13,7 @@ from ax3l.app.DbMgr import DbMgr
 
 from ax3l.app.snakelab.prompts.GenerateHaiku import GenerateHaiku
 from ax3l.constants.DSnakeLab import DSnakeLab
+from ax3l.constants.DAx3l import DAx3l
 from ax3l.interface.LLM import LLM
 
 
@@ -21,7 +22,8 @@ def run(llm: LLM, output: Path, db: DbMgr, count: int = DSnakeLab.HAIKU_COUNT) -
     print(f"Conversation: {process_id}", flush=True)
     conversation_id = db.log(
         "conversation_started", "Conversation", "INFO",
-        f"Haiku conversation started with {llm.url}. Output: {output.resolve()}",
+        f"Haiku conversation started with {llm.url}."
+        + (f" Output: {output.resolve()}" if DAx3l.RAW_LOGS_ENABLED else ""),
         process_id=process_id,
     )
     outcome = "Completed requested haiku turns."
@@ -36,7 +38,8 @@ def run(llm: LLM, output: Path, db: DbMgr, count: int = DSnakeLab.HAIKU_COUNT) -
                 "messages": [json.loads(prompt.to_json())],
                 "stream": False,
             }, ensure_ascii=False).encode("utf-8")
-            prefix.with_suffix(".request.json").write_bytes(payload)
+            if DAx3l.RAW_LOGS_ENABLED:
+                prefix.with_suffix(".request.json").write_bytes(payload)
             print(f"{datetime.now(timezone.utc).isoformat()} Request {turn}: {llm.url}", flush=True)
             prompt_id = db.log(
                 "prompt_sent", "Conversation", "INFO", prompt.to_md(),
@@ -50,20 +53,22 @@ def run(llm: LLM, output: Path, db: DbMgr, count: int = DSnakeLab.HAIKU_COUNT) -
                     process_id=process_id, parent_event_id=prompt_id,
                 )
                 raise
-            prefix.with_suffix(".response.body").write_bytes(body)
-            prefix.with_suffix(".response.headers").write_text(
-                f"HTTP status: {status}\n{headers}", encoding="utf-8"
-            )
+            if DAx3l.RAW_LOGS_ENABLED:
+                prefix.with_suffix(".response.body").write_bytes(body)
+                prefix.with_suffix(".response.headers").write_text(
+                    f"HTTP status: {status}\n{headers}", encoding="utf-8"
+                )
             response_text = body.decode("utf-8", errors="backslashreplace")
-            print(f"HTTP status: {status}\n{headers}", flush=True)
-            print(response_text, flush=True)
+            if DAx3l.RAW_LOGS_ENABLED:
+                print(f"HTTP status: {status}\n{headers}", flush=True)
+                print(response_text, flush=True)
             if status >= 400:
                 db.log(
                     "llm_request_failed", "LLM", "ERROR",
                     f"HTTP {status}\n{response_text}",
                     process_id=process_id, parent_event_id=prompt_id,
                 )
-                raise RuntimeError(f"LLM returned HTTP {status}; see {prefix}.response.body")
+                raise RuntimeError(f"LLM returned HTTP {status}; see the llm_request_failed event")
             reply_id = db.log(
                 "reply_received", "Conversation", "INFO", response_text,
                 process_id=process_id, parent_event_id=prompt_id,
@@ -103,23 +108,27 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.count < 0:
         parser.error("--count must be zero or positive")
-    output = args.output / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
-    output.mkdir(parents=True)
-    print(f"Capturing output in {output.resolve()}", flush=True)
-    with (output / "run.log").open("w", encoding="utf-8", buffering=1) as log:
-        with redirect_stdout(log), redirect_stderr(log):
+    output = args.output
+    with ExitStack() as captures:
+        if DAx3l.RAW_LOGS_ENABLED:
+            output = output / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
+            output.mkdir(parents=True)
+            print(f"Capturing output in {output.resolve()}", flush=True)
+            log = captures.enter_context((output / "run.log").open("w", encoding="utf-8", buffering=1))
+            captures.enter_context(redirect_stdout(log))
+            captures.enter_context(redirect_stderr(log))
+        try:
+            db = DbMgr()
             try:
-                db = DbMgr()
-                try:
-                    run(LLM(args.url), output, db, args.count)
-                finally:
-                    db.close()
-            except KeyboardInterrupt:
-                print("Stopped by user.")
-                return 130
-            except Exception:
-                traceback.print_exc()
-                return 1
+                run(LLM(args.url), output, db, args.count)
+            finally:
+                db.close()
+        except KeyboardInterrupt:
+            print("Stopped by user.")
+            return 130
+        except Exception:
+            traceback.print_exc()
+            return 1
     return 0
 
 

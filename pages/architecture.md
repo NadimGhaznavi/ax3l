@@ -92,11 +92,12 @@ state needed for LLM workflow continuity.
 ### Current service skeleton
 
 The four systemd definitions in `systemd/` are templates rendered by
-`scripts/install-services.sh`. Run `scripts/install.sh` first to provision the
-environment's Linux account, database, and credentials, then run:
+`scripts/install-services.sh`, which is called automatically by `scripts/install.sh`
+after provisioning the Linux account, database, and credentials. Install and start
+the full dev environment with:
 
 ```sh
-scripts/install-services.sh -env dev
+scripts/install.sh -env dev -db-admin-sudo
 ```
 
 Dev runs under `ax3l_dev`. QA and production installation is performed by the

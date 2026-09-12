@@ -11,8 +11,9 @@ import traceback
 from uuid import uuid4
 
 from ax3l.app.DbMgr import DbMgr
+from ax3l.app.ConfigurationLog import ConfigurationLog
 from ax3l.app.snakelab.GenerateDefaultConfig import GenerateDefaultConfig
-from ax3l.constants.DConversation import DConversation
+from ax3l.constants.DEventCategory import DEventCategory
 
 from ax3l.app.snakelab.prompts.GenerateHaiku import GenerateHaiku
 from ax3l.constants.DSnakeLab import DSnakeLab
@@ -25,7 +26,7 @@ def run(llm: LLM, output: Path, db: DbMgr, count: int = DSnakeLab.HAIKU_COUNT) -
     process_id = str(uuid4())
     print(f"Conversation: {process_id}", flush=True)
     conversation_id = db.log(
-        DConversation.STARTED, DConversation.CATEGORY, "INFO",
+        DEventCategory.Conversation.STARTED, DEventCategory.Conversation.CATEGORY, "INFO",
         f"Haiku conversation started with {llm.url}."
         + (f" Output: {output.resolve()}" if DAx3l.RAW_LOGS_ENABLED else ""),
         process_id=process_id,
@@ -46,14 +47,14 @@ def run(llm: LLM, output: Path, db: DbMgr, count: int = DSnakeLab.HAIKU_COUNT) -
                 prefix.with_suffix(".request.json").write_bytes(payload)
             print(f"{datetime.now(timezone.utc).isoformat()} Request {turn}: {llm.url}", flush=True)
             prompt_id = db.log(
-                DConversation.PROMPT, DConversation.CATEGORY, "INFO", prompt.to_md(),
+                DEventCategory.Conversation.PROMPT, DEventCategory.Conversation.CATEGORY, "INFO", prompt.to_md(),
                 process_id=process_id, parent_event_id=conversation_id,
             )
             try:
                 status, headers, body = llm.complete(payload)
             except Exception as error:
                 db.log(
-                    "llm_request_failed", "LLM", "ERROR", str(error),
+                    DEventCategory.LLM.REQUEST_FAILED, DEventCategory.LLM.CATEGORY, "ERROR", str(error),
                     process_id=process_id, parent_event_id=prompt_id,
                 )
                 raise
@@ -68,24 +69,24 @@ def run(llm: LLM, output: Path, db: DbMgr, count: int = DSnakeLab.HAIKU_COUNT) -
                 print(response_text, flush=True)
             if status >= 400:
                 db.log(
-                    "llm_request_failed", "LLM", "ERROR",
+                    DEventCategory.LLM.REQUEST_FAILED, DEventCategory.LLM.CATEGORY, "ERROR",
                     f"HTTP {status}\n{response_text}",
                     process_id=process_id, parent_event_id=prompt_id,
                 )
                 raise RuntimeError(f"LLM returned HTTP {status}; see the llm_request_failed event")
             reply_id = db.log(
-                DConversation.RESPONSE, DConversation.CATEGORY, "INFO", response_text,
+                DEventCategory.Conversation.RESPONSE, DEventCategory.Conversation.CATEGORY, "INFO", response_text,
                 process_id=process_id, parent_event_id=prompt_id,
             )
             if count == 0 or turn < count:
                 wait_id = db.log(
-                    "wait_started", "Process", "INFO",
+                    DEventCategory.Process.WAIT_STARTED, DEventCategory.Process.CATEGORY, "INFO",
                     f"Sleep for seconds: ({DSnakeLab.HAIKU_SLEEP_SECONDS})",
                     process_id=process_id, parent_event_id=reply_id,
                 )
                 time.sleep(DSnakeLab.HAIKU_SLEEP_SECONDS)
                 db.log(
-                    "wait_ended", "Process", "INFO",
+                    DEventCategory.Process.WAIT_ENDED, DEventCategory.Process.CATEGORY, "INFO",
                     f"Wait completed after {DSnakeLab.HAIKU_SLEEP_SECONDS} seconds.",
                     process_id=process_id, parent_event_id=wait_id,
                 )
@@ -98,7 +99,7 @@ def run(llm: LLM, output: Path, db: DbMgr, count: int = DSnakeLab.HAIKU_COUNT) -
         raise
     finally:
         db.log(
-            DConversation.ENDED, DConversation.CATEGORY, level, outcome,
+            DEventCategory.Conversation.ENDED, DEventCategory.Conversation.CATEGORY, level, outcome,
             process_id=process_id, parent_event_id=conversation_id,
         )
 
@@ -110,8 +111,11 @@ def initialize_simulation(db: DbMgr) -> None:
         return
     run_id = snake.submit_simulation(GenerateDefaultConfig().run())
     submitted_id = db.log(
-        "simulation_submitted", "SnakeLab", "INFO", "Submitted config.",
+        DEventCategory.SnakeLab.SUBMITTED, DEventCategory.SnakeLab.CATEGORY, "INFO", "Submitted config.",
         process_id=run_id,
+    )
+    ConfigurationLog(db).golden_config_created(
+        run_id, reason="Seeded database with default config.", parent_event_id=submitted_id,
     )
     started = False
     while True:
@@ -119,13 +123,13 @@ def initialize_simulation(db: DbMgr) -> None:
         state = snake.get_simulation_status(run_id)
         if state == "running" and not started:
             db.log(
-                "simulation_started", "SnakeLab", "INFO", "Simulation started running.",
+                DEventCategory.SnakeLab.STARTED, DEventCategory.SnakeLab.CATEGORY, "INFO", "Simulation started running.",
                 process_id=run_id, parent_event_id=submitted_id,
             )
             started = True
         if state in ("completed", "failed", "cancelled"):
             db.log(
-                f"simulation_{state}", "SnakeLab", "ERROR" if state == "failed" else "INFO",
+                DEventCategory.SnakeLab.TERMINAL_EVENTS[state], DEventCategory.SnakeLab.CATEGORY, "ERROR" if state == "failed" else "INFO",
                 f"Simulation {state}." if started else
                 f"Simulation {state} before running status was observed.",
                 process_id=run_id, parent_event_id=submitted_id,

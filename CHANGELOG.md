@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added `golden_config_created` in the Configuration category with a reason. Initial creation uses `Seeded database with default config.`; subsequent creations supply the parameter comparison.
+
+- Centralized log categories, event names, and display labels in `DEventCategory`, using a shared `EventCategory` class. The main loop and reporting use the catalog; existing stored event names and categories are preserved.
+
 - The Snake Lab main loop submits defaults from the JSON spec when the simulation database is empty, logs the run reference without copying its configuration, and polls every five seconds through completion. It logs the start once and the final outcome to close the cycle. The submission's config link reads its detail page directly from Snake Lab's database through the DAL.
 
 - Added `SnakeLab.get_num_sims()` to count all stored Snake Lab runs through MariaDB, using separate `SNAKELAB_DB_*` credentials without initializing external tables.

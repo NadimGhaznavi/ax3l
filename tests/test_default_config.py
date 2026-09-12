@@ -43,9 +43,15 @@ class DefaultConfigTests(unittest.TestCase):
                 if num_sims == 0:
                     snake.submit_simulation.assert_called_once_with(GenerateDefaultConfig().run())
                     self.assertEqual([call.args[0] for call in db.log.call_args_list], [
-                        "simulation_submitted", "simulation_started", "simulation_completed",
+                        "simulation_submitted", "golden_config_created", "simulation_started", "simulation_completed",
                     ])
                     self.assertEqual(db.log.call_args_list[0].args[3], "Submitted config.")
+                    created = db.log.call_args_list[1]
+                    self.assertEqual(created.args[1:4], (
+                        "Configuration", "INFO", "Seeded database with default config.",
+                    ))
+                    self.assertEqual(created.kwargs["process_id"], snake.submit_simulation.return_value)
+                    self.assertEqual(created.kwargs["parent_event_id"], db.log.return_value)
                     self.assertEqual(db.log.call_args_list[0].kwargs["process_id"], snake.submit_simulation.return_value)
                     self.assertEqual(sleep.call_count, 4)
                     self.assertTrue(all(call.args == (5,) for call in sleep.call_args_list))
@@ -66,7 +72,7 @@ class DefaultConfigTests(unittest.TestCase):
                 with patch.dict(initialize.__globals__, {"SnakeLab": lambda: snake}), patch("time.sleep"):
                     initialize(db)
                 self.assertEqual([call.args[0] for call in db.log.call_args_list], [
-                    "simulation_submitted", f"simulation_{state}",
+                    "simulation_submitted", "golden_config_created", f"simulation_{state}",
                 ])
 
     def test_running_cycle_logs_start_once_and_closes_on_each_terminal_state(self):
@@ -80,7 +86,7 @@ class DefaultConfigTests(unittest.TestCase):
                 with patch.dict(initialize.__globals__, {"SnakeLab": lambda: snake}), patch("time.sleep") as sleep:
                     initialize(db)
                 self.assertEqual([call.args[0] for call in db.log.call_args_list], [
-                    "simulation_submitted", "simulation_started", f"simulation_{state}",
+                    "simulation_submitted", "golden_config_created", "simulation_started", f"simulation_{state}",
                 ])
                 self.assertEqual(db.log.call_args.args[3], f"Simulation {state}.")
                 self.assertEqual(db.log.call_args.args[2], "ERROR" if state == "failed" else "INFO")

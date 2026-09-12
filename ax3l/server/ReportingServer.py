@@ -9,10 +9,9 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 import zmq
 
 from ax3l.app.DbMgr import DbMgr
-from ax3l.constants.DConversation import DConversation
+from ax3l.constants.DEventCategory import DEventCategory
 from ax3l.app.EventLogDb import EventLogDb
 from ax3l.activity.ReplyReport import fields, reply_content
-from ax3l.constants.DEventDisplay import DEventDisplay
 from ax3l.constants.DReportMgr import DReportMgr
 from ax3l.interface.SnakeLab import SnakeLab
 
@@ -23,7 +22,8 @@ def make_server(host: str, port: int) -> HTTPServer:
         autoescape=select_autoescape(["html"]),
     )
     template = templates.get_template("events.html")
-    templates.globals["event_labels"] = DEventDisplay.LABELS
+    templates.globals["event_label"] = DEventCategory.label
+    templates.globals["simulation_events"] = DEventCategory.SnakeLab
     templates.globals["refresh_seconds"] = DReportMgr.REFRESH_SECONDS
 
     class Handler(BaseHTTPRequestHandler):
@@ -54,7 +54,7 @@ def make_server(host: str, port: int) -> HTTPServer:
                         if self.path == "/":
                             events = log.recent()
                             for event in events:
-                                if event["name"] == DConversation.RESPONSE and event["category"] == DConversation.CATEGORY:
+                                if event["name"] == DEventCategory.Conversation.RESPONSE and event["category"] == DEventCategory.Conversation.CATEGORY:
                                     event["reply_text"] = reply_content(json.loads(event["content"]))
                             try:
                                 simulation_running = SnakeLab().is_simulation_running()
@@ -67,7 +67,7 @@ def make_server(host: str, port: int) -> HTTPServer:
                             ).encode("utf-8")
                         else:
                             event = log.get(int(self.path.rsplit("/", 1)[1]))
-                            if event is None or event["name"] != DConversation.RESPONSE or event["category"] != DConversation.CATEGORY:
+                            if event is None or event["name"] != DEventCategory.Conversation.RESPONSE or event["category"] != DEventCategory.Conversation.CATEGORY:
                                 self.send_error(404)
                                 return
                             response = json.loads(event["content"])

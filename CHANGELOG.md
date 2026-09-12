@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.5] - 2026-09-12 @ 10:01
+
+- Shortened the `wait_ended` display label to `Sleep`.
+
+- Shortened the `prompt_sent` display label to `Prompt`.
+
+- Shortened conversation lifecycle display labels to `Started` and `Ended`; the Category column already identifies them as conversation events.
+
 ## [0.7.4] - 2026-09-12 @ 09:57
 
 - Added shared event display labels in `DEventDisplay`. The loop logs `wait_started`, displayed as `Sleep`; existing `sleep` events receive the same label. Hovering a label shows its raw event name. New sleep messages record `Sleep for seconds: (x)` using the configured interval.

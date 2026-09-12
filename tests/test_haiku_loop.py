@@ -9,18 +9,40 @@ from urllib.error import HTTPError
 
 from ax3l.app.snakelab.prompts.GenerateHaiku import GenerateHaiku
 from ax3l.interface.LLM import LLM
+from ax3l.constants.DAx3l import DAx3l
 
 
 RUN = runpy.run_path(str(Path(__file__).resolve().parents[1] / "ax3l/app/snakelab/main-loop.py"))["run"]
 
 
 class HaikuLoopTests(unittest.TestCase):
+    def test_raw_log_switch_controls_all_capture_files(self):
+        main = RUN.__globals__["main"]
+        for enabled in (False, True):
+            with self.subTest(enabled=enabled), tempfile.TemporaryDirectory() as folder:
+                output = Path(folder) / "haiku"
+                db = Mock()
+                llm = Mock(url="http://example/v1/chat/completions")
+                llm.complete.return_value = (200, "Content-Type: application/json", b'{"choices":[]}')
+                with patch.object(DAx3l, "RAW_LOGS_ENABLED", enabled), patch.dict(main.__globals__, {"DbMgr": lambda: db, "LLM": lambda url: llm}), patch("sys.stdout", new_callable=io.StringIO):
+                    self.assertEqual(main(["--url", "http://example", "--output", str(output), "--count", "1"]), 0)
+                self.assertEqual([call.args[0] for call in db.log.call_args_list], [
+                    "conversation_started", "prompt_sent", "reply_received", "conversation_ended",
+                ])
+                db.close.assert_called_once()
+                if enabled:
+                    files = {path.name for path in output.glob("*/*")}
+                    self.assertEqual(files, {"run.log", "0001.request.json", "0001.response.body", "0001.response.headers"})
+                else:
+                    self.assertFalse(output.exists())
+
     def test_prompt_formats(self):
         prompt = GenerateHaiku()
         self.assertEqual(json.loads(prompt.to_json()), {
             "role": "user", "content": prompt.to_md(),
         })
 
+    @patch.object(DAx3l, "RAW_LOGS_ENABLED", True)
     def test_two_turns_capture_unparsed_output_and_wait(self):
         body = b'{"choices":[],"reasoning":"unfiltered","unknown":true}\n'
         llm = Mock(url="http://example/v1/chat/completions")
@@ -38,6 +60,7 @@ class HaikuLoopTests(unittest.TestCase):
                     "stream": False,
                 })
 
+    @patch.object(DAx3l, "RAW_LOGS_ENABLED", True)
     def test_http_error_body_is_captured_before_stopping(self):
         error = HTTPError("http://example", 503, "Unavailable", {}, io.BytesIO(b"model unavailable"))
         db = Mock()

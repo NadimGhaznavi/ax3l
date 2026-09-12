@@ -1,5 +1,11 @@
 # Haiku experiment
 
+Raw file capture is off by default. Set `DAx3l.RAW_LOGS_ENABLED = True` in
+`ax3l/constants/DAx3l.py` to enable the capture files described below.
+When off, no haiku output directory or files are created, including under
+`/var/lib/ax3l/haiku`. Database logging continues; status and errors go to the
+console (the systemd journal for service runs). Existing captures are retained.
+
 From the checkout root, load the installed database credentials into the
 environment, then point the loop at the running model server. For DEV:
 

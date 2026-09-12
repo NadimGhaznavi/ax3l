@@ -1,4 +1,6 @@
 import argparse
+import json
+import re
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 import traceback
@@ -7,6 +9,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from ax3l.app.DbMgr import DbMgr
 from ax3l.app.EventLogDb import EventLogDb
+from ax3l.activity.ReplyReport import fields, reply_content
 
 
 def make_server(host: str, port: int) -> HTTPServer:
@@ -21,14 +24,33 @@ def make_server(host: str, port: int) -> HTTPServer:
             if self.path == "/health":
                 body = b'{"status":"ok","service":"reporting-server","mode":"events"}'
                 content_type = "application/json"
-            elif self.path == "/":
+            elif self.path == "/" or re.fullmatch(r"/events/[0-9]{1,20}", self.path):
                 try:
                     db = DbMgr()
                     try:
-                        events = EventLogDb(db).recent()
+                        log = EventLogDb(db)
+                        if self.path == "/":
+                            events = log.recent()
+                            for event in events:
+                                if event["name"] == "reply_received" and event["category"] == "Conversation":
+                                    event["reply_text"] = reply_content(json.loads(event["content"]))
+                            body = template.render(events=events).encode("utf-8")
+                        else:
+                            event = log.get(int(self.path.rsplit("/", 1)[1]))
+                            if event is None or event["name"] != "reply_received" or event["category"] != "Conversation":
+                                self.send_error(404)
+                                return
+                            response = json.loads(event["content"])
+                            groups = ("choices", "usage", "timings")
+                            sections = [("Response", fields({
+                                key: value for key, value in response.items() if key not in groups
+                            }))]
+                            sections.extend((key, fields(response[key], key)) for key in groups if key in response)
+                            body = templates.get_template("reply.html").render(
+                                event=event, reply_text=reply_content(response), sections=sections,
+                            ).encode("utf-8")
                     finally:
                         db.close()
-                    body = template.render(events=events).encode("utf-8")
                     content_type = "text/html; charset=utf-8"
                 except Exception:
                     traceback.print_exc()

@@ -4,12 +4,14 @@ import argparse
 from contextlib import ExitStack, redirect_stderr, redirect_stdout
 from datetime import datetime, timezone
 import json
+import random
 from pathlib import Path
 import time
 import traceback
 from uuid import uuid4
 
 from ax3l.app.DbMgr import DbMgr
+from ax3l.constants.DConversation import DConversation
 
 from ax3l.app.snakelab.prompts.GenerateHaiku import GenerateHaiku
 from ax3l.constants.DSnakeLab import DSnakeLab
@@ -21,7 +23,7 @@ def run(llm: LLM, output: Path, db: DbMgr, count: int = DSnakeLab.HAIKU_COUNT) -
     process_id = str(uuid4())
     print(f"Conversation: {process_id}", flush=True)
     conversation_id = db.log(
-        "conversation_started", "Conversation", "INFO",
+        DConversation.STARTED, DConversation.CATEGORY, "INFO",
         f"Haiku conversation started with {llm.url}."
         + (f" Output: {output.resolve()}" if DAx3l.RAW_LOGS_ENABLED else ""),
         process_id=process_id,
@@ -29,10 +31,10 @@ def run(llm: LLM, output: Path, db: DbMgr, count: int = DSnakeLab.HAIKU_COUNT) -
     outcome = "Completed requested haiku turns."
     level = "INFO"
     try:
-        prompt = GenerateHaiku()
         turn = 0
         while count == 0 or turn < count:
             turn += 1
+            prompt = GenerateHaiku(random.randint(0, 30))
             prefix = output / f"{turn:04d}"
             payload = json.dumps({
                 "messages": [json.loads(prompt.to_json())],
@@ -42,7 +44,7 @@ def run(llm: LLM, output: Path, db: DbMgr, count: int = DSnakeLab.HAIKU_COUNT) -
                 prefix.with_suffix(".request.json").write_bytes(payload)
             print(f"{datetime.now(timezone.utc).isoformat()} Request {turn}: {llm.url}", flush=True)
             prompt_id = db.log(
-                "prompt_sent", "Conversation", "INFO", prompt.to_md(),
+                DConversation.PROMPT, DConversation.CATEGORY, "INFO", prompt.to_md(),
                 process_id=process_id, parent_event_id=conversation_id,
             )
             try:
@@ -70,7 +72,7 @@ def run(llm: LLM, output: Path, db: DbMgr, count: int = DSnakeLab.HAIKU_COUNT) -
                 )
                 raise RuntimeError(f"LLM returned HTTP {status}; see the llm_request_failed event")
             reply_id = db.log(
-                "reply_received", "Conversation", "INFO", response_text,
+                DConversation.RESPONSE, DConversation.CATEGORY, "INFO", response_text,
                 process_id=process_id, parent_event_id=prompt_id,
             )
             if count == 0 or turn < count:
@@ -94,7 +96,7 @@ def run(llm: LLM, output: Path, db: DbMgr, count: int = DSnakeLab.HAIKU_COUNT) -
         raise
     finally:
         db.log(
-            "conversation_ended", "Conversation", level, outcome,
+            DConversation.ENDED, DConversation.CATEGORY, level, outcome,
             process_id=process_id, parent_event_id=conversation_id,
         )
 

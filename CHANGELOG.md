@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.98.2] - 2026-09-12 @ 14:23
+
+- Run `ax3l-server` as root to address the reported permission denial executing its installed virtual-environment Python.
+
 ## [0.98.1] - 2026-09-12 @ 14:19
 
 - Prompt log entries link to detail views that display the captured text and embedded PNG plots, without regenerating images from simulation data.

@@ -62,6 +62,30 @@ class SnakeLabDbTests(unittest.TestCase):
         self.assertEqual(self.query_count(), 0)
         self.assertFalse(self.db._connection.open)
 
+    def test_episode_losses_are_scoped_ordered_and_preserve_nulls(self):
+        run_id, other_run = str(uuid4()), str(uuid4())
+
+        def connect(**kwargs):
+            db = DbMgr(**kwargs)
+            self.db = db
+            self.addCleanup(lambda: db.close() if db._connection.open else None)
+            db.execute("""CREATE TEMPORARY TABLE simulation_episodes (
+                run_id CHAR(36) NOT NULL, episode INT UNSIGNED NOT NULL,
+                loss DOUBLE NULL, PRIMARY KEY (run_id, episode)
+            )""")
+            for episode, loss in ((3, 0.0), (1, None), (2, 0.5)):
+                db.execute("INSERT INTO simulation_episodes VALUES (%s, %s, %s)",
+                           (run_id, episode, loss))
+            db.execute("INSERT INTO simulation_episodes VALUES (%s, %s, %s)",
+                       (other_run, 1, 99.0))
+            return db
+
+        with patch("ax3l.interface.SnakeLab.DbMgr", side_effect=connect) as factory:
+            self.assertEqual(SnakeLab().get_episode_losses(run_id),
+                             [(1, None), (2, 0.5), (3, 0.0)])
+        factory.assert_called_once_with(env_prefix="SNAKELAB_DB", initialize_event_tables=False)
+        self.assertFalse(self.db._connection.open)
+
     def test_counts_all_statuses_and_repeated_configurations(self):
         count = self.query_count(("queued", "running", "completed", "failed", "cancelled"))
         self.assertEqual(count, 5)

@@ -34,3 +34,4 @@ class GoldenConfig(DynamicPrompt):
             f"{json.dumps(config, indent=2, ensure_ascii=False, allow_nan=False)}\n"
             "```"
         )
+        self.run_id = golden["process_id"]

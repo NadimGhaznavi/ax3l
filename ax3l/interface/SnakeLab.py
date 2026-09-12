@@ -51,6 +51,14 @@ class SnakeLab:
         finally:
             db.close()
 
+    def get_episode_losses(self, run_id: str) -> list[tuple[int, float | None]]:
+        UUID(run_id)
+        db = DbMgr(env_prefix="SNAKELAB_DB", initialize_event_tables=False)
+        try:
+            return SnakeLabDb(db).get_episode_losses(run_id)
+        finally:
+            db.close()
+
     def submit_simulation(self, config: dict) -> str:
         """Submit once and return the queued run ID; never retry a submission."""
         payload = self._request("simulation.submit", {"config": config})

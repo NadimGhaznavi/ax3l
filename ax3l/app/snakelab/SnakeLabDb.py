@@ -18,3 +18,11 @@ class SnakeLabDb:
             "SELECT config FROM simulation_runs WHERE run_id = %s", (run_id,)
         )
         return json.loads(rows[0]["config"]) if rows else None
+
+    def get_episode_losses(self, run_id: str) -> list[tuple[int, float | None]]:
+        """Read losses in episode order, preserving episodes with no training loss."""
+        rows = self._db.query(
+            "SELECT episode, loss FROM simulation_episodes WHERE run_id = %s ORDER BY episode",
+            (run_id,),
+        )
+        return [(row["episode"], row["loss"]) for row in rows]

@@ -1,11 +1,33 @@
 # Haiku experiment
 
+LLM conversation snippets can include the golden configuration and its loss plot:
+
+```python
+import json
+
+from ax3l.app.snakelab.prompts.GoldenConfig import GoldenConfig
+from ax3l.app.snakelab.prompts.LossPlot import LossPlot
+
+golden = GoldenConfig(db)
+loss_plot = LossPlot(golden.run_id)
+messages = [json.loads(golden.to_json()), json.loads(loss_plot.to_json())]
+```
+
+`LossPlot.refresh()` reads that same run's `simulation_episodes` rows through the
+DAL and regenerates an in-memory PNG. The x-axis uses stored episode numbers;
+null losses remain gaps. A run without recorded losses raises `ValueError`.
+`to_json()` embeds a caption and base64 PNG image content for the vision model.
+Resolve the golden configuration once per conversation; recreate the loss prompt
+from its run ID after changing the golden selection. PNG generation requires
+Plotly, Kaleido, and Chrome; the local packages are installed in `.venv`.
+The existing haiku loop does not yet assemble these snippets.
+
 `SnakeLab().get_num_sims()` returns the number of rows in Snake Lab's
 `simulation_runs` table, across all statuses and including repeated configurations.
 Set `SNAKELAB_DB_HOST`, `SNAKELAB_DB_USER`, `SNAKELAB_DB_PASSWORD`, and
 `SNAKELAB_DB_NAME` in the calling process's environment. `SNAKELAB_DB_PORT`
 defaults to 3306. These credentials are separate from AX3L's `DB_*` settings;
-the account only needs SELECT access to `simulation_runs`. Each call opens and
+the account needs SELECT access to `simulation_runs` and `simulation_episodes`. Each call opens and
 closes its connection without initializing tables. Database errors propagate.
 
 At startup, `main-loop.py` checks that count. When it is zero,

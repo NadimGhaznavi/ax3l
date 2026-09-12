@@ -19,10 +19,12 @@ class GoldenConfigTests(unittest.TestCase):
                        {"training": {"learning_rate": 0.003}, "seed": 1970}]
             snake.return_value.get_config.side_effect = configs
             prompt = GoldenConfig(Mock())
+            self.assertEqual(prompt.run_id, "first-run")
             self.assertIsInstance(prompt, DynamicPrompt)
             self.assertIn("Seeded database with default config.", prompt.to_md())
             self.assertEqual(json.loads(prompt.to_md().split("```json\n")[1].split("\n```")[0]), configs[0])
             prompt.refresh()
+            self.assertEqual(prompt.run_id, "next-run")
             snake.return_value.get_config.assert_called_with("next-run")
             self.assertIn("Parameter x: 2 > 4", prompt.to_md())
             self.assertNotIn("Seeded database", prompt.to_md())

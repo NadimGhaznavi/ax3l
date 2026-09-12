@@ -30,9 +30,10 @@ class ReportingTests(unittest.TestCase):
             with urlopen(url) as response:
                 page = response.read().decode()
                 self.assertEqual(response.headers["Cache-Control"], "no-store")
-                self.assertIn("Refresh</button>", page)
+                self.assertIn("Auto refresh every 30 seconds.", page)
+                self.assertNotIn("Refresh</button>", page)
                 self.assertIn("&lt;script&gt;", page)
-                self.assertNotIn("<script>", page)
+                self.assertNotIn("<script>alert('test')</script>", page)
                 self.assertIn("Next line", page)
             second = f"{process_id} refreshed event"
             db.log("report_test", "System", "INFO", second, process_id=process_id)

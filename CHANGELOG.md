@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Replaced the event log Refresh button with automatic refresh every 30 seconds, configurable through `DReportMgr.REFRESH_SECONDS`. Updates preserve scroll position and keep the current entries visible if refresh fails.
+
+- Added the SnakeLab ZeroMQ interface to query whether the local server has an active or queued simulation, with strict response validation and bounded waits.
+
 ## [0.7.10] - 2026-09-12 @ 10:26
 
 - Each haiku request now uses a fresh random integer from 0 through 30 in the prompt: `Write a haiku based on the number X.`

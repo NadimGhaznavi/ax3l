@@ -12,6 +12,7 @@ from ax3l.constants.DConversation import DConversation
 from ax3l.app.EventLogDb import EventLogDb
 from ax3l.activity.ReplyReport import fields, reply_content
 from ax3l.constants.DEventDisplay import DEventDisplay
+from ax3l.constants.DReportMgr import DReportMgr
 
 
 def make_server(host: str, port: int) -> HTTPServer:
@@ -21,6 +22,7 @@ def make_server(host: str, port: int) -> HTTPServer:
     )
     template = templates.get_template("events.html")
     templates.globals["event_labels"] = DEventDisplay.LABELS
+    templates.globals["refresh_seconds"] = DReportMgr.REFRESH_SECONDS
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):

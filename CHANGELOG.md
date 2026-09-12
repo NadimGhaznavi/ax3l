@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.98.12] - 2026-09-12 @ 16:34
+
+- Increased num epochs to 1500
+
 ## [0.98.11] - 2026-09-12 @ 16:21
 
 - Add `scripts/wipe-db.sh -env dev|qa|prod` to stop Ax3l and SnakeLab and clear both event and simulation data in one transaction. Schemas and accounts remain intact; services remain stopped.

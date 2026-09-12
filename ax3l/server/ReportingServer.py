@@ -12,6 +12,7 @@ from ax3l.app.DbMgr import DbMgr
 from ax3l.constants.DEventCategory import DEventCategory
 from ax3l.app.EventLogDb import EventLogDb
 from ax3l.activity.ReplyReport import fields, reply_content
+from ax3l.activity.PromptReport import parts, summary
 from ax3l.constants.DReportMgr import DReportMgr
 from ax3l.interface.SnakeLab import SnakeLab
 
@@ -56,6 +57,8 @@ def make_server(host: str, port: int) -> HTTPServer:
                             for event in events:
                                 if event["name"] == DEventCategory.Conversation.RESPONSE and event["category"] == DEventCategory.Conversation.CATEGORY:
                                     event["reply_text"] = reply_content(json.loads(event["content"]))
+                                elif event["name"] == DEventCategory.Conversation.PROMPT and event["category"] == DEventCategory.Conversation.CATEGORY:
+                                    event["prompt_text"] = summary(json.loads(event["content"]))
                             try:
                                 simulation_running = SnakeLab().is_simulation_running()
                             except zmq.ZMQError:
@@ -67,18 +70,23 @@ def make_server(host: str, port: int) -> HTTPServer:
                             ).encode("utf-8")
                         else:
                             event = log.get(int(self.path.rsplit("/", 1)[1]))
-                            if event is None or event["name"] != DEventCategory.Conversation.RESPONSE or event["category"] != DEventCategory.Conversation.CATEGORY:
+                            if event is None or event["name"] not in (DEventCategory.Conversation.RESPONSE, DEventCategory.Conversation.PROMPT) or event["category"] != DEventCategory.Conversation.CATEGORY:
                                 self.send_error(404)
                                 return
-                            response = json.loads(event["content"])
-                            groups = ("choices", "usage", "timings")
-                            sections = [("Response", fields({
-                                key: value for key, value in response.items() if key not in groups
-                            }))]
-                            sections.extend((key, fields(response[key], key)) for key in groups if key in response)
-                            body = templates.get_template("reply.html").render(
-                                event=event, reply_text=reply_content(response), sections=sections,
-                            ).encode("utf-8")
+                            if event["name"] == DEventCategory.Conversation.PROMPT:
+                                body = templates.get_template("prompt.html").render(
+                                    event=event, parts=parts(json.loads(event["content"])),
+                                ).encode("utf-8")
+                            else:
+                                response = json.loads(event["content"])
+                                groups = ("choices", "usage", "timings")
+                                sections = [("Response", fields({
+                                    key: value for key, value in response.items() if key not in groups
+                                }))]
+                                sections.extend((key, fields(response[key], key)) for key in groups if key in response)
+                                body = templates.get_template("reply.html").render(
+                                    event=event, reply_text=reply_content(response), sections=sections,
+                                ).encode("utf-8")
                     finally:
                         db.close()
                     content_type = "text/html; charset=utf-8"

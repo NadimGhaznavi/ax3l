@@ -32,7 +32,7 @@ class DEventCategory:
         CATEGORY = "LLM"
         REQUEST_FAILED = "llm_request_failed"
         LABELS = {
-            REQUEST_FAILED: "LLM request failed",
+            REQUEST_FAILED: "Request failed",
         }
 
     class Metrics(EventCategory):
@@ -49,10 +49,10 @@ class DEventCategory:
         COMPLETED = "tool_execution_completed"
         FAILED = "tool_execution_failed"
         LABELS = {
-            RECEIVED: "Tool request received",
-            STARTED: "Tool started",
-            COMPLETED: "Tool completed",
-            FAILED: "Tool failed",
+            RECEIVED: "Request received",
+            STARTED: "Started",
+            COMPLETED: "Completed",
+            FAILED: "Failed",
         }
 
     class Process(EventCategory):
@@ -101,12 +101,12 @@ class DEventCategory:
             PROPOSAL_ACCEPTED: "Proposal accepted",
             PROPOSAL_INVALID: "Invalid proposal",
             PROPOSAL_DUPLICATE: "Duplicate proposal",
-            COMPARED: "Configuration compared",
-            GOLDEN_CREATED: "Golden configuration created",
-            GOLDEN_REPLACED: "Golden configuration replaced",
-            GOLDEN_RETAINED: "Golden configuration retained",
+            COMPARED: "Compared",
+            GOLDEN_CREATED: "Golden created",
+            GOLDEN_REPLACED: "Golden replaced",
+            GOLDEN_RETAINED: "Golden retained",
             SEED_ROTATION_STARTED: "Seed rotation started",
-            GOLDEN_SEED_INCREMENTED: "Golden configuration seed incremented",
+            GOLDEN_SEED_INCREMENTED: "Golden seed incremented",
         }
 
     ALL = (System, Conversation, LLM, Metrics, Tool, Process, SnakeLab, Configuration)

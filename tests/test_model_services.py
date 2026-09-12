@@ -108,10 +108,10 @@ class ModelServicesTests(unittest.TestCase):
                     'start watchdog-dev.service',
                 ])
 
-    def test_default_is_qwen(self):
+    def test_default_is_qwenv(self):
         result, calls = self.run_helper('start')
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('start qwen-server-dev.service', calls)
+        self.assertIn('start qwenv-server-dev.service', calls)
 
     def test_missing_units_do_not_break_stop_or_migration(self):
         result, calls = self.run_helper('stop')

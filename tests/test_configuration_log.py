@@ -20,7 +20,7 @@ class ConfigurationLogTests(unittest.TestCase):
                     process_id="run-id", parent_event_id=12,
                 )
         self.assertEqual(DEventCategory.label("Configuration", "golden_config_created"),
-                         "Golden configuration created")
+                         "Golden created")
 
     def test_empty_reason_does_not_write_an_event(self):
         db = Mock()

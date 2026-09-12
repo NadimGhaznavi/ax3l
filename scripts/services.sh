@@ -15,7 +15,7 @@ if [[ ( $# != 3 && $# != 5 ) || $1 != -env || ( $3 != start && $3 != stop ) ]]; 
     exit 2
 fi
 
-model=qwen
+model=qwenv
 if [[ $# == 5 ]]; then
     [[ $4 == -model && ( $5 == qwen || $5 == phi || $5 == qwenv ) ]] || { usage >&2; exit 2; }
     model=$5

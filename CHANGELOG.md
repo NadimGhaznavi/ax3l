@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Default installation, upgrade, and service startup to `qwenv`, with its vision projector for PNG prompts. Explicit `-model qwen|phi|qwenv` selections remain supported.
+
 - Ax3l logs each decoded MCP tool request as `tool_request_received`, including its sender, target, method, protocol version, and payload, before dispatch or validation. Unknown methods are logged too; logging failure prevents execution.
 
 - Ax3l now runs a shared ZeroMQ listener and handles single-value proposals: JSON-spec legality checks return `InvalidValue`, duplicate golden or historical configurations return `NoDupesSingle`, and legal unique candidates are submitted once. Added `is_config_unique()` to the SnakeLab DAL using full JSON equality across all runs. Deployment assigns separate DEV/QA/PROD endpoints, installs the JSON spec, and runs Ax3l from its provisioned virtual environment.

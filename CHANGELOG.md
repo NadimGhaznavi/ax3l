@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-09-12 @ 07:24
+
+### Added
+
+- Added a minimal SnakeLab haiku loop with a shared prompt class and LLM HTTP interface. Saves requests, complete response bodies, headers, and a run log; waits five seconds between requests.
+
+### Running the haiku loop
+
+From the project root, run:
+
+```bash
+python3 -m ax3l.app.snakelab.main-loop --url http://neuromancer.ososyalce.com:27770
+```
+
+The loop asks the running model to write a haiku, captures the response, sleeps
+five seconds, and repeats. Each request starts with fresh context. Press Ctrl-C
+to stop, or append `--count 2` to stop after two requests.
+
+Output is saved in a timestamped directory under `tmp/haiku/`, printed at startup.
+It includes request JSON, exact response bodies, HTTP headers and status, and
+`run.log` containing output and errors. Use `--output /tmp/haiku` to change the
+output root. HTTP or transport errors are logged and stop the loop.
+
 ## [0.4.0] - 2026-09-12 @ 06:13
 
 ### Added

@@ -1,0 +1,23 @@
+[Unit]
+Description=Ax3l llama.cpp Server
+After=network.target mariadb.service
+Wants=mariadb.service
+
+[Service]
+Type=simple
+User=ax3l
+Group=ax3l
+WorkingDirectory=/opt/prod/ax3l
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=/etc/ax3l/database.env
+ExecStart=/opt/prod/ax3l/.venv/bin/python -m ax3l.server.LLMServer
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/prod/ax3l/logs
+
+[Install]
+WantedBy=multi-user.target

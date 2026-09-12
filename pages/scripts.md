@@ -16,7 +16,7 @@ runs QA/prod setup and service commands as root on the corresponding machine.
 | --- | --- | --- |
 | `install.sh` | Creates the installation directory, Linux account/group, MariaDB database/account, and credentials, then installs and starts all four services. | `scripts/install.sh -env dev -db-admin-sudo` |
 | `upgrade.sh` | Updates an existing installation's Python modules and systemd units from this checkout, preserving its database, credentials, and accounts. Stops services before updating and starts them afterward. | `scripts/upgrade.sh -env dev` |
-| `install-services.sh` | Copies Python modules, installs five systemd units, enables the selected model and three application services, and stops/starts them in order. Called by `install.sh`; can also refresh services on an existing installation. | `scripts/install-services.sh -env dev` |
+| `install-services.sh` | Copies Python modules, installs six systemd units, enables the selected model and three application services, and stops/starts them in order. Called by `install.sh`; can also refresh services on an existing installation. | `scripts/install-services.sh -env dev` |
 | `services.sh` | Starts or stops all four services in order. | `scripts/services.sh -env dev start` or `scripts/services.sh -env dev stop` |
 | `uninstall.sh` | Stops and removes the units, then deletes the installation, credentials, database/account, and Linux account/group. **Deletes the selected environment's data.** | `scripts/uninstall.sh -env dev -db-admin-sudo` |
 
@@ -33,12 +33,21 @@ Qwen is the default. Select Phi with:
 scripts/services.sh -env dev start -model phi
 ```
 
-Use `-model qwen` to switch back. The helper stops and disables the other model,
-then enables and starts the selected model, so the selection also applies at boot.
-Both models share the LLM port; their systemd units conflict to prevent concurrent
-operation. Five units are installed, with four services running at a time.
-`install-services.sh` and `upgrade.sh` also accept `-model phi`; without that
-option they select Qwen. Upgrade removes the legacy `llm-server` unit.
+Use `-model qwen`, `-model phi`, or `-model qwenv` to choose the server to
+start. The helper enables and starts that model without checking or stopping
+other models. All three use the same LLM port; an occupied port or insufficient
+GPU memory is left for llama.cpp to report. Stop the running model yourself
+before starting another. `services.sh -env dev stop` stops all model and
+application services.
+
+All six units are installed and upgraded together. `install-services.sh` and
+`upgrade.sh` accept the same `-model` option to select the model started afterward;
+Qwen remains the default. Upgrade removes the legacy `llm-server` unit.
+
+Qwen Vision uses `DQwenV.GGUF`, `DQwenV.MMPROJ`, and a 4096-token context.
+Place both GGUF files in `DLlama.MODEL_DIR` (`/opt/prod/models`) before starting
+`qwenv-server` in production. It uses the shared executable configured by
+`DLlama`, with `--mmproj`, `-c 4096`, and the existing host, port, and metrics options.
 
 To deploy changes, update your checkout to the desired release, then run
 `scripts/upgrade.sh -env dev`, or as root on the target machine,

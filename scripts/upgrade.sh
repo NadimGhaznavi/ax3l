@@ -4,7 +4,7 @@ set -euo pipefail
 
 usage() {
     cat <<'HELP'
-Usage: scripts/upgrade.sh -env dev|qa|prod [-model qwen|phi]
+Usage: scripts/upgrade.sh -env dev|qa|prod [-model qwen|phi|qwenv]
 
 Updates application modules and systemd units from the current checkout,
 then starts all four services in dependency order. Services are stopped

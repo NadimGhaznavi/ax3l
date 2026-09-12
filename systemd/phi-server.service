@@ -1,7 +1,6 @@
 [Unit]
 Description=Ax3l phi-server (@ENV@)
 After=network.target
-Conflicts=qwen-server@SUFFIX@.service
 
 [Service]
 Type=simple

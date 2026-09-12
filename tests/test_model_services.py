@@ -35,13 +35,15 @@ class ModelServicesTests(unittest.TestCase):
                 'set -euo pipefail\n'
                 f'checkout_dir={shlex.quote(folder)}\n'
                 f'config_dir={shlex.quote(folder)}\n'
+                f'install_dir={shlex.quote(folder)}\n'
                 'selected_model=qwenv\nllm_port=27770\n    llm_paths='
                 + production + '\nprintf "%s\\n" "$qwenv_command"\n'
             )
             result = subprocess.run(['bash', '-c', command], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(shlex.split(result.stdout), [
-                str(binary), '--model', str(directory / DQwenV.GGUF),
+                str(binary), '--chat-template-file', str(directory / DQwenV.CHAT_TEMPLATE),
+                '--model', str(directory / DQwenV.GGUF),
                 '--mmproj', str(projector), '-c', '4096', '--host', '0.0.0.0',
                 '--port', '27770', '--metrics', '--jinja', '--mcp-servers-config', str(directory / 'mcp.json'),
             ])

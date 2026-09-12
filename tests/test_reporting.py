@@ -36,7 +36,7 @@ class ReportingTests(unittest.TestCase):
             db.log("report_test", "System", "INFO", second, process_id=process_id)
             with urlopen(url) as response:
                 page = response.read().decode()
-                self.assertLess(page.index(process_id), page.index(second))
+                self.assertLess(page.index(second), page.index("&lt;script&gt;"))
             with urlopen(url + "/health") as response:
                 self.assertEqual(response.status, 200)
         finally:

@@ -16,6 +16,8 @@ python3 -m venv huggingface-venv
 source ./venv_huggingface-venv/bin/activate
 pip install --upgrade pip
 pip install huggingface_hub
+cd /opt/src/llama.cpp
+pip install -r requirements.txt
 ```
 
 ## Download Phi

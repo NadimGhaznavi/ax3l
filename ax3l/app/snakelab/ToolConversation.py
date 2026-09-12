@@ -4,6 +4,7 @@ import asyncio
 import json
 from uuid import uuid4
 
+from ax3l.app.snakelab.prompts.UseTool import UseTool
 from ax3l.constants.DAx3l import DAx3l
 from ax3l.constants.DEventCategory import DEventCategory as Events
 
@@ -42,11 +43,22 @@ async def converse(llm, output, db, tools, prompts) -> str:
             except Exception as error:
                 log(Events.LLM, Events.LLM.REQUEST_FAILED, str(error), "ERROR")
                 raise
-            log(Events.Conversation, Events.Conversation.RESPONSE, body.decode(errors="backslashreplace"))
-            reply = json.loads(body)["choices"][0]["message"]
+            reply_id = log(Events.Conversation, Events.Conversation.RESPONSE, body.decode(errors="backslashreplace"))
+            choice = json.loads(body)["choices"][0]
+            reply = choice["message"]
             calls = reply.get("tool_calls", [])
+            if calls == []:
+                reminder = json.loads(UseTool().to_json())
+                messages = [reminder]
+                log(Events.Conversation, Events.Conversation.PROMPT,
+                    json.dumps(reminder, ensure_ascii=False))
+                continue
             if len(calls) != 1 or calls[0]["function"]["name"] != "submit_single_value":
-                raise ValueError("Expected exactly one submit_single_value tool call")
+                names = [call["function"]["name"] for call in calls]
+                raise ValueError(
+                    f"Expected exactly one submit_single_value tool call; received {names!r}, "
+                    f"finish_reason={choice.get('finish_reason')!r}. See reply event {reply_id}."
+                )
             call = calls[0]
             arguments = json.loads(call["function"]["arguments"])
             if arguments.get("parameter") != "learning_rate":

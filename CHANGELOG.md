@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Reduce a missing-tool retry to “Please submit using the submit_single_value tool”. Do not resend the model’s prose response or original prompt material.
+
+- When the LLM replies without a tool call, send only its latest response and a short `UseTool` reminder on the next request. Original prompts and plots are not resent; reminders remain linked to the same logged conversation.
+
+- Make the first single-parameter prompt explicitly require one numeric `submit_single_value` tool call, include constraints from the JSON spec, and limit the change to the selected parameter.
+
+- Explicitly enable llama-server’s Jinja tool-calling support for all production models. Unexpected tool responses now report the received function names, finish reason, and captured reply event ID.
+
 ## [0.98.6] - 2026-09-12 @ 15:05
 
 - Give Chrome writable config/cache paths in Ax3l’s systemd runtime directory. This fixes the browser exiting during plot rendering when home directories are hidden and the filesystem is read-only. Verified headless PNG rendering under the service’s filesystem restrictions.

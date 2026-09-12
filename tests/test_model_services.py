@@ -43,7 +43,7 @@ class ModelServicesTests(unittest.TestCase):
             self.assertEqual(shlex.split(result.stdout), [
                 str(binary), '--model', str(directory / DQwenV.GGUF),
                 '--mmproj', str(projector), '-c', '4096', '--host', '0.0.0.0',
-                '--port', '27770', '--metrics', '--mcp-servers-config', str(directory / 'mcp.json'),
+                '--port', '27770', '--metrics', '--jinja', '--mcp-servers-config', str(directory / 'mcp.json'),
             ])
             projector.unlink()
             result = subprocess.run(['bash', '-c', command], capture_output=True, text=True)

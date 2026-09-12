@@ -76,7 +76,7 @@ def run(llm: LLM, output: Path, db: DbMgr, count: int = DSnakeLab.HAIKU_COUNT) -
             if count == 0 or turn < count:
                 wait_id = db.log(
                     "wait_started", "Process", "INFO",
-                    f"Waiting {DSnakeLab.HAIKU_SLEEP_SECONDS} seconds before the next prompt.",
+                    f"Sleep for seconds: ({DSnakeLab.HAIKU_SLEEP_SECONDS})",
                     process_id=process_id, parent_event_id=reply_id,
                 )
                 time.sleep(DSnakeLab.HAIKU_SLEEP_SECONDS)

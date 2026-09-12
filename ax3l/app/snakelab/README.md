@@ -24,7 +24,8 @@ LLM failures through `DbMgr.log()`. Events share a process ID printed in
 `run.log`, and replies link to their prompt events. Reply metrics remain in
 the captured JSON for now. Database errors stop the loop.
 
-The loop sends `Write a haiku.`, saves the response, sleeps for
+Each turn picks a random integer from 0 through 30 and sends
+`Write a haiku based on the number X.`, saves the response, sleeps for
 `DSnakeLab.HAIKU_SLEEP_SECONDS` (default: 5 seconds),
 and repeats until Ctrl-C. Each request has fresh context. It uses whichever
 model is already running on that server. Dev/QA health stubs cannot generate text.

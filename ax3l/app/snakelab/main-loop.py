@@ -12,10 +12,11 @@ from uuid import uuid4
 from ax3l.app.DbMgr import DbMgr
 
 from ax3l.app.snakelab.prompts.GenerateHaiku import GenerateHaiku
+from ax3l.constants.DSnakeLab import DSnakeLab
 from ax3l.interface.LLM import LLM
 
 
-def run(llm: LLM, output: Path, db: DbMgr, count: int = 0) -> None:
+def run(llm: LLM, output: Path, db: DbMgr, count: int = DSnakeLab.HAIKU_COUNT) -> None:
     process_id = str(uuid4())
     print(f"Conversation: {process_id}", flush=True)
     conversation_id = db.log(
@@ -69,12 +70,14 @@ def run(llm: LLM, output: Path, db: DbMgr, count: int = 0) -> None:
             )
             if count == 0 or turn < count:
                 wait_id = db.log(
-                    "wait_started", "Process", "INFO", "Waiting five seconds before the next prompt.",
+                    "wait_started", "Process", "INFO",
+                    f"Waiting {DSnakeLab.HAIKU_SLEEP_SECONDS} seconds before the next prompt.",
                     process_id=process_id, parent_event_id=reply_id,
                 )
-                time.sleep(5)
+                time.sleep(DSnakeLab.HAIKU_SLEEP_SECONDS)
                 db.log(
-                    "wait_ended", "Process", "INFO", "Five-second wait completed.",
+                    "wait_ended", "Process", "INFO",
+                    f"Wait completed after {DSnakeLab.HAIKU_SLEEP_SECONDS} seconds.",
                     process_id=process_id, parent_event_id=wait_id,
                 )
     except KeyboardInterrupt:
@@ -91,12 +94,13 @@ def run(llm: LLM, output: Path, db: DbMgr, count: int = 0) -> None:
         )
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description="Ask the active LLM for a haiku every five seconds.")
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Ask the active LLM for haikus with a configured wait between requests.")
     parser.add_argument("--url", required=True, help="LLM server base URL, e.g. http://host:27770")
     parser.add_argument("--output", type=Path, default=Path("tmp/haiku"))
-    parser.add_argument("--count", type=int, default=0, help="Number of requests; 0 repeats until Ctrl-C")
-    args = parser.parse_args()
+    parser.add_argument("--count", type=int, default=DSnakeLab.HAIKU_COUNT,
+                        help="Override DSnakeLab.HAIKU_COUNT; 0 repeats until stopped")
+    args = parser.parse_args(argv)
     if args.count < 0:
         parser.error("--count must be zero or positive")
     output = args.output / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")

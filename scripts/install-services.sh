@@ -112,7 +112,7 @@ if [[ $install_env == prod ]]; then
     if [[ ! -x $install_dir/.venv/bin/python ]]; then
         python3 -m venv "$install_dir/.venv"
     fi
-    "$install_dir/.venv/bin/python" -m pip install 'mcp>=2,<3'
+    "$install_dir/.venv/bin/python" -m pip install 'mcp>=2,<3' 'pyzmq>=26,<28'
 fi
 for name in qwen-server phi-server qwenv-server ax3l-server reporting-server watchdog; do
     unit="$name$suffix.service"

@@ -4,11 +4,15 @@
 
 The SnakeLab MCP entry point is `python -m ax3l.app.snakelab.tools` and uses
 stdio. Register domain tool functions in `tools/server.py` with `@mcp.tool()`.
-The server currently exposes no tools; `SubmitSingleValue` is a subsequent slice.
+It exposes `submit_single_value(parameter, value)` through `SubmitSingleValue`.
+The parameter is its exact JSON spec key (for example `learning_rate`); the value
+is a JSON integer or number. MCP rejects strings and booleans as numeric values.
+Parameter existence, permitted ranges, duplicates, and submission decisions
+belong to Ax3l, not the MCP tool.
 
 `scripts/install-services.sh` generates the installation's `mcp.json` and adds
 `--mcp-servers-config` to all three production model commands. It installs the
-MCP SDK in `<app>/.venv`, which llama-server uses to launch the MCP child process.
+MCP SDK and PyZMQ in `<app>/.venv`, which llama-server uses to launch the MCP child process.
 Production needs Python's venv/pip support and package-index access for this step.
 DEV/QA retain their existing health-only LLM stubs.
 
@@ -19,8 +23,28 @@ python3 scripts/generate-mcp-config.py --app /opt/dev/ax3l > tmp/mcp.json
 ```
 
 Pass that file to a llama-server build supporting `--mcp-servers-config`.
-llama-server discovers the tool names through MCP. Future tool implementations
-will forward requests over ZeroMQ to Ax3l for validation and submission.
+llama-server discovers the tool names through MCP. The tool forwards requests
+over ZeroMQ using the project-wide `ax3l/zmq/ZMQMsg.py` and `ZMQClient.py`:
+
+```json
+{
+  "protocol_version": 1,
+  "sender": "mcp-snakelab",
+  "target": "snakelab",
+  "method": "submit_single_value",
+  "payload": {"parameter": "learning_rate", "value": 0.003}
+}
+```
+
+The default endpoint is `DAx3l.ZMQ_ENDPOINT` (`tcp://127.0.0.1:61970`), separate
+from Ax3l's HTTP health port. Override it with `AX3L_ZMQ_ENDPOINT` in the MCP
+process environment, including through the `env` entry in `mcp.json`.
+Ax3l replies with the same envelope shape and an application result in `payload`;
+the tool returns that payload as JSON text without changing acceptance or rejection.
+`DZMQ.TIMEOUT_SECONDS` bounds send and receive waits. Transport failures propagate
+as tool errors; calls are never retried automatically because a timed-out request
+may already have been processed. No database or Snake Lab submission occurs in
+the tool. The Ax3l ZeroMQ listener and validation handler are not implemented yet.
 
 ## Conversation snippets
 

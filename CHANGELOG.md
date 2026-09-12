@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added the SnakeLab `submit_single_value` MCP tool and shared `ZMQMsg`/`ZMQClient` boundary. The tool forwards the parameter and numeric value to Ax3l and returns its reply without domain validation or automatic retries. The Ax3l handler remains a separate step.
+
 - Added the SnakeLab stdio MCP entry point and generated `mcp.json` registration. Production Qwen, Phi, and QwenV launches pass that config to llama-server; installation provisions the MCP SDK in the application's virtual environment. Domain tools will be registered in the new server module.
 
 - The active first iteration seeds an empty Snake Lab database, waits for idle, and sends FirstContact, GoldenConfig, LossPlot, and the learning-rate introduction in one request. Each exact message snapshot is logged as a conversation-linked prompt event; the reply ends the iteration.

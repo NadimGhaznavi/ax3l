@@ -34,7 +34,7 @@ implementation proceeds in thin, working slices.
 ### MCP servers and tools
 
 - Provide capabilities behind Ax3l's API.
-- The SnakeLab MCP server is registered in llama-server's `mcp.json`; domain tools live in `ax3l/app/snakelab/tools`. The registration is implemented; the submission tool and Ax3l ZeroMQ handler are the next slice.
+- The SnakeLab MCP server is registered in llama-server's `mcp.json`; domain tools live in `ax3l/app/snakelab/tools`. `SubmitSingleValue` forwards proposals through shared `ZMQMsg` and `ZMQClient` classes. The Ax3l ZeroMQ listener and validation handler are the next slice.
 - Tool implementations can be added or modified behind that boundary as a slice requires them.
 
 ### MariaDB

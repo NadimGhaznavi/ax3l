@@ -50,7 +50,7 @@ def make_server(host: str, port: int) -> HTTPServer:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Show the application event log.")
     parser.add_argument("--port", type=int, required=True)
-    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--host", default="0.0.0.0")
     args = parser.parse_args()
     with make_server(args.host, args.port) as server:
         print(f"Event log: http://{args.host}:{server.server_port}/", flush=True)

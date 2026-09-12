@@ -18,6 +18,7 @@ catalog. Add or change definitions there.
 | `llm_request_failed` | LLM |
 | `llm_usage_recorded` | Metrics |
 | `tool_execution_started` | Tool |
+| `tool_request_received` | Tool |
 | `tool_execution_completed` | Tool |
 | `tool_execution_failed` | Tool |
 | `wait_started` | Process |

@@ -44,10 +44,12 @@ class DEventCategory:
 
     class Tool(EventCategory):
         CATEGORY = "Tool"
+        RECEIVED = "tool_request_received"
         STARTED = "tool_execution_started"
         COMPLETED = "tool_execution_completed"
         FAILED = "tool_execution_failed"
         LABELS = {
+            RECEIVED: "Tool request received",
             STARTED: "Tool started",
             COMPLETED: "Tool completed",
             FAILED: "Tool failed",

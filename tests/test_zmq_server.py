@@ -1,3 +1,4 @@
+import json
 import unittest
 from unittest.mock import Mock, patch
 
@@ -31,10 +32,24 @@ class ZMQServerTests(unittest.TestCase):
     def test_dispatch_opens_and_closes_request_database(self):
         with patch('ax3l.server.ToolHandler.DbMgr') as db, patch('ax3l.server.ToolHandler.SubmitSingleValueHandler') as handler:
             request = ZMQMsg('test', 'submit_single_value', 'snakelab', {'parameter': 'learning_rate', 'value': 0.003})
-            handler.return_value.submit.return_value = {'status': 'ok', 'run_id': 'run'}
+            def submit(payload):
+                db.return_value.log.assert_called_once_with(
+                    'tool_request_received', 'Tool', 'INFO', json.dumps(request.to_dict(), ensure_ascii=False))
+                return {'status': 'ok', 'run_id': 'run'}
+            handler.return_value.submit.side_effect = submit
             self.assertEqual(handle_tool(request), {'status': 'ok', 'run_id': 'run'})
             handler.return_value.submit.assert_called_once_with(request.payload)
             db.return_value.close.assert_called_once()
             db.reset_mock()
             self.assertEqual(handle_tool(ZMQMsg('test', 'unknown', 'snakelab')).get('status'), 'error')
-            db.assert_not_called()
+            db.assert_called_once()
+            self.assertEqual(json.loads(db.return_value.log.call_args.args[3])['method'], 'unknown')
+            db.return_value.close.assert_called_once()
+
+    def test_log_failure_prevents_tool_execution(self):
+        with patch('ax3l.server.ToolHandler.DbMgr') as db, patch('ax3l.server.ToolHandler.SubmitSingleValueHandler') as handler:
+            db.return_value.log.side_effect = RuntimeError('Log unavailable')
+            with self.assertRaisesRegex(RuntimeError, 'Log unavailable'):
+                handle_tool(ZMQMsg('test', 'submit_single_value', 'snakelab', {}))
+            handler.assert_not_called()
+            db.return_value.close.assert_called_once()

@@ -8,6 +8,7 @@ import traceback
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from ax3l.app.DbMgr import DbMgr
+from ax3l.constants.DConversation import DConversation
 from ax3l.app.EventLogDb import EventLogDb
 from ax3l.activity.ReplyReport import fields, reply_content
 from ax3l.constants.DEventDisplay import DEventDisplay
@@ -34,12 +35,12 @@ def make_server(host: str, port: int) -> HTTPServer:
                         if self.path == "/":
                             events = log.recent()
                             for event in events:
-                                if event["name"] == "reply_received" and event["category"] == "Conversation":
+                                if event["name"] == DConversation.RESPONSE and event["category"] == DConversation.CATEGORY:
                                     event["reply_text"] = reply_content(json.loads(event["content"]))
                             body = template.render(events=events).encode("utf-8")
                         else:
                             event = log.get(int(self.path.rsplit("/", 1)[1]))
-                            if event is None or event["name"] != "reply_received" or event["category"] != "Conversation":
+                            if event is None or event["name"] != DConversation.RESPONSE or event["category"] != DConversation.CATEGORY:
                                 self.send_error(404)
                                 return
                             response = json.loads(event["content"])

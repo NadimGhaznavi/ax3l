@@ -107,7 +107,7 @@ class DbMgrTests(unittest.TestCase):
         body = b'{"choices":[{"message":{"content":"A haiku"}}],"usage":{"completion_tokens":20}}'
         llm = Mock(url="http://example/v1/chat/completions")
         llm.complete.return_value = (200, "Content-Type: application/json", body)
-        with tempfile.TemporaryDirectory() as folder, patch("time.sleep") as sleep, patch("sys.stdout", new_callable=io.StringIO), patch.dict(run.__globals__, {"uuid4": lambda: self.process_id}):
+        with tempfile.TemporaryDirectory() as folder, patch("time.sleep") as sleep, patch("sys.stdout", new_callable=io.StringIO), patch.dict(run.__globals__, {"uuid4": lambda: self.process_id}), patch("random.randint", return_value=17):
             run(llm, Path(folder), self.db, count=2)
             sleep.assert_called_once_with(5)
         rows = self.db.query(
@@ -121,7 +121,7 @@ class DbMgrTests(unittest.TestCase):
             "wait_started", "wait_ended", "prompt_sent", "reply_received",
             "conversation_ended",
         ])
-        self.assertEqual(rows[1]["content"], "Write a haiku.")
+        self.assertEqual(rows[1]["content"], "Write a haiku based on the number 17.")
         self.assertEqual(rows[2]["content"], body.decode())
         self.assertEqual(rows[2]["parent_event_id"], rows[1]["event_id"])
         self.assertEqual(rows[6]["parent_event_id"], rows[5]["event_id"])

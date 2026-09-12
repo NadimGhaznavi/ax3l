@@ -37,13 +37,15 @@ class HaikuLoopTests(unittest.TestCase):
                     self.assertFalse(output.exists())
 
     def test_prompt_formats(self):
-        prompt = GenerateHaiku()
+        prompt = GenerateHaiku(17)
+        self.assertEqual(prompt.to_md(), "Write a haiku based on the number 17.")
         self.assertEqual(json.loads(prompt.to_json()), {
             "role": "user", "content": prompt.to_md(),
         })
 
     @patch.object(DAx3l, "RAW_LOGS_ENABLED", True)
-    def test_two_turns_capture_unparsed_output_and_wait(self):
+    @patch("random.randint", side_effect=[0, 30])
+    def test_two_turns_capture_unparsed_output_and_wait(self, randint):
         body = b'{"choices":[],"reasoning":"unfiltered","unknown":true}\n'
         llm = Mock(url="http://example/v1/chat/completions")
         llm.complete.return_value = (200, "Content-Type: application/json\n", body)
@@ -56,9 +58,11 @@ class HaikuLoopTests(unittest.TestCase):
                 self.assertEqual((output / f"{turn:04d}.response.body").read_bytes(), body)
                 request = json.loads((output / f"{turn:04d}.request.json").read_bytes())
                 self.assertEqual(request, {
-                    "messages": [{"role": "user", "content": "Write a haiku."}],
+                    "messages": [{"role": "user", "content": f"Write a haiku based on the number {0 if turn == 1 else 30}."}],
                     "stream": False,
                 })
+            self.assertEqual(randint.call_count, 2)
+            randint.assert_called_with(0, 30)
 
     @patch.object(DAx3l, "RAW_LOGS_ENABLED", True)
     def test_http_error_body_is_captured_before_stopping(self):

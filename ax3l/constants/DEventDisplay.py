@@ -1,15 +1,17 @@
 """Human-readable labels for stored event names."""
 
+from ax3l.constants.DConversation import DConversation
+
 
 class DEventDisplay:
     LABELS = {
         "service_started": "Service started",
         "service_stopped": "Service stopped",
         "service_failed": "Service failed",
-        "conversation_started": "Started",
-        "conversation_ended": "Ended",
-        "prompt_sent": "Prompt",
-        "reply_received": "Response",
+        DConversation.STARTED: "Started",
+        DConversation.ENDED: "Ended",
+        DConversation.PROMPT: "Prompt",
+        DConversation.RESPONSE: "Response",
         "llm_request_failed": "LLM request failed",
         "llm_usage_recorded": "LLM usage",
         "tool_execution_started": "Tool started",

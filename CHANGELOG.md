@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.10] - 2026-09-12 @ 10:26
+
+- Each haiku request now uses a fresh random integer from 0 through 30 in the prompt: `Write a haiku based on the number X.`
+
+- Added `DConversation` definitions for the conversation category and event names, shared by the main loop, reporting, and display-label mapping.
+
 ## [0.7.9] - 2026-09-12 @ 10:10
 
 - Split the event log timestamp into Date (`YYYY-MM-DD`) and Time (`HH:MM:SS`) columns, omitting fractional seconds from the display.

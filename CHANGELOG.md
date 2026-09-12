@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.98.5] - 2026-09-12 @ 14:55
+
 - Provision Chrome for Kaleido inside the application directory, configure its path for Ax3l’s service, and verify PNG rendering during installation. This avoids relying on a browser download in a home directory hidden by systemd.
 
 ## [0.98.3] - 2026-09-12 @ 14:39

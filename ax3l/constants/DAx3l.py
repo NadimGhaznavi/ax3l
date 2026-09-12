@@ -3,7 +3,7 @@ from typing import Final
 class DAx3l:
     RAW_LOGS_ENABLED: Final[bool] = False
 
-    VERSION: Final[str] = "0.7.6"
+    VERSION: Final[str] = "0.7.7"
 
     BASE_DIR: Final[str] = "/opt/prod/ax3l"
     BASE_DIR_QA: Final[str] = "/opt/qa/ax3l"

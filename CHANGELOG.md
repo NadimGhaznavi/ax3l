@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Updated *Ax3l* logo!
+
+### Fixed
+
+- Site name in `_config.yml`
+
 ## [0.0.3] - 2026-09-12 @ 00:53
 
 ### Added

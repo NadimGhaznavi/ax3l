@@ -4,7 +4,7 @@ author_profile: true
 layout: single
 ---
 
-![Akbar]({{ '/pages/images/akbar.png' | relative_url }})
+![Ax3l]({{ '/pages/images/ax3l.png' | relative_url }})
 
 ## Create a virtual environment
 

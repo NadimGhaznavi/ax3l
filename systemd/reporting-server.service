@@ -1,6 +1,6 @@
 [Unit]
-Description=Ax3l llm-server (@ENV@)
-After=network.target
+Description=Ax3l reporting-server (@ENV@)
+After=network.target mariadb.service
 
 [Service]
 Type=simple
@@ -9,7 +9,8 @@ Group=@USER@
 WorkingDirectory=@APP@
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONDONTWRITEBYTECODE=1
-ExecStart=@LLM_COMMAND@
+EnvironmentFile=@CONFIG@/database.env
+ExecStart=/usr/bin/python3 -m ax3l.server.ReportingServer --port @REPORT_PORT@
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=true

@@ -13,6 +13,7 @@ The base OS was Debian 13.6, just the OS, server utilities, and the SSH server.
 ```sh
 sudo apt install \
     htop \
+    mariadb-server \
     sudo \
     vim
 ```

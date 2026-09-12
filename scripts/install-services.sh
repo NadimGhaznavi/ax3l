@@ -16,8 +16,6 @@ case "$install_env" in
         install_dir="$checkout_dir/ax3l_prod"
         config_dir="$checkout_dir/prod_etc/ax3l"
         suffix=-dev
-        llm_port=18080; ax3l_port=18081; report_port=18082
-        llm_command="/usr/bin/python3 -m ax3l.server.LLMHealthStub --port $llm_port"
         ;;
     qa|prod)
         [[ $EUID == 0 ]] || { printf 'QA/prod require root.\n' >&2; exit 1; }
@@ -27,10 +25,8 @@ case "$install_env" in
         config_dir=/etc/ax3l
         if [[ $install_env == qa ]]; then
             suffix=-qa
-            llm_port=28080; ax3l_port=28081; report_port=28082
         else
             suffix=
-            llm_port=8080; ax3l_port=8081; report_port=8082
         fi
         llm_binary="/opt/$install_env/llama.cpp/bin/llama-server"
         model="/opt/$install_env/models/Qwen3.5-4B-Q4_K_M.gguf"
@@ -38,10 +34,26 @@ case "$install_env" in
             printf 'Install llama.cpp at %s and the model at %s first.\n' "$llm_binary" "$model" >&2
             exit 1
         }
-        llm_command="$llm_binary --model $model --host 127.0.0.1 --port $llm_port"
         ;;
     *) printf 'Invalid environment: %s\n' "$install_env" >&2; exit 2 ;;
 esac
+
+ports=$(cd -- "$checkout_dir" && python3 - "$install_env" <<'PY'
+import sys
+from ax3l.constants.DAx3l import DAx3l
+from ax3l.constants.DLlama import DLlama
+from ax3l.constants.DReportMgr import DReportMgr
+
+attribute = {"dev": "PORT_DEV", "qa": "PORT_QA", "prod": "PORT"}[sys.argv[1]]
+print(*(getattr(constants, attribute) for constants in (DLlama, DAx3l, DReportMgr)))
+PY
+)
+read -r llm_port ax3l_port report_port <<< "$ports"
+if [[ $install_env == dev ]]; then
+    llm_command="/usr/bin/python3 -m ax3l.server.LLMHealthStub --port $llm_port"
+else
+    llm_command="$llm_binary --model $model --host 127.0.0.1 --port $llm_port"
+fi
 
 [[ -d $install_dir && -f $config_dir/database.env ]] || {
     printf 'Run install.sh for this environment first.\n' >&2

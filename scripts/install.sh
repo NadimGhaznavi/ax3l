@@ -67,7 +67,8 @@ if [[ $# == 3 ]]; then
 fi
 
 DB_HOST=localhost
-DB_PORT=3306
+DB_PORT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." &&
+    python3 -c 'from ax3l.constants.DDbMgr import DDbMgr; print(DDbMgr.PORT)')
 case "$install_env" in
     dev) DB_NAME=ax3l_dev ;;
     qa) DB_NAME=ax3l_qa ;;

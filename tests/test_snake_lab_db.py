@@ -14,13 +14,6 @@ from ax3l.interface.SnakeLab import SnakeLab
 class SnakeLabDbTests(unittest.TestCase):
     def setUp(self):
         self.assertEqual(os.environ["DB_NAME"], "ax3l_dev")
-        credentials = {
-            f"SNAKELAB_{key}": value
-            for key, value in os.environ.items() if key.startswith("DB_")
-        }
-        env = patch.dict(os.environ, credentials)
-        env.start()
-        self.addCleanup(env.stop)
         initialization = patch.object(
             DbMgr, "_initialize_event_tables",
             side_effect=AssertionError("External connections must not initialize tables"),
@@ -30,6 +23,7 @@ class SnakeLabDbTests(unittest.TestCase):
 
     def query_count(self, statuses=()):
         def connect(**kwargs):
+            self.assertEqual(kwargs.pop("database"), "snakelab")
             db = DbMgr(**kwargs)
             self.addCleanup(lambda: db.close() if db._connection.open else None)
             self.db = db
@@ -55,7 +49,7 @@ class SnakeLabDbTests(unittest.TestCase):
                 return SnakeLab().get_num_sims()
             finally:
                 factory.assert_called_once_with(
-                    env_prefix="SNAKELAB_DB", initialize_event_tables=False
+                    database="snakelab", initialize_event_tables=False
                 )
 
     def test_empty_database(self):
@@ -66,6 +60,7 @@ class SnakeLabDbTests(unittest.TestCase):
         run_id, other_run = str(uuid4()), str(uuid4())
 
         def connect(**kwargs):
+            self.assertEqual(kwargs.pop("database"), "snakelab")
             db = DbMgr(**kwargs)
             self.db = db
             self.addCleanup(lambda: db.close() if db._connection.open else None)
@@ -83,7 +78,7 @@ class SnakeLabDbTests(unittest.TestCase):
         with patch("ax3l.interface.SnakeLab.DbMgr", side_effect=connect) as factory:
             self.assertEqual(SnakeLab().get_episode_losses(run_id),
                              [(1, None), (2, 0.5), (3, 0.0)])
-        factory.assert_called_once_with(env_prefix="SNAKELAB_DB", initialize_event_tables=False)
+        factory.assert_called_once_with(database="snakelab", initialize_event_tables=False)
         self.assertFalse(self.db._connection.open)
 
     def test_counts_all_statuses_and_repeated_configurations(self):
@@ -95,7 +90,7 @@ class SnakeLabDbTests(unittest.TestCase):
     def test_full_configuration_uniqueness_uses_json_values_and_all_statuses(self):
         import json
         from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb
-        db = DbMgr(env_prefix='SNAKELAB_DB', initialize_event_tables=False)
+        db = DbMgr(initialize_event_tables=False)
         self.addCleanup(db.close)
         db.execute('CREATE TEMPORARY TABLE simulation_runs (config JSON NOT NULL, status VARCHAR(16))')
         dal = SnakeLabDb(db)
@@ -113,7 +108,7 @@ class SnakeLabDbTests(unittest.TestCase):
     def test_comparison_reads_all_runs_in_numeric_learning_rate_order(self):
         import json
         from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb
-        db = DbMgr(env_prefix='SNAKELAB_DB', initialize_event_tables=False)
+        db = DbMgr(initialize_event_tables=False)
         self.addCleanup(db.close)
         db.execute('''CREATE TEMPORARY TABLE simulation_runs (
             id INT AUTO_INCREMENT PRIMARY KEY, run_id CHAR(36), config JSON,
@@ -133,7 +128,7 @@ class SnakeLabDbTests(unittest.TestCase):
     def test_score_history_omits_seeds_and_preserves_sorted_repeated_scores(self):
         import json
         from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb
-        db = DbMgr(env_prefix='SNAKELAB_DB', initialize_event_tables=False)
+        db = DbMgr(initialize_event_tables=False)
         self.addCleanup(db.close)
         db.execute('''CREATE TEMPORARY TABLE simulation_runs (
             id INT AUTO_INCREMENT PRIMARY KEY, run_id CHAR(36), config JSON,

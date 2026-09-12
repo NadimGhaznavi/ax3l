@@ -143,7 +143,11 @@ while IFS= read -r -d '' source; do
         -- "$source" "$install_dir/$source"
 done < <(find ax3l -type f \( -name '*.py' -o -name '*.schema.json' -o -path 'ax3l/server/templates/*.html' \) -print0)
 
-"${system_admin[@]}" install -m 644 -o "$service_account" -g "$service_account" \
+# install.sh creates this directory under umask 077. Model services need to
+# traverse it to read MCP registration; database credentials retain mode 600.
+"${system_admin[@]}" chgrp "$service_account" "$config_dir"
+"${system_admin[@]}" chmod 750 "$config_dir"
+"${system_admin[@]}" install -m 640 -o "$service_account" -g "$service_account" \
     -- "$unit_dir/mcp.json" "$config_dir/mcp.json"
 
 for unit in "${units[@]}"; do

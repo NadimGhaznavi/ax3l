@@ -14,12 +14,12 @@ class SnakeLab:
         self.endpoint = endpoint
 
     def get_num_sims(self) -> int:
-        """Return the total stored run count using SNAKELAB_DB_* credentials.
+        """Return the total stored run count using Ax3l’s DB credentials.
 
         Database errors propagate. The connection is closed after each query,
         and no tables are initialized in the Snake Lab database.
         """
-        db = DbMgr(env_prefix="SNAKELAB_DB", initialize_event_tables=False)
+        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
         try:
             return SnakeLabDb(db).get_num_sims()
         finally:
@@ -45,7 +45,7 @@ class SnakeLab:
 
     def get_config(self, run_id: str) -> dict | None:
         UUID(run_id)
-        db = DbMgr(env_prefix="SNAKELAB_DB", initialize_event_tables=False)
+        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
         try:
             return SnakeLabDb(db).get_config(run_id)
         finally:
@@ -53,21 +53,21 @@ class SnakeLab:
 
     def get_run_result(self, run_id: str) -> dict | None:
         UUID(run_id)
-        db = DbMgr(env_prefix="SNAKELAB_DB", initialize_event_tables=False)
+        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
         try:
             return SnakeLabDb(db).get_run_result(run_id)
         finally:
             db.close()
 
     def get_learning_rate_history(self) -> list[dict]:
-        db = DbMgr(env_prefix="SNAKELAB_DB", initialize_event_tables=False)
+        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
         try:
             return SnakeLabDb(db).get_learning_rate_history()
         finally:
             db.close()
 
     def find_config_run(self, config: dict) -> str | None:
-        db = DbMgr(env_prefix="SNAKELAB_DB", initialize_event_tables=False)
+        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
         try:
             return SnakeLabDb(db).find_config_run(config)
         finally:
@@ -75,14 +75,14 @@ class SnakeLab:
 
     def get_learning_rate_report(self, golden_run_id: str) -> list[dict]:
         UUID(golden_run_id)
-        db = DbMgr(env_prefix="SNAKELAB_DB", initialize_event_tables=False)
+        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
         try:
             return SnakeLabDb(db).get_learning_rate_report(golden_run_id)
         finally:
             db.close()
 
     def is_config_unique(self, config: dict) -> bool:
-        db = DbMgr(env_prefix="SNAKELAB_DB", initialize_event_tables=False)
+        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
         try:
             return SnakeLabDb(db).is_config_unique(config)
         finally:
@@ -90,7 +90,7 @@ class SnakeLab:
 
     def get_episode_losses(self, run_id: str) -> list[tuple[int, float | None]]:
         UUID(run_id)
-        db = DbMgr(env_prefix="SNAKELAB_DB", initialize_event_tables=False)
+        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
         try:
             return SnakeLabDb(db).get_episode_losses(run_id)
         finally:

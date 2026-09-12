@@ -9,7 +9,7 @@ class DEventDisplay:
         "conversation_started": "Started",
         "conversation_ended": "Ended",
         "prompt_sent": "Prompt",
-        "reply_received": "Reply received",
+        "reply_received": "Response",
         "llm_request_failed": "LLM request failed",
         "llm_usage_recorded": "LLM usage",
         "tool_execution_started": "Tool started",

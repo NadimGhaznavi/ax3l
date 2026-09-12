@@ -142,6 +142,11 @@ for Qwen GGUF, not a health check. QA/prod use the same helper as root with the
 corresponding `-env` value. Service installation uses the helper for its stop/start
 sequence; these commands do not change systemd's boot ordering.
 
+`scripts/upgrade.sh -env <environment>` updates an existing installation from
+the current checkout. It validates the generated units, stops services, copies
+application modules and installs the units, then starts services in order.
+Database contents, credentials, and accounts are preserved.
+
 `scripts/uninstall.sh -env <environment>` stops, disables, and removes that
 environment's units before deleting its installation and database resources.
 

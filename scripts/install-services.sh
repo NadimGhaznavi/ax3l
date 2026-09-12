@@ -86,18 +86,19 @@ for name in llm-server ax3l-server reporting-server watchdog; do
         "$checkout_dir/systemd/$name.service" > "$unit_dir/$unit"
 done
 
+systemd-analyze verify "$unit_dir/"*.service
+"$checkout_dir/scripts/services.sh" -env "$install_env" stop
+
 cd -- "$checkout_dir"
 while IFS= read -r -d '' source; do
     "${system_admin[@]}" install -D -m 644 -o "$service_account" -g "$service_account" \
         -- "$source" "$install_dir/$source"
 done < <(find ax3l -type f -name '*.py' -print0)
 
-systemd-analyze verify "$unit_dir/"*.service
 for unit in "${units[@]}"; do
     "${system_admin[@]}" install -m 644 -- "$unit_dir/$unit" "/etc/systemd/system/$unit"
 done
 "${system_admin[@]}" systemctl daemon-reload
 "${system_admin[@]}" systemctl enable "${units[@]}"
-"$checkout_dir/scripts/services.sh" -env "$install_env" stop
 "$checkout_dir/scripts/services.sh" -env "$install_env" start
 printf 'Installed and started: %s\n' "${units[*]}"

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added `scripts/upgrade.sh -env dev|qa|prod` to update application modules and systemd units from the current checkout while preserving the database, credentials, and accounts.
+
+### Fixed
+
+- Service installation validates generated units and stops services before replacing application files.
+
 ## [0.2.2] - 2026-09-12 @ 04:25
 
 ### Added

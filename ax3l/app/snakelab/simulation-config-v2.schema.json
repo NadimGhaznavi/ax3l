@@ -191,7 +191,7 @@
           "default": 0.0021,
           "minimum": 0.0005,
           "maximum": 0.005,
-          "description": "Optimizer learning rate; controls the size of gradient updates."
+          "description": "Control the size of gradient updates."
         },
         "gamma": {
           "type": "number",

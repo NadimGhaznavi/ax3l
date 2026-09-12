@@ -30,6 +30,24 @@ class DbMgrTests(unittest.TestCase):
         )
         return self.db.query("SELECT LAST_INSERT_ID() AS event_id")[0]["event_id"]
 
+    def test_current_golden_config_selects_latest_creation(self):
+        from ax3l.app.EventLogDb import EventLogDb
+
+        with self.db.transaction():
+            for category, reason in (("Configuration", "Initial defaults"),
+                                     ("Configuration", "Parameter x: 2 > 4"),
+                                     ("Other", "Not a golden configuration")):
+                self.db.execute(
+                    "INSERT INTO events (name, category, log_level, process_id) VALUES (%s, %s, %s, %s)",
+                    ("golden_config_created", category, "INFO", self.process_id),
+                )
+                event_id = self.db.query("SELECT LAST_INSERT_ID() AS event_id")[0]["event_id"]
+                self.db.execute("INSERT INTO event_messages VALUES (%s, %s)", (event_id, reason))
+            self.assertEqual(EventLogDb(self.db).current_golden_config(), {
+                "process_id": self.process_id, "reason": "Parameter x: 2 > 4",
+            })
+            self.db.execute("DELETE FROM events WHERE process_id = %s", (self.process_id,))
+
     def test_round_trip_and_reinitialization(self):
         from ax3l.app.DbMgr import DbMgr
 

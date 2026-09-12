@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added the `GoldenConfig` dynamic prompt. Initialization and explicit refresh read the latest golden creation's run, reason, and stored Snake Lab configuration for use in an LLM conversation.
+
+- `FirstContactSingle` now accepts a JSON parameter key and builds its introduction from a readable name and the simulation spec's description.
+
 - Added `golden_config_created` in the Configuration category with a reason. Initial creation uses `Seeded database with default config.`; subsequent creations supply the parameter comparison.
 
 - Centralized log categories, event names, and display labels in `DEventCategory`, using a shared `EventCategory` class. The main loop and reporting use the catalog; existing stored event names and categories are preserved.

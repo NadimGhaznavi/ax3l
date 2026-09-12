@@ -57,7 +57,7 @@
           <td class="metadata" title="{{ event.event_id }}">{{ event.event_id }}</td>
           <td class="metadata" title="{{ event.log_level }}">{{ event.log_level }}</td>
           <td title="{{ event.category }}">{{ event.category }}</td>
-          <td title="{{ event.name }}">{{ event.name }}</td>
+          <td title="{{ event.name }}">{{ event_labels.get(event.name, event.name) }}</td>
           {% if event.reply_text is defined %}
           <td class="content" title="{{ event.reply_text }}"><a href="/events/{{ event.event_id }}">{{ event.reply_text }}</a></td>
           {% else %}

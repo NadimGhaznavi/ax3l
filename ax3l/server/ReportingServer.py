@@ -10,6 +10,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from ax3l.app.DbMgr import DbMgr
 from ax3l.app.EventLogDb import EventLogDb
 from ax3l.activity.ReplyReport import fields, reply_content
+from ax3l.constants.DEventDisplay import DEventDisplay
 
 
 def make_server(host: str, port: int) -> HTTPServer:
@@ -18,6 +19,7 @@ def make_server(host: str, port: int) -> HTTPServer:
         autoescape=select_autoescape(["html"]),
     )
     template = templates.get_template("events.html")
+    templates.globals["event_labels"] = DEventDisplay.LABELS
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):

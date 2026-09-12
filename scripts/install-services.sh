@@ -128,7 +128,7 @@ cd -- "$checkout_dir"
 while IFS= read -r -d '' source; do
     "${system_admin[@]}" install -D -m 644 -o "$service_account" -g "$service_account" \
         -- "$source" "$install_dir/$source"
-done < <(find ax3l -type f -name '*.py' -print0)
+done < <(find ax3l -type f \( -name '*.py' -o -path 'ax3l/server/templates/*.html' \) -print0)
 
 for unit in "${units[@]}"; do
     "${system_admin[@]}" install -m 644 -- "$unit_dir/$unit" "/etc/systemd/system/$unit"

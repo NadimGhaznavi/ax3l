@@ -1,0 +1,32 @@
+# Events
+
+| Event | Category |
+| --- | --- |
+| `service_started` | System |
+| `service_stopped` | System |
+| `service_failed` | System |
+| `conversation_started` | Conversation |
+| `conversation_ended` | Conversation |
+| `prompt_sent` | Conversation |
+| `reply_received` | Conversation |
+| `llm_request_failed` | LLM |
+| `llm_usage_recorded` | Metrics |
+| `tool_execution_started` | Tool |
+| `tool_execution_completed` | Tool |
+| `tool_execution_failed` | Tool |
+| `wait_started` | Process |
+| `wait_ended` | Process |
+| `simulation_submitted` | Simulation |
+| `simulation_queued` | Simulation |
+| `simulation_started` | Simulation |
+| `simulation_completed` | Simulation |
+| `simulation_cancelled` | Simulation |
+| `simulation_failed` | Simulation |
+| `simulation_restarted` | Simulation |
+| `proposal_accepted` | Configuration |
+| `proposal_rejected_invalid` | Configuration |
+| `proposal_rejected_duplicate` | Configuration |
+| `configuration_compared` | Configuration |
+| `golden_config_replaced` | Configuration |
+| `golden_config_retained` | Configuration |
+| `golden_config_seed_incremented` | Configuration |

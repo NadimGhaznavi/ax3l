@@ -96,9 +96,9 @@ PY
         printf 'Install llama.cpp at %s and the model at %s first.\n' "$llm_binary" "$model" >&2
         exit 1
     }
-    qwen_command="$llm_binary --model $qwen_model --host $llm_host --port $llm_port --metrics --mcp-servers-config $config_dir/mcp.json"
-    phi_command="$llm_binary --model $phi_model --host $llm_host --port $llm_port --metrics --mcp-servers-config $config_dir/mcp.json"
-    qwenv_command="$llm_binary --model $qwenv_model --mmproj $qwenv_mmproj -c $qwenv_context --host $llm_host --port $llm_port --metrics --mcp-servers-config $config_dir/mcp.json"
+    qwen_command="$llm_binary --model $qwen_model --host $llm_host --port $llm_port --metrics --jinja --mcp-servers-config $config_dir/mcp.json"
+    phi_command="$llm_binary --model $phi_model --host $llm_host --port $llm_port --metrics --jinja --mcp-servers-config $config_dir/mcp.json"
+    qwenv_command="$llm_binary --model $qwenv_model --mmproj $qwenv_mmproj -c $qwenv_context --host $llm_host --port $llm_port --metrics --jinja --mcp-servers-config $config_dir/mcp.json"
 fi
 
 [[ -d $install_dir && -f $config_dir/database.env ]] || {

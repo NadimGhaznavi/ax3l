@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.98.7] - 2026-09-12 @ 15:19
+
 - Reduce a missing-tool retry to “Please submit using the submit_single_value tool”. Do not resend the model’s prose response or original prompt material.
 
 - When the LLM replies without a tool call, send only its latest response and a short `UseTool` reminder on the next request. Original prompts and plots are not resent; reminders remain linked to the same logged conversation.

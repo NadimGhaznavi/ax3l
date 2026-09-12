@@ -110,14 +110,18 @@ operator as root, using `-env qa` or `-env prod` on the corresponding machine.
 | Watchdog | `watchdog-dev.service` | Reports to the systemd journal |
 
 QA units use a `-qa` suffix and ports 28080–28082. Production units have no
-environment suffix and use ports 8080–8082. All HTTP endpoints bind to localhost.
+environment suffix. Port assignments are defined in `DLlama`, `DAx3l`, and
+`DReportMgr`. The production LLM binds to `DLlama.HOST` (`0.0.0.0`) for access
+from the dev machine at `http://<production-host>:27770`. Other HTTP endpoints
+bind to localhost.
 
 For this slice, Ax3l and reporting implement only `/health`; conversations,
-report queries, and workflow persistence are not implemented yet. Dev's LLM
-service is explicitly a health-only stub and provides no inference. QA/prod
-units launch the real llama.cpp binary and require it and the Qwen model under
-`/opt/<environment>/llama.cpp/bin/llama-server` and
-`/opt/<environment>/models/Qwen3.5-4B-Q4_K_M.gguf` respectively.
+report queries, and workflow persistence are not implemented yet. Dev and QA use
+an explicitly labeled health-only LLM stub that provides no inference and requires
+no model or GPU. Production launches the real llama.cpp binary directly, using
+the executable path from `DLlama` and model path from `DQwen`. Their current paths
+are `/opt/prod/llama.cpp/bin/llama-server` and
+`/opt/prod/models/Qwen3.5-4B-Q4_K_M.gguf` respectively.
 
 The watchdog checks Ax3l's systemd state and the LLM health endpoint every ten
 seconds. It logs the observations without restarting services. The units do not

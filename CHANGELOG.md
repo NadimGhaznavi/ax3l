@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Split the event log timestamp into Date (`YYYY-MM-DD`) and Time (`HH:MM:SS`) columns, omitting fractional seconds from the display.
+
 ## [0.7.7] - 2026-09-12 @ 10:06
 
 - Reduced the Event column width from `23ch` to `12ch` to give the Message column more room.

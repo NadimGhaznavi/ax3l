@@ -94,6 +94,27 @@ class LoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(names.count('tool_execution_completed'), 2)
         self.assertEqual(names[-1], 'conversation_ended')
 
+    async def test_prose_responses_get_logged_reminders_until_tool_is_used(self):
+        llm, db = Mock(url='fixture'), Mock()
+        prose = {'role': 'assistant', 'content': 'Try increasing the learning rate.'}
+        prose_response = (200, '', json.dumps({'choices': [
+            {'message': prose, 'finish_reason': 'stop'}]}).encode())
+        llm.complete.side_effect = [prose_response, prose_response, reply(.003)]
+        tools = Mock(definition={'type': 'function'})
+        tools.submit = AsyncMock(return_value={'status': 'ok', 'run_id': 'next'})
+        self.assertEqual(await converse(llm, Path('/tmp'), db, tools, [Prompt('initial')]), 'next')
+        requests = [json.loads(c.args[0]) for c in llm.complete.call_args_list]
+        self.assertEqual([len(r['messages']) for r in requests], [1, 1, 1])
+        self.assertNotIn(prose, requests[1]['messages'])
+        self.assertEqual(requests[1]['messages'][0]['content'], 'Please submit using the submit_single_value tool')
+        self.assertEqual(requests[2]['messages'], requests[1]['messages'])
+        tools.submit.assert_awaited_once_with({'parameter': 'learning_rate', 'value': .003})
+        logs = db.log.call_args_list
+        self.assertEqual([json.loads(c.args[3]) for c in logs if c.args[0] == 'prompt_sent'],
+                         [requests[0]['messages'][0], requests[1]['messages'][0], requests[2]['messages'][0]])
+        self.assertEqual(sum(c.args[0] == 'conversation_started' for c in logs), 1)
+        self.assertEqual(sum(c.args[0] == 'conversation_ended' for c in logs), 1)
+
     async def test_ambiguous_tool_failure_stops_without_resubmission(self):
         llm, db = Mock(url='fixture'), Mock()
         llm.complete.return_value = reply(.003)

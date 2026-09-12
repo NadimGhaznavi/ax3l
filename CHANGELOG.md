@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.98.9] - 2026-09-12 @ 15:56
+
+- Doubled the plot width
+
 ## [0.98.8] - 2026-09-12 @ 15:30
 
 - Supply QwenV with an explicit chat template combining vision inputs and Qwen tool definitions, calls, and results. The bundled model template omitted tools, causing prose replies despite required tool calls.

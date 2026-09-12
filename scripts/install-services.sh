@@ -28,12 +28,6 @@ case "$install_env" in
         else
             suffix=
         fi
-        llm_binary="/opt/$install_env/llama.cpp/bin/llama-server"
-        model="/opt/$install_env/models/Qwen3.5-4B-Q4_K_M.gguf"
-        [[ -x $llm_binary && -r $model ]] || {
-            printf 'Install llama.cpp at %s and the model at %s first.\n' "$llm_binary" "$model" >&2
-            exit 1
-        }
         ;;
     *) printf 'Invalid environment: %s\n' "$install_env" >&2; exit 2 ;;
 esac
@@ -49,10 +43,28 @@ print(*(getattr(constants, attribute) for constants in (DLlama, DAx3l, DReportMg
 PY
 )
 read -r llm_port ax3l_port report_port <<< "$ports"
-if [[ $install_env == dev ]]; then
+if [[ $install_env == dev || $install_env == qa ]]; then
     llm_command="/usr/bin/python3 -m ax3l.server.LLMHealthStub --port $llm_port"
 else
-    llm_command="$llm_binary --model $model --host 127.0.0.1 --port $llm_port"
+    llm_paths=$(cd -- "$checkout_dir" && python3 - <<'PY'
+from pathlib import Path
+from ax3l.constants.DLlama import DLlama
+from ax3l.constants.DQwen import DQwen
+
+print(Path(DLlama.BASE_DIR) / DLlama.BIN_DIR / DLlama.SERVER)
+print(Path(DQwen.BASE_DIR) / DQwen.GGUF)
+print(DLlama.HOST)
+PY
+)
+    mapfile -t paths <<< "$llm_paths"
+    llm_binary=${paths[0]}
+    model=${paths[1]}
+    llm_host=${paths[2]}
+    [[ -x $llm_binary && -r $model ]] || {
+        printf 'Install llama.cpp at %s and the model at %s first.\n' "$llm_binary" "$model" >&2
+        exit 1
+    }
+    llm_command="$llm_binary --model $model --host $llm_host --port $llm_port"
 fi
 
 [[ -d $install_dir && -f $config_dir/database.env ]] || {

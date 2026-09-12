@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-12 @ 03:23
+
+### Changed
+
+- Production LLM now binds to `DLlama.HOST` (`0.0.0.0`) to allow connections from the dev machine.
+- QA now uses the health-only LLM stub alongside dev, without requiring llama.cpp or a model. Production launches the real server using the executable and model paths from `DLlama` and `DQwen`.
+
 ## [0.1.1] - 2026-09-12 @ 03:15
 
 ### Changed

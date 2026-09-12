@@ -34,6 +34,7 @@ class ModelServicesTests(unittest.TestCase):
             command = (
                 'set -euo pipefail\n'
                 f'checkout_dir={shlex.quote(folder)}\n'
+                f'config_dir={shlex.quote(folder)}\n'
                 'selected_model=qwenv\nllm_port=27770\n    llm_paths='
                 + production + '\nprintf "%s\\n" "$qwenv_command"\n'
             )
@@ -42,7 +43,7 @@ class ModelServicesTests(unittest.TestCase):
             self.assertEqual(shlex.split(result.stdout), [
                 str(binary), '--model', str(directory / DQwenV.GGUF),
                 '--mmproj', str(projector), '-c', '4096', '--host', '0.0.0.0',
-                '--port', '27770', '--metrics',
+                '--port', '27770', '--metrics', '--mcp-servers-config', str(directory / 'mcp.json'),
             ])
             projector.unlink()
             result = subprocess.run(['bash', '-c', command], capture_output=True, text=True)
@@ -56,6 +57,7 @@ class ModelServicesTests(unittest.TestCase):
                     'ENV': environment, 'SUFFIX': suffix, 'USER': 'nobody',
                     'APP': str(ROOT), 'CONFIG': '/tmp/ax3l-test', 'LLM_PORT': str(port),
                     'AX3L_PORT': '27771', 'REPORT_PORT': '27772',
+                    'AX3L_ZMQ_ENDPOINT': 'tcp://127.0.0.1:61968',
                     'AX3L_ARGS': '--llm-url http://127.0.0.1:27770 --output /var/lib/ax3l/haiku' if environment == 'prod' else '',
                     'QWEN_COMMAND': '/usr/bin/true --model /models/Qwen.gguf',
                     'QWENV_COMMAND': '/usr/bin/true --model /models/Qwenv.gguf --mmproj /models/projector.gguf -c 4096',
@@ -106,10 +108,10 @@ class ModelServicesTests(unittest.TestCase):
                     'start watchdog-dev.service',
                 ])
 
-    def test_default_is_qwen(self):
+    def test_default_is_qwenv(self):
         result, calls = self.run_helper('start')
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('start qwen-server-dev.service', calls)
+        self.assertIn('start qwenv-server-dev.service', calls)
 
     def test_missing_units_do_not_break_stop_or_migration(self):
         result, calls = self.run_helper('stop')

@@ -1,10 +1,5 @@
-from typing import Final
+"""Compatibility import; maintain conversation events in DEventCategory."""
 
+from ax3l.constants.DEventCategory import DEventCategory
 
-class DConversation:
-    CATEGORY: Final[str] = "Conversation"
-
-    STARTED: Final[str] = "conversation_started"
-    ENDED: Final[str] = "conversation_ended"
-    PROMPT: Final[str] = "prompt_sent"
-    RESPONSE: Final[str] = "reply_received"
+DConversation = DEventCategory.Conversation

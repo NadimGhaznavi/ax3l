@@ -28,13 +28,13 @@ implementation proceeds in thin, working slices.
 
 - Hosts the LLM and provides inference to Ax3l.
 - Receives context and tool definitions from Ax3l and returns model responses, including tool-call requests.
-- Tool execution belongs to Ax3l. The llama-server web interface is outside the user conversation flow.
+- Launches the SnakeLab stdio MCP server using `--mcp-servers-config`. Domain tools forward proposed actions over ZeroMQ to Ax3l, which owns validation and submission.
 - The intended systemd service launches the llama.cpp server binary directly; no Python wrapper is needed for the current responsibilities.
 
 ### MCP servers and tools
 
 - Provide capabilities behind Ax3l's API.
-- Ax3l connects to MCP servers through interface classes and controls which tools are available to the LLM.
+- The SnakeLab MCP server is registered in llama-server's `mcp.json`; domain tools live in `ax3l/app/snakelab/tools`. `SubmitSingleValue` forwards proposals through shared `ZMQMsg` and `ZMQClient` classes. Ax3l's `ZMQServer` dispatches them to the domain handler, which validates legality and full-configuration uniqueness before submission.
 - Tool implementations can be added or modified behind that boundary as a slice requires them.
 
 ### MariaDB
@@ -116,8 +116,9 @@ environment suffix. Port assignments are defined in `DLlama`, `DAx3l`, and
 from the dev machine at `http://<production-host>:27770`. Other HTTP endpoints
 bind to localhost.
 
-For this slice, Ax3l and reporting implement only `/health`; conversations,
-report queries, and workflow persistence are not implemented yet. Dev and QA use
+Ax3l serves HTTP health checks and ZeroMQ tool requests, while reporting reads
+the shared event log and simulation configurations. The first conversation is
+implemented; continuing the optimization workflow remains a later slice. Dev and QA use
 an explicitly labeled health-only LLM stub that provides no inference and requires
 no model or GPU. Production launches the real llama.cpp binary directly, using
 the executable path from `DLlama` and model path from `DLlama.MODEL_DIR` plus
@@ -145,7 +146,7 @@ for the selected model, not a health check. QA/prod use the same helper as root 
 corresponding `-env` value. Service installation uses the helper for its stop/start
 sequence. The helper starts the selected model without checking or stopping other
 models. The three model units share the LLM port and have no concurrency guards.
-Installation and upgrade update all units together and default to starting Qwen;
+Installation and upgrade update all units together and default to starting QwenV;
 pass `-model phi` or `-model qwenv` to start another model. Upgrade removes the
 old `llm-server` unit. Qwen Vision also loads `DQwenV.MMPROJ` from
 `DLlama.MODEL_DIR` using `--mmproj` and sets `-c 4096`.

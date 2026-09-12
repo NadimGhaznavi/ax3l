@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-12 @ 03:23
+
 ### Changed
 
 - Production LLM now binds to `DLlama.HOST` (`0.0.0.0`) to allow connections from the dev machine.

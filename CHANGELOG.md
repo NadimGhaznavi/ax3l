@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-12 @ 06:13
+
+### Added
+
+- Added `qwenv-server` and `-model qwenv` for Qwen2.5-VL, including its vision projector and 4096-token context. All model services are installed and upgraded together.
+
+### Changed
+
+- Removed model service conflicts and automatic stopping/disabling of other models. Starting a model leaves existing model processes alone.
+
 ## [0.3.0] - 2026-09-12 @ 05:13
 
 ### Added

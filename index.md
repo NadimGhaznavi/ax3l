@@ -48,5 +48,6 @@ The current phase involves setting up the environment.
 
 ## Models
 
-- [Qwen Model Setup](pages/qwen-model-setup)
-- [Phi Model Setup](/pages/phi-model-setup)
+- [Qwen 3.5 4B Setup](/pages/qwen-3.5-model-setup)
+- [Qwen 2.5 VL 3B Setup](/pages/qwen-2.5-VL-model-setup)
+- [Phi Setup](/pages/phi-model-setup)

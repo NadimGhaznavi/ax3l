@@ -48,7 +48,7 @@ class ComparisonTests(unittest.TestCase):
     def test_prompts_include_full_history_and_two_loss_curves(self):
         golden, latest = str(uuid4()), str(uuid4())
         rows = [{'learning_rate': .001, 'high_score': 4}, {'learning_rate': .003, 'high_score': 12}]
-        with patch('ax3l.interface.SnakeLab.SnakeLab.get_learning_rate_history', return_value=rows):
+        with patch('ax3l.interface.SnakeLab.SnakeLab.get_learning_rate_report', return_value=rows):
             prompt = Comparison(golden, latest, latest)
         history = json.loads(prompt.to_md().split('```json\n')[1].split('```')[0])
         self.assertEqual(history, rows)
@@ -72,6 +72,11 @@ class ComparisonTests(unittest.TestCase):
 
 
 class LoopTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        rotation = patch(MODULE + 'rotate_if_needed', new_callable=AsyncMock, return_value=None)
+        rotation.start()
+        self.addCleanup(rotation.stop)
+
     async def test_rejection_feedback_then_acceptance_in_same_conversation(self):
         llm = Mock(url='fixture')
         llm.complete.side_effect = [reply(.002), reply(.003)]
@@ -116,6 +121,7 @@ class LoopTests(unittest.IsolatedAsyncioTestCase):
         context = AsyncMock()
         conversations = AsyncMock(side_effect=['last', 'next', asyncio.CancelledError()])
         with patch(MODULE + 'SnakeLab', return_value=snake), patch(MODULE + 'GoldenConfig', return_value=golden), patch(MODULE + 'LossPlot', return_value=Prompt('loss')), patch(MODULE + 'SnakeLabTools', return_value=context), patch(MODULE + 'EventLogDb') as events, patch(MODULE + 'converse', conversations), patch(MODULE + 'wait_for_run', new_callable=AsyncMock) as wait, patch(MODULE + 'compare', side_effect=['last', 'last']) as comparison, patch(MODULE + 'Comparison', side_effect=lambda *ids: Prompt(str(ids))) as prompt, patch(MODULE + 'ComparisonPlot', return_value=Prompt('overlay')) as plot:
+            events.return_value.latest_seed_baseline.return_value = None
             events.return_value.latest_snakelab_proposal.return_value = proposal
             with self.assertRaises(asyncio.CancelledError):
                 await optimize(Mock(), Path('/tmp'), Mock(), 'endpoint')

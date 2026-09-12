@@ -6,6 +6,7 @@ import json
 from ax3l.app.ConfigurationLog import ConfigurationLog
 from ax3l.app.EventLogDb import EventLogDb
 from ax3l.app.snakelab.ToolConversation import converse
+from ax3l.app.snakelab.SeedRotation import rotate_if_needed
 from ax3l.app.snakelab.prompts.Comparison import Comparison
 from ax3l.app.snakelab.prompts.ComparisonSingle import ComparisonSingle
 from ax3l.app.snakelab.prompts.ComparisonPlot import ComparisonPlot
@@ -63,6 +64,7 @@ async def optimize(llm, output, db, endpoint):
     snake = SnakeLab()
     while snake.is_simulation_running():
         await asyncio.sleep(DSnakeLab.STATUS_POLL_SECONDS)
+    await rotate_if_needed(snake, db, wait_for_run, resume_only=True)
     golden = GoldenConfig(db)
     golden_id = golden.run_id
     baseline = snake.get_run_result(golden_id)
@@ -86,10 +88,16 @@ async def optimize(llm, output, db, endpoint):
             golden_id = compare(snake, db, golden_id, latest_id)
         prompts = [Comparison(previous_golden_id, latest_id, golden_id), ComparisonSingle(),
                    ComparisonPlot(previous_golden_id, latest_id)]
+    elif EventLogDb(db).latest_seed_baseline() is not None:
+        prompts = [Comparison(golden_id, golden_id, golden_id), ComparisonSingle(), LossPlot(golden_id)]
     else:
         prompts = [FirstContact(), golden, LossPlot(golden_id), FirstContactSingle("learning_rate")]
     async with SnakeLabTools(endpoint) as tools:
         while True:
+            rotated_id = await rotate_if_needed(snake, db, wait_for_run)
+            if rotated_id is not None:
+                golden_id = rotated_id
+                prompts = [Comparison(golden_id, golden_id, golden_id), ComparisonSingle(), LossPlot(golden_id)]
             latest_id = await converse(llm, output, db, tools, prompts)
             await wait_for_run(snake, db, latest_id)
             while snake.is_simulation_running():

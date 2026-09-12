@@ -56,3 +56,31 @@ class SnakeLabDb:
             (run_id,),
         )
         return [(row["episode"], row["loss"]) for row in rows]
+
+    def find_config_run(self, config: dict) -> str | None:
+        rows = self._db.query("SELECT run_id FROM simulation_runs WHERE JSON_EQUALS(config, %s) ORDER BY id DESC LIMIT 1",
+                              (json.dumps(config, allow_nan=False),))
+        return rows[0]["run_id"] if rows else None
+
+    def get_learning_rate_report(self, golden_run_id: str) -> list[dict]:
+        rows = self._db.query("""
+            SELECT r.run_id, r.status, r.high_score,
+                   JSON_EXTRACT(r.config, '$.training.learning_rate') AS learning_rate,
+                   JSON_EQUALS(JSON_EXTRACT(r.config, '$.seed'),
+                               JSON_EXTRACT(g.config, '$.seed')) AS current_seed
+            FROM simulation_runs r JOIN simulation_runs g ON g.run_id = %s
+            WHERE JSON_EQUALS(JSON_REMOVE(r.config, '$.seed', '$.training.learning_rate'),
+                              JSON_REMOVE(g.config, '$.seed', '$.training.learning_rate'))
+            ORDER BY JSON_EXTRACT(r.config, '$.training.learning_rate') + 0, r.id
+        """, (golden_run_id,))
+        grouped = {}
+        for row in rows:
+            lr = json.loads(row["learning_rate"])
+            entry = grouped.setdefault(lr, {"learning_rate": lr, "results": [], "history": []})
+            if row["current_seed"]:
+                entry["results"].append({key: row[key] for key in ("run_id", "status", "high_score")})
+            elif row["status"] == "completed" and row["high_score"] is not None:
+                entry["history"].append(row["high_score"])
+        for entry in grouped.values():
+            entry["history"].sort()
+        return list(grouped.values())

@@ -129,3 +129,26 @@ class SnakeLabDbTests(unittest.TestCase):
         self.assertIsNone(history[0]['high_score'])
         self.assertEqual(dal.get_run_result(ids[0])['config']['training']['learning_rate'], .01)
         self.assertIsNone(dal.get_run_result(str(uuid4())))
+
+    def test_score_history_omits_seeds_and_preserves_sorted_repeated_scores(self):
+        import json
+        from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb
+        db = DbMgr(env_prefix='SNAKELAB_DB', initialize_event_tables=False)
+        self.addCleanup(db.close)
+        db.execute('''CREATE TEMPORARY TABLE simulation_runs (
+            id INT AUTO_INCREMENT PRIMARY KEY, run_id CHAR(36), config JSON,
+            status VARCHAR(16), high_score INT NULL)''')
+        golden_id = str(uuid4())
+        config = {'seed': 9003, 'training': {'learning_rate': .002, 'batch_size': 24}}
+        for seed, score, state in ((9000, 12, 'completed'), (9001, 0, 'completed'),
+                                   (9002, 12, 'completed'), (8999, None, 'completed'),
+                                   (8998, 99, 'failed'), (9003, 3, 'completed')):
+            db.execute('INSERT INTO simulation_runs (run_id, config, status, high_score) VALUES (%s,%s,%s,%s)',
+                       (golden_id if seed == 9003 else str(uuid4()), json.dumps({**config, 'seed': seed}), state, score))
+        dal = SnakeLabDb(db)
+        report = dal.get_learning_rate_report(golden_id)
+        self.assertEqual(report, [{'learning_rate': .002, 'results': [
+            {'run_id': golden_id, 'status': 'completed', 'high_score': 3}], 'history': [0, 12, 12]}])
+        self.assertNotIn('seed', json.dumps(report))
+        self.assertEqual(dal.find_config_run(config), golden_id)
+        self.assertIsNone(dal.find_config_run({**config, 'seed': 123}))

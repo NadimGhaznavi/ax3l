@@ -28,7 +28,7 @@ class GoldenConfigTests(unittest.TestCase):
             snake.return_value.get_config.assert_called_with("next-run")
             self.assertIn("Parameter x: 2 > 4", prompt.to_md())
             self.assertNotIn("Seeded database", prompt.to_md())
-            self.assertEqual(json.loads(prompt.to_md().split("```json\n")[1].split("\n```")[0]), configs[1])
+            self.assertEqual(json.loads(prompt.to_md().split("```json\n")[1].split("\n```")[0]), {"training": configs[1]["training"]})
             self.assertEqual(json.loads(prompt.to_json()), {"role": "user", "content": prompt.to_md()})
 
     def test_missing_selection_or_run_fails(self):

@@ -169,6 +169,30 @@ class DbMgrTests(unittest.TestCase):
         self.assertEqual(dal.latest_snakelab_proposal(), {
             'process_id': self.process_id, 'comparison_id': event_id, 'comparison': snapshot})
 
+    def test_stagnation_reset_and_rotation_recovery_queries(self):
+        import json
+        from ax3l.app.EventLogDb import EventLogDb
+        dal = EventLogDb(self.db)
+        def log(name, content='test', parent=None):
+            return self.db.log(name, 'Configuration', 'INFO', content,
+                               process_id=self.process_id, parent_event_id=parent)
+        log('golden_config_created')
+        self.assertEqual(dal.stagnant_rounds(), 0)
+        log('configuration_compared')
+        log('configuration_compared')
+        self.assertEqual(dal.stagnant_rounds(), 1)  # Duplicate accounting of one run counts once.
+        log('golden_config_created')
+        self.assertEqual(dal.stagnant_rounds(), 0)
+        log('proposal_accepted')
+        intent = log('seed_rotation_started', json.dumps({'config': {'seed': 2}}))
+        self.assertEqual(dal.pending_seed_rotation()['event_id'], intent)
+        submitted = log('golden_config_seed_incremented', parent=intent)
+        self.assertEqual(dal.pending_seed_rotation()['run_id'], self.process_id)
+        self.assertIsNone(dal.latest_snakelab_proposal())
+        log('golden_config_created', parent=submitted)
+        self.assertIsNone(dal.pending_seed_rotation())
+        self.assertEqual(dal.latest_seed_baseline(), self.process_id)
+
 
 if __name__ == "__main__":
     unittest.main()

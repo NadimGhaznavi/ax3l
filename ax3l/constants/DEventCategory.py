@@ -95,6 +95,7 @@ class DEventCategory:
         GOLDEN_CREATED = "golden_config_created"
         GOLDEN_REPLACED = "golden_config_replaced"
         GOLDEN_RETAINED = "golden_config_retained"
+        SEED_ROTATION_STARTED = "seed_rotation_started"
         GOLDEN_SEED_INCREMENTED = "golden_config_seed_incremented"
         LABELS = {
             PROPOSAL_ACCEPTED: "Proposal accepted",
@@ -104,6 +105,7 @@ class DEventCategory:
             GOLDEN_CREATED: "Golden configuration created",
             GOLDEN_REPLACED: "Golden configuration replaced",
             GOLDEN_RETAINED: "Golden configuration retained",
+            SEED_ROTATION_STARTED: "Seed rotation started",
             GOLDEN_SEED_INCREMENTED: "Golden configuration seed incremented",
         }
 

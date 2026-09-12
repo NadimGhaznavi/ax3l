@@ -27,6 +27,7 @@ class GoldenConfig(DynamicPrompt):
         config = self._snake_lab.get_config(golden["process_id"])
         if config is None:
             raise ValueError(f"Golden configuration run {golden['process_id']} was not found")
+        config = {key: value for key, value in config.items() if key != "seed"}
         self._content = (
             "Current Golden Configuration\n\n"
             f"Reason: {golden['reason']}\n\n"

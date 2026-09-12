@@ -66,6 +66,21 @@ class SnakeLab:
         finally:
             db.close()
 
+    def find_config_run(self, config: dict) -> str | None:
+        db = DbMgr(env_prefix="SNAKELAB_DB", initialize_event_tables=False)
+        try:
+            return SnakeLabDb(db).find_config_run(config)
+        finally:
+            db.close()
+
+    def get_learning_rate_report(self, golden_run_id: str) -> list[dict]:
+        UUID(golden_run_id)
+        db = DbMgr(env_prefix="SNAKELAB_DB", initialize_event_tables=False)
+        try:
+            return SnakeLabDb(db).get_learning_rate_report(golden_run_id)
+        finally:
+            db.close()
+
     def is_config_unique(self, config: dict) -> bool:
         db = DbMgr(env_prefix="SNAKELAB_DB", initialize_event_tables=False)
         try:

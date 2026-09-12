@@ -48,6 +48,8 @@ class SubmitSingleValueHandler:
                 elif name == parameter:
                     yield path + (name,), definition
 
+        if parameter == "seed":
+            return self._reject("Seed is managed by Ax3l and cannot be proposed.")
         fields = list(matches(self._schema))
         if len(fields) != 1:
             return self._reject(f"Unknown or ambiguous parameter: {parameter}.")

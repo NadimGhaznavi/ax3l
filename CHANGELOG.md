@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Made event log entries single-line rows with alternating dark/light backgrounds. Long entries truncate with an ellipsis; hover reveals the full entry.
+
+- Styled the event log with a dark background, green monospace lettering, and bordered sections, controls, and log entries.
+
+- The reporting event log now shows the newest entries first.
+
 ## [0.7.0] - 2026-09-12 @ 09:06
 
 - Reporting now listens on `0.0.0.0` by default, including under systemd. The production event log is available at `http://neuromancer.osoyalce.com:28870/`. Use `--host 127.0.0.1` for local-only access.

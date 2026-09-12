@@ -3,12 +3,31 @@
 
 set -e
 
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
+
 usage() {
+    local branch likely_version major minor patch next_version current_version
+    branch=$(git branch --show-current)
+    if [[ ${branch} =~ (^|[/_-])v?([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?)$ ]]; then
+        likely_version=${BASH_REMATCH[2]}
+    else
+        current_version=$(sed -nE 's/^    VERSION: Final\[str\] = "([^"]+)"$/\1/p' ax3l/constants/DAx3l.py)
+        IFS=. read -r major minor patch <<< "${current_version%%[-+]*}"
+        likely_version="${major}.${minor}.$((10#${patch} + 1))"
+    fi
+    IFS=. read -r major minor patch <<< "${likely_version%%[-+]*}"
+    next_version="${major}.${minor}.$((10#${patch} + 1))"
+
     cat <<EOF
 Usage: $(basename -- "$0") <version> <message> [next-feature-branch]
 
+Current branch: ${branch}
+Likely next version: ${likely_version}
+
 Example:
-  $(basename -- "$0") 0.0.1 "Maintenance release"
+  $(basename -- "$0") ${likely_version} "Maintenance release"
+
+Next feature branch: feat/maint-${next_version}
 
 Run from a clean feature branch with local dev and main up to date.
 Use a version without a leading v. The next branch defaults to
@@ -27,8 +46,6 @@ if [[ $# -lt 2 || $# -gt 3 ]]; then
     usage >&2
     exit 2
 fi
-
-cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 
 version=$1
 message="Release ${version}: $2"

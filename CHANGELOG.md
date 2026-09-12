@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Give Chrome writable config/cache paths in Ax3l’s systemd runtime directory. This fixes the browser exiting during plot rendering when home directories are hidden and the filesystem is read-only. Verified headless PNG rendering under the service’s filesystem restrictions.
+
 ## [0.98.5] - 2026-09-12 @ 14:55
 
 - Provision Chrome for Kaleido inside the application directory, configure its path for Ax3l’s service, and verify PNG rendering during installation. This avoids relying on a browser download in a home directory hidden by systemd.

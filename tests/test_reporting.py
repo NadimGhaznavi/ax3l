@@ -1,9 +1,11 @@
 """HTTP integration check using the disposable DEV event database."""
 
 import os
+import json
 from threading import Thread
 import unittest
 from urllib.request import urlopen
+from urllib.error import HTTPError
 from uuid import uuid4
 
 
@@ -39,6 +41,31 @@ class ReportingTests(unittest.TestCase):
                 self.assertLess(page.index(second), page.index("&lt;script&gt;"))
             with urlopen(url + "/health") as response:
                 self.assertEqual(response.status, 200)
+
+            reply_text = "Quiet <script>night</script>\nA tree's shade"
+            payload = {
+                "choices": [{"index": 0, "finish_reason": "stop", "message": {
+                    "role": "assistant", "content": reply_text,
+                }}],
+                "model": "Qwen2.5-VL", "id": "chatcmpl-test",
+                "usage": {"prompt_tokens": 24, "prompt_tokens_details": {"cached_tokens": 0}},
+                "timings": {"predicted_ms": 946.36},
+                "extra": {"flag": False, "empty": [], "missing": None},
+            }
+            event_id = db.log("reply_received", "Conversation", "INFO", json.dumps(payload), process_id=process_id)
+            with urlopen(url) as response:
+                page = response.read().decode()
+                self.assertIn(f'href="/events/{event_id}">Quiet &lt;script&gt;night&lt;/script&gt;', page)
+                self.assertNotIn("chatcmpl-test", page)
+            with urlopen(f"{url}/events/{event_id}") as response:
+                page = response.read().decode()
+                self.assertIn("Quiet &lt;script&gt;night&lt;/script&gt;", page)
+                self.assertNotIn("<script>", page)
+                for value in ("usage.prompt_tokens_details.cached_tokens", "timings.predicted_ms", "946.36", "chatcmpl-test", "choices[0].finish_reason", "extra.flag", "false", "extra.empty", "[]", "null"):
+                    self.assertIn(value, page)
+            with self.assertRaises(HTTPError) as error:
+                urlopen(url + "/events/0")
+            self.assertEqual(error.exception.code, 404)
         finally:
             server.shutdown()
             thread.join()

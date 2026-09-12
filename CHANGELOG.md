@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added the global `DAx3l.RAW_LOGS_ENABLED` flag, defaulting to `False`. The haiku loop creates no capture directories or files while disabled; database events and normal console/journal status remain available. Set it to `True` to restore raw captures. Existing captures are not deleted.
+
+- Conversation replies now link from their assistant message text to a detail page showing the event envelope and every captured response field, including usage and timings.
+
 ## [0.7.2] - 2026-09-12 @ 09:25
 
 - Gave the event log separate Time, ID, Level, Category, Event, and Message columns while retaining single-line striped rows.

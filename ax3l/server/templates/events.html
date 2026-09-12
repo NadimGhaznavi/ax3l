@@ -28,6 +28,8 @@
     .entry:hover { background: #1d3825; }
     .metadata { color: var(--muted); }
     .content { font: inherit; }
+    a { color: var(--green); text-underline-offset: .2em; }
+    a:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
     .empty { margin: 0; padding: 1rem; border: 1px solid var(--border); }
     ::selection { background: var(--green); color: #050a06; }
     @media (max-width: 600px) { body { margin: .5rem; padding: .5rem; } }
@@ -56,7 +58,11 @@
           <td class="metadata" title="{{ event.log_level }}">{{ event.log_level }}</td>
           <td title="{{ event.category }}">{{ event.category }}</td>
           <td title="{{ event.name }}">{{ event.name }}</td>
+          {% if event.reply_text is defined %}
+          <td class="content" title="{{ event.reply_text }}"><a href="/events/{{ event.event_id }}">{{ event.reply_text }}</a></td>
+          {% else %}
           <td class="content" title="{{ event.content if event.content is not none else '' }}">{{ event.content if event.content is not none else '' }}</td>
+          {% endif %}
         </tr>
     {% else %}
         <tr><td class="empty" colspan="6">No events logged yet.</td></tr>

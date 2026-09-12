@@ -18,3 +18,11 @@ class EventLogDb:
             LIMIT 500
         """)
         return rows
+
+    def get(self, event_id: int) -> dict[str, Any] | None:
+        rows = self._db.query("""
+            SELECT e.*, m.content
+            FROM events e LEFT JOIN event_messages m USING (event_id)
+            WHERE e.event_id = %s
+        """, (event_id,))
+        return rows[0] if rows else None

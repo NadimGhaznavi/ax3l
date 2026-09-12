@@ -50,18 +50,17 @@ class Ax3lServiceTests(unittest.TestCase):
                     try:
                         deadline = time.monotonic() + 15
                         while time.monotonic() < deadline:
-                            logs = list((output / "haiku").glob("*/run.log"))
-                            if logs:
-                                match = re.search(r"Conversation: ([\w-]+)", logs[0].read_text())
-                                if match:
-                                    process_id = match[1]
-                                    rows = db.query("SELECT name FROM events WHERE process_id = %s ORDER BY event_id", (process_id,))
-                                    if any(row["name"] == "wait_started" for row in rows):
-                                        break
+                            match = re.search(r"Conversation: ([\w-]+)", (output / "service.log").read_text())
+                            if match:
+                                process_id = match[1]
+                                rows = db.query("SELECT name FROM events WHERE process_id = %s ORDER BY event_id", (process_id,))
+                                if any(row["name"] == "wait_started" for row in rows):
+                                    break
                             self.assertIsNone(process.poll(), (output / "service.log").read_text())
                             time.sleep(0.05)
                         else:
                             self.fail("Service did not reach its first wait")
+                        self.assertFalse((output / "haiku").exists())
                         console.seek(0)
                         port = re.search(r"listening on 127.0.0.1:(\d+)", console.read()).group(1)
                         with urlopen(f"http://127.0.0.1:{port}/health", timeout=3) as response:

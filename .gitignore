@@ -3,6 +3,7 @@
 /ax3l_prod/
 /prod_etc/
 /tmp/
+/legacy/
 
 __pycache__/
 *.py[codz]

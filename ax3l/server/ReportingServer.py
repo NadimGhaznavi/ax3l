@@ -6,12 +6,15 @@ from pathlib import Path
 import traceback
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+import zmq
 
 from ax3l.app.DbMgr import DbMgr
 from ax3l.constants.DConversation import DConversation
 from ax3l.app.EventLogDb import EventLogDb
 from ax3l.activity.ReplyReport import fields, reply_content
 from ax3l.constants.DEventDisplay import DEventDisplay
+from ax3l.constants.DReportMgr import DReportMgr
+from ax3l.interface.SnakeLab import SnakeLab
 
 
 def make_server(host: str, port: int) -> HTTPServer:
@@ -21,6 +24,7 @@ def make_server(host: str, port: int) -> HTTPServer:
     )
     template = templates.get_template("events.html")
     templates.globals["event_labels"] = DEventDisplay.LABELS
+    templates.globals["refresh_seconds"] = DReportMgr.REFRESH_SECONDS
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
@@ -37,7 +41,15 @@ def make_server(host: str, port: int) -> HTTPServer:
                             for event in events:
                                 if event["name"] == DConversation.RESPONSE and event["category"] == DConversation.CATEGORY:
                                     event["reply_text"] = reply_content(json.loads(event["content"]))
-                            body = template.render(events=events).encode("utf-8")
+                            try:
+                                simulation_running = SnakeLab().is_simulation_running()
+                            except zmq.ZMQError:
+                                snake_lab_status = "unavailable"
+                            else:
+                                snake_lab_status = "running simulation" if simulation_running else "idle"
+                            body = template.render(
+                                events=events, snake_lab_status=snake_lab_status,
+                            ).encode("utf-8")
                         else:
                             event = log.get(int(self.path.rsplit("/", 1)[1]))
                             if event is None or event["name"] != DConversation.RESPONSE or event["category"] != DConversation.CATEGORY:

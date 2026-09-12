@@ -14,8 +14,8 @@ runs QA/prod setup and service commands as root on the corresponding machine.
 
 | Script | Purpose | Dev command |
 | --- | --- | --- |
-| `install.sh` | Creates the installation directory, Linux account/group, MariaDB database/account, and credentials. | `scripts/install.sh -env dev -db-admin-sudo` |
-| `install-services.sh` | Copies Python modules, installs/enables the four systemd units, and stops/starts them in order. Run after `install.sh`. | `scripts/install-services.sh -env dev` |
+| `install.sh` | Creates the installation directory, Linux account/group, MariaDB database/account, and credentials, then installs and starts all four services. | `scripts/install.sh -env dev -db-admin-sudo` |
+| `install-services.sh` | Copies Python modules, installs/enables the four systemd units, and stops/starts them in order. Called by `install.sh`; can also refresh services on an existing installation. | `scripts/install-services.sh -env dev` |
 | `services.sh` | Starts or stops all four services in order. | `scripts/services.sh -env dev start` or `scripts/services.sh -env dev stop` |
 | `uninstall.sh` | Stops and removes the units, then deletes the installation, credentials, database/account, and Linux account/group. **Deletes the selected environment's data.** | `scripts/uninstall.sh -env dev -db-admin-sudo` |
 

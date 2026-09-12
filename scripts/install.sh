@@ -22,7 +22,9 @@ Existing credentials are reused; existing account passwords are not reset.
 MariaDB must already be running. Its current administrative connection must
 have permission to create databases/users and grant database privileges.
 For dev, -db-admin-sudo additionally uses sudo for the MariaDB administrative client.
-No code deployment, service startup, or release publication is performed.
+Installs application modules and enables/starts all four systemd services.
+Production requires the llama.cpp binary and model configured in the constants.
+No release publication is performed.
 HELP
 }
 
@@ -143,3 +145,5 @@ MYSQL_PWD="$DB_PASSWORD" mariadb --no-defaults --protocol=socket \
 printf 'Installation directory ready: %s\n' "$install_dir"
 printf 'Credentials ready: %s\n' "$credentials_file"
 printf 'Verified local MariaDB account %s on database %s.\n' "$DB_USER" "$DB_NAME"
+
+"$(dirname -- "${BASH_SOURCE[0]}")/install-services.sh" -env "$install_env"

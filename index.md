@@ -27,7 +27,7 @@ The current phase involves setting up the environment.
 
 # Links
 
-- [OS Setup](/pages/os-setup.html)
-- [Driver Setup](pages/driver-setup.html)
-- [Model Setup](pages/model-setup.html)
+- [OS Setup](/pages/os-setup)
+- [Driver Setup](pages/driver-setup)
+- [Model Setup](pages/model-setup)
 

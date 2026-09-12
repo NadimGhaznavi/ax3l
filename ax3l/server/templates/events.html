@@ -8,11 +8,9 @@
     :root { color-scheme: dark; --green: #80ff98; --muted: #a0cbaa; --border: #347746; }
     * { box-sizing: border-box; }
     body { margin: 1.5rem; padding: 1rem; border: 1px solid var(--border); background: #050a06; color: var(--green); font: 15px/1.6 "Courier New", Courier, monospace; }
-    header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem; padding: 1rem; border: 1px solid var(--border); background: #0a140d; }
-    h1 { margin: 0; font-size: 1.5rem; letter-spacing: .06em; }
-    button { padding: .5rem 1rem; border: 1px solid var(--green); border-radius: 0; background: #0a140d; color: var(--green); font: inherit; cursor: pointer; }
-    button:hover { background: var(--green); color: #050a06; }
-    button:focus-visible { outline: 2px solid var(--green); outline-offset: 4px; }
+    header, .server-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem; padding: 1rem; border: 1px solid var(--border); background: #0a140d; }
+    h1, .server-bar h2 { margin: 0; font-size: 1.5rem; letter-spacing: .06em; }
+    .server-bar { margin-bottom: 1rem; }
     .note { margin: 1rem 0; padding: .6rem 1rem; border: 1px solid var(--border); color: var(--muted); }
     main { border: 1px solid var(--border); overflow-x: auto; }
     table { width: 100%; min-width: 1100px; table-layout: fixed; border-collapse: collapse; }
@@ -37,9 +35,12 @@
   </style>
 </head>
 <body>
+  <section class="server-bar" aria-labelledby="snake-lab-status">
+    <h2 id="snake-lab-status" role="status">Snake Lab Server: {{ snake_lab_status }}</h2>
+  </section>
   <header>
     <h1>Ax3l Event Log</h1>
-    <form action="/" method="get"><button type="submit">Refresh</button></form>
+    <span id="refresh-status" role="status">Auto refresh every {{ refresh_seconds }} seconds.</span>
   </header>
   <p class="note">Latest {{ events | length }} entries (up to 500), newest first.</p>
   <main>
@@ -72,5 +73,35 @@
       </tbody>
     </table>
   </main>
+  <script>
+    const refreshMs = {{ refresh_seconds | tojson }} * 1000;
+    const status = document.querySelector('#refresh-status');
+    const main = document.querySelector('main');
+
+    async function refreshEvents() {
+      try {
+        const response = await fetch(window.location.href, {
+          cache: 'no-store', signal: AbortSignal.timeout(refreshMs)
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const page = new DOMParser().parseFromString(await response.text(), 'text/html');
+        const scrollX = window.scrollX;
+        const scrollY = window.scrollY;
+        const scrollLeft = main.scrollLeft;
+        main.replaceChildren(...page.querySelector('main').childNodes);
+        document.querySelector('.note').textContent = page.querySelector('.note').textContent;
+        document.querySelector('#snake-lab-status').textContent = page.querySelector('#snake-lab-status').textContent;
+        main.scrollLeft = scrollLeft;
+        window.scrollTo(scrollX, scrollY);
+        status.textContent = 'Auto refresh every {{ refresh_seconds }} seconds.';
+      } catch (error) {
+        status.textContent = 'Refresh failed. Retrying in {{ refresh_seconds }} seconds.';
+      } finally {
+        window.setTimeout(refreshEvents, refreshMs);
+      }
+    }
+
+    window.setTimeout(refreshEvents, refreshMs);
+  </script>
 </body>
 </html>

@@ -7,6 +7,7 @@ import unittest
 from urllib.request import urlopen
 from urllib.error import HTTPError
 from uuid import uuid4
+from unittest.mock import patch
 
 
 @unittest.skipUnless(os.environ.get("AX3L_TEST_DEV_DB") == "1", "requires DEV MariaDB")
@@ -15,6 +16,11 @@ class ReportingTests(unittest.TestCase):
         self.assertEqual(os.environ["DB_NAME"], "ax3l_dev")
         from ax3l.app.DbMgr import DbMgr
         from ax3l.server.ReportingServer import make_server
+        import zmq
+
+        simulation = self.enterContext(patch(
+            "ax3l.server.ReportingServer.SnakeLab.is_simulation_running", return_value=False,
+        ))
 
         db = DbMgr()
         process_id = str(uuid4())
@@ -30,15 +36,32 @@ class ReportingTests(unittest.TestCase):
             with urlopen(url) as response:
                 page = response.read().decode()
                 self.assertEqual(response.headers["Cache-Control"], "no-store")
-                self.assertIn("Refresh</button>", page)
+                self.assertIn("Auto refresh every 30 seconds.", page)
+                self.assertNotIn("Refresh</button>", page)
                 self.assertIn("&lt;script&gt;", page)
-                self.assertNotIn("<script>", page)
+                self.assertNotIn("<script>alert('test')</script>", page)
                 self.assertIn("Next line", page)
+                self.assertIn("Snake Lab Server: idle", page)
+                self.assertLess(page.index('class="server-bar"'), page.index('<h1>Ax3l Event Log'))
             second = f"{process_id} refreshed event"
+            simulation.return_value = True
             db.log("report_test", "System", "INFO", second, process_id=process_id)
             with urlopen(url) as response:
                 page = response.read().decode()
                 self.assertLess(page.index(second), page.index("&lt;script&gt;"))
+                self.assertIn("Snake Lab Server: running simulation", page)
+            simulation.side_effect = zmq.Again()
+            for _ in range(2):
+                with urlopen(url) as response:
+                    page = response.read().decode()
+                    self.assertEqual(response.status, 200)
+                    self.assertIn("Snake Lab Server: unavailable", page)
+                    self.assertIn(second, page)
+                    self.assertIn("Auto refresh every 30 seconds.", page)
+            simulation.side_effect = None
+            simulation.return_value = False
+            with urlopen(url) as response:
+                self.assertIn("Snake Lab Server: idle", response.read().decode())
             with urlopen(url + "/health") as response:
                 self.assertEqual(response.status, 200)
 

@@ -1,0 +1,69 @@
+"""Run with AX3L_TEST_DEV_DB=1 and the disposable DEV DB_* credentials."""
+
+import os
+from pathlib import Path
+import unittest
+from unittest.mock import patch
+from uuid import uuid4
+
+from ax3l.app.DbMgr import DbMgr
+from ax3l.interface.SnakeLab import SnakeLab
+
+
+@unittest.skipUnless(os.environ.get("AX3L_TEST_DEV_DB") == "1", "requires DEV MariaDB")
+class SnakeLabDbTests(unittest.TestCase):
+    def setUp(self):
+        self.assertEqual(os.environ["DB_NAME"], "ax3l_dev")
+        credentials = {
+            f"SNAKELAB_{key}": value
+            for key, value in os.environ.items() if key.startswith("DB_")
+        }
+        env = patch.dict(os.environ, credentials)
+        env.start()
+        self.addCleanup(env.stop)
+        initialization = patch.object(
+            DbMgr, "_initialize_event_tables",
+            side_effect=AssertionError("External connections must not initialize tables"),
+        )
+        initialization.start()
+        self.addCleanup(initialization.stop)
+
+    def query_count(self, statuses=()):
+        def connect(**kwargs):
+            db = DbMgr(**kwargs)
+            self.addCleanup(lambda: db.close() if db._connection.open else None)
+            self.db = db
+            schema = (Path(__file__).resolve().parents[1] /
+                      "pages/snake-lab/database-v1.sql").read_text().split(";", 1)[0]
+            schema = schema.replace("CREATE TABLE IF NOT EXISTS", "CREATE TEMPORARY TABLE")
+            # v2 removes configuration uniqueness; retain it only by run_id.
+            schema = schema.replace(
+                "    UNIQUE KEY uq_simulation_experiment (project_version, config_hash),\n", ""
+            )
+            db.execute(schema)
+            for status in statuses:
+                db.execute(
+                    """INSERT INTO simulation_runs
+                       (run_id, project_version, config, config_hash, status)
+                       VALUES (%s, %s, %s, %s, %s)""",
+                    (str(uuid4()), "test", "{}", "a" * 64, status),
+                )
+            return db
+
+        with patch("ax3l.interface.SnakeLab.DbMgr", side_effect=connect) as factory:
+            try:
+                return SnakeLab().get_num_sims()
+            finally:
+                factory.assert_called_once_with(
+                    env_prefix="SNAKELAB_DB", initialize_event_tables=False
+                )
+
+    def test_empty_database(self):
+        self.assertEqual(self.query_count(), 0)
+        self.assertFalse(self.db._connection.open)
+
+    def test_counts_all_statuses_and_repeated_configurations(self):
+        count = self.query_count(("queued", "running", "completed", "failed", "cancelled"))
+        self.assertEqual(count, 5)
+        self.assertIsInstance(count, int)
+        self.assertFalse(self.db._connection.open)

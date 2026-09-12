@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added `SnakeLab.get_num_sims()` to count all stored Snake Lab runs through MariaDB, using separate `SNAKELAB_DB_*` credentials without initializing external tables.
+
 ## [0.8.1] - 2026-09-12 @ 11:14
 
 - Installed the system Python ZeroMQ dependency in DEV and PROD. Services using `/usr/bin/python3` require Debian's `python3-zmq` package (`sudo apt-get install python3-zmq`) for the Snake Lab status query; listing `pyzmq` in `requirements.txt` alone does not install it.

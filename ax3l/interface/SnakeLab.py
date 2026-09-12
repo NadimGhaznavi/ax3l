@@ -1,15 +1,29 @@
-"""Query the local Snake Lab control interface over ZeroMQ."""
+"""Query Snake Lab through its control interface and MariaDB database."""
 
 from uuid import uuid4
 
 import zmq
 
 from ax3l.constants.DSnakeLab import DSnakeLab
+from ax3l.app.DbMgr import DbMgr
+from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb
 
 
 class SnakeLab:
     def __init__(self, endpoint: str = DSnakeLab.ENDPOINT):
         self.endpoint = endpoint
+
+    def get_num_sims(self) -> int:
+        """Return the total stored run count using SNAKELAB_DB_* credentials.
+
+        Database errors propagate. The connection is closed after each query,
+        and no tables are initialized in the Snake Lab database.
+        """
+        db = DbMgr(env_prefix="SNAKELAB_DB", initialize_event_tables=False)
+        try:
+            return SnakeLabDb(db).get_num_sims()
+        finally:
+            db.close()
 
     def is_simulation_running(self) -> bool:
         """Return whether work is running, paused, cancelling, or queued.

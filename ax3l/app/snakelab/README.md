@@ -1,5 +1,13 @@
 # Haiku experiment
 
+`SnakeLab().get_num_sims()` returns the number of rows in Snake Lab's
+`simulation_runs` table, across all statuses and including repeated configurations.
+Set `SNAKELAB_DB_HOST`, `SNAKELAB_DB_USER`, `SNAKELAB_DB_PASSWORD`, and
+`SNAKELAB_DB_NAME` in the calling process's environment. `SNAKELAB_DB_PORT`
+defaults to 3306. These credentials are separate from AX3L's `DB_*` settings;
+the account only needs SELECT access to `simulation_runs`. Each call opens and
+closes its connection without initializing tables. Database errors propagate.
+
 Raw file capture is off by default. Set `DAx3l.RAW_LOGS_ENABLED = True` in
 `ax3l/constants/DAx3l.py` to enable the capture files described below.
 When off, no haiku output directory or files are created, including under

@@ -10,6 +10,10 @@ class HealthServer:
         parser = argparse.ArgumentParser()
         parser.add_argument("--port", type=int, required=True)
         args = parser.parse_args()
+        with self.make_server(service, args.port, mode) as server:
+            server.serve_forever()
+
+    def make_server(self, service: str, port: int, mode: str = "skeleton") -> HTTPServer:
         payload = json.dumps({"status": "ok", "service": service, "mode": mode}).encode()
 
         class Handler(BaseHTTPRequestHandler):
@@ -23,6 +27,6 @@ class HealthServer:
                 self.end_headers()
                 self.wfile.write(payload)
 
-        print(f"{service}: {mode}, listening on 127.0.0.1:{args.port}", flush=True)
-        with HTTPServer(("127.0.0.1", args.port), Handler) as server:
-            server.serve_forever()
+        server = HTTPServer(("127.0.0.1", port), Handler)
+        print(f"{service}: {mode}, listening on 127.0.0.1:{server.server_port}", flush=True)
+        return server

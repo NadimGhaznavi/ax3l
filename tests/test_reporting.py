@@ -86,6 +86,30 @@ class ReportingTests(unittest.TestCase):
                 self.assertNotIn("<script>", page)
                 for value in ("usage.prompt_tokens_details.cached_tokens", "timings.predicted_ms", "946.36", "chatcmpl-test", "choices[0].finish_reason", "extra.flag", "false", "extra.empty", "[]", "null"):
                     self.assertIn(value, page)
+            png_url = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a4WQAAAAASUVORK5CYII="
+            for caption in ("Per-episode loss <script>test</script>", "Golden versus latest loss"):
+                prompt = {"role": "user", "content": [
+                    {"type": "text", "text": caption},
+                    {"type": "image_url", "image_url": {"url": png_url}},
+                ]}
+                prompt_id = db.log("prompt_sent", "Conversation", "INFO", json.dumps(prompt), process_id=process_id)
+                with urlopen(url) as response:
+                    page = response.read().decode()
+                    self.assertIn(f'href="/events/{prompt_id}"', page)
+                    self.assertNotIn(png_url, page)
+                with patch("ax3l.interface.SnakeLab.SnakeLab.get_episode_losses", side_effect=AssertionError("Must use logged snapshot")):
+                    with urlopen(f"{url}/events/{prompt_id}") as response:
+                        page = response.read().decode()
+                self.assertIn(f'<img src="{png_url}"', page)
+                self.assertIn(f'Prompt #{prompt_id}', page)
+                self.assertNotIn('<script>test</script>', page)
+                self.assertIn('Back to event log', page)
+            text_id = db.log("prompt_sent", "Conversation", "INFO",
+                             json.dumps({"role": "user", "content": "Choose a learning rate."}), process_id=process_id)
+            with urlopen(f"{url}/events/{text_id}") as response:
+                page = response.read().decode()
+                self.assertIn('Choose a learning rate.', page)
+                self.assertNotIn('<img', page)
             with self.assertRaises(HTTPError) as error:
                 urlopen(url + "/events/0")
             self.assertEqual(error.exception.code, 404)

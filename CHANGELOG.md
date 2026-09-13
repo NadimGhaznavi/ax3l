@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Restore FirstContact's experiment background and guidance to explore apparently poor choices for useful data and potential higher scores.
+
 ## [0.99.3] - 2026-09-13 @ 11:42
 
 - Move the HTTP request timeout to `DAx3l.HTTP_TIMEOUT_SECONDS`, retaining the 300-second value.

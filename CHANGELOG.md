@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-09-13 @ 16:26
+
 - Increased epochs from 500 to 1500.
 
 ## [1.0.0] - 2026-09-13 @ 16:20

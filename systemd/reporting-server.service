@@ -10,7 +10,7 @@ WorkingDirectory=@APP@
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONDONTWRITEBYTECODE=1
 EnvironmentFile=@CONFIG@/database.env
-ExecStart=/usr/bin/python3 -m ax3l.server.ReportingServer --port @REPORT_PORT@
+ExecStart=@APP@/.venv/bin/python -m ax3l.server.ReportingServer --port @REPORT_PORT@
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=true

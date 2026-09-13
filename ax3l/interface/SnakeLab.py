@@ -25,6 +25,14 @@ class SnakeLab:
         finally:
             db.close()
 
+    def get_high_score(self) -> int | None:
+        """Return the experiment's highest recorded score across configs and seeds."""
+        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
+        try:
+            return SnakeLabDb(db).get_high_score()
+        finally:
+            db.close()
+
     def is_simulation_running(self) -> bool:
         """Return whether work is running, paused, cancelling, or queued.
 

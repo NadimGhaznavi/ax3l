@@ -11,6 +11,8 @@
     header, .server-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem; padding: 1rem; border: 1px solid var(--border); background: #0a140d; }
     h1, .server-bar h2 { margin: 0; font-size: 1.5rem; letter-spacing: .06em; }
     .server-bar { margin-bottom: 1rem; }
+    .server-bar[aria-labelledby="snake-lab-status"] { flex-wrap: nowrap; }
+    #last-refreshed { white-space: nowrap; }
     .experiment-status { flex-direction: column; align-items: flex-start; gap: 0; }
     .note { margin: 1rem 0; padding: .6rem 1rem; border: 1px solid var(--border); color: var(--muted); }
     main { border: 1px solid var(--border); overflow-x: auto; }
@@ -34,6 +36,7 @@
 <body>
   <section class="server-bar" aria-labelledby="snake-lab-status">
     <h2 id="snake-lab-status" role="status">Snake Lab Server: {{ snake_lab_status }}</h2>
+    <time id="last-refreshed" aria-label="Last successful refresh in UTC"></time>
   </section>
   <section class="server-bar experiment-status" aria-labelledby="experiment-status">
     <h2 id="experiment-status">Experiment Status</h2>
@@ -96,6 +99,14 @@
     </table>
   </main>
   <script>
+    const lastRefreshed = document.querySelector('#last-refreshed');
+    function updateLastRefreshed() {
+      const timestamp = new Date().toISOString();
+      lastRefreshed.dateTime = timestamp;
+      lastRefreshed.textContent = `Last Refresh: ${timestamp.slice(0, 10)} ${timestamp.slice(11, 19)} UTC`;
+    }
+    updateLastRefreshed();
+
     const interval = document.querySelector('#refresh-interval');
     const status = document.querySelector('#refresh-status');
     const main = document.querySelector('main');
@@ -168,6 +179,7 @@
         document.querySelector('#experiment-cycles').textContent = page.querySelector('#experiment-cycles').textContent;
         main.scrollLeft = scrollLeft;
         window.scrollTo(scrollX, scrollY);
+        updateLastRefreshed();
         status.textContent = '';
       } catch (error) {
         if (currentGeneration === generation) {

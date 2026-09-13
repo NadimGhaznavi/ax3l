@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Show the last successful dashboard refresh date/time in UTC beside the Snake Lab server status, using the same font size as Current Highscore.
+
 ## [0.99.13] - 2026-09-13 @ 14:11
 
 - Style the score histogram in dark blue and orange with outlined bars, a chart border, and a bottom legend inside the border.

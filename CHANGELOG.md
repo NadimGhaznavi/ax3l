@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.99.2] - 2026-09-13 @ 10:58
+
 - Remove the original Haiku POC loop, prompt, constants, and unused first-iteration helper with their obsolete tests. Rename optional capture directories to `snakelab`; retain the active optimization entry point.
 
 - Rotate the seed after 3 complete stagnant round-robin cycles instead of counting individual comparisons. Reset on a new golden high score and preserve accounting across restarts.

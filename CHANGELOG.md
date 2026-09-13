@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Add an automatically refreshed Experiment Status section showing the highest recorded Snake Lab score across all runs, independent of the current golden configuration.
 - Size event log columns to fit their full content without shrinking, leaving Message to use the remaining width.
 
 ## [0.99.5] - 2026-09-13 @ 11:50

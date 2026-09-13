@@ -33,6 +33,10 @@
   <section class="server-bar" aria-labelledby="snake-lab-status">
     <h2 id="snake-lab-status" role="status">Snake Lab Server: {{ snake_lab_status }}</h2>
   </section>
+  <section class="server-bar" aria-labelledby="experiment-status">
+    <h2 id="experiment-status">Experiment Status</h2>
+    <span id="experiment-high-score" role="status">Current Highscore: {{ high_score if high_score is not none else '—' }}</span>
+  </section>
   <header>
     <h1>Ax3l Event Log</h1>
     <span id="refresh-status" role="status">Auto refresh every {{ refresh_seconds }} seconds.</span>
@@ -86,6 +90,7 @@
         main.replaceChildren(...page.querySelector('main').childNodes);
         document.querySelector('.note').textContent = page.querySelector('.note').textContent;
         document.querySelector('#snake-lab-status').textContent = page.querySelector('#snake-lab-status').textContent;
+        document.querySelector('#experiment-high-score').textContent = page.querySelector('#experiment-high-score').textContent;
         main.scrollLeft = scrollLeft;
         window.scrollTo(scrollX, scrollY);
         status.textContent = 'Auto refresh every {{ refresh_seconds }} seconds.';

@@ -21,6 +21,9 @@ class ReportingTests(unittest.TestCase):
         simulation = self.enterContext(patch(
             "ax3l.server.ReportingServer.SnakeLab.is_simulation_running", return_value=False,
         ))
+        high_score = self.enterContext(patch(
+            "ax3l.server.ReportingServer.SnakeLab.get_high_score", return_value=55,
+        ))
 
         db = DbMgr()
         process_id = str(uuid4())
@@ -41,27 +44,37 @@ class ReportingTests(unittest.TestCase):
                 self.assertIn("&lt;script&gt;", page)
                 self.assertNotIn("<script>alert('test')</script>", page)
                 self.assertIn("Next line", page)
-                self.assertIn("Snake Lab Server: idle", page)
+                self.assertIn("Snake Lab Server: Idle", page)
+                self.assertIn("Current Highscore: 55", page)
+                self.assertLess(page.index('id="snake-lab-status"'), page.index('id="experiment-status"'))
+                self.assertLess(page.index('id="experiment-status"'), page.index('<h1>Ax3l Event Log'))
                 self.assertLess(page.index('class="server-bar"'), page.index('<h1>Ax3l Event Log'))
             second = f"{process_id} refreshed event"
             simulation.return_value = True
+            high_score.return_value = 60
             db.log("report_test", "System", "INFO", second, process_id=process_id)
             with urlopen(url) as response:
                 page = response.read().decode()
                 self.assertLess(page.index(second), page.index("&lt;script&gt;"))
-                self.assertIn("Snake Lab Server: running simulation", page)
+                self.assertIn("Snake Lab Server: Running Simulation", page)
+                self.assertIn("Current Highscore: 60", page)
             simulation.side_effect = zmq.Again()
             for _ in range(2):
                 with urlopen(url) as response:
                     page = response.read().decode()
                     self.assertEqual(response.status, 200)
-                    self.assertIn("Snake Lab Server: unavailable", page)
+                    self.assertIn("Snake Lab Server: Service Unavailable", page)
+                    self.assertIn("Current Highscore: 60", page)
                     self.assertIn(second, page)
                     self.assertIn("Auto refresh every 30 seconds.", page)
             simulation.side_effect = None
             simulation.return_value = False
             with urlopen(url) as response:
-                self.assertIn("Snake Lab Server: idle", response.read().decode())
+                self.assertIn("Snake Lab Server: Idle", response.read().decode())
+            for score, label in ((None, "—"), (0, "0")):
+                high_score.return_value = score
+                with urlopen(url) as response:
+                    self.assertIn(f"Current Highscore: {label}", response.read().decode())
             with urlopen(url + "/health") as response:
                 self.assertEqual(response.status, 200)
 

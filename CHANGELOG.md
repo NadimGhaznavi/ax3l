@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.99.7] - 2026-09-13 @ 13:28
+
 - Put the experiment highscore on its own line and show total submitted simulations and completed round-robin cycles, including automatic refresh.
 - Reset event and SnakeLab simulation auto-increment counters after a successful database wipe, so new IDs start at 1.
 

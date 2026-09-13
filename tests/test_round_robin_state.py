@@ -131,12 +131,18 @@ class RoundRobinTests(unittest.TestCase):
 
 
 class ConversationParameterTests(unittest.IsolatedAsyncioTestCase):
-    async def test_wrong_parameter_never_reaches_submission(self):
+    async def test_parameter_override_is_rejected_then_value_only_call_succeeds(self):
         llm = Mock(url='fixture')
-        llm.complete.return_value = (200, '', json.dumps({'choices': [{'message': {
-            'tool_calls': [{'function': {'name': 'submit_single_value', 'arguments':
-                json.dumps({'parameter': 'gamma', 'value': .9})}}]}}]}).encode())
-        tools = Mock(definition={}, submit=AsyncMock())
-        with self.assertRaisesRegex(ValueError, 'may only change hidden_size'):
-            await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('test')], parameter='hidden_size')
-        tools.submit.assert_not_awaited()
+        def reply(arguments):
+            return (200, '', json.dumps({'choices': [{'message': {
+                'role': 'assistant', 'tool_calls': [{'id': 'call-1', 'type': 'function',
+                'function': {'name': 'submit_single_value',
+                             'arguments': json.dumps(arguments)}}]}}]}).encode())
+        llm.complete.side_effect = [reply({'parameter': 'gamma', 'value': .9}),
+                                    reply({'value': 16})]
+        tools = Mock(definition={}, submit=AsyncMock(return_value={'status': 'ok', 'run_id': 'next'}))
+        self.assertEqual(await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('test')]), 'next')
+        tools.submit.assert_awaited_once_with({'value': 16})
+        request = json.loads(llm.complete.call_args.args[0])
+        self.assertEqual(json.loads(request['messages'][2]['content'])['status'], 'rejected')
+        self.assertEqual(request['messages'][2]['tool_call_id'], 'call-1')

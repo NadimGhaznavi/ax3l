@@ -2,6 +2,7 @@ from typing import Final
 
 class DAx3l:
     RAW_LOGS_ENABLED: Final[bool] = False
+    HTTP_TIMEOUT_SECONDS: Final[int] = 300
 
     VERSION: Final[str] = "0.99.2"
 

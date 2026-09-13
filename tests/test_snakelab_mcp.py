@@ -38,7 +38,10 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
             result = await client.list_tools()
             self.assertEqual([tool.name for tool in result.tools], ["submit_single_value"])
             schema = result.tools[0].input_schema
-            self.assertEqual(set(schema["required"]), {"parameter", "value"})
+            self.assertEqual(set(schema["required"]), {"value"})
+            self.assertEqual(set(schema["properties"]), {"value"})
+            result = await client.call_tool("submit_single_value", {"value": 16})
+            self.assertTrue(result.is_error)
 
     async def test_mcp_forwards_proposals_and_returns_ax3l_replies(self):
         entry = configuration(ROOT)["mcpServers"]["snakelab"]
@@ -47,10 +50,11 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
                 server.setsockopt(zmq.LINGER, 0)
                 port = server.bind_to_random_port("tcp://127.0.0.1")
                 entry["env"]["AX3L_ZMQ_ENDPOINT"] = f"tcp://127.0.0.1:{port}"
+                entry["env"]["AX3L_CONVERSATION_PARAMETER"] = "learning_rate"
                 async with Client(StdioServerParameters(**entry), read_timeout_seconds=10) as client:
                     cases = [
                         ({"parameter": "learning_rate", "value": 0.003}, {"status": "ok", "run_id": "accepted-run"}),
-                        ({"parameter": "unknown_parameter", "value": -4}, {"status": "rejected", "reason": "Unknown parameter"}),
+                        ({"parameter": "learning_rate", "value": -4}, {"status": "rejected", "reason": "Invalid value"}),
                     ]
                     for proposal, reply in cases:
                         async def exchange():
@@ -63,11 +67,11 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
                                 "protocol_version": 1, "sender": "ax3l", "target": "mcp-snakelab",
                                 "method": "submit_single_value", "payload": reply,
                             })
-                        _, result = await asyncio.gather(exchange(), client.call_tool("submit_single_value", proposal))
+                        _, result = await asyncio.gather(exchange(), client.call_tool("submit_single_value", {"value": proposal["value"]}))
                         self.assertFalse(result.is_error)
                         self.assertEqual(json.loads(result.content[0].text), reply)
                     for value in ("0.003", True):
-                        result = await client.call_tool("submit_single_value", {"parameter": "learning_rate", "value": value})
+                        result = await client.call_tool("submit_single_value", {"value": value})
                         self.assertTrue(result.is_error)
                     self.assertEqual(await server.poll(timeout=50), 0)
 
@@ -88,11 +92,12 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
             with ZMQServer('tcp://127.0.0.1:*', handle_tool) as server:
                 entry = configuration(ROOT)['mcpServers']['snakelab']
                 entry['env']['AX3L_ZMQ_ENDPOINT'] = server.endpoint
+                entry['env']['AX3L_CONVERSATION_PARAMETER'] = 'learning_rate'
                 async with Client(StdioServerParameters(**entry), read_timeout_seconds=10) as client:
                     for value, expected in [(0.2, 'invalid_value'),
                                             (baseline['training']['learning_rate'], 'duplicate_config'),
                                             (0.004, 'duplicate_config'), (0.003, 'ok'), (0.003, 'duplicate_config')]:
-                        result = await client.call_tool('submit_single_value', {'parameter': 'learning_rate', 'value': value})
+                        result = await client.call_tool('submit_single_value', {'value': value})
                         payload = json.loads(result.content[0].text)
                         self.assertEqual(payload.get('code', payload['status']), expected)
                         if expected != 'ok':
@@ -118,12 +123,18 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
             'role': 'assistant', 'content': None, 'tool_calls': [{
                 'type': 'function', 'id': 'call-1', 'function': {
                     'name': 'submit_single_value',
-                    'arguments': '{"parameter":"hidden_size","value":240}'}}]}}]}).encode())
+                    'arguments': '{"value":240}'}}]}}]}).encode())
         with ZMQServer('tcp://127.0.0.1:*', handle) as server:
-            async with SnakeLabTools(server.endpoint) as tools:
-                self.assertEqual(set(tools.definition['function']['parameters']['properties']['parameter']['enum']),
-                                 {'hidden_size', 'sequence_length', 'batch_size', 'learning_rate', 'gamma'})
-                self.assertEqual(await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('Choose one parameter')]), run_id)
-        self.assertEqual(requests, [{'parameter': 'hidden_size', 'value': 240}])
+            for parameter in ('hidden_size', 'sequence_length'):
+                async with SnakeLabTools(server.endpoint, parameter) as tools:
+                    self.assertEqual(set(tools.definition['function']['parameters']['properties']), {'value'})
+                    description = tools.definition['function']['description']
+                    self.assertIn(parameter, description)
+                    self.assertIn('multipleOf', description)
+                    for other in {'hidden_size', 'sequence_length', 'batch_size', 'learning_rate', 'gamma'} - {parameter}:
+                        self.assertNotIn(other, description)
+                    self.assertEqual(await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('Choose a value')]), run_id)
+        self.assertEqual(requests, [{'parameter': 'hidden_size', 'value': 240},
+                                    {'parameter': 'sequence_length', 'value': 240}])
         payload = json.loads(llm.complete.call_args.args[0])
         self.assertEqual(payload['tools'][0]['function']['name'], 'submit_single_value')

@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Move the HTTP request timeout to `DAx3l.HTTP_TIMEOUT_SECONDS`, retaining the 300-second value.
+- Bind each conversation’s MCP tool to Ax3l’s round-robin parameter and accept only a value. Limit tool instructions, baseline data, and history to that parameter; correct unexpected parameter arguments without submitting them.
+
 ## [0.99.2] - 2026-09-13 @ 10:58
 
 - Remove the original Haiku POC loop, prompt, constants, and unused first-iteration helper with their obsolete tests. Rename optional capture directories to `snakelab`; retain the active optimization entry point.

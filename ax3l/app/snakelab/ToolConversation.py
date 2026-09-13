@@ -5,12 +5,11 @@ import json
 
 from uuid import uuid4
 
-from ax3l.app.snakelab.SingleParameters import SINGLE_PARAMETERS
 from ax3l.constants.DAx3l import DAx3l
 from ax3l.constants.DEventCategory import DEventCategory as Events
 
 
-async def converse(llm, output, db, tools, prompts, *, parameter=None) -> str:
+async def converse(llm, output, db, tools, prompts) -> str:
     process_id = str(uuid4())
     print(f"Conversation: {process_id}", flush=True)
     conversation_id = db.log(Events.Conversation.STARTED, Events.Conversation.CATEGORY,
@@ -56,14 +55,15 @@ async def converse(llm, output, db, tools, prompts, *, parameter=None) -> str:
                 )
             call = calls[0]
             arguments = json.loads(call["function"]["arguments"])
-            if arguments.get("parameter") not in SINGLE_PARAMETERS:
-                raise ValueError("This conversation may only change an allowed single parameter")
-            if parameter is not None and arguments["parameter"] != parameter:
-                raise ValueError(f"This round-robin turn may only change {parameter}")
             messages.append(reply)
             log(Events.Tool, Events.Tool.STARTED, json.dumps(call))
             try:
-                result = await tools.submit(arguments)
+                if not isinstance(arguments, dict) or set(arguments) != {"value"}:
+                    result = {"status": "rejected", "code": "invalid_arguments",
+                              "prompt": {"role": "user", "content":
+                                  'Call submit_single_value with only {"value": number}.'}}
+                else:
+                    result = await tools.submit(arguments)
                 if result["status"] not in ("ok", "rejected"):
                     raise RuntimeError(f"Tool submission failed: {result}")
             except Exception as error:

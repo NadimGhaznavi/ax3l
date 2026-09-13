@@ -23,7 +23,8 @@
     .metadata { color: var(--muted); }
     .content { max-width: 0; overflow: hidden; text-overflow: ellipsis; font: inherit; }
     a { color: var(--green); text-underline-offset: .2em; }
-    a:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+    a:focus-visible, select:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+    select { padding: .35rem .65rem; border: 1px solid var(--border); background: #0a140d; color: var(--green); font: inherit; }
     .empty { margin: 0; padding: 1rem; border: 1px solid var(--border); }
     ::selection { background: var(--green); color: #050a06; }
     @media (max-width: 600px) { body { margin: .5rem; padding: .5rem; } }
@@ -39,7 +40,18 @@
   </section>
   <header>
     <h1>Ax3l Event Log</h1>
-    <span id="refresh-status" role="status">Auto refresh every {{ refresh_seconds }} seconds.</span>
+    <div>
+      <label for="refresh-interval">Refresh:</label>
+      <select id="refresh-interval">
+        <option value="0" selected>No Refresh</option>
+        <option value="5">5 seconds</option>
+        <option value="30">30 seconds</option>
+        <option value="60">1 minute</option>
+        <option value="300">5 minutes</option>
+        <option value="1800">30 minutes</option>
+      </select>
+      <span id="refresh-status" role="status"></span>
+    </div>
   </header>
   <p class="note">Latest {{ events | length }} entries (up to 500), newest first.</p>
   <main>
@@ -73,17 +85,26 @@
     </table>
   </main>
   <script>
-    const refreshMs = {{ refresh_seconds | tojson }} * 1000;
+    const interval = document.querySelector('#refresh-interval');
     const status = document.querySelector('#refresh-status');
     const main = document.querySelector('main');
+    let refreshMs = 0;
+    let timer;
+    let controller;
+    let generation = 0;
+    interval.value = '0';
 
-    async function refreshEvents() {
+    async function refreshEvents(currentGeneration) {
+      const request = new AbortController();
+      controller = request;
+      const timeout = window.setTimeout(() => request.abort(), {{ request_timeout_seconds | tojson }} * 1000);
       try {
         const response = await fetch(window.location.href, {
-          cache: 'no-store', signal: AbortSignal.timeout(refreshMs)
+          cache: 'no-store', signal: request.signal
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const page = new DOMParser().parseFromString(await response.text(), 'text/html');
+        if (currentGeneration !== generation) return;
         const scrollX = window.scrollX;
         const scrollY = window.scrollY;
         const scrollLeft = main.scrollLeft;
@@ -93,15 +114,32 @@
         document.querySelector('#experiment-high-score').textContent = page.querySelector('#experiment-high-score').textContent;
         main.scrollLeft = scrollLeft;
         window.scrollTo(scrollX, scrollY);
-        status.textContent = 'Auto refresh every {{ refresh_seconds }} seconds.';
+        status.textContent = '';
       } catch (error) {
-        status.textContent = 'Refresh failed. Retrying in {{ refresh_seconds }} seconds.';
+        if (currentGeneration === generation) {
+          status.textContent = `Refresh failed. Retrying in ${interval.selectedOptions[0].textContent}.`;
+        }
       } finally {
-        window.setTimeout(refreshEvents, refreshMs);
+        window.clearTimeout(timeout);
+        if (currentGeneration === generation) {
+          controller = null;
+          timer = window.setTimeout(() => refreshEvents(currentGeneration), refreshMs);
+        }
       }
     }
 
-    window.setTimeout(refreshEvents, refreshMs);
+    interval.addEventListener('change', () => {
+      generation += 1;
+      window.clearTimeout(timer);
+      if (controller) controller.abort();
+      controller = null;
+      refreshMs = Number(interval.value) * 1000;
+      status.textContent = '';
+      if (refreshMs > 0) {
+        const currentGeneration = generation;
+        timer = window.setTimeout(() => refreshEvents(currentGeneration), refreshMs);
+      }
+    });
   </script>
 </body>
 </html>

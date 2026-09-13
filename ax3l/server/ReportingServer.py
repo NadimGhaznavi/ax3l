@@ -25,7 +25,7 @@ def make_server(host: str, port: int) -> HTTPServer:
     template = templates.get_template("events.html")
     templates.globals["event_label"] = DEventCategory.label
     templates.globals["simulation_events"] = DEventCategory.SnakeLab
-    templates.globals["refresh_seconds"] = DReportMgr.REFRESH_SECONDS
+    templates.globals["request_timeout_seconds"] = DReportMgr.REQUEST_TIMEOUT_SECONDS
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):

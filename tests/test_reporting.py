@@ -39,7 +39,7 @@ class ReportingTests(unittest.TestCase):
             with urlopen(url) as response:
                 page = response.read().decode()
                 self.assertEqual(response.headers["Cache-Control"], "no-store")
-                self.assertIn("Auto refresh every 30 seconds.", page)
+                self.assertIn('<option value="0" selected>No Refresh</option>', page)
                 self.assertNotIn("Refresh</button>", page)
                 self.assertIn("&lt;script&gt;", page)
                 self.assertNotIn("<script>alert('test')</script>", page)
@@ -66,7 +66,7 @@ class ReportingTests(unittest.TestCase):
                     self.assertIn("Snake Lab Server: Service Unavailable", page)
                     self.assertIn("Current Highscore: 60", page)
                     self.assertIn(second, page)
-                    self.assertIn("Auto refresh every 30 seconds.", page)
+                    self.assertIn('<option value="0" selected>No Refresh</option>', page)
             simulation.side_effect = None
             simulation.return_value = False
             with urlopen(url) as response:

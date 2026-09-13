@@ -11,7 +11,7 @@ import time
 import traceback
 from uuid import uuid4
 
-from ax3l.app.snakelab.LearningRateLoop import run_optimization
+from ax3l.app.snakelab.SnakeLabLoop import run_optimization
 from ax3l.app.DbMgr import DbMgr
 from ax3l.app.Prompt import Prompt
 from ax3l.app.ConfigurationLog import ConfigurationLog
@@ -154,12 +154,12 @@ def run_first_iteration(llm: LLM, output: Path, db: DbMgr) -> None:
         time.sleep(DSnakeLab.STATUS_POLL_SECONDS)
     first_contact = FirstContact()
     golden = GoldenConfig(db)
-    parameter = FirstContactSingle("learning_rate")
+    parameter = FirstContactSingle()
     run(llm, output, db, count=1, prompts=[first_contact, golden, parameter])
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run the Snake Lab learning-rate optimization loop.")
+    parser = argparse.ArgumentParser(description="Run the Snake Lab single-parameter optimization loop.")
     parser.add_argument("--url", required=True, help="LLM server base URL, e.g. http://host:27770")
     parser.add_argument("--output", type=Path, default=Path("tmp/haiku"))
     parser.add_argument("--zmq-endpoint", default=os.environ.get("AX3L_ZMQ_ENDPOINT", DAx3l.ZMQ_ENDPOINT))

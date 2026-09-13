@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import sys
 
+from ax3l.app.snakelab.SingleParameters import SINGLE_PARAMETERS
 from ax3l.constants.DSnakeLab import DSnakeLab
 
 from mcp import Client
@@ -26,7 +27,7 @@ class SnakeLabTools:
             tools = await self._client.list_tools()
             tool = next(tool for tool in tools.tools if tool.name == "submit_single_value")
             schema = deepcopy(tool.input_schema)
-            schema["properties"]["parameter"]["const"] = "learning_rate"
+            schema["properties"]["parameter"]["enum"] = list(SINGLE_PARAMETERS)
             self.definition = {"type": "function", "function": {
                 "name": tool.name, "description": tool.description, "parameters": schema,
             }}

@@ -32,7 +32,7 @@ class FirstIterationTests(unittest.TestCase):
         llm.complete.assert_called_once()
         messages = json.loads(llm.complete.call_args.args[0])['messages']
         self.assertEqual(messages, [json.loads(FirstContact().to_json()), json.loads(golden.to_json()),
-                                    json.loads(FirstContactSingle('learning_rate').to_json())])
+                                    json.loads(FirstContactSingle().to_json())])
         self.assertTrue(all(isinstance(message['content'], str) for message in messages))
         calls = db.log.call_args_list
         self.assertEqual([call.args[0] for call in calls], [

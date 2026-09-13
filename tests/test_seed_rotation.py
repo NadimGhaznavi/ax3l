@@ -77,8 +77,8 @@ class SeedRotationTests(unittest.IsolatedAsyncioTestCase):
         import asyncio
         from pathlib import Path
         from ax3l.app.Prompt import Prompt
-        from ax3l.app.snakelab.LearningRateLoop import optimize
-        module = 'ax3l.app.snakelab.LearningRateLoop.'
+        from ax3l.app.snakelab.SnakeLabLoop import optimize
+        module = 'ax3l.app.snakelab.SnakeLabLoop.'
         snake, events = Mock(), Mock()
         snake.is_simulation_running.return_value = False
         snake.get_run_result.return_value = {'status': 'completed', 'high_score': 100}

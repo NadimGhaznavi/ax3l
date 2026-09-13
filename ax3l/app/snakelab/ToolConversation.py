@@ -15,15 +15,18 @@ async def converse(llm, output, db, tools, prompts) -> str:
     conversation_id = db.log(Events.Conversation.STARTED, Events.Conversation.CATEGORY,
                              "INFO", f"Conversation started with {llm.url}.", process_id=process_id)
 
-    def log(category, name, content, level="INFO"):
+    def log(category, name, content, level="INFO", *, source_name=None):
         return db.log(name, category.CATEGORY, level, content, process_id=process_id,
-                      parent_event_id=conversation_id)
+                      parent_event_id=conversation_id, source_name=source_name)
 
     outcome, level = "Simulation submitted.", "INFO"
     try:
+        tool_name = tools.definition["function"]["name"]
+        argument_names = set(tools.definition["function"]["parameters"]["properties"])
         messages = [json.loads(prompt.to_json()) for prompt in prompts]
-        for message in messages:
-            log(Events.Conversation, Events.Conversation.PROMPT, json.dumps(message, ensure_ascii=False))
+        for prompt, message in zip(prompts, messages):
+            log(Events.Conversation, Events.Conversation.PROMPT, json.dumps(message, ensure_ascii=False),
+                source_name=prompt.source_name)
         turn = 0
         while True:
             turn += 1
@@ -47,10 +50,10 @@ async def converse(llm, output, db, tools, prompts) -> str:
             choice = json.loads(body)["choices"][0]
             reply = choice["message"]
             calls = reply.get("tool_calls", [])
-            if len(calls) != 1 or calls[0]["function"]["name"] != "submit_single_value":
+            if len(calls) != 1 or calls[0]["function"]["name"] != tool_name:
                 names = [call["function"]["name"] for call in calls]
                 raise ValueError(
-                    f"Expected exactly one submit_single_value tool call; received {names!r}, "
+                    f"Expected exactly one {tool_name} tool call; received {names!r}, "
                     f"finish_reason={choice.get('finish_reason')!r}. See reply event {reply_id}."
                 )
             call = calls[0]
@@ -58,10 +61,12 @@ async def converse(llm, output, db, tools, prompts) -> str:
             messages.append(reply)
             log(Events.Tool, Events.Tool.STARTED, json.dumps(call))
             try:
-                if not isinstance(arguments, dict) or set(arguments) != {"value"}:
+                if not isinstance(arguments, dict) or set(arguments) != argument_names:
                     result = {"status": "rejected", "code": "invalid_arguments",
+                              "source_name": "ToolConversation",
                               "prompt": {"role": "user", "content":
-                                  'Call submit_single_value with only {"value": number}.'}}
+                                  f"Call {tool_name} with exactly these numeric fields: "
+                                  + ", ".join(sorted(argument_names)) + "."}}
                 else:
                     result = await tools.submit(arguments)
                 if result["status"] not in ("ok", "rejected"):
@@ -77,7 +82,8 @@ async def converse(llm, output, db, tools, prompts) -> str:
                              "content": json.dumps(result)})
             feedback = result["prompt"]
             messages.append(feedback)
-            log(Events.Conversation, Events.Conversation.PROMPT, json.dumps(feedback, ensure_ascii=False))
+            log(Events.Conversation, Events.Conversation.PROMPT, json.dumps(feedback, ensure_ascii=False),
+                source_name=result.get("source_name", "ToolConversation"))
     except (KeyboardInterrupt, asyncio.CancelledError):
         outcome = "Stopped by user."
         raise

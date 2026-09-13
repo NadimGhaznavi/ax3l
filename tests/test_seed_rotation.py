@@ -19,6 +19,7 @@ class SeedRotationTests(unittest.IsolatedAsyncioTestCase):
                 config = GenerateDefaultConfig().run()
                 snake, db, wait = Mock(), Mock(), AsyncMock()
                 snake.get_config.return_value = config
+                snake.get_num_sims.return_value = 12
                 snake.find_config_run.return_value = None
                 snake.submit_simulation.return_value = 'new'
                 snake.get_run_result.return_value = {'status': 'completed', 'high_score': 1}
@@ -33,6 +34,8 @@ class SeedRotationTests(unittest.IsolatedAsyncioTestCase):
                     wait.assert_awaited_once_with(snake, db, 'new')
                     self.assertEqual(db.log.call_args.args[0], 'golden_config_created')
                     self.assertIn('Score to beat: 1', db.log.call_args.args[3])
+                    self.assertEqual(db.log.call_args.kwargs['experiment_score'],
+                                     {'simulations': 12, 'score': 1, 'seed': config['seed'] + 1})
                     self.assertEqual(config, GenerateDefaultConfig().run())
 
     async def test_restart_reconciles_submission_without_resubmitting(self):
@@ -92,7 +95,7 @@ class SeedRotationTests(unittest.IsolatedAsyncioTestCase):
             selector.return_value.begin.return_value = 'hidden_size'
             with self.assertRaises(asyncio.CancelledError):
                 await optimize(Mock(), Path('/tmp'), Mock(), 'endpoint')
-            comparison.assert_called_once_with('rotated', 'rotated', 'rotated', 'hidden_size')
+            comparison.assert_called_once_with('rotated', 'hidden_size')
             prompts = conversation.call_args.args[4]
             self.assertEqual(len(prompts), 2)
             self.assertTrue(all(isinstance(json.loads(p.to_json())['content'], str) for p in prompts))

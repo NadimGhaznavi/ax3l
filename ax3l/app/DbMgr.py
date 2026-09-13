@@ -41,6 +41,7 @@ class DbMgr:
                 log_level VARCHAR(10) NOT NULL,
                 process_id CHAR(36) NULL,
                 parent_event_id BIGINT UNSIGNED NULL,
+                source_name VARCHAR(255) NULL,
                 INDEX idx_event_time (occurred_at, event_id),
                 INDEX idx_event_name_time (name, occurred_at),
                 INDEX idx_event_process (process_id, event_id),
@@ -76,6 +77,15 @@ class DbMgr:
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             """,
         )
+        statements += ("""
+            CREATE TABLE IF NOT EXISTS experiment_highscores (
+                event_id BIGINT UNSIGNED PRIMARY KEY,
+                simulations BIGINT UNSIGNED NOT NULL,
+                score INT NOT NULL,
+                seed BIGINT NULL,
+                FOREIGN KEY (event_id) REFERENCES events(event_id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """,)
         for statement in statements:
             self.execute(statement)
 
@@ -88,6 +98,8 @@ class DbMgr:
         *,
         process_id: str | None = None,
         parent_event_id: int | None = None,
+        source_name: str | None = None,
+        experiment_score: dict | None = None,
     ) -> int:
         """Commit an event and its message together and return the event ID.
 
@@ -96,15 +108,20 @@ class DbMgr:
         with self.transaction():
             self.execute(
                 """INSERT INTO events
-                   (name, category, log_level, process_id, parent_event_id)
-                   VALUES (%s, %s, %s, %s, %s)""",
-                (name, category, log_level, process_id, parent_event_id),
+                   (name, category, log_level, process_id, parent_event_id, source_name)
+                   VALUES (%s, %s, %s, %s, %s, %s)""",
+                (name, category, log_level, process_id, parent_event_id, source_name),
             )
             event_id = self.query("SELECT LAST_INSERT_ID() AS event_id")[0]["event_id"]
             self.execute(
                 "INSERT INTO event_messages (event_id, content) VALUES (%s, %s)",
                 (event_id, content),
             )
+            if experiment_score is not None:
+                self.execute(
+                    "INSERT INTO experiment_highscores (event_id, simulations, score, seed) VALUES (%s, %s, %s, %s)",
+                    (event_id, experiment_score["simulations"], experiment_score["score"], experiment_score["seed"]),
+                )
         return event_id
 
     def execute(

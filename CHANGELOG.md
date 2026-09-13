@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-09-13 @ 16:20
+
+- Increase histogram bar borders to 4 pixels and match the Experiment Highscores chart to the histogram styling, with a 4-pixel highscore line and a centered bottom legend with matching spacing.
+
+- Add Experiment Highscores, a Plotly step chart of accepted config scores against simulation count, including lower baselines after seed rotation. Store score snapshots atomically with golden creation events in the fresh database.
+
+- Store prompt module names in `events.source_name` and show them in prompt detail titles, including correction prompts. Requires a clean database reinstall; no upgrade migration.
+
+- Remove `simulation_runs.config` from the fresh-install schema and read configuration values from `configurations` for lookups, duplicate detection, and tuning reports. Requires the matching SnakeLab writer update and a clean database reinstall.
+
+- Integrate epsilon and reward pair tuning into the seven-entry round robin, with pair reports, bound MCP calls, retry feedback, and complete-cycle seed rotation. Existing experiment events must be reset before using the new order.
+
+- Show the last successful dashboard refresh date/time in UTC beside the Snake Lab server status, using the same font size as Current Highscore.
+
 ## [0.99.13] - 2026-09-13 @ 14:11
 
 - Style the score histogram in dark blue and orange with outlined bars, a chart border, and a bottom legend inside the border.

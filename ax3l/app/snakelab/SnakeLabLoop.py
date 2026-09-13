@@ -12,6 +12,10 @@ from ax3l.app.snakelab.prompts.Comparison import Comparison
 from ax3l.app.snakelab.prompts.ComparisonSingle import ComparisonSingle
 from ax3l.app.snakelab.prompts.FirstContact import FirstContact
 from ax3l.app.snakelab.prompts.FirstContactSingle import FirstContactSingle
+from ax3l.app.snakelab.prompts.FirstContactEpsilonPair import FirstContactEpsilonPair
+from ax3l.app.snakelab.prompts.FirstContactRewardPair import FirstContactRewardPair
+from ax3l.app.snakelab.prompts.ComparisonEpsilonPair import ComparisonEpsilonPair
+from ax3l.app.snakelab.prompts.ComparisonRewardPair import ComparisonRewardPair
 from ax3l.app.snakelab.prompts.GoldenConfig import GoldenConfig
 from ax3l.constants.DEventCategory import DEventCategory as Events
 from ax3l.constants.DSnakeLab import DSnakeLab
@@ -60,7 +64,9 @@ def compare(snake, db, golden_id, latest_id):
                                       "current_golden_run_id": current_id, "reason": reason}),
                           process_id=latest_id)
     if won:
-        ConfigurationLog(db).golden_config_created(latest_id, reason=reason, parent_event_id=comparison_id)
+        ConfigurationLog(db).golden_config_created(latest_id, reason=reason, parent_event_id=comparison_id,
+            experiment_score={"simulations": snake.get_num_sims(), "score": latest["high_score"],
+                              "seed": latest["config"].get("seed")})
     else:
         db.log(Events.Configuration.GOLDEN_RETAINED, Events.Configuration.CATEGORY, "INFO", reason,
                process_id=golden_id, parent_event_id=comparison_id)
@@ -82,30 +88,33 @@ async def optimize(llm, output, db, endpoint):
         latest_id = proposal["process_id"]
         if proposal["comparison"]:
             snapshot = json.loads(proposal["comparison"])
-            previous_golden_id = snapshot["golden_run_id"]
             selected_id = snapshot["current_golden_run_id"]
             # Finish a promotion interrupted between the comparison and creation events.
             if selected_id != golden_id:
                 ConfigurationLog(db).golden_config_created(
-                    selected_id, reason=snapshot["reason"], parent_event_id=proposal["comparison_id"])
+                    selected_id, reason=snapshot["reason"], parent_event_id=proposal["comparison_id"],
+                    experiment_score={"simulations": snake.get_num_sims(),
+                                      "score": snake.get_run_result(selected_id)["high_score"],
+                                      "seed": snake.get_config(selected_id).get("seed")})
             golden_id = selected_id
         else:
             await wait_for_run(snake, db, latest_id)
-            previous_golden_id = golden_id
             golden_id = compare(snake, db, golden_id, latest_id)
-    else:
-        previous_golden_id = latest_id = golden_id
     first_contact = proposal is None and EventLogDb(db).latest_seed_baseline() is None
     selector = RoundRobinState(db)
     while True:
         rotated_id = await rotate_if_needed(snake, db, wait_for_run)
         if rotated_id is not None:
             golden_id = rotated_id
-            previous_golden_id = latest_id = golden_id
             first_contact = False
         parameter = selector.begin()
-        prompts = [Comparison(previous_golden_id, latest_id, golden_id, parameter),
-                   FirstContactSingle(parameter) if first_contact else ComparisonSingle(parameter)]
+        if parameter == "epsilon_pair":
+            prompts = [ComparisonEpsilonPair(golden_id), FirstContactEpsilonPair()]
+        elif parameter == "reward_pair":
+            prompts = [ComparisonRewardPair(golden_id), FirstContactRewardPair()]
+        else:
+            prompts = [Comparison(golden_id, parameter),
+                       FirstContactSingle(parameter) if first_contact else ComparisonSingle(parameter)]
         if first_contact:
             prompts.insert(0, FirstContact())
         async with SnakeLabTools(endpoint, parameter) as tools:
@@ -113,8 +122,7 @@ async def optimize(llm, output, db, endpoint):
         await wait_for_run(snake, db, latest_id)
         while snake.is_simulation_running():
             await asyncio.sleep(DSnakeLab.STATUS_POLL_SECONDS)
-        previous_golden_id = golden_id
-        golden_id = compare(snake, db, previous_golden_id, latest_id)
+        golden_id = compare(snake, db, golden_id, latest_id)
         first_contact = False
 
 

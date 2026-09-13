@@ -7,8 +7,7 @@ from unittest.mock import AsyncMock, Mock
 
 from ax3l.app.Prompt import Prompt
 from ax3l.app.EventLogDb import EventLogDb
-from ax3l.app.snakelab.RoundRobinState import RoundRobinState
-from ax3l.app.snakelab.SingleParameters import SINGLE_PARAMETERS
+from ax3l.app.snakelab.RoundRobinState import RoundRobinState, ROUND_ROBIN_ORDER
 from ax3l.app.snakelab.ToolConversation import converse
 
 
@@ -42,7 +41,7 @@ class RoundRobinTests(unittest.TestCase):
         self.path = Path(folder.name) / 'events.db'
         self.db = EventDb(self.path)
         self.addCleanup(lambda: self.db.connection.close())
-        self.order = list(SINGLE_PARAMETERS)
+        self.order = list(ROUND_ROBIN_ORDER)
 
     def restart(self):
         self.db.connection.close()
@@ -93,29 +92,29 @@ class RoundRobinTests(unittest.TestCase):
 
     def test_stagnation_counts_three_complete_cycles_across_restart(self):
         self.db.log('golden_config_created')
-        for turn in range(15):
-            self.assertEqual(EventLogDb(self.db).stagnant_rounds(), turn // 5)
+        for turn in range(21):
+            self.assertEqual(EventLogDb(self.db).stagnant_rounds(), turn // 7)
             self.complete_turn(str(turn))
             # Replayed comparison events must not count the run twice.
             self.db.log('configuration_compared', process_id=str(turn))
             self.db.connection.close()
             self.db = EventDb(self.path)
-            self.assertEqual(EventLogDb(self.db).stagnant_rounds(), (turn + 1) // 5)
+            self.assertEqual(EventLogDb(self.db).stagnant_rounds(), (turn + 1) // 7)
 
     def test_improvement_discards_partial_cycle_and_resets_stagnation(self):
-        for turn in range(7):
-            self.complete_turn(str(turn), improved=turn == 6)
+        for turn in range(8):
+            self.complete_turn(str(turn), improved=turn == 7)
         self.assertEqual(EventLogDb(self.db).stagnant_rounds(), 0)
-        for turn in range(7, 14):
+        for turn in range(8, 20):
             self.complete_turn(str(turn))
             self.assertEqual(EventLogDb(self.db).stagnant_rounds(), 0)
-        self.complete_turn('14')
+        self.complete_turn('20')
         self.assertEqual(EventLogDb(self.db).stagnant_rounds(), 1)
         self.db.log('golden_config_created')  # Fresh seed baseline.
         self.assertEqual(EventLogDb(self.db).stagnant_rounds(), 0)
 
     def test_pending_last_run_does_not_finish_cycle(self):
-        for turn in range(4):
+        for turn in range(6):
             self.complete_turn(str(turn))
         self.restart()
         self.db.log('proposal_invalid')
@@ -140,9 +139,9 @@ class RoundRobinTests(unittest.TestCase):
             self.assertEqual(EventLogDb(self.db).experiment_cycles(), (turn + 1) // len(self.order))
 
     def test_improvement_on_last_parameter_does_not_count_that_cycle(self):
-        for turn in range(10):
-            self.complete_turn(str(turn), improved=turn == 4)
-            self.assertEqual(EventLogDb(self.db).stagnant_rounds(), 1 if turn == 9 else 0)
+        for turn in range(14):
+            self.complete_turn(str(turn), improved=turn == 6)
+            self.assertEqual(EventLogDb(self.db).stagnant_rounds(), 1 if turn == 13 else 0)
 
 
 class ConversationParameterTests(unittest.IsolatedAsyncioTestCase):
@@ -155,7 +154,7 @@ class ConversationParameterTests(unittest.IsolatedAsyncioTestCase):
                              'arguments': json.dumps(arguments)}}]}}]}).encode())
         llm.complete.side_effect = [reply({'parameter': 'gamma', 'value': .9}),
                                     reply({'value': 16})]
-        tools = Mock(definition={}, submit=AsyncMock(return_value={'status': 'ok', 'run_id': 'next'}))
+        tools = Mock(definition={'function': {'name': 'submit_single_value', 'parameters': {'properties': {'value': {}}}}}, submit=AsyncMock(return_value={'status': 'ok', 'run_id': 'next'}))
         self.assertEqual(await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('test')]), 'next')
         tools.submit.assert_awaited_once_with({'value': 16})
         request = json.loads(llm.complete.call_args.args[0])

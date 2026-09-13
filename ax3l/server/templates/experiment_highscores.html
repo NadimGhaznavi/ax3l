@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Experiment Highscores</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 1.5rem; padding: 1rem; border: 1px solid #40566e; background: #0b1119; color: #d5dfeb; font: 15px/1.6 "Courier New", Courier, monospace; }
+    h1 { font-size: 1.5rem; }
+    a { color: #79b8f3; text-underline-offset: .2em; }
+    p { color: #a7b8cb; }
+    main { border: 1px solid #40566e; background: #101720; padding: .5rem; }
+    @media (max-width: 600px) { body { margin: .5rem; padding: .5rem; } }
+  </style>
+</head>
+<body>
+  <a href="/">Back to event log</a>
+  <h1>Experiment Highscores</h1>
+  <p>Simulations submitted: {{ total }}. The line follows the accepted config’s high score.
+    Seed changes can lower the score; unsuccessful candidates leave it unchanged.
+    Hover over a point for its seed, run, and acceptance reason. Reload this page to update the data.</p>
+  <main>
+    {% if chart %}
+    {{ chart | safe }}
+    <noscript>Enable JavaScript to view the interactive chart.</noscript>
+    {% else %}
+    <p>No accepted scores recorded yet.</p>
+    {% endif %}
+  </main>
+</body>
+</html>

@@ -74,7 +74,7 @@ class EventLogDb:
         return self._completed_rounds(since_golden=False)
 
     def _completed_rounds(self, *, since_golden: bool) -> int:
-        from ax3l.app.snakelab.SingleParameters import SINGLE_PARAMETERS
+        from ax3l.app.snakelab.RoundRobinState import ROUND_ROBIN_ORDER
 
         category = DEventCategory.Configuration
         rows = self._db.query("""
@@ -94,7 +94,7 @@ class EventLogDb:
                category.CATEGORY, "round_robin_checkpoint",
                category.CATEGORY, category.COMPARED, int(since_golden),
                category.CATEGORY, category.GOLDEN_CREATED))
-        order = list(SINGLE_PARAMETERS)
+        order = ROUND_ROBIN_ORDER
         rounds, expected = 0, 0
         seen = set()
         for row in rows:
@@ -103,7 +103,7 @@ class EventLogDb:
             seen.add(row["process_id"])
             checkpoint = json.loads(row["content"])
             if checkpoint["parameter_order"] != order:
-                raise ValueError("Search parameter order changed; migrate the saved checkpoint before resuming")
+                raise ValueError("Search parameter order changed; reset experiment events before resuming")
             index = checkpoint["index"]
             if index != expected:
                 expected = 0
@@ -139,3 +139,12 @@ class EventLogDb:
         """, (category.GOLDEN_CREATED, category.CATEGORY,
                category.GOLDEN_SEED_INCREMENTED, category.CATEGORY))
         return rows[0]["process_id"] if rows else None
+
+    def experiment_highscores(self) -> list[dict[str, Any]]:
+        """Read accepted scores in decision order, including lower seed baselines."""
+        return self._db.query("""
+            SELECT h.simulations, h.score, h.seed, e.process_id AS run_id, m.content AS reason
+            FROM experiment_highscores h JOIN events e USING (event_id)
+            JOIN event_messages m USING (event_id)
+            ORDER BY h.event_id
+        """)

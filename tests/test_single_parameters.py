@@ -15,6 +15,7 @@ class SingleParameterTests(unittest.TestCase):
             for prompt in (FirstContactSingle(parameter), ComparisonSingle(parameter)):
                 content = prompt.to_md()
                 self.assertIn(parameter, content)
+                self.assertIn(SINGLE_PARAMETERS[parameter][1]['description'], content)
                 for other in expected - {parameter}:
                     self.assertNotIn(other, content)
                 self.assertIn('{"value": number}', content)
@@ -24,16 +25,17 @@ class SingleParameterTests(unittest.TestCase):
             with self.subTest(parameter=name):
                 db = Mock()
                 db.query.return_value = [
-                    {name: '16', 'run_id': 'old', 'status': 'completed', 'high_score': 7, 'current_seed': 0},
-                    {name: '16', 'run_id': 'failed', 'status': 'failed', 'high_score': 99, 'current_seed': 0},
-                    {name: '16', 'run_id': 'gold', 'status': 'completed', 'high_score': 5, 'current_seed': 1},
+                    {name: 16, 'run_id': 'old', 'status': 'completed', 'high_score': 7, 'current_seed': 0},
+                    {name: 16, 'run_id': 'failed', 'status': 'failed', 'high_score': 99, 'current_seed': 0},
+                    {name: 16, 'run_id': 'gold', 'status': 'completed', 'high_score': 5, 'current_seed': 1},
                 ]
                 self.assertEqual(SnakeLabDb(db).get_parameter_report('gold', name), [
                     {name: 16, 'results': [{'run_id': 'gold', 'status': 'completed', 'high_score': 5}],
                      'history': [7]}])
                 sql, args = db.query.call_args.args
-                self.assertIn(f"JSON_REMOVE(r.config, '$.seed', '$.{'.'.join(path)}')", sql)
-                self.assertIn(f"JSON_REMOVE(g.config, '$.seed', '$.{'.'.join(path)}')", sql)
+                self.assertIn(f"c.{'_'.join(path)} AS {name}", sql)
+                self.assertNotIn(f"c.{'_'.join(path)} = g.{'_'.join(path)}", sql)
+                self.assertIn("c.epochs = g.epochs", sql)
                 self.assertEqual(args, ('gold',))
         with self.assertRaises(KeyError):
             SnakeLabDb(Mock()).get_parameter_report('gold', 'initial')

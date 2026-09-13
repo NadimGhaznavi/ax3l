@@ -5,7 +5,7 @@ from uuid import UUID
 
 import plotly.graph_objects as go
 
-from ax3l.app.snakelab.prompts.LossPlot import LossPlot
+from ax3l.app.ideas.prompts.LossPlot import LossPlot
 from ax3l.constants.DLossPlot import DLossPlot
 
 

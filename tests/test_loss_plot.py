@@ -3,7 +3,7 @@ import json
 import unittest
 from unittest.mock import patch
 
-from ax3l.app.snakelab.prompts.LossPlot import LossPlot
+from ax3l.app.ideas.prompts.LossPlot import LossPlot
 
 
 RUN_ID = "f6e72cb3-9bcf-4669-b368-a17c656bad79"
@@ -11,7 +11,7 @@ RUN_ID = "f6e72cb3-9bcf-4669-b368-a17c656bad79"
 
 class LossPlotTests(unittest.TestCase):
     def test_refresh_and_image_message_preserve_episodes_and_gaps(self):
-        with patch("ax3l.app.snakelab.prompts.LossPlot.SnakeLab") as snake, patch(
+        with patch("ax3l.app.ideas.prompts.LossPlot.SnakeLab") as snake, patch(
             "plotly.graph_objects.Figure.to_image", autospec=True,
             side_effect=[b"first PNG", b"second PNG"],
         ) as render:
@@ -39,7 +39,7 @@ class LossPlotTests(unittest.TestCase):
             self.assertEqual(base64.b64decode(image["image_url"]["url"].split(",", 1)[1]), b"second PNG")
 
     def test_no_loss_does_not_render_a_misleading_chart(self):
-        with patch("ax3l.app.snakelab.prompts.LossPlot.SnakeLab") as snake, patch(
+        with patch("ax3l.app.ideas.prompts.LossPlot.SnakeLab") as snake, patch(
             "plotly.graph_objects.Figure.to_image"
         ) as render:
             for losses in ([], [(1, None), (2, None)]):

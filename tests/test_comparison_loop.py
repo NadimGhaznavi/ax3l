@@ -6,7 +6,8 @@ from unittest.mock import AsyncMock, Mock, patch
 from uuid import uuid4
 
 from ax3l.app.Prompt import Prompt
-from ax3l.app.snakelab.SnakeLabLoop import compare, optimize, wait_for_run
+from ax3l.app.snakelab.SnakeLabLoop import compare, optimize, wait_for_run, SimulationUnsuccessful
+from ax3l.interface.SnakeLab import SimulationUnavailable
 from ax3l.app.snakelab.ToolConversation import converse
 from ax3l.app.snakelab.prompts.Comparison import Comparison
 from ax3l.app.ideas.prompts.ComparisonPlot import ComparisonPlot
@@ -165,7 +166,7 @@ class LoopTests(unittest.IsolatedAsyncioTestCase):
             await wait_for_run(snake, db, 'run')
         self.assertEqual([c.args[0] for c in db.log.call_args_list], ['simulation_started', 'simulation_failed'])
 
-    async def exercise_loop(self, proposal=None):
+    async def exercise_loop(self, proposal=None, resume_error=None):
         snake = Mock()
         snake.is_simulation_running.return_value = False
         snake.get_run_result.return_value = result(10, .002)
@@ -174,11 +175,36 @@ class LoopTests(unittest.IsolatedAsyncioTestCase):
         context = AsyncMock()
         conversations = AsyncMock(side_effect=['last', 'next', asyncio.CancelledError()])
         with patch(MODULE + 'SnakeLab', return_value=snake), patch(MODULE + 'GoldenConfig', return_value=golden), patch(MODULE + 'SnakeLabTools', return_value=context), patch(MODULE + 'EventLogDb') as events, patch(MODULE + 'converse', conversations), patch(MODULE + 'wait_for_run', new_callable=AsyncMock) as wait, patch(MODULE + 'compare', side_effect=['last', 'last']) as comparison, patch(MODULE + 'Comparison', side_effect=lambda *ids: Prompt(str(ids))) as prompt:
+            if resume_error is not None:
+                wait.side_effect = [resume_error, None, None]
             events.return_value.latest_seed_baseline.return_value = None
             events.return_value.latest_snakelab_proposal.return_value = proposal
             with self.assertRaises(asyncio.CancelledError):
                 await optimize(Mock(), Path('/tmp'), Mock(), 'endpoint')
             return conversations, comparison, prompt, wait
+
+    async def test_restart_skips_interrupted_proposal_and_continues_with_golden(self):
+        for error in (SimulationUnavailable('forgotten'), SimulationUnsuccessful('cancelled')):
+            with self.subTest(error=error):
+                conversations, comparison, prompt, wait = await self.exercise_loop(
+                    {'process_id': 'interrupted', 'comparison': None}, error)
+                self.assertEqual(wait.call_args_list[0].args[2], 'interrupted')
+                self.assertEqual(comparison.call_args_list[0].args[2:], ('gold', 'last'))
+                self.assertEqual(comparison.call_count, 2)
+                self.assertEqual(prompt.call_args_list[0].args, ('gold', 'learning_rate'))
+                self.assertEqual(len(conversations.call_args_list[0].args[4]), 2)
+
+    async def test_restart_does_not_swallow_transport_failure(self):
+        with self.assertRaises(TimeoutError):
+            await self.exercise_loop({'process_id': 'pending', 'comparison': None}, TimeoutError())
+
+    async def test_monitor_logs_forgotten_run(self):
+        snake, db = Mock(), Mock()
+        snake.get_simulation_status.side_effect = SimulationUnavailable('forgotten')
+        with self.assertRaises(SimulationUnavailable):
+            await wait_for_run(snake, db, 'interrupted')
+        self.assertEqual(db.log.call_args.args[0], 'simulation_failed')
+        self.assertEqual(db.log.call_args.kwargs['process_id'], 'interrupted')
 
     async def test_first_round_then_repeated_fresh_comparisons(self):
         conversations, comparison, prompt, wait = await self.exercise_loop()

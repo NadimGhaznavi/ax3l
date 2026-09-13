@@ -27,7 +27,7 @@ Startup order: **LLM → wait 7 seconds → reporting → Ax3l → watchdog**.
 The delay comes from `DQwen.STARTUP_SECONDS` or `DPhi.STARTUP_SECONDS`.
 Shutdown stops the application services, then both model services.
 
-Qwen is the default. Select Phi with:
+Qwen3.5 (`qwen`, using `DQwen.GGUF`) is the default for text-only prompts. Select Phi with:
 
 ```sh
 scripts/services.sh -env dev start -model phi

@@ -77,7 +77,5 @@ INFO:hf-to-gguf:Model successfully exported to /opt/dev/models/intermediate/Qwen
 ## Install the Models
 
 ```sh
-cp /opt/dev/Qwen2.5-VL-3B-Instruct/Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf /opt/prod/models/
-cp /opt/dev/Qwen2.5-VL-3B-Instruct/mmproj-Qwen2.5-VL-3B-Instruct-F16.gguf /opt/prod/models/
-root@neuromancer:~ # 
+cp /opt/dev/models/quantized/Qwen3.5-4B-Q4_K_M.gguf /opt/prod/models/
 ```

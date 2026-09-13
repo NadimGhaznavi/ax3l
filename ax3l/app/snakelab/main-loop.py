@@ -149,17 +149,13 @@ def initialize_simulation(db: DbMgr) -> None:
 
 
 def run_first_iteration(llm: LLM, output: Path, db: DbMgr) -> None:
-    # Import the renderer only for the image workflow.
-    from ax3l.app.snakelab.prompts.LossPlot import LossPlot
-
     snake = SnakeLab()
     while snake.is_simulation_running():
         time.sleep(DSnakeLab.STATUS_POLL_SECONDS)
     first_contact = FirstContact()
     golden = GoldenConfig(db)
-    loss_plot = LossPlot(golden.run_id)
     parameter = FirstContactSingle("learning_rate")
-    run(llm, output, db, count=1, prompts=[first_contact, golden, loss_plot, parameter])
+    run(llm, output, db, count=1, prompts=[first_contact, golden, parameter])
 
 
 def main(argv: list[str] | None = None) -> int:

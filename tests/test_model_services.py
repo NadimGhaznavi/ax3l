@@ -44,7 +44,7 @@ class ModelServicesTests(unittest.TestCase):
             self.assertEqual(shlex.split(result.stdout), [
                 str(binary), '--chat-template-file', str(directory / DQwenV.CHAT_TEMPLATE),
                 '--model', str(directory / DQwenV.GGUF),
-                '--mmproj', str(projector), '-c', '4096', '--host', '0.0.0.0',
+                '--mmproj', str(projector), '-c', str(DQwenV.CONTEXT_SIZE), '--host', '0.0.0.0',
                 '--port', '27770', '--metrics', '--jinja', '--mcp-servers-config', str(directory / 'mcp.json'),
             ])
             projector.unlink()
@@ -103,21 +103,25 @@ class ModelServicesTests(unittest.TestCase):
             return result, log.read_text().splitlines() if log.exists() else []
 
     def test_starting_each_model_leaves_other_models_alone(self):
-        for model in ('qwen', 'phi', 'qwenv'):
+        from ax3l.constants.DQwen import DQwen
+        from ax3l.constants.DPhi import DPhi
+        from ax3l.constants.DQwenV import DQwenV
+
+        for model, constants in (('qwen', DQwen), ('phi', DPhi), ('qwenv', DQwenV)):
             with self.subTest(model=model):
                 result, calls = self.run_helper('start', '-model', model)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(calls, [
                     f'enable {model}-server-dev.service',
-                    f'start {model}-server-dev.service', 'sleep 7',
+                    f'start {model}-server-dev.service', f'sleep {constants.STARTUP_SECONDS}',
                     'start reporting-server-dev.service', 'start ax3l-server-dev.service',
                     'start watchdog-dev.service',
                 ])
 
-    def test_default_is_qwenv(self):
+    def test_default_is_qwen(self):
         result, calls = self.run_helper('start')
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('start qwenv-server-dev.service', calls)
+        self.assertIn('start qwen-server-dev.service', calls)
 
     def test_missing_units_do_not_break_stop_or_migration(self):
         result, calls = self.run_helper('stop')

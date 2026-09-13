@@ -67,6 +67,13 @@ class EventLogDb:
         Count comparisons, not acceptances, so pending runs and retries cannot
         trigger rotation. Durable events make this calculation restart-safe.
         """
+        return self._completed_rounds(since_golden=True)
+
+    def experiment_cycles(self) -> int:
+        """Count completed round robins across all golden configs and seeds."""
+        return self._completed_rounds(since_golden=False)
+
+    def _completed_rounds(self, *, since_golden: bool) -> int:
         from ax3l.app.snakelab.SingleParameters import SINGLE_PARAMETERS
 
         category = DEventCategory.Configuration
@@ -80,12 +87,12 @@ class EventLogDb:
                 SELECT MAX(event_id) FROM events
                 WHERE event_id < p.event_id AND category = %s AND name = %s)
             JOIN event_messages m ON m.event_id = checkpoint.event_id
-            WHERE c.category = %s AND c.name = %s AND c.event_id > COALESCE(
-                (SELECT MAX(event_id) FROM events WHERE category = %s AND name = %s), 0)
+            WHERE c.category = %s AND c.name = %s AND (%s = 0 OR c.event_id > COALESCE(
+                (SELECT MAX(event_id) FROM events WHERE category = %s AND name = %s), 0))
             ORDER BY c.event_id
         """, (category.CATEGORY, category.PROPOSAL_ACCEPTED,
                category.CATEGORY, "round_robin_checkpoint",
-               category.CATEGORY, category.COMPARED,
+               category.CATEGORY, category.COMPARED, int(since_golden),
                category.CATEGORY, category.GOLDEN_CREATED))
         order = list(SINGLE_PARAMETERS)
         rounds, expected = 0, 0

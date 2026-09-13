@@ -91,6 +91,8 @@ def make_server(host: str, port: int) -> HTTPServer:
                                 events=events,
                                 snake_lab_status=snake_lab_status,
                                 high_score=SnakeLab().get_high_score(),
+                                simulations_submitted=SnakeLab().get_num_sims(),
+                                experiment_cycles=log.experiment_cycles(),
                             ).encode("utf-8")
                         else:
                             event = log.get(int(self.path.rsplit("/", 1)[1]))

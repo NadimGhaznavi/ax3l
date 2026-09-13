@@ -151,10 +151,19 @@ SnakeLab credentials are needed. Each call opens and closes its connection witho
 initializing tables. Simulation submissions still go through SnakeLab's ZMQ API.
 
 At startup, `main-loop.py` checks the simulation count. If it is zero, it
-submits the JSON spec's default configuration once and records the submission
-and golden creation. It polls the submitted run through its terminal status,
-then waits until Snake Lab reports idle. With an existing database it skips
-seeding and waits for idle directly.
+submits the JSON spec's default configuration once and records the submission.
+It polls the run through its terminal status and accepts the initial golden config
+once its completed score is available. A restart before that acceptance resumes
+the recorded initial submission. With an existing golden config it skips seeding.
+
+The report server's `/experiment-highscores` page plots accepted config scores
+against the total simulation count at acceptance. The `experiment_highscores`
+table stores each score, seed, and count atomically with its golden creation event;
+the event supplies the run reference and reason. Seed rotation records the new
+baseline even when its score drops. The step line remains flat across unsuccessful
+or pending submissions, extending to the current submission count. The page uses
+self-contained Plotly JavaScript; reload it to update. A fresh installation starts
+an empty history, and wiping events also deletes their score snapshots.
 
 The loop resolves the current golden configuration and submits proposals through
 `submit_single_value` or `submit_pair_values`. Each serialized prompt is stored in a `prompt_sent` entry

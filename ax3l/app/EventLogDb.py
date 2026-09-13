@@ -139,3 +139,12 @@ class EventLogDb:
         """, (category.GOLDEN_CREATED, category.CATEGORY,
                category.GOLDEN_SEED_INCREMENTED, category.CATEGORY))
         return rows[0]["process_id"] if rows else None
+
+    def experiment_highscores(self) -> list[dict[str, Any]]:
+        """Read accepted scores in decision order, including lower seed baselines."""
+        return self._db.query("""
+            SELECT h.simulations, h.score, h.seed, e.process_id AS run_id, m.content AS reason
+            FROM experiment_highscores h JOIN events e USING (event_id)
+            JOIN event_messages m USING (event_id)
+            ORDER BY h.event_id
+        """)

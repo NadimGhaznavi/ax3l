@@ -77,6 +77,15 @@ class DbMgr:
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             """,
         )
+        statements += ("""
+            CREATE TABLE IF NOT EXISTS experiment_highscores (
+                event_id BIGINT UNSIGNED PRIMARY KEY,
+                simulations BIGINT UNSIGNED NOT NULL,
+                score INT NOT NULL,
+                seed BIGINT NULL,
+                FOREIGN KEY (event_id) REFERENCES events(event_id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """,)
         for statement in statements:
             self.execute(statement)
 
@@ -90,6 +99,7 @@ class DbMgr:
         process_id: str | None = None,
         parent_event_id: int | None = None,
         source_name: str | None = None,
+        experiment_score: dict | None = None,
     ) -> int:
         """Commit an event and its message together and return the event ID.
 
@@ -107,6 +117,11 @@ class DbMgr:
                 "INSERT INTO event_messages (event_id, content) VALUES (%s, %s)",
                 (event_id, content),
             )
+            if experiment_score is not None:
+                self.execute(
+                    "INSERT INTO experiment_highscores (event_id, simulations, score, seed) VALUES (%s, %s, %s, %s)",
+                    (event_id, experiment_score["simulations"], experiment_score["score"], experiment_score["seed"]),
+                )
         return event_id
 
     def execute(

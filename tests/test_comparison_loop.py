@@ -32,10 +32,16 @@ class ComparisonTests(unittest.TestCase):
             with self.subTest(score=score):
                 snake, db = Mock(), Mock()
                 snake.get_run_result.side_effect = [result(10, .002), result(score, .003)]
+                snake.get_num_sims.return_value = 8
                 self.assertEqual(compare(snake, db, 'gold', 'last'), 'last' if score > 10 else 'gold')
                 logs = db.log.call_args_list
                 self.assertEqual(logs[0].args[0], 'configuration_compared')
                 self.assertEqual(logs[1].args[0], 'golden_config_created' if score > 10 else 'golden_config_retained')
+                if score > 10:
+                    self.assertEqual(logs[1].kwargs['experiment_score']['score'], score)
+                    self.assertEqual(logs[1].kwargs['experiment_score']['simulations'], 8)
+                else:
+                    self.assertNotIn('experiment_score', logs[1].kwargs)
                 self.assertIn(f'{score} {">" if score > 10 else "<="} 10', logs[1].args[3])
 
     def test_comparison_logs_the_actual_non_learning_rate_change(self):

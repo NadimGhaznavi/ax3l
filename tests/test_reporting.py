@@ -61,6 +61,9 @@ class ExperimentStatusTests(unittest.TestCase):
                 self.assertIn(f"Current Highscore: {score if score is not None else '—'}", page)
                 self.assertIn('class="server-bar experiment-status"', page)
                 self.assertIn('href="/score-distribution">Score Distribution Histogram</a>', page)
+                self.assertIn('href="/experiment-highscores">Experiment Highscores</a>', page)
+                self.assertLess(page.index('>Score Distribution Histogram</a>'),
+                                page.index('>Experiment Highscores</a>'))
                 for element in ('simulations-submitted', 'experiment-cycles'):
                     self.assertIn(f"page.querySelector('#{element}').textContent", page)
         finally:

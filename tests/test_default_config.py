@@ -28,7 +28,9 @@ class DefaultConfigTests(unittest.TestCase):
             with self.subTest(num_sims=num_sims):
                 main = runpy.run_path(str(ROOT / "ax3l/app/snakelab/main-loop.py"))["main"]
                 db = Mock()
+                db.query.return_value = [{"process_id": "gold", "reason": "Initial"}]
                 snake = Mock()
+                snake.get_run_result.return_value = {"high_score": 38, "config": {"seed": 1}}
                 snake.get_num_sims.return_value = num_sims
                 snake.submit_simulation.return_value = "f6e72cb3-9bcf-4669-b368-a17c656bad79"
                 snake.get_simulation_status.side_effect = ["queued", "running", "running", "completed"]
@@ -37,16 +39,16 @@ class DefaultConfigTests(unittest.TestCase):
                     "DbMgr": lambda: db, "SnakeLab": lambda: snake, "run_optimization": run,
                 }), patch("time.sleep") as sleep, patch("sys.stdout", new_callable=io.StringIO):
                     self.assertEqual(main(["--url", "http://example"]), 0)
-                snake.get_num_sims.assert_called_once_with()
+                self.assertEqual(snake.get_num_sims.call_count, 2 if num_sims == 0 else 1)
                 run.assert_called_once()
                 db.close.assert_called_once_with()
                 if num_sims == 0:
                     snake.submit_simulation.assert_called_once_with(GenerateDefaultConfig().run())
                     self.assertEqual([call.args[0] for call in db.log.call_args_list], [
-                        "simulation_submitted", "golden_config_created", "simulation_started", "simulation_completed",
+                        "simulation_submitted", "simulation_started", "simulation_completed", "golden_config_created",
                     ])
                     self.assertEqual(db.log.call_args_list[0].args[3], "Submitted config.")
-                    created = db.log.call_args_list[1]
+                    created = db.log.call_args_list[-1]
                     self.assertEqual(created.args[1:4], (
                         "Configuration", "INFO", "Seeded database with default config.",
                     ))
@@ -55,7 +57,7 @@ class DefaultConfigTests(unittest.TestCase):
                     self.assertEqual(db.log.call_args_list[0].kwargs["process_id"], snake.submit_simulation.return_value)
                     self.assertEqual(sleep.call_count, 4)
                     self.assertTrue(all(call.args == (5,) for call in sleep.call_args_list))
-                    self.assertEqual(db.log.call_args.args[3], "Simulation completed.")
+                    self.assertEqual(db.log.call_args_list[-2].args[3], "Simulation completed.")
                     snake.get_simulation_status.assert_called_with(snake.submit_simulation.return_value)
                 else:
                     db.log.assert_not_called()
@@ -67,29 +69,32 @@ class DefaultConfigTests(unittest.TestCase):
         for state in ("completed", "failed", "cancelled"):
             with self.subTest(state=state):
                 db, snake = Mock(), Mock()
+                snake.get_run_result.return_value = {"high_score": 38, "config": {"seed": 1}}
                 snake.get_num_sims.return_value = 0
                 snake.get_simulation_status.return_value = state
                 with patch.dict(initialize.__globals__, {"SnakeLab": lambda: snake}), patch("time.sleep"):
                     initialize(db)
                 self.assertEqual([call.args[0] for call in db.log.call_args_list], [
-                    "simulation_submitted", "golden_config_created", f"simulation_{state}",
-                ])
+                    "simulation_submitted", f"simulation_{state}",
+                ] + (["golden_config_created"] if state == "completed" else []))
 
     def test_running_cycle_logs_start_once_and_closes_on_each_terminal_state(self):
         initialize = runpy.run_path(str(ROOT / "ax3l/app/snakelab/main-loop.py"))["initialize_simulation"]
         for state in ("completed", "failed", "cancelled"):
             with self.subTest(state=state):
                 db, snake = Mock(), Mock()
+                snake.get_run_result.return_value = {"high_score": 38, "config": {"seed": 1}}
                 snake.get_num_sims.return_value = 0
                 snake.submit_simulation.return_value = "f6e72cb3-9bcf-4669-b368-a17c656bad79"
                 snake.get_simulation_status.side_effect = ["running", "paused", "running", state]
                 with patch.dict(initialize.__globals__, {"SnakeLab": lambda: snake}), patch("time.sleep") as sleep:
                     initialize(db)
                 self.assertEqual([call.args[0] for call in db.log.call_args_list], [
-                    "simulation_submitted", "golden_config_created", "simulation_started", f"simulation_{state}",
-                ])
-                self.assertEqual(db.log.call_args.args[3], f"Simulation {state}.")
-                self.assertEqual(db.log.call_args.args[2], "ERROR" if state == "failed" else "INFO")
+                    "simulation_submitted", "simulation_started", f"simulation_{state}",
+                ] + (["golden_config_created"] if state == "completed" else []))
+                terminal = db.log.call_args_list[-2 if state == "completed" else -1]
+                self.assertEqual(terminal.args[3], f"Simulation {state}.")
+                self.assertEqual(terminal.args[2], "ERROR" if state == "failed" else "INFO")
                 self.assertEqual(db.log.call_args.kwargs["process_id"], snake.submit_simulation.return_value)
                 self.assertEqual(db.log.call_args.kwargs["parent_event_id"], db.log.return_value)
                 self.assertEqual(sleep.call_count, 4)

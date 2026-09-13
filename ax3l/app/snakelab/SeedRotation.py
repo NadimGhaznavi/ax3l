@@ -54,5 +54,7 @@ async def rotate_if_needed(snake, db, wait_for_run, *, resume_only=False) -> str
         raise ValueError("Seed baseline requires a completed simulation with a recorded high score")
     ConfigurationLog(db).golden_config_created(
         run_id, reason=f"Fresh baseline after seed rotation. Score to beat: {result['high_score']}.",
-        parent_event_id=pending["submitted_event_id"])
+        parent_event_id=pending["submitted_event_id"],
+        experiment_score={"simulations": snake.get_num_sims(), "score": result["high_score"],
+                          "seed": config["seed"]})
     return run_id

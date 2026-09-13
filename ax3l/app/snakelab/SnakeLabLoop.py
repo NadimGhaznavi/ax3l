@@ -64,7 +64,9 @@ def compare(snake, db, golden_id, latest_id):
                                       "current_golden_run_id": current_id, "reason": reason}),
                           process_id=latest_id)
     if won:
-        ConfigurationLog(db).golden_config_created(latest_id, reason=reason, parent_event_id=comparison_id)
+        ConfigurationLog(db).golden_config_created(latest_id, reason=reason, parent_event_id=comparison_id,
+            experiment_score={"simulations": snake.get_num_sims(), "score": latest["high_score"],
+                              "seed": latest["config"].get("seed")})
     else:
         db.log(Events.Configuration.GOLDEN_RETAINED, Events.Configuration.CATEGORY, "INFO", reason,
                process_id=golden_id, parent_event_id=comparison_id)
@@ -90,7 +92,10 @@ async def optimize(llm, output, db, endpoint):
             # Finish a promotion interrupted between the comparison and creation events.
             if selected_id != golden_id:
                 ConfigurationLog(db).golden_config_created(
-                    selected_id, reason=snapshot["reason"], parent_event_id=proposal["comparison_id"])
+                    selected_id, reason=snapshot["reason"], parent_event_id=proposal["comparison_id"],
+                    experiment_score={"simulations": snake.get_num_sims(),
+                                      "score": snake.get_run_result(selected_id)["high_score"],
+                                      "seed": snake.get_config(selected_id).get("seed")})
             golden_id = selected_id
         else:
             await wait_for_run(snake, db, latest_id)

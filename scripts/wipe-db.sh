@@ -43,7 +43,8 @@ for unit in "watchdog$suffix.service" "ax3l-server$suffix.service" "reporting-se
 done
 
 # All tables are InnoDB. ON DELETE CASCADE clears event_messages,
-# event_list_items, and event_key_values from events, plus simulation_episodes
+# event_list_items, event_key_values, and experiment_highscores from events,
+# plus simulation_episodes
 # (SnakeLab v1) and configurations (v3) from simulation_runs. The v2 index
 # change needs no extra cleanup. Round-robin checkpoints are events too.
 # Clear event parent links first so self references cannot block deletion.

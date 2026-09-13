@@ -13,20 +13,15 @@
     .server-bar { margin-bottom: 1rem; }
     .note { margin: 1rem 0; padding: .6rem 1rem; border: 1px solid var(--border); color: var(--muted); }
     main { border: 1px solid var(--border); overflow-x: auto; }
-    table { width: 100%; min-width: 1100px; table-layout: fixed; border-collapse: collapse; }
-    .date-col { width: 13ch; }
-    .time-col { width: 11ch; }
-    .id-col { width: 9ch; }
-    .level-col { width: 9ch; }
-    .category-col { width: 15ch; }
-    .event-col { width: 12ch; }
-    th, td { padding: .35rem .65rem; border: 1px solid var(--border); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    table { width: 100%; table-layout: auto; border-collapse: collapse; }
+    th, td { padding: .35rem .65rem; border: 1px solid var(--border); text-align: left; white-space: nowrap; }
+    th:not(:last-child), td:not(:last-child) { width: 1%; }
     th { background: #0d1c11; color: var(--green); }
     .entry { background: #08100a; }
     .entry:nth-child(even) { background: #13271a; }
     .entry:hover { background: #1d3825; }
     .metadata { color: var(--muted); }
-    .content { font: inherit; }
+    .content { max-width: 0; overflow: hidden; text-overflow: ellipsis; font: inherit; }
     a { color: var(--green); text-underline-offset: .2em; }
     a:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
     .empty { margin: 0; padding: 1rem; border: 1px solid var(--border); }
@@ -45,10 +40,6 @@
   <p class="note">Latest {{ events | length }} entries (up to 500), newest first.</p>
   <main>
     <table aria-label="Event log">
-      <colgroup>
-        <col class="date-col"><col class="time-col"><col class="id-col"><col class="level-col">
-        <col class="category-col"><col class="event-col"><col>
-      </colgroup>
       <thead>
         <tr><th scope="col">Date</th><th scope="col">Time</th><th scope="col">ID</th><th scope="col">Level</th><th scope="col">Category</th><th scope="col">Event</th><th scope="col">Message</th></tr>
       </thead>

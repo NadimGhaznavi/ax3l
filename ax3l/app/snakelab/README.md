@@ -22,9 +22,11 @@ configuration to establish a fresh score baseline. The count survives restarts.
 
 The SnakeLab MCP entry point is `python -m ax3l.app.snakelab.tools` and uses
 stdio. Register domain tool functions in `tools/server.py` with `@mcp.tool()`.
-It exposes `submit_single_value(parameter, value)` through `SubmitSingleValue`.
-The parameter is its exact JSON spec key (for example `learning_rate`); the value
-is a JSON integer or number. MCP rejects strings and booleans as numeric values.
+It exposes `submit_single_value(value)` through `SubmitSingleValue`.
+Ax3l starts a dedicated MCP session for each conversation, binding its parameter
+through `AX3L_CONVERSATION_PARAMETER`. The LLM supplies only a JSON integer or number.
+The tool description contains only the assigned parameter’s meaning and schema rules.
+Conversation prompts show only its golden value, high score, and comparable history. MCP rejects strings and booleans as numeric values.
 Parameter existence, permitted ranges, duplicates, and submission decisions
 belong to Ax3l, not the MCP tool.
 
@@ -40,6 +42,9 @@ For a checkout, generate the same configuration with:
 python3 scripts/generate-mcp-config.py --app /opt/dev/ax3l > tmp/mcp.json
 ```
 
+This unbound configuration supports discovery only. Submission requires an
+Ax3l-assigned `AX3L_CONVERSATION_PARAMETER` in the MCP process environment.
+The optimization loop configures its own bound MCP sessions automatically.
 Pass that file to a llama-server build supporting `--mcp-servers-config`.
 llama-server discovers the tool names through MCP. The tool forwards requests
 over ZeroMQ using the project-wide `ax3l/zmq/ZMQMsg.py` and `ZMQClient.py`:

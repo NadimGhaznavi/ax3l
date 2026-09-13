@@ -1,15 +1,11 @@
-"""Introduce the available single-parameter search space."""
+"""Request a value for the assigned parameter."""
 
 from ax3l.app.Prompt import Prompt
-from ax3l.app.snakelab.SingleParameters import parameter_instructions
 
 
 class FirstContactSingle(Prompt):
-    def __init__(self, parameter=None):
+    def __init__(self, parameter):
         super().__init__(
-            "The baseline is the current Golden Configuration. Choose exactly one parameter "
-            "from the list below and one new value different from its current golden value. "
-            "Keep every other configuration setting unchanged.\n"
-            + parameter_instructions(parameter) + "\n"
-            "Call submit_single_value with the chosen parameter's exact JSON spec key and value."
+            f"Choose an untested {parameter} value to improve the current golden high score. "
+            'Call submit_single_value with {"value": number}.'
         )

@@ -11,15 +11,13 @@ class SingleParameterTests(unittest.TestCase):
     def test_prompts_offer_only_tunable_single_parameters_with_schema_rules(self):
         expected = {'hidden_size', 'sequence_length', 'batch_size', 'learning_rate', 'gamma'}
         self.assertEqual(set(SINGLE_PARAMETERS), expected)
-        for prompt in (FirstContactSingle(), ComparisonSingle()):
-            content = prompt.to_md()
-            for name in expected:
-                self.assertIn(name, content)
-            for excluded in ('closer_to_food', 'further_from_food', 'initial', 'decay', 'seed'):
-                self.assertNotIn(excluded, content)
-            self.assertIn('"multipleOf": 16', content)
-            self.assertIn('"multipleOf": 4', content)
-            self.assertIn('"multipleOf": 2', content)
+        for parameter in expected:
+            for prompt in (FirstContactSingle(parameter), ComparisonSingle(parameter)):
+                content = prompt.to_md()
+                self.assertIn(parameter, content)
+                for other in expected - {parameter}:
+                    self.assertNotIn(other, content)
+                self.assertIn('{"value": number}', content)
 
     def test_reports_use_parameter_path_and_preserve_seed_history(self):
         for name, (path, _) in SINGLE_PARAMETERS.items():

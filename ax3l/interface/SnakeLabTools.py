@@ -13,11 +13,14 @@ from mcp.client.stdio import StdioServerParameters
 
 
 class SnakeLabTools:
-    def __init__(self, endpoint: str):
+    def __init__(self, endpoint: str, parameter: str):
+        if parameter not in SINGLE_PARAMETERS:
+            raise ValueError(f"Unknown conversation parameter: {parameter}")
         root = Path(__file__).resolve().parents[2]
         self._client = Client(StdioServerParameters(
             command=sys.executable, args=["-m", "ax3l.app.snakelab.tools"], cwd=str(root),
             env={"PYTHONPATH": str(root), "AX3L_ZMQ_ENDPOINT": endpoint,
+                 "AX3L_CONVERSATION_PARAMETER": parameter,
                  "PYTHONDONTWRITEBYTECODE": "1"},
         ), read_timeout_seconds=DSnakeLab.MCP_TIMEOUT_SECONDS)
 
@@ -27,7 +30,6 @@ class SnakeLabTools:
             tools = await self._client.list_tools()
             tool = next(tool for tool in tools.tools if tool.name == "submit_single_value")
             schema = deepcopy(tool.input_schema)
-            schema["properties"]["parameter"]["enum"] = list(SINGLE_PARAMETERS)
             self.definition = {"type": "function", "function": {
                 "name": tool.name, "description": tool.description, "parameters": schema,
             }}

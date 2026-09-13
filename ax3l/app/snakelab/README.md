@@ -87,7 +87,7 @@ object key order and equivalent numeric representations. This uses MariaDB's
 
 Illegal values return `status: rejected`, `code: invalid_value`, and an
 `InvalidValue` prompt. Duplicates return `code: duplicate_config` and a
-`NoDupesSingle` prompt. These prompt messages travel back in the MCP result;
+`NoDupes` prompt. These prompt messages travel back in the MCP result;
 the handler does not start a separate LLM conversation. Accepted candidates
 return `status: ok` and their submitted `run_id`, with proposal and submission
 events logged. Golden selection is unchanged. The listener handles requests

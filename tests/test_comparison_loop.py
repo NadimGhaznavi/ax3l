@@ -9,7 +9,7 @@ from ax3l.app.Prompt import Prompt
 from ax3l.app.snakelab.SnakeLabLoop import compare, optimize, wait_for_run
 from ax3l.app.snakelab.ToolConversation import converse
 from ax3l.app.snakelab.prompts.Comparison import Comparison
-from ax3l.app.snakelab.prompts.ComparisonPlot import ComparisonPlot
+from ax3l.app.ideas.prompts.ComparisonPlot import ComparisonPlot
 from ax3l.app.snakelab.prompts.ComparisonSingle import ComparisonSingle
 from ax3l.activity.ReplyReport import reply_content
 
@@ -55,18 +55,22 @@ class ComparisonTests(unittest.TestCase):
             compare(snake, db, 'gold', 'last')
         db.log.assert_not_called()
 
-    def test_prompts_include_full_history_and_two_loss_curves(self):
-        golden, latest = str(uuid4()), str(uuid4())
+    def test_comparison_prompt_includes_parameter_history(self):
+        latest = str(uuid4())
         rows = [{'learning_rate': .001, 'high_score': 4}, {'learning_rate': .003, 'high_score': 12}]
         with patch('ax3l.interface.SnakeLab.SnakeLab.get_run_result', return_value=result(12, .003)), patch('ax3l.interface.SnakeLab.SnakeLab.get_parameter_report', return_value=rows) as report:
-            prompt = Comparison(golden, latest, latest, 'learning_rate')
+            prompt = Comparison(latest, 'learning_rate')
         history = json.loads(prompt.to_md().split('```json\n')[1].split('```')[0])
         self.assertEqual(history, rows)
         report.assert_called_once_with(latest, 'learning_rate')
         for other in ('hidden_size', 'sequence_length', 'batch_size', 'gamma'):
             self.assertNotIn(other, prompt.to_md())
         self.assertIn('current golden', ComparisonSingle('learning_rate').to_md())
+
+    def test_comparison_plot_builds_two_loss_curves_and_embeds_image(self):
+        golden, latest = str(uuid4()), str(uuid4())
         figures = []
+        # Exercise Plotly figure construction without requiring Kaleido PNG export.
         def render(figure, **kwargs):
             figures.append(figure)
             return b'png'
@@ -172,8 +176,8 @@ class LoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([len(c.args[4]) for c in conversations.call_args_list], [3, 2, 2])
         self.assertEqual(comparison.call_args_list[0].args[2:], ('gold', 'last'))
         self.assertEqual(comparison.call_args_list[1].args[2:], ('last', 'next'))
-        self.assertEqual(prompt.call_args_list[0].args, ('gold', 'gold', 'gold', 'learning_rate'))
-        self.assertEqual(prompt.call_args_list[1].args, ('gold', 'last', 'last', 'learning_rate'))
+        self.assertEqual(prompt.call_args_list[0].args, ('gold', 'learning_rate'))
+        self.assertEqual(prompt.call_args_list[1].args, ('last', 'learning_rate'))
         for call in conversations.call_args_list:
             self.assertTrue(all(isinstance(json.loads(p.to_json())['content'], str) for p in call.args[4]))
             self.assertIn('learning_rate', call.args[4][-1].to_md())
@@ -184,7 +188,7 @@ class LoopTests(unittest.IsolatedAsyncioTestCase):
         snapshot = {'golden_run_id': 'old', 'latest_run_id': 'previous', 'current_golden_run_id': 'gold', 'reason': 'retained'}
         conversations, _, prompt, _ = await self.exercise_loop({'process_id': 'previous', 'comparison_id': 1, 'comparison': json.dumps(snapshot)})
         self.assertEqual(len(conversations.call_args_list[0].args[4]), 2)
-        self.assertEqual(prompt.call_args_list[0].args, ('old', 'previous', 'gold', 'learning_rate'))
+        self.assertEqual(prompt.call_args_list[0].args, ('gold', 'learning_rate'))
 
     async def test_restart_monitors_pending_submission_before_requesting_next_value(self):
         snake, db = Mock(), Mock()

@@ -82,7 +82,6 @@ async def optimize(llm, output, db, endpoint):
         latest_id = proposal["process_id"]
         if proposal["comparison"]:
             snapshot = json.loads(proposal["comparison"])
-            previous_golden_id = snapshot["golden_run_id"]
             selected_id = snapshot["current_golden_run_id"]
             # Finish a promotion interrupted between the comparison and creation events.
             if selected_id != golden_id:
@@ -91,20 +90,16 @@ async def optimize(llm, output, db, endpoint):
             golden_id = selected_id
         else:
             await wait_for_run(snake, db, latest_id)
-            previous_golden_id = golden_id
             golden_id = compare(snake, db, golden_id, latest_id)
-    else:
-        previous_golden_id = latest_id = golden_id
     first_contact = proposal is None and EventLogDb(db).latest_seed_baseline() is None
     selector = RoundRobinState(db)
     while True:
         rotated_id = await rotate_if_needed(snake, db, wait_for_run)
         if rotated_id is not None:
             golden_id = rotated_id
-            previous_golden_id = latest_id = golden_id
             first_contact = False
         parameter = selector.begin()
-        prompts = [Comparison(previous_golden_id, latest_id, golden_id, parameter),
+        prompts = [Comparison(golden_id, parameter),
                    FirstContactSingle(parameter) if first_contact else ComparisonSingle(parameter)]
         if first_contact:
             prompts.insert(0, FirstContact())
@@ -113,8 +108,7 @@ async def optimize(llm, output, db, endpoint):
         await wait_for_run(snake, db, latest_id)
         while snake.is_simulation_running():
             await asyncio.sleep(DSnakeLab.STATUS_POLL_SECONDS)
-        previous_golden_id = golden_id
-        golden_id = compare(snake, db, previous_golden_id, latest_id)
+        golden_id = compare(snake, db, golden_id, latest_id)
         first_contact = False
 
 

@@ -11,7 +11,7 @@ from ax3l.app.snakelab.SingleParameters import SINGLE_PARAMETERS
 from ax3l.app.DbMgr import DbMgr
 from ax3l.app.EventLogDb import EventLogDb
 from ax3l.app.snakelab.prompts.InvalidValue import InvalidValue
-from ax3l.app.snakelab.prompts.NoDupesSIngle import NoDupesSingle
+from ax3l.app.snakelab.prompts.NoDupes import NoDupes
 from ax3l.constants.DEventCategory import DEventCategory
 from ax3l.interface.SnakeLab import SnakeLab
 
@@ -24,7 +24,7 @@ class SubmitSingleValueHandler:
 
     def _reject(self, reason: str, *, duplicate: bool = False) -> dict:
         category = DEventCategory.Configuration
-        prompt = NoDupesSingle(reason) if duplicate else InvalidValue(reason)
+        prompt = NoDupes(reason) if duplicate else InvalidValue(reason)
         self._db.log(
             category.PROPOSAL_DUPLICATE if duplicate else category.PROPOSAL_INVALID,
             category.CATEGORY, "INFO", prompt.to_md(),

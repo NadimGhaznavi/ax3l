@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Add a Source filter when Prompt is selected in the Event Log, preserving the selected source during automatic refresh.
+
 ## [1.0.3] - 2026-09-13 @ 17:28
 
 - Narrow Event Log event choices by category using the shared event catalog, and show prompt sources when the Prompt filter is selected.

@@ -70,7 +70,7 @@
           <td></td><td></td><td></td><td></td>
           <td><select id="category-filter" aria-label="Filter by category"><option value="*">*</option></select></td>
           <td><select id="event-filter" aria-label="Filter by event"><option value="*">*</option></select></td>
-          <td class="source-column" hidden></td>
+          <td class="source-column" hidden><select id="source-filter" aria-label="Filter by source"><option value="*">*</option></select></td>
           <td></td>
         </tr>
       </thead>
@@ -121,7 +121,8 @@
 
     const filters = [
       { id: 'category-filter', column: 4, value: '*' },
-      { id: 'event-filter', column: 5, value: '*' }
+      { id: 'event-filter', column: 5, value: '*' },
+      { id: 'source-filter', column: 6, value: '*' }
     ];
     const eventChoices = {{ event_choices | tojson }};
     const promptLabel = {{ prompt_label | tojson }};
@@ -151,7 +152,7 @@
       if (!values.has(filter.value)) filter.value = '*';
       select.replaceChildren(new Option('*', '*'));
       for (const value of Array.from(values).sort((a, b) => a.localeCompare(b))) {
-        select.add(new Option(value, value));
+        select.add(new Option(value === '' ? '(No source)' : value, value));
       }
       select.value = filter.value;
     }
@@ -172,17 +173,34 @@
       populateFilter(filters[1], values);
     }
 
+    function updateSourceChoices(preserveSelection = false) {
+      const source = filters[2];
+      const values = new Set();
+      if (filters[1].value === promptLabel) {
+        for (const row of main.querySelectorAll('.entry')) {
+          if (row.cells[5].textContent === promptLabel &&
+              (filters[0].value === '*' || row.cells[4].textContent === filters[0].value)) {
+            values.add(row.cells[6].textContent);
+          }
+        }
+        if (preserveSelection && source.value !== '*') values.add(source.value);
+      }
+      populateFilter(source, values);
+    }
+
     function initializeFilters() {
       const rows = Array.from(main.querySelectorAll('.entry'));
       const categories = new Set([...Object.keys(eventChoices), ...rows.map(row => row.cells[4].textContent)]);
       if (filters[0].value !== '*') categories.add(filters[0].value);
       populateFilter(filters[0], categories);
       updateEventChoices(true);
+      updateSourceChoices(true);
       for (const filter of filters) {
         const select = main.querySelector(`#${filter.id}`);
         select.addEventListener('change', () => {
           filter.value = select.value;
           if (filter.id === 'category-filter') updateEventChoices();
+          if (filter.id !== 'source-filter') updateSourceChoices();
           applyFilters();
         });
       }

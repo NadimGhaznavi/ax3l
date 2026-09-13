@@ -33,6 +33,14 @@ class SnakeLab:
         finally:
             db.close()
 
+    def get_run_scores(self) -> list[int | None]:
+        """Return all recorded run scores, oldest submissions first."""
+        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
+        try:
+            return SnakeLabDb(db).get_run_scores()
+        finally:
+            db.close()
+
     def is_simulation_running(self) -> bool:
         """Return whether work is running, paused, cancelling, or queued.
 

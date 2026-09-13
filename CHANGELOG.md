@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.99.11] - 2026-09-13 @ 14:03
+
 - Run the report server as root to resolve deployment file permission errors.
 
 ## [0.99.10] - 2026-09-13 @ 13:59

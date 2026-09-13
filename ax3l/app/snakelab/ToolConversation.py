@@ -6,7 +6,6 @@ import json
 from uuid import uuid4
 
 from ax3l.app.snakelab.SingleParameters import SINGLE_PARAMETERS
-from ax3l.app.snakelab.prompts.UseTool import UseTool
 from ax3l.constants.DAx3l import DAx3l
 from ax3l.constants.DEventCategory import DEventCategory as Events
 
@@ -49,12 +48,6 @@ async def converse(llm, output, db, tools, prompts) -> str:
             choice = json.loads(body)["choices"][0]
             reply = choice["message"]
             calls = reply.get("tool_calls", [])
-            if calls == []:
-                reminder = json.loads(UseTool().to_json())
-                messages = [reminder]
-                log(Events.Conversation, Events.Conversation.PROMPT,
-                    json.dumps(reminder, ensure_ascii=False))
-                continue
             if len(calls) != 1 or calls[0]["function"]["name"] != "submit_single_value":
                 names = [call["function"]["name"] for call in calls]
                 raise ValueError(

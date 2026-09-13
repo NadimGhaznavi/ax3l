@@ -10,7 +10,3 @@ class DSnakeLab:
     # Complete round-robin cycles without a new golden high score.
     SEED_STAGNANT_ROUNDS: Final[int] = 3
     STATUS_POLL_SECONDS: Final[int] = 5
-
-    # Number of haiku requests per run; zero repeats until stopped.
-    HAIKU_COUNT: Final[int] = 0
-    HAIKU_SLEEP_SECONDS: Final[int] = 5

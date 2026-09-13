@@ -74,7 +74,7 @@ class DbMgrTests(unittest.TestCase):
         from ax3l.app.DbMgr import DbMgr
 
         prompt_id = self.db.log(
-            "prompt_sent", "Conversation", "INFO", "Write a haiku.",
+            "prompt_sent", "Conversation", "INFO", "Describe the configuration.",
             process_id=self.process_id,
         )
         content = "A tree's quiet shade 🌳\nSecond line"
@@ -113,37 +113,6 @@ class DbMgrTests(unittest.TestCase):
             self.db.query("SELECT * FROM events WHERE process_id = %s", (self.process_id,)),
             [],
         )
-
-    def test_haiku_loop_records_linked_conversation(self):
-        import io
-        from pathlib import Path
-        import runpy
-        import tempfile
-        from unittest.mock import Mock, patch
-
-        run = runpy.run_path(str(Path(__file__).resolve().parents[1] / "ax3l/app/snakelab/main-loop.py"))["run"]
-        body = b'{"choices":[{"message":{"content":"A haiku"}}],"usage":{"completion_tokens":20}}'
-        llm = Mock(url="http://example/v1/chat/completions")
-        llm.complete.return_value = (200, "Content-Type: application/json", body)
-        with tempfile.TemporaryDirectory() as folder, patch("time.sleep") as sleep, patch("sys.stdout", new_callable=io.StringIO), patch.dict(run.__globals__, {"uuid4": lambda: self.process_id}), patch("random.randint", return_value=17):
-            run(llm, Path(folder), self.db, count=2)
-            sleep.assert_called_once_with(5)
-        rows = self.db.query(
-            """SELECT e.event_id, e.name, e.parent_event_id, m.content
-               FROM events e JOIN event_messages m USING (event_id)
-               WHERE process_id = %s ORDER BY event_id""",
-            (self.process_id,),
-        )
-        self.assertEqual([row["name"] for row in rows], [
-            "conversation_started", "prompt_sent", "reply_received",
-            "wait_started", "wait_ended", "prompt_sent", "reply_received",
-            "conversation_ended",
-        ])
-        self.assertEqual(__import__("json").loads(rows[1]["content"]), {"role": "user", "content": "Write a haiku based on the number 17."})
-        self.assertEqual(rows[2]["content"], body.decode())
-        self.assertEqual(rows[2]["parent_event_id"], rows[1]["event_id"])
-        self.assertEqual(rows[6]["parent_event_id"], rows[5]["event_id"])
-        self.assertEqual(rows[-1]["parent_event_id"], rows[0]["event_id"])
 
     def test_duplicate_dictionary_key_rolls_back_whole_event(self):
         import pymysql

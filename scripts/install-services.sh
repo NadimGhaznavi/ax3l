@@ -52,7 +52,7 @@ read -r llm_port ax3l_port report_port <<< "$ports"
 ax3l_zmq_endpoint=${ports##*$'\n'}
 ax3l_args=
 if [[ $install_env == prod ]]; then
-    ax3l_args="--llm-url http://127.0.0.1:$llm_port --output /var/lib/ax3l/haiku"
+    ax3l_args="--llm-url http://127.0.0.1:$llm_port --output /var/lib/ax3l/snakelab"
 fi
 if [[ $install_env == dev || $install_env == qa ]]; then
     qwen_command="/usr/bin/python3 -m ax3l.server.LLMHealthStub --port $llm_port"

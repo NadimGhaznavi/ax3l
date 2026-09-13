@@ -59,7 +59,7 @@ class ModelServicesTests(unittest.TestCase):
                     'APP': str(ROOT), 'CONFIG': '/tmp/ax3l-test', 'LLM_PORT': str(port),
                     'AX3L_PORT': '27771', 'REPORT_PORT': '27772',
                     'AX3L_ZMQ_ENDPOINT': 'tcp://127.0.0.1:61968',
-                    'AX3L_ARGS': '--llm-url http://127.0.0.1:27770 --output /var/lib/ax3l/haiku' if environment == 'prod' else '',
+                    'AX3L_ARGS': '--llm-url http://127.0.0.1:27770 --output /var/lib/ax3l/snakelab' if environment == 'prod' else '',
                     'QWEN_COMMAND': '/usr/bin/true --model /models/Qwen.gguf',
                     'QWENV_COMMAND': '/usr/bin/true --model /models/Qwenv.gguf --mmproj /models/projector.gguf -c 4096',
                     'PHI_COMMAND': '/usr/bin/true --model /models/Phi.gguf',

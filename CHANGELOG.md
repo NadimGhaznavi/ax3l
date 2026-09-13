@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Remove the original Haiku POC loop, prompt, constants, and unused first-iteration helper with their obsolete tests. Rename optional capture directories to `snakelab`; retain the active optimization entry point.
+
 - Rotate the seed after 3 complete stagnant round-robin cycles instead of counting individual comparisons. Reset on a new golden high score and preserve accounting across restarts.
 - Persist the single-parameter round-robin position in the event DB before each conversation. Restart interrupted thinking on the same parameter and advance after accepted submissions, including lost MCP replies.
 - Configure Qwen3.5 with `DQwen.CONTEXT_SIZE` (8196 tokens) and a 5-second startup delay, matching the existing QwenV settings. Pass the context size to llama-server on installation and upgrade.

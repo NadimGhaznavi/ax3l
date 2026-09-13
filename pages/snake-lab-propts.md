@@ -21,8 +21,7 @@ configuration is the current baseline used to evaluate new proposals.
 | `NoDupesSingle` | Explains that a proposed configuration matches the golden configuration or an existing simulation, and asks the model to submit a different value. |
 
 This list follows `SnakeLabLoop.py`, `ToolConversation.py`, and
-`SubmitSingleValueHandler.py` in `ax3l/app/snakelab/`. `GenerateHaiku` belongs to
-the separate helper workflow and is not used by the optimization entry point.
+`SubmitSingleValueHandler.py` in `ax3l/app/snakelab/`.
 Unused placeholder prompts for epsilon and reward pairs are also excluded.
 
 Requests require one tool call through the API's tool metadata. A response without

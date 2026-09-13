@@ -5,11 +5,11 @@ from ax3l.app.snakelab.SingleParameters import parameter_instructions
 
 
 class ComparisonSingle(Prompt):
-    def __init__(self):
+    def __init__(self, parameter=None):
         super().__init__(
             "Choose exactly one parameter from the list below and change only its value in the "
             "current golden configuration. Keep every other setting unchanged.\n"
-            + parameter_instructions() + "\n"
+            + parameter_instructions(parameter) + "\n"
             "The resulting complete configuration must differ from the golden configuration "
             "and every previously submitted configuration. Use the comparison history "
             "to choose a promising unexplored value, even if the latest simulation did not improve the score. "

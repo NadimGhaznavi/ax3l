@@ -43,7 +43,7 @@ async def rotate_if_needed(snake, db, wait_for_run, *, resume_only=False) -> str
             run_id = snake.submit_simulation(config)
         pending["submitted_event_id"] = db.log(
             Events.Configuration.GOLDEN_SEED_INCREMENTED, Events.Configuration.CATEGORY, "INFO",
-            "Submitted golden configuration with the next seed after stagnant rounds.",
+            "Submitted golden configuration with the next seed after stagnant round-robin cycles.",
             process_id=run_id, parent_event_id=pending["event_id"])
         db.log(Events.SnakeLab.SUBMITTED, Events.SnakeLab.CATEGORY, "INFO",
                "Submitted config for a fresh baseline.", process_id=run_id,

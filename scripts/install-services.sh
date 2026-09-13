@@ -52,7 +52,7 @@ read -r llm_port ax3l_port report_port <<< "$ports"
 ax3l_zmq_endpoint=${ports##*$'\n'}
 ax3l_args=
 if [[ $install_env == prod ]]; then
-    ax3l_args="--llm-url http://127.0.0.1:$llm_port --output /var/lib/ax3l/haiku"
+    ax3l_args="--llm-url http://127.0.0.1:$llm_port --output /var/lib/ax3l/snakelab"
 fi
 if [[ $install_env == dev || $install_env == qa ]]; then
     qwen_command="/usr/bin/python3 -m ax3l.server.LLMHealthStub --port $llm_port"
@@ -73,6 +73,7 @@ print(Path(DLlama.MODEL_DIR) / DPhi.GGUF)
 print(Path(DLlama.MODEL_DIR) / DQwenV.GGUF)
 print(Path(DLlama.MODEL_DIR) / DQwenV.MMPROJ)
 print(DQwenV.CONTEXT_SIZE)
+print(DQwen.CONTEXT_SIZE)
 PY
 )
     mapfile -t paths <<< "$llm_paths"
@@ -82,6 +83,7 @@ PY
     qwenv_model=${paths[4]}
     qwenv_mmproj=${paths[5]}
     qwenv_context=${paths[6]}
+    qwen_context=${paths[7]}
     model=$qwen_model
     if [[ $selected_model == phi ]]; then model=$phi_model; fi
     if [[ $selected_model == qwenv ]]; then
@@ -96,7 +98,7 @@ PY
         printf 'Install llama.cpp at %s and the model at %s first.\n' "$llm_binary" "$model" >&2
         exit 1
     }
-    qwen_command="$llm_binary --model $qwen_model --host $llm_host --port $llm_port --metrics --jinja --mcp-servers-config $config_dir/mcp.json"
+    qwen_command="$llm_binary --model $qwen_model -c $qwen_context --host $llm_host --port $llm_port --metrics --jinja --mcp-servers-config $config_dir/mcp.json"
     phi_command="$llm_binary --model $phi_model --host $llm_host --port $llm_port --metrics --jinja --mcp-servers-config $config_dir/mcp.json"
     qwenv_command="$llm_binary --model $qwenv_model --mmproj $qwenv_mmproj -c $qwenv_context --host $llm_host --port $llm_port --metrics --jinja --mcp-servers-config $config_dir/mcp.json"
 fi

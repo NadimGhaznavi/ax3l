@@ -6,7 +6,7 @@ if [[ ( $# != 2 && $# != 4 ) || $1 != -env ]]; then
     printf 'Usage: scripts/install-services.sh -env dev|qa|prod [-model qwen|phi|qwenv]\n' >&2
     exit 2
 fi
-selected_model=qwenv
+selected_model=qwen
 if [[ $# == 4 ]]; then
     [[ $3 == -model && ( $4 == qwen || $4 == phi || $4 == qwenv ) ]] || { printf 'Expected -model qwen|phi|qwenv.\n' >&2; exit 2; }
     selected_model=$4

@@ -9,11 +9,9 @@ from ax3l.app.snakelab.ToolConversation import converse
 from ax3l.app.snakelab.SeedRotation import rotate_if_needed
 from ax3l.app.snakelab.prompts.Comparison import Comparison
 from ax3l.app.snakelab.prompts.ComparisonSingle import ComparisonSingle
-from ax3l.app.snakelab.prompts.ComparisonPlot import ComparisonPlot
 from ax3l.app.snakelab.prompts.FirstContact import FirstContact
 from ax3l.app.snakelab.prompts.FirstContactSingle import FirstContactSingle
 from ax3l.app.snakelab.prompts.GoldenConfig import GoldenConfig
-from ax3l.app.snakelab.prompts.LossPlot import LossPlot
 from ax3l.constants.DEventCategory import DEventCategory as Events
 from ax3l.constants.DSnakeLab import DSnakeLab
 from ax3l.interface.SnakeLab import SnakeLab
@@ -86,26 +84,24 @@ async def optimize(llm, output, db, endpoint):
             await wait_for_run(snake, db, latest_id)
             previous_golden_id = golden_id
             golden_id = compare(snake, db, golden_id, latest_id)
-        prompts = [Comparison(previous_golden_id, latest_id, golden_id), ComparisonSingle(),
-                   ComparisonPlot(previous_golden_id, latest_id)]
+        prompts = [Comparison(previous_golden_id, latest_id, golden_id), ComparisonSingle()]
     elif EventLogDb(db).latest_seed_baseline() is not None:
-        prompts = [Comparison(golden_id, golden_id, golden_id), ComparisonSingle(), LossPlot(golden_id)]
+        prompts = [Comparison(golden_id, golden_id, golden_id), ComparisonSingle()]
     else:
-        prompts = [FirstContact(), golden, LossPlot(golden_id), FirstContactSingle("learning_rate")]
+        prompts = [FirstContact(), golden, FirstContactSingle("learning_rate")]
     async with SnakeLabTools(endpoint) as tools:
         while True:
             rotated_id = await rotate_if_needed(snake, db, wait_for_run)
             if rotated_id is not None:
                 golden_id = rotated_id
-                prompts = [Comparison(golden_id, golden_id, golden_id), ComparisonSingle(), LossPlot(golden_id)]
+                prompts = [Comparison(golden_id, golden_id, golden_id), ComparisonSingle()]
             latest_id = await converse(llm, output, db, tools, prompts)
             await wait_for_run(snake, db, latest_id)
             while snake.is_simulation_running():
                 await asyncio.sleep(DSnakeLab.STATUS_POLL_SECONDS)
             previous_golden_id = golden_id
             golden_id = compare(snake, db, previous_golden_id, latest_id)
-            prompts = [Comparison(previous_golden_id, latest_id, golden_id), ComparisonSingle(),
-                       ComparisonPlot(previous_golden_id, latest_id)]
+            prompts = [Comparison(previous_golden_id, latest_id, golden_id), ComparisonSingle()]
 
 
 def run_optimization(llm, output, db, endpoint):

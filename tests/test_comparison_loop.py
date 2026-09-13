@@ -141,27 +141,28 @@ class LoopTests(unittest.IsolatedAsyncioTestCase):
         golden.run_id = 'gold'
         context = AsyncMock()
         conversations = AsyncMock(side_effect=['last', 'next', asyncio.CancelledError()])
-        with patch(MODULE + 'SnakeLab', return_value=snake), patch(MODULE + 'GoldenConfig', return_value=golden), patch(MODULE + 'LossPlot', return_value=Prompt('loss')), patch(MODULE + 'SnakeLabTools', return_value=context), patch(MODULE + 'EventLogDb') as events, patch(MODULE + 'converse', conversations), patch(MODULE + 'wait_for_run', new_callable=AsyncMock) as wait, patch(MODULE + 'compare', side_effect=['last', 'last']) as comparison, patch(MODULE + 'Comparison', side_effect=lambda *ids: Prompt(str(ids))) as prompt, patch(MODULE + 'ComparisonPlot', return_value=Prompt('overlay')) as plot:
+        with patch(MODULE + 'SnakeLab', return_value=snake), patch(MODULE + 'GoldenConfig', return_value=golden), patch(MODULE + 'SnakeLabTools', return_value=context), patch(MODULE + 'EventLogDb') as events, patch(MODULE + 'converse', conversations), patch(MODULE + 'wait_for_run', new_callable=AsyncMock) as wait, patch(MODULE + 'compare', side_effect=['last', 'last']) as comparison, patch(MODULE + 'Comparison', side_effect=lambda *ids: Prompt(str(ids))) as prompt:
             events.return_value.latest_seed_baseline.return_value = None
             events.return_value.latest_snakelab_proposal.return_value = proposal
             with self.assertRaises(asyncio.CancelledError):
                 await optimize(Mock(), Path('/tmp'), Mock(), 'endpoint')
-            return conversations, comparison, prompt, plot, wait
+            return conversations, comparison, prompt, wait
 
     async def test_first_round_then_repeated_fresh_comparisons(self):
-        conversations, comparison, prompt, plot, wait = await self.exercise_loop()
-        self.assertEqual([len(c.args[4]) for c in conversations.call_args_list], [4, 3, 3])
+        conversations, comparison, prompt, wait = await self.exercise_loop()
+        self.assertEqual([len(c.args[4]) for c in conversations.call_args_list], [3, 2, 2])
         self.assertEqual(comparison.call_args_list[0].args[2:], ('gold', 'last'))
         self.assertEqual(comparison.call_args_list[1].args[2:], ('last', 'next'))
         self.assertEqual(prompt.call_args_list[0].args, ('gold', 'last', 'last'))
-        self.assertEqual(plot.call_args_list[0].args, ('gold', 'last'))
+        for call in conversations.call_args_list:
+            self.assertTrue(all(isinstance(json.loads(p.to_json())['content'], str) for p in call.args[4]))
         self.assertEqual(wait.await_count, 2)
 
     async def test_restart_uses_recorded_comparison_without_first_contact(self):
         snapshot = {'golden_run_id': 'old', 'latest_run_id': 'previous', 'current_golden_run_id': 'gold', 'reason': 'retained'}
-        conversations, _, prompt, plot, _ = await self.exercise_loop({'process_id': 'previous', 'comparison_id': 1, 'comparison': json.dumps(snapshot)})
-        self.assertEqual(len(conversations.call_args_list[0].args[4]), 3)
-        self.assertEqual(plot.call_args_list[0].args, ('old', 'previous'))
+        conversations, _, prompt, _ = await self.exercise_loop({'process_id': 'previous', 'comparison_id': 1, 'comparison': json.dumps(snapshot)})
+        self.assertEqual(len(conversations.call_args_list[0].args[4]), 2)
+        self.assertEqual(prompt.call_args_list[0].args, ('old', 'previous', 'gold'))
 
     async def test_restart_monitors_pending_submission_before_requesting_next_value(self):
         snake, db = Mock(), Mock()
@@ -169,7 +170,7 @@ class LoopTests(unittest.IsolatedAsyncioTestCase):
         snake.get_run_result.return_value = result(10, .002)
         golden = Prompt('golden')
         golden.run_id = 'gold'
-        with patch(MODULE + 'SnakeLab', return_value=snake), patch(MODULE + 'GoldenConfig', return_value=golden), patch(MODULE + 'SnakeLabTools', return_value=AsyncMock()), patch(MODULE + 'EventLogDb') as events, patch(MODULE + 'converse', new_callable=AsyncMock) as conversation, patch(MODULE + 'wait_for_run', new_callable=AsyncMock) as wait, patch(MODULE + 'compare', return_value='pending') as comparison, patch(MODULE + 'Comparison', return_value=Prompt('comparison')), patch(MODULE + 'ComparisonPlot', return_value=Prompt('plot')), patch(MODULE + 'FirstContact') as first:
+        with patch(MODULE + 'SnakeLab', return_value=snake), patch(MODULE + 'GoldenConfig', return_value=golden), patch(MODULE + 'SnakeLabTools', return_value=AsyncMock()), patch(MODULE + 'EventLogDb') as events, patch(MODULE + 'converse', new_callable=AsyncMock) as conversation, patch(MODULE + 'wait_for_run', new_callable=AsyncMock) as wait, patch(MODULE + 'compare', return_value='pending') as comparison, patch(MODULE + 'Comparison', return_value=Prompt('comparison')), patch(MODULE + 'FirstContact') as first:
             events.return_value.latest_snakelab_proposal.return_value = {'process_id': 'pending', 'comparison': None}
             conversation.side_effect = asyncio.CancelledError()
             with self.assertRaises(asyncio.CancelledError):

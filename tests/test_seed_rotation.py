@@ -88,9 +88,11 @@ class SeedRotationTests(unittest.IsolatedAsyncioTestCase):
         golden.run_id = 'old'
         rotation = AsyncMock(side_effect=[None, 'rotated'])
         conversation = AsyncMock(side_effect=asyncio.CancelledError())
-        with patch(module + 'SnakeLab', return_value=snake), patch(module + 'EventLogDb', return_value=events), patch(module + 'GoldenConfig', return_value=golden), patch(module + 'rotate_if_needed', rotation), patch(module + 'SnakeLabTools', return_value=AsyncMock()), patch(module + 'converse', conversation), patch(module + 'Comparison', return_value=Prompt('new baseline')) as comparison, patch(module + 'LossPlot', return_value=Prompt('loss')) as plot:
+        with patch(module + 'SnakeLab', return_value=snake), patch(module + 'EventLogDb', return_value=events), patch(module + 'GoldenConfig', return_value=golden), patch(module + 'rotate_if_needed', rotation), patch(module + 'SnakeLabTools', return_value=AsyncMock()), patch(module + 'converse', conversation), patch(module + 'Comparison', return_value=Prompt('new baseline')) as comparison:
             with self.assertRaises(asyncio.CancelledError):
                 await optimize(Mock(), Path('/tmp'), Mock(), 'endpoint')
             comparison.assert_called_once_with('rotated', 'rotated', 'rotated')
-            self.assertEqual(plot.call_args.args, ('rotated',))
+            prompts = conversation.call_args.args[4]
+            self.assertEqual(len(prompts), 2)
+            self.assertTrue(all(isinstance(json.loads(p.to_json())['content'], str) for p in prompts))
             self.assertEqual(conversation.call_args.args[4][0].to_md(), 'new baseline')

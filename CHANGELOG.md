@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.99.9] - 2026-09-13 @ 13:53
+
 - Add a Score Distribution Histogram link under Experiment Status, showing all run high scores with the oldest half overlaid in shared bins using an interactive, self-contained Plotly chart.
 
 ## [0.99.7] - 2026-09-13 @ 13:28

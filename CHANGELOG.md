@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Connect Experiment Highscores points with a smooth curve instead of steps.
+- Fix SnakeLab MCP startup permissions by creating service files with umask 022 and granting the service group access to existing Python virtual environments during install or upgrade.
+
 ## [1.0.1] - 2026-09-13 @ 16:26
 
 - Increased epochs from 500 to 1500.

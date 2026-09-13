@@ -2,6 +2,9 @@
 # Install the model and application services after install.sh has provisioned the account/DB.
 set -euo pipefail
 
+# install.sh uses 077 for database credentials; service files must be readable.
+umask 022
+
 if [[ ( $# != 2 && $# != 4 ) || $1 != -env ]]; then
     printf 'Usage: scripts/install-services.sh -env dev|qa|prod [-model qwen|phi|qwenv]\n' >&2
     exit 2
@@ -117,6 +120,10 @@ if [[ ! -x $install_dir/.venv/bin/python ]]; then
 fi
 "${system_admin[@]}" "$install_dir/.venv/bin/python" -m pip install -r "$checkout_dir/requirements.txt"
 "${system_admin[@]}" "$install_dir/.venv/bin/python" "$checkout_dir/scripts/install-chrome.py" --app "$install_dir"
+# Repair environments created under install.sh's former inherited umask 077.
+# Model services launch MCP as the service account, rather than as root.
+"${system_admin[@]}" chgrp -R "$service_account" "$install_dir/.venv"
+"${system_admin[@]}" chmod -R g+rX "$install_dir/.venv"
 for name in qwen-server phi-server qwenv-server ax3l-server reporting-server watchdog; do
     unit="$name$suffix.service"
     units+=("$unit")

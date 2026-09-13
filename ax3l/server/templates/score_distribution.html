@@ -17,11 +17,16 @@
 <body>
   <a href="/">Back to event log</a>
   <h1>Score Distribution Histogram</h1>
-  <p>All runs: {{ total }} ({{ scored }} with scores). Oldest half: {{ half }} ({{ older_scored }} with scores).</p>
-  <p>Blue shows all runs; orange overlays the oldest half using the same score bins and raw counts.
-    Each run contributes its recorded high score, across all configurations, seeds, and statuses.
-    The oldest half is selected in submission order, rounding down for odd totals.
-    Runs without a score are excluded from the bars. Reload this page to update the data.</p>
+  <p>
+    All runs: {{ total }} ({{ scored }} scored).
+    Oldest half: {{ half }} ({{ older_scored }} scored).
+  </p>
+
+  <p>
+    Blue shows all scored runs. Orange shows the oldest half, using the same bins.
+    Runs are ordered by submission time; for odd totals, the older half is rounded down.
+    Runs without a score are excluded. Reload the page to refresh the data.
+  </p>
   <main>
     {% if chart %}
     {{ chart | safe }}
@@ -32,3 +37,4 @@
   </main>
 </body>
 </html>
+

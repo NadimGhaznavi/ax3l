@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.99.0] - 2026-09-13 @ 09:58
+
 - Make Snake Lab optimization conversations text-only by removing `LossPlot` and `ComparisonPlot` from initial, comparison, restart, and seed-baseline prompts, including the first-iteration helper. Update proposal instructions to use comparison history without loss curves and document the active prompts in `pages/snake-lab-propts.md`.
 - Restore Qwen3.5 (`qwen`) as the default for installation, upgrade, and service startup for text-only prompt development. Explicit `-model phi|qwenv` selections remain supported.
 

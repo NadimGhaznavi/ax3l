@@ -54,6 +54,10 @@ class SubmitSingleValueHandler:
         if definition["type"] == "integer":
             value = int(value)
 
+        return self._submit_changes([(path, value)], f"{parameter}: {value}")
+
+    def _submit_changes(self, changes: list, description: str) -> dict:
+        """Apply validated values together and submit one unique configuration."""
         golden = EventLogDb(self._db).current_golden_config()
         if golden is None:
             raise RuntimeError("No golden configuration has been created")
@@ -61,10 +65,11 @@ class SubmitSingleValueHandler:
         if baseline is None:
             raise RuntimeError("The golden configuration's run was not found")
         candidate = deepcopy(baseline)
-        node = candidate
-        for key in path[:-1]:
-            node = node[key]
-        node[path[-1]] = value
+        for path, value in changes:
+            node = candidate
+            for key in path[:-1]:
+                node = node[key]
+            node[path[-1]] = value
         # A broken stored baseline is a server/data error, not a bad proposal.
         Draft202012Validator(self._schema).validate(candidate)
         if candidate == baseline:
@@ -75,7 +80,7 @@ class SubmitSingleValueHandler:
         run_id = self._snake.submit_simulation(candidate)
         category = DEventCategory.Configuration
         accepted_id = self._db.log(category.PROPOSAL_ACCEPTED, category.CATEGORY, "INFO",
-                                   f"{parameter}: {value}", process_id=run_id)
+                                   description, process_id=run_id)
         category = DEventCategory.SnakeLab
         self._db.log(category.SUBMITTED, category.CATEGORY, "INFO", "Submitted config.",
                      process_id=run_id, parent_event_id=accepted_id)

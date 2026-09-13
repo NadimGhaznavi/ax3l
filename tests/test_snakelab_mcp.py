@@ -153,6 +153,47 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(submitted['training']['learning_rate'], 0.003)
                     self.assertEqual(baseline['training']['learning_rate'], 0.0021)
 
+    async def test_pair_mcp_reaches_ax3l_validation_and_submission(self):
+        from copy import deepcopy
+        from unittest.mock import patch
+        from ax3l.app.snakelab.GenerateDefaultConfig import GenerateDefaultConfig
+        from ax3l.interface.SnakeLabTools import SnakeLabTools
+        from ax3l.server.ToolHandler import handle_tool
+        from ax3l.zmq.ZMQServer import ZMQServer
+
+        baseline = GenerateDefaultConfig().run()
+        shared = 'ax3l.app.snakelab.SubmitSingleValueHandler'
+        with patch('ax3l.server.ToolHandler.DbMgr'), patch(shared + '.EventLogDb') as events, patch(shared + '.SnakeLab') as snake:
+            events.return_value.current_golden_config.return_value = {'process_id': 'golden-run'}
+            snake.return_value.get_config.return_value = baseline
+            snake.return_value.is_config_unique.return_value = True
+            snake.return_value.submit_simulation.return_value = 'submitted-run'
+            with ZMQServer('tcp://127.0.0.1:*', handle_tool) as server:
+                for pair, values, invalid in (
+                    ('epsilon_pair', (.91, .95), (.91, 1.5)),
+                    ('reward_pair', (3, -3), (3, -3.5)),
+                ):
+                    async with SnakeLabTools(server.endpoint, pair) as tools:
+                        snake.return_value.reset_mock()
+                        snake.return_value.is_config_unique.return_value = True
+                        result = await tools.submit(dict(zip(('value_1', 'value_2'), invalid)))
+                        self.assertEqual(result['code'], 'invalid_value')
+                        self.assertEqual(result['prompt']['role'], 'user')
+                        snake.return_value.submit_simulation.assert_not_called()
+                        arguments = dict(zip(('value_1', 'value_2'), values))
+                        result = await tools.submit(arguments)
+                        self.assertEqual(result, {'status': 'ok', 'run_id': 'submitted-run'})
+                        expected = deepcopy(baseline)
+                        if pair == 'epsilon_pair':
+                            expected['epsilon'].update(initial=values[0], decay=values[1])
+                        else:
+                            expected['game']['rewards'].update(closer_to_food=values[0], further_from_food=values[1])
+                        snake.return_value.submit_simulation.assert_called_once_with(expected)
+                        snake.return_value.is_config_unique.return_value = False
+                        result = await tools.submit(arguments)
+                        self.assertEqual(result['code'], 'duplicate_config')
+                        snake.return_value.submit_simulation.assert_called_once()
+
     async def test_conversation_dispatches_discovered_tool_through_mcp_and_zmq(self):
         from unittest.mock import Mock
         from ax3l.app.Prompt import Prompt

@@ -123,8 +123,13 @@ Replies pass through unchanged and transport errors are not retried.
 Unbound sessions permit discovery but reject submissions; single assignments
 reject pair submissions and pair assignments reject single submissions.
 `SnakeLabTools` discovers and calls the tool for its assigned single or pair.
-The Ax3l pair handler, conversation dispatch, and round-robin entries are not
-yet connected, so this tool alone does not enable live pair tuning.
+Ax3l dispatches this method to `SubmitPairValuesHandler`. It validates both
+values before reading the golden configuration, changes only the assigned pair
+in a copy, validates the full candidate, and rejects unchanged or previously
+stored configurations. Either value may remain unchanged if the other changes.
+Accepted candidates are submitted once and logged through the shared single/pair
+submission workflow. Backend failures propagate without automatic retries.
+Pair conversation dispatch and round-robin entries are not yet connected.
 
 ### Active single-parameter flow
 

@@ -25,8 +25,10 @@ stdio. Register domain tool functions in `tools/server.py` with `@mcp.tool()`.
 It exposes `submit_single_value(value)` through `SubmitSingleValue`.
 Ax3l starts a dedicated MCP session for each conversation, binding its parameter
 through `AX3L_CONVERSATION_PARAMETER`. The LLM supplies only a JSON integer or number.
-The tool description contains only the assigned parameter’s meaning and schema rules.
-Conversation prompts show only its golden value, high score, and comparable history. MCP rejects strings and booleans as numeric values.
+The tool description identifies the assigned parameter and includes its schema rules.
+FirstContactSingle and ComparisonSingle include the assigned parameter’s schema description
+before requesting a value. Other conversation prompts show its golden value, high score,
+and comparable history. MCP rejects strings and booleans as numeric values.
 Parameter existence, permitted ranges, duplicates, and submission decisions
 belong to Ax3l, not the MCP tool.
 

@@ -77,6 +77,36 @@ class SnakeLabDb:
     def get_learning_rate_report(self, golden_run_id: str) -> list[dict]:
         return self.get_parameter_report(golden_run_id, "learning_rate")
 
+    def get_epsilon_report(self, golden_run_id: str) -> list[dict]:
+        """Group comparable epsilon pairs, including gaps in observed values."""
+        rows = self._db.query("""
+            SELECT r.status, r.high_score,
+                   JSON_EXTRACT(r.config, '$.epsilon.initial') AS initial,
+                   JSON_EXTRACT(r.config, '$.epsilon.decay') AS decay
+            FROM simulation_runs r JOIN simulation_runs g ON g.run_id = %s
+            WHERE JSON_EQUALS(
+                JSON_REMOVE(r.config, '$.seed', '$.epsilon.initial', '$.epsilon.decay'),
+                JSON_REMOVE(g.config, '$.seed', '$.epsilon.initial', '$.epsilon.decay'))
+            ORDER BY JSON_EXTRACT(r.config, '$.epsilon.initial') + 0,
+                     JSON_EXTRACT(r.config, '$.epsilon.decay') + 0, r.id
+        """, (golden_run_id,))
+        grouped = {}
+        decays = set()
+        for row in rows:
+            initial = json.loads(row["initial"])
+            decay = json.loads(row["decay"])
+            decays.add(decay)
+            scores = grouped.setdefault(initial, {}).setdefault(decay, [])
+            if row["status"] == "completed" and row["high_score"] is not None:
+                scores.append(row["high_score"])
+        return [
+            {"initial": initial, "pairs": [
+                {"decay": decay, "scores": sorted(grouped[initial].get(decay, []))}
+                for decay in sorted(decays)
+            ]}
+            for initial in sorted(grouped)
+        ]
+
     def get_parameter_report(self, golden_run_id: str, parameter: str) -> list[dict]:
         path, _ = SINGLE_PARAMETERS[parameter]
         json_path = "$." + ".".join(path)

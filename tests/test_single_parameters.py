@@ -15,6 +15,7 @@ class SingleParameterTests(unittest.TestCase):
             for prompt in (FirstContactSingle(parameter), ComparisonSingle(parameter)):
                 content = prompt.to_md()
                 self.assertIn(parameter, content)
+                self.assertIn(SINGLE_PARAMETERS[parameter][1]['description'], content)
                 for other in expected - {parameter}:
                     self.assertNotIn(other, content)
                 self.assertIn('{"value": number}', content)

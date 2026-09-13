@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Increased epochs from 500 to 1500.
+
 ## [1.0.0] - 2026-09-13 @ 16:20
 
 - Increase histogram bar borders to 4 pixels and match the Experiment Highscores chart to the histogram styling, with a 4-pixel highscore line and a centered bottom legend with matching spacing.

@@ -26,6 +26,13 @@ def make_server(host: str, port: int) -> HTTPServer:
     )
     template = templates.get_template("events.html")
     templates.globals["event_label"] = DEventCategory.label
+    templates.globals["event_choices"] = {
+        category.CATEGORY: sorted(set(category.LABELS.values()))
+        for category in DEventCategory.ALL
+    }
+    templates.globals["prompt_label"] = DEventCategory.Conversation.LABELS[
+        DEventCategory.Conversation.PROMPT
+    ]
     templates.globals["simulation_events"] = DEventCategory.SnakeLab
     templates.globals["request_timeout_seconds"] = DReportMgr.REQUEST_TIMEOUT_SECONDS
 

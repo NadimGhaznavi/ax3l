@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.99.5] - 2026-09-13 @ 11:50
+
 - Restore FirstContact's experiment background and guidance to explore apparently poor choices for useful data and potential higher scores.
 
 ## [0.99.3] - 2026-09-13 @ 11:42

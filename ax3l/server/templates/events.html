@@ -58,6 +58,12 @@
     <table aria-label="Event log">
       <thead>
         <tr><th scope="col">Date</th><th scope="col">Time</th><th scope="col">ID</th><th scope="col">Level</th><th scope="col">Category</th><th scope="col">Event</th><th scope="col">Message</th></tr>
+        <tr>
+          <td></td><td></td><td></td><td></td>
+          <td><select id="category-filter" aria-label="Filter by category"><option value="*">*</option></select></td>
+          <td><select id="event-filter" aria-label="Filter by event"><option value="*">*</option></select></td>
+          <td></td>
+        </tr>
       </thead>
       <tbody>
     {% for event in events %}
@@ -81,6 +87,7 @@
     {% else %}
         <tr><td class="empty" colspan="7">No events logged yet.</td></tr>
     {% endfor %}
+        <tr id="no-filter-matches" hidden><td class="empty" colspan="7">No events match the selected filters.</td></tr>
       </tbody>
     </table>
   </main>
@@ -93,6 +100,46 @@
     let controller;
     let generation = 0;
     interval.value = '0';
+
+    const filters = [
+      { id: 'category-filter', column: 4, value: '*' },
+      { id: 'event-filter', column: 5, value: '*' }
+    ];
+
+    function applyFilters() {
+      const rows = main.querySelectorAll('.entry');
+      let visible = 0;
+      for (const row of rows) {
+        row.hidden = !filters.every(filter =>
+          filter.value === '*' || row.cells[filter.column].textContent === filter.value
+        );
+        if (!row.hidden) visible += 1;
+      }
+      main.querySelector('#no-filter-matches').hidden = rows.length === 0 || visible > 0;
+    }
+
+    function initializeFilters() {
+      const rows = Array.from(main.querySelectorAll('.entry'));
+      for (const filter of filters) {
+        const select = main.querySelector(`#${filter.id}`);
+        const values = new Set(rows.map(row => row.cells[filter.column].textContent));
+        // Keep an active filter even if its last matching entry ages out on refresh.
+        if (filter.value !== '*') values.add(filter.value);
+        values.delete('*');
+        select.replaceChildren(new Option('*', '*'));
+        for (const value of Array.from(values).sort((a, b) => a.localeCompare(b))) {
+          select.add(new Option(value, value));
+        }
+        select.value = filter.value;
+        select.addEventListener('change', () => {
+          filter.value = select.value;
+          applyFilters();
+        });
+      }
+      applyFilters();
+    }
+
+    initializeFilters();
 
     async function refreshEvents(currentGeneration) {
       const request = new AbortController();
@@ -109,6 +156,7 @@
         const scrollY = window.scrollY;
         const scrollLeft = main.scrollLeft;
         main.replaceChildren(...page.querySelector('main').childNodes);
+        initializeFilters();
         document.querySelector('.note').textContent = page.querySelector('.note').textContent;
         document.querySelector('#snake-lab-status').textContent = page.querySelector('#snake-lab-status').textContent;
         document.querySelector('#experiment-high-score').textContent = page.querySelector('#experiment-high-score').textContent;

@@ -118,11 +118,12 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
             'role': 'assistant', 'content': None, 'tool_calls': [{
                 'type': 'function', 'id': 'call-1', 'function': {
                     'name': 'submit_single_value',
-                    'arguments': '{"parameter":"learning_rate","value":0.003}'}}]}}]}).encode())
+                    'arguments': '{"parameter":"hidden_size","value":240}'}}]}}]}).encode())
         with ZMQServer('tcp://127.0.0.1:*', handle) as server:
             async with SnakeLabTools(server.endpoint) as tools:
-                self.assertEqual(tools.definition['function']['parameters']['properties']['parameter']['const'], 'learning_rate')
-                self.assertEqual(await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('Choose LR')]), run_id)
-        self.assertEqual(requests, [{'parameter': 'learning_rate', 'value': .003}])
+                self.assertEqual(set(tools.definition['function']['parameters']['properties']['parameter']['enum']),
+                                 {'hidden_size', 'sequence_length', 'batch_size', 'learning_rate', 'gamma'})
+                self.assertEqual(await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('Choose one parameter')]), run_id)
+        self.assertEqual(requests, [{'parameter': 'hidden_size', 'value': 240}])
         payload = json.loads(llm.complete.call_args.args[0])
         self.assertEqual(payload['tools'][0]['function']['name'], 'submit_single_value')

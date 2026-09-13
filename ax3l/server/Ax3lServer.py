@@ -10,7 +10,7 @@ from ax3l.zmq.ZMQServer import ZMQServer
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run Ax3l and its learning-rate optimization loop.")
+    parser = argparse.ArgumentParser(description="Run Ax3l and its single-parameter optimization loop.")
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--llm-url", help="Use this LLM server for optimization")
     parser.add_argument("--output", default="tmp/haiku")

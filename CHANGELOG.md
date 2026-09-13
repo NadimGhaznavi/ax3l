@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.99.0] - 2026-09-13 @ 10:12
+
+- Rename `LearningRateLoop.py` to `SnakeLabLoop.py` and expand proposals to hidden size, sequence length, batch size, learning rate, and gamma. Keep reward-distance and epsilon pairs out of this iteration; use schema-backed single-parameter prompts, tool validation, per-parameter comparison histories, and actual configuration changes in comparison logs.
+
 ## [0.99.0] - 2026-09-13 @ 09:58
 
 - Make Snake Lab optimization conversations text-only by removing `LossPlot` and `ComparisonPlot` from initial, comparison, restart, and seed-baseline prompts, including the first-iteration helper. Update proposal instructions to use comparison history without loss curves and document the active prompts in `pages/snake-lab-propts.md`.

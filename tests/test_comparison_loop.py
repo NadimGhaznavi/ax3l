@@ -6,14 +6,14 @@ from unittest.mock import AsyncMock, Mock, patch
 from uuid import uuid4
 
 from ax3l.app.Prompt import Prompt
-from ax3l.app.snakelab.LearningRateLoop import compare, optimize, wait_for_run
+from ax3l.app.snakelab.SnakeLabLoop import compare, optimize, wait_for_run
 from ax3l.app.snakelab.ToolConversation import converse
 from ax3l.app.snakelab.prompts.Comparison import Comparison
 from ax3l.app.snakelab.prompts.ComparisonPlot import ComparisonPlot
 from ax3l.app.snakelab.prompts.ComparisonSingle import ComparisonSingle
 from ax3l.activity.ReplyReport import reply_content
 
-MODULE = 'ax3l.app.snakelab.LearningRateLoop.'
+MODULE = 'ax3l.app.snakelab.SnakeLabLoop.'
 
 
 def reply(value):
@@ -38,6 +38,16 @@ class ComparisonTests(unittest.TestCase):
                 self.assertEqual(logs[1].args[0], 'golden_config_created' if score > 10 else 'golden_config_retained')
                 self.assertIn(f'{score} {">" if score > 10 else "<="} 10', logs[1].args[3])
 
+    def test_comparison_logs_the_actual_non_learning_rate_change(self):
+        snake, db = Mock(), Mock()
+        snake.get_run_result.side_effect = [
+            {'status': 'completed', 'high_score': score, 'config': {'model': {'hidden_size': size}}}
+            for score, size in [(10, 224), (12, 240)]]
+        self.assertEqual(compare(snake, db, 'gold', 'last'), 'last')
+        reason = json.loads(db.log.call_args_list[0].args[3])['reason']
+        self.assertIn('model.hidden_size: 224 -> 240', reason)
+        self.assertNotIn('learning_rate', reason)
+
     def test_missing_score_does_not_change_golden(self):
         snake, db = Mock(), Mock()
         snake.get_run_result.side_effect = [result(10, .002), result(None, .003)]
@@ -48,10 +58,11 @@ class ComparisonTests(unittest.TestCase):
     def test_prompts_include_full_history_and_two_loss_curves(self):
         golden, latest = str(uuid4()), str(uuid4())
         rows = [{'learning_rate': .001, 'high_score': 4}, {'learning_rate': .003, 'high_score': 12}]
-        with patch('ax3l.interface.SnakeLab.SnakeLab.get_learning_rate_report', return_value=rows):
+        with patch('ax3l.interface.SnakeLab.SnakeLab.get_parameter_report', return_value=rows):
             prompt = Comparison(golden, latest, latest)
         history = json.loads(prompt.to_md().split('```json\n')[1].split('```')[0])
-        self.assertEqual(history, rows)
+        self.assertEqual(set(history), {"hidden_size", "sequence_length", "batch_size", "learning_rate", "gamma"})
+        self.assertTrue(all(entries == rows for entries in history.values()))
         self.assertIn('current golden', ComparisonSingle().to_md())
         figures = []
         def render(figure, **kwargs):
@@ -64,7 +75,7 @@ class ComparisonTests(unittest.TestCase):
         self.assertEqual(list(figure.data[0].x), [1, 3])
         self.assertEqual(list(figure.data[0].y), [None, .2])
         self.assertEqual(list(figure.data[1].x), [2])
-        self.assertEqual((figure.layout.width, figure.layout.height), (750, 450))
+        self.assertEqual((figure.layout.width, figure.layout.height), (1500, 450))
         self.assertIn('data:image/png;base64,', plot.to_json())
 
     def test_tool_only_reply_is_readable(self):

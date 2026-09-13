@@ -1,4 +1,4 @@
-# First learning-rate iteration
+# Single-parameter optimization
 
 ## MCP tools
 
@@ -70,12 +70,18 @@ return `status: ok` and their submitted `run_id`, with proposal and submission
 events logged. Golden selection is unchanged. The listener handles requests
 serially; external writers to SnakeLab are outside that serialization boundary.
 
+The single-parameter search space is `hidden_size`, `sequence_length`, `batch_size`,
+`learning_rate`, and `gamma`. Each conversation chooses one parameter and value.
+Reward distance pairs and epsilon initial/decay are excluded, along with seed
+and schema-fixed settings. Comparison histories hold all other settings equal
+to the current golden configuration for each parameter.
+
 ## Conversation snippets
 
 The optimization flow sends text-only prompts. The initial conversation uses
-`FirstContact`, `GoldenConfig`, and `FirstContactSingle("learning_rate")`.
+`FirstContact`, `GoldenConfig`, and `FirstContactSingle()`.
 Subsequent conversations use `Comparison` and `ComparisonSingle` to choose the
-next learning rate from high-score history. Seed baseline conversations use
+next single-parameter change from high-score history. Seed baseline conversations use
 those same two comparison prompts. `LossPlot` and `ComparisonPlot` are no
 longer included, so this flow does not require PNG rendering or a vision model.
 

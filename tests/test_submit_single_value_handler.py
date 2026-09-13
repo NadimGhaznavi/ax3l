@@ -41,7 +41,7 @@ class SubmitSingleValueHandlerTests(unittest.TestCase):
         self.snake.is_config_unique.return_value = False
         result = self.handler.submit({'parameter': 'learning_rate', 'value': 0.003})
         self.assertEqual(result['code'], 'duplicate_config')
-        self.assertIn('Duplicate configuration:', result['prompt']['content'])
+        self.assertIn('already exists in the simulation database', result['prompt']['content'])
         self.snake.submit_simulation.assert_not_called()
 
     def test_only_selected_field_changes_and_submission_is_logged_once(self):
@@ -55,6 +55,28 @@ class SubmitSingleValueHandlerTests(unittest.TestCase):
         self.assertEqual(self.baseline, original)
         self.assertEqual([c.args[0] for c in self.db.log.call_args_list],
                          ['proposal_accepted', 'simulation_submitted'])
+
+    def test_all_single_parameters_change_exactly_one_field(self):
+        for section, parameter, value in [('model', 'hidden_size', 240),
+                                           ('training', 'sequence_length', 12),
+                                           ('training', 'batch_size', 26),
+                                           ('training', 'learning_rate', .003),
+                                           ('training', 'gamma', .97)]:
+            with self.subTest(parameter=parameter):
+                candidate = deepcopy(self.baseline)
+                candidate[section][parameter] = value
+                self.assertEqual(self.handler.submit({'parameter': parameter, 'value': value})['status'], 'ok')
+                self.snake.submit_simulation.assert_called_with(candidate)
+
+    def test_pairs_and_managed_settings_are_rejected_even_with_legal_values(self):
+        for parameter, value in [('closer_to_food', 3), ('further_from_food', -3),
+                                 ('initial', .95), ('decay', .98), ('seed', 1971),
+                                 ('epochs', 1500), ('layers', 4)]:
+            with self.subTest(parameter=parameter):
+                self.assertEqual(self.handler.submit({'parameter': parameter, 'value': value})['code'],
+                                 'invalid_value')
+        self.snake.submit_simulation.assert_not_called()
+        self.events.current_golden_config.assert_not_called()
 
     def test_backend_failure_is_not_retried_or_logged_as_accepted(self):
         self.snake.submit_simulation.side_effect = TimeoutError('timeout')

@@ -2,8 +2,10 @@
 
 import asyncio
 import json
+
 from uuid import uuid4
 
+from ax3l.app.snakelab.SingleParameters import SINGLE_PARAMETERS
 from ax3l.app.snakelab.prompts.UseTool import UseTool
 from ax3l.constants.DAx3l import DAx3l
 from ax3l.constants.DEventCategory import DEventCategory as Events
@@ -61,8 +63,8 @@ async def converse(llm, output, db, tools, prompts) -> str:
                 )
             call = calls[0]
             arguments = json.loads(call["function"]["arguments"])
-            if arguments.get("parameter") != "learning_rate":
-                raise ValueError("This conversation may only change learning_rate")
+            if arguments.get("parameter") not in SINGLE_PARAMETERS:
+                raise ValueError("This conversation may only change an allowed single parameter")
             messages.append(reply)
             log(Events.Tool, Events.Tool.STARTED, json.dumps(call))
             try:

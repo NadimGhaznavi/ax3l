@@ -7,6 +7,7 @@ from pathlib import Path
 
 from jsonschema import Draft202012Validator, ValidationError
 
+from ax3l.app.snakelab.SingleParameters import SINGLE_PARAMETERS
 from ax3l.app.DbMgr import DbMgr
 from ax3l.app.EventLogDb import EventLogDb
 from ax3l.app.snakelab.prompts.InvalidValue import InvalidValue
@@ -41,19 +42,11 @@ class SubmitSingleValueHandler:
         if type(value) not in (int, float) or (isinstance(value, float) and not math.isfinite(value)):
             return self._reject("value must be a finite JSON number.")
 
-        def matches(node, path=()):
-            for name, definition in node["properties"].items():
-                if definition["type"] == "object":
-                    yield from matches(definition, path + (name,))
-                elif name == parameter:
-                    yield path + (name,), definition
-
         if parameter == "seed":
             return self._reject("Seed is managed by Ax3l and cannot be proposed.")
-        fields = list(matches(self._schema))
-        if len(fields) != 1:
-            return self._reject(f"Unknown or ambiguous parameter: {parameter}.")
-        path, definition = fields[0]
+        if parameter not in SINGLE_PARAMETERS:
+            return self._reject(f"Parameter is not in the single-parameter search space: {parameter}.")
+        path, definition = SINGLE_PARAMETERS[parameter]
         try:
             Draft202012Validator(definition).validate(value)
         except ValidationError as error:

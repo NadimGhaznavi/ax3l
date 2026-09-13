@@ -4,8 +4,8 @@ After=network.target mariadb.service
 
 [Service]
 Type=simple
-User=@USER@
-Group=@USER@
+User=root
+Group=root
 WorkingDirectory=@APP@
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONDONTWRITEBYTECODE=1

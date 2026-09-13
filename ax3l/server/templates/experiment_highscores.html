@@ -16,10 +16,14 @@
 </head>
 <body>
   <a href="/">Back to event log</a>
-  <h1>Experiment Highscores</h1>
-  <p>Simulations submitted: {{ total }}. The line follows the accepted config’s high score.
-    Seed changes can lower the score; unsuccessful candidates leave it unchanged.
-    Hover over a point for its seed, run, and acceptance reason. Reload this page to update the data.</p>
+  <h1>Experiment High Scores</h1>
+  <p>
+    Simulations submitted: {{ total }}.
+    The line shows the current accepted configuration’s high score over time.
+    Failed candidates leave the score unchanged; seed changes may lower it.
+    Hover over an accepted point to see the seed, run ID, and reason for acceptance.
+    Reload to update.
+  </p>
   <main>
     {% if chart %}
     {{ chart | safe }}
@@ -30,3 +34,4 @@
   </main>
 </body>
 </html>
+

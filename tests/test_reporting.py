@@ -10,6 +10,37 @@ from uuid import uuid4
 from unittest.mock import patch
 
 
+class ExperimentStatusTests(unittest.TestCase):
+    def test_status_counts_render_and_update(self):
+        from ax3l.server.ReportingServer import make_server
+
+        self.enterContext(patch('ax3l.server.ReportingServer.DbMgr'))
+        log = self.enterContext(patch('ax3l.server.ReportingServer.EventLogDb')).return_value
+        log.recent.return_value = []
+        snake = self.enterContext(patch('ax3l.server.ReportingServer.SnakeLab')).return_value
+        snake.is_simulation_running.return_value = False
+        server = make_server('127.0.0.1', 0)
+        thread = Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            for submitted, cycles, score in ((0, 0, None), (17, 3, 60)):
+                snake.get_num_sims.return_value = submitted
+                snake.get_high_score.return_value = score
+                log.experiment_cycles.return_value = cycles
+                with urlopen(f'http://127.0.0.1:{server.server_port}/') as response:
+                    page = response.read().decode()
+                self.assertIn(f'Simulations Submitted: {submitted}', page)
+                self.assertIn(f'Experiment Cycles: {cycles}', page)
+                self.assertIn(f"Current Highscore: {score if score is not None else '—'}", page)
+                self.assertIn('class="server-bar experiment-status"', page)
+                for element in ('simulations-submitted', 'experiment-cycles'):
+                    self.assertIn(f"page.querySelector('#{element}').textContent", page)
+        finally:
+            server.shutdown()
+            thread.join()
+            server.server_close()
+
+
 @unittest.skipUnless(os.environ.get("AX3L_TEST_DEV_DB") == "1", "requires DEV MariaDB")
 class ReportingTests(unittest.TestCase):
     def test_log_page_refresh_and_escaping(self):
@@ -23,6 +54,9 @@ class ReportingTests(unittest.TestCase):
         ))
         high_score = self.enterContext(patch(
             "ax3l.server.ReportingServer.SnakeLab.get_high_score", return_value=55,
+        ))
+        self.enterContext(patch(
+            "ax3l.server.ReportingServer.SnakeLab.get_num_sims", return_value=17,
         ))
 
         db = DbMgr()

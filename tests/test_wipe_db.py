@@ -9,12 +9,12 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class WipeDbTests(unittest.TestCase):
-    def run_script(self, environment='prod', *, fail_stop=False):
+    def run_script(self, environment='prod', *, fail_stop=False, fail_wipe=False):
         with tempfile.TemporaryDirectory() as folder:
             directory = Path(folder)
             scripts = {
                 'id': '#!/bin/sh\necho 0\n',
-                'mariadb': '#!/bin/sh\nprintf "db %s\\n" "$*" >> "$CALLS"\ncase "$*" in *--execute=*) exit 0;; esac\ncat > "$SQL_FILE"\n',
+                'mariadb': '#!/bin/sh\nprintf "db %s\\n" "$*" >> "$CALLS"\ncase "$*" in *--execute=*) exit 0;; esac\ncat > "$SQL_FILE"\nif [ "$FAIL_WIPE" = 1 ]; then exit 1; fi\nprintf "wipe committed\\n" >> "$CALLS"\n',
                 'systemctl': '#!/bin/sh\nprintf "service %s\\n" "$*" >> "$CALLS"\nif [ "$1" = show ]; then echo loaded; fi\nif [ "$1" = stop ] && [ "$FAIL_STOP" = 1 ]; then exit 1; fi\n',
             }
             for name, content in scripts.items():
@@ -23,7 +23,7 @@ class WipeDbTests(unittest.TestCase):
                 path.chmod(0o755)
             env = dict(os.environ, PATH=f'{folder}:{os.environ["PATH"]}',
                        CALLS=str(directory / 'calls'), SQL_FILE=str(directory / 'sql'),
-                       FAIL_STOP=str(int(fail_stop)))
+                       FAIL_STOP=str(int(fail_stop)), FAIL_WIPE=str(int(fail_wipe)))
             result = subprocess.run(['bash', str(ROOT / 'scripts/wipe-db.sh'), '-env', environment],
                                     env=env, capture_output=True, text=True)
             return result, (directory / 'calls').read_text() if (directory / 'calls').exists() else '', (directory / 'sql').read_text() if (directory / 'sql').exists() else ''
@@ -40,13 +40,24 @@ class WipeDbTests(unittest.TestCase):
                 self.assertIn('DELETE FROM snakelab.simulation_runs;', sql)
                 self.assertTrue(sql.startswith('START TRANSACTION;'))
                 self.assertTrue(sql.endswith('COMMIT;\n'))
+                self.assertIn(f'ALTER TABLE `{database}`.events AUTO_INCREMENT = 1;', calls)
+                self.assertIn('ALTER TABLE snakelab.simulation_runs AUTO_INCREMENT = 1;', calls)
+                self.assertLess(calls.index('wipe committed'), calls.index('ALTER TABLE'))
+                self.assertNotIn('ALTER TABLE', sql)
                 self.assertNotIn('DROP ', sql)
                 self.assertNotIn('service start', calls)
 
     def test_failed_stop_prevents_wipe(self):
-        result, _, sql = self.run_script(fail_stop=True)
+        result, calls, sql = self.run_script(fail_stop=True)
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(sql, '')
+        self.assertNotIn('ALTER TABLE', calls)
+
+    def test_failed_wipe_prevents_counter_reset(self):
+        result, calls, _ = self.run_script(fail_wipe=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn('ALTER TABLE', calls)
+        self.assertNotIn('Cleared ', result.stdout)
 
     def test_invalid_environment_does_nothing(self):
         result, calls, sql = self.run_script('unknown')

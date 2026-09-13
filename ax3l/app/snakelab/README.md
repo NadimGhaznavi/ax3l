@@ -72,27 +72,12 @@ serially; external writers to SnakeLab are outside that serialization boundary.
 
 ## Conversation snippets
 
-LLM conversation snippets can include the golden configuration and its loss plot:
-
-```python
-import json
-
-from ax3l.app.snakelab.prompts.GoldenConfig import GoldenConfig
-from ax3l.app.snakelab.prompts.LossPlot import LossPlot
-
-golden = GoldenConfig(db)
-loss_plot = LossPlot(golden.run_id)
-messages = [json.loads(golden.to_json()), json.loads(loss_plot.to_json())]
-```
-
-`LossPlot.refresh()` reads that same run's `simulation_episodes` rows through the
-DAL and regenerates an in-memory PNG. The x-axis uses stored episode numbers;
-null losses remain gaps. A run without recorded losses raises `ValueError`.
-`to_json()` embeds a caption and base64 PNG image content for the vision model.
-Resolve the golden configuration once per conversation; recreate the loss prompt
-from its run ID after changing the golden selection. PNG generation requires
-Plotly, Kaleido, and Chrome; the local packages are installed in `.venv`.
-The existing haiku loop does not yet assemble these snippets.
+The optimization flow sends text-only prompts. The initial conversation uses
+`FirstContact`, `GoldenConfig`, and `FirstContactSingle("learning_rate")`.
+Subsequent conversations use `Comparison` and `ComparisonSingle` to choose the
+next learning rate from high-score history. Seed baseline conversations use
+those same two comparison prompts. `LossPlot` and `ComparisonPlot` are no
+longer included, so this flow does not require PNG rendering or a vision model.
 
 `SnakeLab().get_num_sims()` returns the number of rows in Snake Lab's
 `simulation_runs` table, across all statuses and including repeated configurations.
@@ -107,13 +92,12 @@ and golden creation. It polls the submitted run through its terminal status,
 then waits until Snake Lab reports idle. With an existing database it skips
 seeding and waits for idle directly.
 
-It resolves the current golden configuration once and sends one LLM request
-with four messages, in order: `FirstContact`, `GoldenConfig`, `LossPlot` for that
-same run, and `FirstContactSingle("learning_rate")`. Each serialized message,
-including the loss PNG, is stored in a `prompt_sent` entry linked to the
-conversation. The request uses those exact snapshots. Construction and refresh
-do not create prompt events. The reply is logged and the iteration ends.
-No follow-up parameter selection or simulation is performed yet.
+The loop resolves the current golden configuration and submits proposals through
+`submit_single_value`. Each serialized prompt is stored in a `prompt_sent` entry
+linked to its conversation, using the same snapshot sent to the model.
+Invalid or duplicate proposals receive correction prompts. After an accepted
+submission completes, the loop compares high scores, updates the golden
+configuration when the score improves, and starts the next conversation.
 
 Raw file capture is off by default. Set `DAx3l.RAW_LOGS_ENABLED = True` in
 `ax3l/constants/DAx3l.py` to enable the capture files described below.
@@ -139,7 +123,6 @@ LLM failures through `DbMgr.log()`. Events share a process ID printed in
 `run.log`, and replies link to their prompt events. Reply metrics remain in
 the captured JSON for now. Database errors stop the loop.
 
-The active flow performs one request and exits after recording the reply.
-Use `--output PATH` to choose the optional capture directory. PNG rendering
-requires the project's `.venv` dependencies and Chrome. Service installations
-run Ax3l from the installed `.venv`; Chrome must be installed for PNG rendering.
+The active flow continues optimizing until stopped or an error occurs.
+Use `--output PATH` to choose the optional capture directory. Service
+installations run Ax3l from the installed `.venv`.

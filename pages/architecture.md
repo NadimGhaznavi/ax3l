@@ -146,7 +146,7 @@ for the selected model, not a health check. QA/prod use the same helper as root 
 corresponding `-env` value. Service installation uses the helper for its stop/start
 sequence. The helper starts the selected model without checking or stopping other
 models. The three model units share the LLM port and have no concurrency guards.
-Installation and upgrade update all units together and default to starting QwenV;
+Installation and upgrade update all units together and default to starting Qwen3.5 (`qwen`);
 pass `-model phi` or `-model qwenv` to start another model. Upgrade removes the
 old `llm-server` unit. Qwen Vision also loads `DQwenV.MMPROJ` from
 `DLlama.MODEL_DIR` using `--mmproj` and sets `-c 4096`.

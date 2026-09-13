@@ -15,7 +15,7 @@ class ComparisonSingle(Prompt):
             f"Choose a JSON number from {field['minimum']} through {field['maximum']}, inclusive. "
             "Change only learning_rate in the current golden configuration. "
             "The resulting complete configuration must differ from the golden configuration "
-            "and every previously submitted configuration. Use the comparison history and loss curves "
+            "and every previously submitted configuration. Use the comparison history "
             "to choose a promising unexplored value, even if the latest simulation did not improve the score. "
             "Call submit_single_value with parameter=learning_rate and your chosen value."
         )

@@ -56,6 +56,36 @@ class SnakeLabDbTests(unittest.TestCase):
         self.assertEqual(self.query_count(), 0)
         self.assertFalse(self.db._connection.open)
 
+    def test_high_score_across_runs_and_seeds_through_interface(self):
+        def connect(**kwargs):
+            self.assertEqual(kwargs.pop("database"), "snakelab")
+            db = DbMgr(**kwargs)
+            self.db = db
+            self.addCleanup(lambda: db.close() if db._connection.open else None)
+            db.execute("""CREATE TEMPORARY TABLE simulation_runs (
+                config JSON, status VARCHAR(16), high_score INT NULL
+            )""")
+            for config, status, score in rows:
+                db.execute("INSERT INTO simulation_runs VALUES (%s, %s, %s)",
+                           (config, status, score))
+            return db
+
+        cases = [
+            ([], None),
+            ([("{}", "queued", None)], None),
+            ([("{}", "completed", 0)], 0),
+            ([("{\"seed\": 1}", "completed", 55),
+              ("{\"seed\": 2}", "completed", 40),
+              ("{}", "queued", None)], 55),
+            ([("{}", "completed", 40), ("{}", "running", 55)], 55),
+        ]
+        for rows, expected in cases:
+            with self.subTest(rows=rows):
+                with patch("ax3l.interface.SnakeLab.DbMgr", side_effect=connect) as factory:
+                    self.assertEqual(SnakeLab().get_high_score(), expected)
+                factory.assert_called_once_with(database="snakelab", initialize_event_tables=False)
+                self.assertFalse(self.db._connection.open)
+
     def test_episode_losses_are_scoped_ordered_and_preserve_nulls(self):
         run_id, other_run = str(uuid4()), str(uuid4())
 

@@ -13,6 +13,12 @@ class SnakeLabDb:
         """Count all stored runs, including repeated configurations and all statuses."""
         return self._db.query("SELECT COUNT(*) AS num_sims FROM simulation_runs")[0]["num_sims"]
 
+    def get_high_score(self) -> int | None:
+        """Return the highest recorded score across all runs, or None before any score."""
+        return self._db.query(
+            "SELECT MAX(high_score) AS high_score FROM simulation_runs"
+        )[0]["high_score"]
+
     def get_config(self, run_id: str) -> dict | None:
         rows = self._db.query(
             "SELECT config FROM simulation_runs WHERE run_id = %s", (run_id,)

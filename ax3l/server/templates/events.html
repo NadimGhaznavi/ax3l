@@ -13,22 +13,18 @@
     .server-bar { margin-bottom: 1rem; }
     .note { margin: 1rem 0; padding: .6rem 1rem; border: 1px solid var(--border); color: var(--muted); }
     main { border: 1px solid var(--border); overflow-x: auto; }
-    table { width: 100%; min-width: 1100px; table-layout: fixed; border-collapse: collapse; }
-    .date-col { width: 13ch; }
-    .time-col { width: 11ch; }
-    .id-col { width: 9ch; }
-    .level-col { width: 9ch; }
-    .category-col { width: 15ch; }
-    .event-col { width: 12ch; }
-    th, td { padding: .35rem .65rem; border: 1px solid var(--border); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    table { width: 100%; table-layout: auto; border-collapse: collapse; }
+    th, td { padding: .35rem .65rem; border: 1px solid var(--border); text-align: left; white-space: nowrap; }
+    th:not(:last-child), td:not(:last-child) { width: 1%; }
     th { background: #0d1c11; color: var(--green); }
     .entry { background: #08100a; }
     .entry:nth-child(even) { background: #13271a; }
     .entry:hover { background: #1d3825; }
     .metadata { color: var(--muted); }
-    .content { font: inherit; }
+    .content { max-width: 0; overflow: hidden; text-overflow: ellipsis; font: inherit; }
     a { color: var(--green); text-underline-offset: .2em; }
-    a:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+    a:focus-visible, select:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+    select { padding: .35rem .65rem; border: 1px solid var(--border); background: #0a140d; color: var(--green); font: inherit; }
     .empty { margin: 0; padding: 1rem; border: 1px solid var(--border); }
     ::selection { background: var(--green); color: #050a06; }
     @media (max-width: 600px) { body { margin: .5rem; padding: .5rem; } }
@@ -38,19 +34,36 @@
   <section class="server-bar" aria-labelledby="snake-lab-status">
     <h2 id="snake-lab-status" role="status">Snake Lab Server: {{ snake_lab_status }}</h2>
   </section>
+  <section class="server-bar" aria-labelledby="experiment-status">
+    <h2 id="experiment-status">Experiment Status</h2>
+    <span id="experiment-high-score" role="status">Current Highscore: {{ high_score if high_score is not none else '—' }}</span>
+  </section>
   <header>
     <h1>Ax3l Event Log</h1>
-    <span id="refresh-status" role="status">Auto refresh every {{ refresh_seconds }} seconds.</span>
+    <div>
+      <label for="refresh-interval">Refresh:</label>
+      <select id="refresh-interval">
+        <option value="0" selected>No Refresh</option>
+        <option value="5">5 seconds</option>
+        <option value="30">30 seconds</option>
+        <option value="60">1 minute</option>
+        <option value="300">5 minutes</option>
+        <option value="1800">30 minutes</option>
+      </select>
+      <span id="refresh-status" role="status"></span>
+    </div>
   </header>
   <p class="note">Latest {{ events | length }} entries (up to 500), newest first.</p>
   <main>
     <table aria-label="Event log">
-      <colgroup>
-        <col class="date-col"><col class="time-col"><col class="id-col"><col class="level-col">
-        <col class="category-col"><col class="event-col"><col>
-      </colgroup>
       <thead>
         <tr><th scope="col">Date</th><th scope="col">Time</th><th scope="col">ID</th><th scope="col">Level</th><th scope="col">Category</th><th scope="col">Event</th><th scope="col">Message</th></tr>
+        <tr>
+          <td></td><td></td><td></td><td></td>
+          <td><select id="category-filter" aria-label="Filter by category"><option value="*">*</option></select></td>
+          <td><select id="event-filter" aria-label="Filter by event"><option value="*">*</option></select></td>
+          <td></td>
+        </tr>
       </thead>
       <tbody>
     {% for event in events %}
@@ -74,38 +87,107 @@
     {% else %}
         <tr><td class="empty" colspan="7">No events logged yet.</td></tr>
     {% endfor %}
+        <tr id="no-filter-matches" hidden><td class="empty" colspan="7">No events match the selected filters.</td></tr>
       </tbody>
     </table>
   </main>
   <script>
-    const refreshMs = {{ refresh_seconds | tojson }} * 1000;
+    const interval = document.querySelector('#refresh-interval');
     const status = document.querySelector('#refresh-status');
     const main = document.querySelector('main');
+    let refreshMs = 0;
+    let timer;
+    let controller;
+    let generation = 0;
+    interval.value = '0';
 
-    async function refreshEvents() {
+    const filters = [
+      { id: 'category-filter', column: 4, value: '*' },
+      { id: 'event-filter', column: 5, value: '*' }
+    ];
+
+    function applyFilters() {
+      const rows = main.querySelectorAll('.entry');
+      let visible = 0;
+      for (const row of rows) {
+        row.hidden = !filters.every(filter =>
+          filter.value === '*' || row.cells[filter.column].textContent === filter.value
+        );
+        if (!row.hidden) visible += 1;
+      }
+      main.querySelector('#no-filter-matches').hidden = rows.length === 0 || visible > 0;
+    }
+
+    function initializeFilters() {
+      const rows = Array.from(main.querySelectorAll('.entry'));
+      for (const filter of filters) {
+        const select = main.querySelector(`#${filter.id}`);
+        const values = new Set(rows.map(row => row.cells[filter.column].textContent));
+        // Keep an active filter even if its last matching entry ages out on refresh.
+        if (filter.value !== '*') values.add(filter.value);
+        values.delete('*');
+        select.replaceChildren(new Option('*', '*'));
+        for (const value of Array.from(values).sort((a, b) => a.localeCompare(b))) {
+          select.add(new Option(value, value));
+        }
+        select.value = filter.value;
+        select.addEventListener('change', () => {
+          filter.value = select.value;
+          applyFilters();
+        });
+      }
+      applyFilters();
+    }
+
+    initializeFilters();
+
+    async function refreshEvents(currentGeneration) {
+      const request = new AbortController();
+      controller = request;
+      const timeout = window.setTimeout(() => request.abort(), {{ request_timeout_seconds | tojson }} * 1000);
       try {
         const response = await fetch(window.location.href, {
-          cache: 'no-store', signal: AbortSignal.timeout(refreshMs)
+          cache: 'no-store', signal: request.signal
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const page = new DOMParser().parseFromString(await response.text(), 'text/html');
+        if (currentGeneration !== generation) return;
         const scrollX = window.scrollX;
         const scrollY = window.scrollY;
         const scrollLeft = main.scrollLeft;
         main.replaceChildren(...page.querySelector('main').childNodes);
+        initializeFilters();
         document.querySelector('.note').textContent = page.querySelector('.note').textContent;
         document.querySelector('#snake-lab-status').textContent = page.querySelector('#snake-lab-status').textContent;
+        document.querySelector('#experiment-high-score').textContent = page.querySelector('#experiment-high-score').textContent;
         main.scrollLeft = scrollLeft;
         window.scrollTo(scrollX, scrollY);
-        status.textContent = 'Auto refresh every {{ refresh_seconds }} seconds.';
+        status.textContent = '';
       } catch (error) {
-        status.textContent = 'Refresh failed. Retrying in {{ refresh_seconds }} seconds.';
+        if (currentGeneration === generation) {
+          status.textContent = `Refresh failed. Retrying in ${interval.selectedOptions[0].textContent}.`;
+        }
       } finally {
-        window.setTimeout(refreshEvents, refreshMs);
+        window.clearTimeout(timeout);
+        if (currentGeneration === generation) {
+          controller = null;
+          timer = window.setTimeout(() => refreshEvents(currentGeneration), refreshMs);
+        }
       }
     }
 
-    window.setTimeout(refreshEvents, refreshMs);
+    interval.addEventListener('change', () => {
+      generation += 1;
+      window.clearTimeout(timer);
+      if (controller) controller.abort();
+      controller = null;
+      refreshMs = Number(interval.value) * 1000;
+      status.textContent = '';
+      if (refreshMs > 0) {
+        const currentGeneration = generation;
+        timer = window.setTimeout(() => refreshEvents(currentGeneration), refreshMs);
+      }
+    });
   </script>
 </body>
 </html>

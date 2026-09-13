@@ -19,14 +19,23 @@ from ax3l.app.snakelab.prompts.ComparisonRewardPair import ComparisonRewardPair
 from ax3l.app.snakelab.prompts.GoldenConfig import GoldenConfig
 from ax3l.constants.DEventCategory import DEventCategory as Events
 from ax3l.constants.DSnakeLab import DSnakeLab
-from ax3l.interface.SnakeLab import SnakeLab
+from ax3l.interface.SnakeLab import SnakeLab, SimulationUnavailable
 from ax3l.interface.SnakeLabTools import SnakeLabTools
+
+
+class SimulationUnsuccessful(RuntimeError):
+    """A simulation ended without completed results to compare."""
 
 
 async def wait_for_run(snake, db, run_id):
     started = False
     while True:
-        state = snake.get_simulation_status(run_id)
+        try:
+            state = snake.get_simulation_status(run_id)
+        except SimulationUnavailable as error:
+            db.log(Events.SnakeLab.FAILED, Events.SnakeLab.CATEGORY, "ERROR",
+                   str(error), process_id=run_id)
+            raise
         if state == "running" and not started:
             db.log(Events.SnakeLab.STARTED, Events.SnakeLab.CATEGORY, "INFO",
                    "Simulation started running.", process_id=run_id)
@@ -35,7 +44,7 @@ async def wait_for_run(snake, db, run_id):
             db.log(Events.SnakeLab.TERMINAL_EVENTS[state], Events.SnakeLab.CATEGORY,
                    "INFO" if state == "completed" else "ERROR", f"Simulation {state}.", process_id=run_id)
             if state != "completed":
-                raise RuntimeError(f"Simulation {run_id} {state}; cannot compare completed results")
+                raise SimulationUnsuccessful(f"Simulation {run_id} {state}; cannot compare completed results")
             return
         await asyncio.sleep(DSnakeLab.STATUS_POLL_SECONDS)
 
@@ -98,8 +107,14 @@ async def optimize(llm, output, db, endpoint):
                                       "seed": snake.get_config(selected_id).get("seed")})
             golden_id = selected_id
         else:
-            await wait_for_run(snake, db, latest_id)
-            golden_id = compare(snake, db, golden_id, latest_id)
+            try:
+                await wait_for_run(snake, db, latest_id)
+            except (SimulationUnavailable, SimulationUnsuccessful):
+                db.log(Events.Configuration.GOLDEN_RETAINED, Events.Configuration.CATEGORY,
+                       "WARNING", f"Skipping interrupted proposal {latest_id}; retaining the golden configuration.",
+                       process_id=golden_id)
+            else:
+                golden_id = compare(snake, db, golden_id, latest_id)
     first_contact = proposal is None and EventLogDb(db).latest_seed_baseline() is None
     selector = RoundRobinState(db)
     while True:

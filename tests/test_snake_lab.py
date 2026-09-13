@@ -3,10 +3,11 @@
 from concurrent.futures import ThreadPoolExecutor
 import unittest
 from unittest.mock import patch
+from uuid import uuid4
 
 import zmq
 
-from ax3l.interface.SnakeLab import SnakeLab
+from ax3l.interface.SnakeLab import SnakeLab, SnakeLabQueryError, SimulationUnavailable
 
 
 class SnakeLabTests(unittest.TestCase):
@@ -56,6 +57,31 @@ class SnakeLabTests(unittest.TestCase):
     def test_server_error(self):
         with self.assertRaisesRegex(RuntimeError, "unavailable"):
             self.exchange(None, status="error", error={"code": "unavailable"})
+
+    def test_forgotten_run_uses_stored_terminal_status(self):
+        run_id = str(uuid4())
+        snake = SnakeLab()
+        for state in ('completed', 'failed', 'cancelled'):
+            with self.subTest(state=state), patch.object(snake, '_request', side_effect=SnakeLabQueryError(
+                {'code': 'run_not_found'})), patch.object(snake, 'get_run_result', return_value={'status': state}) as saved:
+                self.assertEqual(snake.get_simulation_status(run_id), state)
+                saved.assert_called_once_with(run_id)
+
+    def test_forgotten_unfinished_or_missing_run_is_unavailable(self):
+        snake = SnakeLab()
+        for result in (None, {'status': 'queued'}, {'status': 'running'}):
+            with self.subTest(result=result), patch.object(snake, '_request', side_effect=SnakeLabQueryError(
+                {'code': 'run_not_found'})), patch.object(snake, 'get_run_result', return_value=result):
+                with self.assertRaises(SimulationUnavailable):
+                    snake.get_simulation_status(str(uuid4()))
+
+    def test_other_status_errors_do_not_fall_back(self):
+        snake = SnakeLab()
+        for error in (SnakeLabQueryError({'code': 'unavailable'}), zmq.Again(), ValueError('protocol')):
+            with self.subTest(error=error), patch.object(snake, '_request', side_effect=error), patch.object(snake, 'get_run_result') as saved:
+                with self.assertRaises(type(error)):
+                    snake.get_simulation_status(str(uuid4()))
+                saved.assert_not_called()
 
     def test_timeout_then_success(self):
         with zmq.Context() as context:

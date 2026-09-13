@@ -180,7 +180,7 @@ class DbMgrTests(unittest.TestCase):
         self.assertEqual(dal.stagnant_rounds(), 0)
         log('configuration_compared')
         log('configuration_compared')
-        self.assertEqual(dal.stagnant_rounds(), 1)  # Duplicate accounting of one run counts once.
+        self.assertEqual(dal.stagnant_rounds(), 0)  # Uncheckpointed comparisons are not full cycles.
         log('golden_config_created')
         self.assertEqual(dal.stagnant_rounds(), 0)
         log('proposal_accepted')

@@ -10,7 +10,7 @@ from ax3l.constants.DAx3l import DAx3l
 from ax3l.constants.DEventCategory import DEventCategory as Events
 
 
-async def converse(llm, output, db, tools, prompts) -> str:
+async def converse(llm, output, db, tools, prompts, *, parameter=None) -> str:
     process_id = str(uuid4())
     print(f"Conversation: {process_id}", flush=True)
     conversation_id = db.log(Events.Conversation.STARTED, Events.Conversation.CATEGORY,
@@ -58,6 +58,8 @@ async def converse(llm, output, db, tools, prompts) -> str:
             arguments = json.loads(call["function"]["arguments"])
             if arguments.get("parameter") not in SINGLE_PARAMETERS:
                 raise ValueError("This conversation may only change an allowed single parameter")
+            if parameter is not None and arguments["parameter"] != parameter:
+                raise ValueError(f"This round-robin turn may only change {parameter}")
             messages.append(reply)
             log(Events.Tool, Events.Tool.STARTED, json.dumps(call))
             try:

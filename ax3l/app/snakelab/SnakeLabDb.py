@@ -1,7 +1,7 @@
 """Read Snake Lab simulation data through AX3L's database manager."""
 
 import json
-
+from ax3l.app.snakelab.SingleParameters import SINGLE_PARAMETERS
 from ax3l.app.DbMgr import DbMgr
 
 
@@ -63,20 +63,25 @@ class SnakeLabDb:
         return rows[0]["run_id"] if rows else None
 
     def get_learning_rate_report(self, golden_run_id: str) -> list[dict]:
-        rows = self._db.query("""
+        return self.get_parameter_report(golden_run_id, "learning_rate")
+
+    def get_parameter_report(self, golden_run_id: str, parameter: str) -> list[dict]:
+        path, _ = SINGLE_PARAMETERS[parameter]
+        json_path = "$." + ".".join(path)
+        rows = self._db.query(f"""
             SELECT r.run_id, r.status, r.high_score,
-                   JSON_EXTRACT(r.config, '$.training.learning_rate') AS learning_rate,
+                   JSON_EXTRACT(r.config, '{json_path}') AS {parameter},
                    JSON_EQUALS(JSON_EXTRACT(r.config, '$.seed'),
                                JSON_EXTRACT(g.config, '$.seed')) AS current_seed
             FROM simulation_runs r JOIN simulation_runs g ON g.run_id = %s
-            WHERE JSON_EQUALS(JSON_REMOVE(r.config, '$.seed', '$.training.learning_rate'),
-                              JSON_REMOVE(g.config, '$.seed', '$.training.learning_rate'))
-            ORDER BY JSON_EXTRACT(r.config, '$.training.learning_rate') + 0, r.id
+            WHERE JSON_EQUALS(JSON_REMOVE(r.config, '$.seed', '{json_path}'),
+                              JSON_REMOVE(g.config, '$.seed', '{json_path}'))
+            ORDER BY JSON_EXTRACT(r.config, '{json_path}') + 0, r.id
         """, (golden_run_id,))
         grouped = {}
         for row in rows:
-            lr = json.loads(row["learning_rate"])
-            entry = grouped.setdefault(lr, {"learning_rate": lr, "results": [], "history": []})
+            value = json.loads(row[parameter])
+            entry = grouped.setdefault(value, {parameter: value, "results": [], "history": []})
             if row["current_seed"]:
                 entry["results"].append({key: row[key] for key in ("run_id", "status", "high_score")})
             elif row["status"] == "completed" and row["high_score"] is not None:

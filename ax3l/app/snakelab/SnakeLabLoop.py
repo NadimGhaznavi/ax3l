@@ -43,9 +43,17 @@ def compare(snake, db, golden_id, latest_id):
             raise ValueError("Comparison requires two completed simulations with recorded high scores")
     won = latest["high_score"] > golden["high_score"]
     current_id = latest_id if won else golden_id
+
+    def changes(before, after, path=""):
+        for key in before:
+            name = f"{path}.{key}" if path else key
+            if isinstance(before[key], dict):
+                yield from changes(before[key], after[key], name)
+            elif before[key] != after[key]:
+                yield f"{name}: {before[key]} -> {after[key]}"
+
     reason = (f"High score: {latest['high_score']} {'>' if won else '<='} {golden['high_score']}; "
-              f"learning_rate: {golden['config']['training']['learning_rate']} -> "
-              f"{latest['config']['training']['learning_rate']}.")
+              + "; ".join(changes(golden["config"], latest["config"])) + ".")
     comparison_id = db.log(Events.Configuration.COMPARED, Events.Configuration.CATEGORY, "INFO",
                           json.dumps({"golden_run_id": golden_id, "latest_run_id": latest_id,
                                       "current_golden_run_id": current_id, "reason": reason}),
@@ -88,7 +96,7 @@ async def optimize(llm, output, db, endpoint):
     elif EventLogDb(db).latest_seed_baseline() is not None:
         prompts = [Comparison(golden_id, golden_id, golden_id), ComparisonSingle()]
     else:
-        prompts = [FirstContact(), golden, FirstContactSingle("learning_rate")]
+        prompts = [FirstContact(), golden, FirstContactSingle()]
     async with SnakeLabTools(endpoint) as tools:
         while True:
             rotated_id = await rotate_if_needed(snake, db, wait_for_run)

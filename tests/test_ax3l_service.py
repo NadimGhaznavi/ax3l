@@ -54,7 +54,7 @@ class Ax3lServiceTests(unittest.TestCase):
                         "from ax3l.app.Prompt import Prompt; "
                         "golden = Prompt('Golden configuration'); "
                         "golden.run_id = 'f6e72cb3-9bcf-4669-b368-a17c656bad79'; "
-                        "patch.object(import_module('ax3l.app.snakelab.LearningRateLoop'), 'GoldenConfig', return_value=golden).start(); "
+                        "patch.object(import_module('ax3l.app.snakelab.SnakeLabLoop'), 'GoldenConfig', return_value=golden).start(); "
                         "patch('ax3l.interface.SnakeLab.SnakeLab.is_simulation_running', return_value=False).start(); "
                         "patch('ax3l.app.EventLogDb.EventLogDb.latest_snakelab_proposal', return_value=None).start(); "
                         "patch('ax3l.interface.SnakeLab.SnakeLab.get_run_result', return_value={'status': 'completed', 'high_score': 10}).start(); "

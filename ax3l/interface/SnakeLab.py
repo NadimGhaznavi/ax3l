@@ -73,6 +73,14 @@ class SnakeLab:
         finally:
             db.close()
 
+    def get_parameter_report(self, golden_run_id: str, parameter: str) -> list[dict]:
+        UUID(golden_run_id)
+        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
+        try:
+            return SnakeLabDb(db).get_parameter_report(golden_run_id, parameter)
+        finally:
+            db.close()
+
     def get_learning_rate_report(self, golden_run_id: str) -> list[dict]:
         UUID(golden_run_id)
         db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)

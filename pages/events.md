@@ -6,6 +6,12 @@ The source of truth is `ax3l/constants/DEventCategory.py`. Each category extends
 `reply_received`, and its label is `Response`. Logging and reporting share this
 catalog. Add or change definitions there.
 
+The Event Log's Category filter narrows Event choices using this catalog, including
+valid events with no entries in the latest 500 rows. Historical events present in
+those rows remain selectable. Changing category resets an incompatible Event
+selection to `*`. Selecting the Prompt event shows a Source column; other Event
+selections hide it.
+
 Prompt text is stored in `event_messages`, linked to a `prompt_sent` row in
 `events`. The nullable `events.source_name` column records the originating Python
 module name without its package or `.py` suffix, for example `GoldenConfig` or

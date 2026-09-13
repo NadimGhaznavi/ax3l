@@ -11,6 +11,33 @@ from unittest.mock import patch
 
 
 class ExperimentStatusTests(unittest.TestCase):
+    def test_prompt_detail_source_title_and_escaping(self):
+        from ax3l.server.ReportingServer import make_server
+
+        self.enterContext(patch('ax3l.server.ReportingServer.DbMgr'))
+        log = self.enterContext(patch('ax3l.server.ReportingServer.EventLogDb')).return_value
+        server = make_server('127.0.0.1', 0)
+        thread = Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            for source, title in (("GoldenConfig", "Prompt (GoldenConfig): #123"),
+                                  ("<script>", "Prompt (&lt;script&gt;): #123"),
+                                  (None, "Prompt: #123")):
+                log.get.return_value = {
+                    'event_id': 123, 'name': 'prompt_sent', 'category': 'Conversation',
+                    'source_name': source,
+                    'content': json.dumps({'role': 'user', 'content': 'Choose a value.'}),
+                }
+                with urlopen(f'http://127.0.0.1:{server.server_port}/events/123') as response:
+                    page = response.read().decode()
+                self.assertIn(f'<h1>{title}</h1>', page)
+                self.assertIn(f'<title>{title} · Ax3l</title>', page)
+                self.assertNotIn('<script>', page)
+        finally:
+            server.shutdown()
+            thread.join()
+            server.server_close()
+
     def test_status_counts_render_and_update(self):
         from ax3l.server.ReportingServer import make_server
 
@@ -140,7 +167,8 @@ class ReportingTests(unittest.TestCase):
                     {"type": "text", "text": caption},
                     {"type": "image_url", "image_url": {"url": png_url}},
                 ]}
-                prompt_id = db.log("prompt_sent", "Conversation", "INFO", json.dumps(prompt), process_id=process_id)
+                prompt_id = db.log("prompt_sent", "Conversation", "INFO", json.dumps(prompt),
+                                   process_id=process_id, source_name="ComparisonPlot")
                 with urlopen(url) as response:
                     page = response.read().decode()
                     self.assertIn(f'href="/events/{prompt_id}"', page)
@@ -149,7 +177,7 @@ class ReportingTests(unittest.TestCase):
                     with urlopen(f"{url}/events/{prompt_id}") as response:
                         page = response.read().decode()
                 self.assertIn(f'<img src="{png_url}"', page)
-                self.assertIn(f'Prompt #{prompt_id}', page)
+                self.assertIn(f'Prompt (ComparisonPlot): #{prompt_id}', page)
                 self.assertNotIn('<script>test</script>', page)
                 self.assertIn('Back to event log', page)
             text_id = db.log("prompt_sent", "Conversation", "INFO",

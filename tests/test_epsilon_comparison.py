@@ -10,7 +10,7 @@ class EpsilonComparisonTests(unittest.TestCase):
     def test_sorted_grid_preserves_repeats_zero_and_missing_pairs(self):
         db = Mock()
         db.query.return_value = [
-            {"initial": str(initial), "decay": str(decay),
+            {"initial": initial, "decay": decay,
              "status": status, "high_score": score}
             for initial, decay, status, score in [
                 (.96, .99, "completed", 39),
@@ -36,11 +36,10 @@ class EpsilonComparisonTests(unittest.TestCase):
             ]},
         ])
         sql, args = db.query.call_args.args
-        for alias in ("r", "g"):
-            self.assertIn(
-                f"JSON_REMOVE({alias}.config, '$.seed', '$.epsilon.initial', '$.epsilon.decay')",
-                sql,
-            )
+        self.assertNotIn("c.seed = g.seed", sql)
+        self.assertNotIn("c.epsilon_initial = g.epsilon_initial", sql)
+        self.assertNotIn("c.epsilon_decay = g.epsilon_decay", sql)
+        self.assertIn("c.epochs = g.epochs", sql)
         self.assertEqual(args, ("gold",))
 
     def test_empty_report(self):

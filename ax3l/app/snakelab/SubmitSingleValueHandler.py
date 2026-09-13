@@ -31,7 +31,7 @@ class SubmitSingleValueHandler:
         )
         return {"status": "rejected", "reason": reason,
                 "code": "duplicate_config" if duplicate else "invalid_value",
-                "prompt": json.loads(prompt.to_json())}
+                "prompt": json.loads(prompt.to_json()), "source_name": prompt.source_name}
 
     def submit(self, payload: dict) -> dict:
         if set(payload) != {"parameter", "value"}:

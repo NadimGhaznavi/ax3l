@@ -6,6 +6,14 @@ The source of truth is `ax3l/constants/DEventCategory.py`. Each category extends
 `reply_received`, and its label is `Response`. Logging and reporting share this
 catalog. Add or change definitions there.
 
+Prompt text is stored in `event_messages`, linked to a `prompt_sent` row in
+`events`. The nullable `events.source_name` column records the originating Python
+module name without its package or `.py` suffix, for example `GoldenConfig` or
+`NoDupes`. The prompt detail heading and browser title include this source as
+`Prompt (GoldenConfig): #123`. Inline argument correction prompts use
+`ToolConversation`. This column is created on fresh installation; no upgrade
+migration is provided.
+
 | Event | Category |
 | --- | --- |
 | `service_started` | System |

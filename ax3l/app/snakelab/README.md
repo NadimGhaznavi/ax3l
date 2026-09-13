@@ -83,9 +83,8 @@ name, and JSON-schema constraints before building a candidate from the golden
 configuration. It changes only the selected parameter. A legal but unchanged
 configuration is rejected; `SnakeLab.is_config_unique(config)` then checks all
 stored runs through `SnakeLabDb`, regardless of status or project version.
-Equality compares the full JSON configuration, including seed, while ignoring
-object key order and equivalent numeric representations. This uses MariaDB's
-`JSON_EQUALS` (MariaDB 10.7 or newer).
+Equality compares all 26 numeric columns in `configurations`, including seed,
+while ignoring object key order and equivalent numeric representations.
 
 Illegal values return `status: rejected`, `code: invalid_value`, and an
 `InvalidValue` prompt. Duplicates return `code: duplicate_config` and a

@@ -75,7 +75,7 @@ class DbMgrTests(unittest.TestCase):
 
         prompt_id = self.db.log(
             "prompt_sent", "Conversation", "INFO", "Describe the configuration.",
-            process_id=self.process_id,
+            process_id=self.process_id, source_name="GoldenConfig",
         )
         content = "A tree's quiet shade 🌳\nSecond line"
         reply_id = self.db.log(
@@ -85,6 +85,9 @@ class DbMgrTests(unittest.TestCase):
         self.assertGreater(reply_id, prompt_id)
         reader = DbMgr()
         try:
+            from ax3l.app.EventLogDb import EventLogDb
+            self.assertEqual(EventLogDb(reader).get(prompt_id)['source_name'], 'GoldenConfig')
+            self.assertIsNone(EventLogDb(reader).get(reply_id)['source_name'])
             rows = reader.query(
                 """SELECT e.name, e.category, e.log_level, e.process_id,
                           e.parent_event_id, m.content

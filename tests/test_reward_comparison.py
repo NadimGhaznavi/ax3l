@@ -11,7 +11,7 @@ class RewardComparisonTests(unittest.TestCase):
     def test_complete_sorted_grid_and_scored_completed_runs_only(self):
         db = Mock()
         db.query.return_value = [
-            {"closer_to_food": json.dumps(first), "further_from_food": json.dumps(second),
+            {"closer_to_food": first, "further_from_food": second,
              "status": status, "high_score": score}
             for first, second, status, score in [
                 (3, -3, "completed", 39), (3, -3, "completed", 41),
@@ -32,11 +32,10 @@ class RewardComparisonTests(unittest.TestCase):
         self.assertEqual(report["6"]["0"], [12])
         self.assertEqual(sum(bool(scores) for pairs in report.values() for scores in pairs.values()), 3)
         sql, args = db.query.call_args.args
-        for alias in ("r", "g"):
-            self.assertIn(
-                f"JSON_REMOVE({alias}.config, '$.seed', '$.game.rewards.closer_to_food', '$.game.rewards.further_from_food')",
-                sql,
-            )
+        self.assertNotIn("c.seed = g.seed", sql)
+        self.assertNotIn("c.game_rewards_closer_to_food = g.game_rewards_closer_to_food", sql)
+        self.assertNotIn("c.game_rewards_further_from_food = g.game_rewards_further_from_food", sql)
+        self.assertIn("c.epochs = g.epochs", sql)
         self.assertEqual(args, ("gold",))
 
     def test_no_runs_still_produces_49_independent_empty_cells(self):

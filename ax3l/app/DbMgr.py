@@ -41,6 +41,7 @@ class DbMgr:
                 log_level VARCHAR(10) NOT NULL,
                 process_id CHAR(36) NULL,
                 parent_event_id BIGINT UNSIGNED NULL,
+                source_name VARCHAR(255) NULL,
                 INDEX idx_event_time (occurred_at, event_id),
                 INDEX idx_event_name_time (name, occurred_at),
                 INDEX idx_event_process (process_id, event_id),
@@ -88,6 +89,7 @@ class DbMgr:
         *,
         process_id: str | None = None,
         parent_event_id: int | None = None,
+        source_name: str | None = None,
     ) -> int:
         """Commit an event and its message together and return the event ID.
 
@@ -96,9 +98,9 @@ class DbMgr:
         with self.transaction():
             self.execute(
                 """INSERT INTO events
-                   (name, category, log_level, process_id, parent_event_id)
-                   VALUES (%s, %s, %s, %s, %s)""",
-                (name, category, log_level, process_id, parent_event_id),
+                   (name, category, log_level, process_id, parent_event_id, source_name)
+                   VALUES (%s, %s, %s, %s, %s, %s)""",
+                (name, category, log_level, process_id, parent_event_id, source_name),
             )
             event_id = self.query("SELECT LAST_INSERT_ID() AS event_id")[0]["event_id"]
             self.execute(

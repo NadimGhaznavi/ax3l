@@ -1,5 +1,23 @@
 # Single-parameter optimization
 
+The optimizer visits hidden size, sequence length, batch size, learning rate,
+and gamma in schema order, wrapping after gamma. Each conversation may change
+only its assigned parameter. Before asking the LLM, Ax3l stores the parameter
+order and current index as a `round_robin_checkpoint` event in its database.
+Restarting during thinking or validation retries resumes that parameter. An
+accepted proposal advances the next turn once, even if the MCP reply was lost;
+existing startup recovery finishes its simulation and comparison first.
+Golden and seed changes preserve position. A changed schema parameter order
+requires migrating the checkpoint before resuming. Existing databases start at
+the first parameter; wiping events also clears these checkpoints.
+
+Seed rotation occurs after `DSnakeLab.SEED_STAGNANT_ROUNDS` (3) complete
+round-robin cycles without a new high score. Each cycle includes all five
+parameters and counts only after its last simulation has been compared.
+A new golden configuration resets the count; a cycle containing an improvement
+does not count as stagnant. Rotation increments the seed and reruns the golden
+configuration to establish a fresh score baseline. The count survives restarts.
+
 ## MCP tools
 
 The SnakeLab MCP entry point is `python -m ax3l.app.snakelab.tools` and uses
@@ -71,7 +89,7 @@ events logged. Golden selection is unchanged. The listener handles requests
 serially; external writers to SnakeLab are outside that serialization boundary.
 
 The single-parameter search space is `hidden_size`, `sequence_length`, `batch_size`,
-`learning_rate`, and `gamma`. Each conversation chooses one parameter and value.
+`learning_rate`, and `gamma`. Each conversation chooses a value for its assigned parameter.
 Reward distance pairs and epsilon initial/decay are excluded, along with seed
 and schema-fixed settings. Comparison histories hold all other settings equal
 to the current golden configuration for each parameter.
@@ -107,8 +125,8 @@ configuration when the score improves, and starts the next conversation.
 
 Raw file capture is off by default. Set `DAx3l.RAW_LOGS_ENABLED = True` in
 `ax3l/constants/DAx3l.py` to enable the capture files described below.
-When off, no haiku output directory or files are created, including under
-`/var/lib/ax3l/haiku`. Database logging continues; status and errors go to the
+When off, no capture output directory or files are created, including under
+`/var/lib/ax3l/snakelab`. Database logging continues; status and errors go to the
 console (the systemd journal for service runs). Existing captures are retained.
 
 From the checkout root, load the installed database credentials into the

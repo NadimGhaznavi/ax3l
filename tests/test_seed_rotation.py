@@ -9,8 +9,8 @@ from ax3l.constants.DSnakeLab import DSnakeLab
 
 class SeedRotationTests(unittest.IsolatedAsyncioTestCase):
     async def test_threshold_changes_only_seed_and_accepts_lower_baseline(self):
-        self.assertEqual(DSnakeLab.SEED_STAGNANT_ROUNDS, 5)
-        for rounds in (4, 5):
+        self.assertEqual(DSnakeLab.SEED_STAGNANT_ROUNDS, 3)
+        for rounds in (2, 3):
             with self.subTest(rounds=rounds), patch('ax3l.app.snakelab.SeedRotation.EventLogDb') as factory:
                 events = factory.return_value
                 events.pending_seed_rotation.return_value = None
@@ -23,7 +23,7 @@ class SeedRotationTests(unittest.IsolatedAsyncioTestCase):
                 snake.submit_simulation.return_value = 'new'
                 snake.get_run_result.return_value = {'status': 'completed', 'high_score': 1}
                 run_id = await rotate_if_needed(snake, db, wait)
-                if rounds == 4:
+                if rounds == 2:
                     self.assertIsNone(run_id)
                     snake.submit_simulation.assert_not_called()
                     wait.assert_not_awaited()
@@ -67,7 +67,7 @@ class SeedRotationTests(unittest.IsolatedAsyncioTestCase):
         with patch('ax3l.app.snakelab.SeedRotation.EventLogDb') as factory:
             events = factory.return_value
             events.pending_seed_rotation.return_value = None
-            events.stagnant_rounds.return_value = 5
+            events.stagnant_rounds.return_value = 3
             snake = Mock()
             self.assertIsNone(await rotate_if_needed(snake, Mock(), AsyncMock(), resume_only=True))
             events.stagnant_rounds.assert_not_called()
@@ -88,7 +88,8 @@ class SeedRotationTests(unittest.IsolatedAsyncioTestCase):
         golden.run_id = 'old'
         rotation = AsyncMock(side_effect=[None, 'rotated'])
         conversation = AsyncMock(side_effect=asyncio.CancelledError())
-        with patch(module + 'SnakeLab', return_value=snake), patch(module + 'EventLogDb', return_value=events), patch(module + 'GoldenConfig', return_value=golden), patch(module + 'rotate_if_needed', rotation), patch(module + 'SnakeLabTools', return_value=AsyncMock()), patch(module + 'converse', conversation), patch(module + 'Comparison', return_value=Prompt('new baseline')) as comparison:
+        with patch(module + 'RoundRobinState') as selector, patch(module + 'SnakeLab', return_value=snake), patch(module + 'EventLogDb', return_value=events), patch(module + 'GoldenConfig', return_value=golden), patch(module + 'rotate_if_needed', rotation), patch(module + 'SnakeLabTools', return_value=AsyncMock()), patch(module + 'converse', conversation), patch(module + 'Comparison', return_value=Prompt('new baseline')) as comparison:
+            selector.return_value.begin.return_value = 'hidden_size'
             with self.assertRaises(asyncio.CancelledError):
                 await optimize(Mock(), Path('/tmp'), Mock(), 'endpoint')
             comparison.assert_called_once_with('rotated', 'rotated', 'rotated')

@@ -25,7 +25,7 @@ class Ax3lServiceTests(unittest.TestCase):
             def do_POST(self):
                 self.rfile.read(int(self.headers["Content-Length"]))
                 time.sleep(2)
-                body = b'{"choices":[{"message":{"content":"Test haiku"}}]}'
+                body = b'{"choices":[{"message":{"content":"Test response"}}]}'
                 self.send_response(200)
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
@@ -62,7 +62,7 @@ class Ax3lServiceTests(unittest.TestCase):
                         "raise SystemExit(main())", "--port", "0",
                         "--zmq-endpoint", "tcp://127.0.0.1:*",
                         "--llm-url", f"http://127.0.0.1:{llm.server_port}",
-                        "--output", str(output / "haiku"),
+                        "--output", str(output / "snakelab"),
                     ], stdout=console, stderr=console)
                     try:
                         deadline = time.monotonic() + 15
@@ -77,7 +77,7 @@ class Ax3lServiceTests(unittest.TestCase):
                             time.sleep(0.05)
                         else:
                             self.fail("Service did not log its first prompts")
-                        self.assertFalse((output / "haiku").exists())
+                        self.assertFalse((output / "snakelab").exists())
                         console.seek(0)
                         port = re.search(r"listening on 127.0.0.1:(\d+)", console.read()).group(1)
                         with urlopen(f"http://127.0.0.1:{port}/health", timeout=3) as response:

@@ -84,6 +84,9 @@ class ComparisonTests(unittest.TestCase):
 
 class LoopTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        selector = patch(MODULE + 'RoundRobinState')
+        selector.start().return_value.begin.return_value = 'learning_rate'
+        self.addCleanup(selector.stop)
         rotation = patch(MODULE + 'rotate_if_needed', new_callable=AsyncMock, return_value=None)
         rotation.start()
         self.addCleanup(rotation.stop)
@@ -170,6 +173,9 @@ class LoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(prompt.call_args_list[0].args, ('gold', 'last', 'last'))
         for call in conversations.call_args_list:
             self.assertTrue(all(isinstance(json.loads(p.to_json())['content'], str) for p in call.args[4]))
+            self.assertEqual(call.kwargs['parameter'], 'learning_rate')
+            self.assertIn('learning_rate', call.args[4][-1].to_md())
+            self.assertNotIn('hidden_size', call.args[4][-1].to_md())
         self.assertEqual(wait.await_count, 2)
 
     async def test_restart_uses_recorded_comparison_without_first_contact(self):

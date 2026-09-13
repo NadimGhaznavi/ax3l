@@ -1,3 +1,4 @@
+import json
 from typing import Any
 
 from ax3l.app.DbMgr import DbMgr
@@ -60,13 +61,52 @@ class EventLogDb:
         return rows[0] if rows else None
 
     def stagnant_rounds(self) -> int:
+        """Count complete ordered passes since the last golden creation.
+
+        An improvement in the middle of a pass discards that partial pass.
+        Count comparisons, not acceptances, so pending runs and retries cannot
+        trigger rotation. Durable events make this calculation restart-safe.
+        """
+        from ax3l.app.snakelab.SingleParameters import SINGLE_PARAMETERS
+
         category = DEventCategory.Configuration
-        return self._db.query("""
-            SELECT COUNT(DISTINCT process_id) AS rounds FROM events
-            WHERE category = %s AND name = %s AND event_id > COALESCE(
+        rows = self._db.query("""
+            SELECT c.process_id, m.content
+            FROM events c
+            JOIN events p ON p.event_id = (
+                SELECT MIN(event_id) FROM events
+                WHERE process_id = c.process_id AND category = %s AND name = %s)
+            JOIN events checkpoint ON checkpoint.event_id = (
+                SELECT MAX(event_id) FROM events
+                WHERE event_id < p.event_id AND category = %s AND name = %s)
+            JOIN event_messages m ON m.event_id = checkpoint.event_id
+            WHERE c.category = %s AND c.name = %s AND c.event_id > COALESCE(
                 (SELECT MAX(event_id) FROM events WHERE category = %s AND name = %s), 0)
-        """, (category.CATEGORY, category.COMPARED,
-               category.CATEGORY, category.GOLDEN_CREATED))[0]["rounds"]
+            ORDER BY c.event_id
+        """, (category.CATEGORY, category.PROPOSAL_ACCEPTED,
+               category.CATEGORY, "round_robin_checkpoint",
+               category.CATEGORY, category.COMPARED,
+               category.CATEGORY, category.GOLDEN_CREATED))
+        order = list(SINGLE_PARAMETERS)
+        rounds, expected = 0, 0
+        seen = set()
+        for row in rows:
+            if row["process_id"] in seen:
+                continue
+            seen.add(row["process_id"])
+            checkpoint = json.loads(row["content"])
+            if checkpoint["parameter_order"] != order:
+                raise ValueError("Search parameter order changed; migrate the saved checkpoint before resuming")
+            index = checkpoint["index"]
+            if index != expected:
+                expected = 0
+                if index != 0:
+                    continue
+            expected += 1
+            if expected == len(order):
+                rounds += 1
+                expected = 0
+        return rounds
 
     def pending_seed_rotation(self) -> dict[str, Any] | None:
         category = DEventCategory.Configuration

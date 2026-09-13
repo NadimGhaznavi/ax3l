@@ -7,6 +7,7 @@ from ax3l.app.ConfigurationLog import ConfigurationLog
 from ax3l.app.EventLogDb import EventLogDb
 from ax3l.app.snakelab.ToolConversation import converse
 from ax3l.app.snakelab.SeedRotation import rotate_if_needed
+from ax3l.app.snakelab.RoundRobinState import RoundRobinState
 from ax3l.app.snakelab.prompts.Comparison import Comparison
 from ax3l.app.snakelab.prompts.ComparisonSingle import ComparisonSingle
 from ax3l.app.snakelab.prompts.FirstContact import FirstContact
@@ -97,13 +98,17 @@ async def optimize(llm, output, db, endpoint):
         prompts = [Comparison(golden_id, golden_id, golden_id), ComparisonSingle()]
     else:
         prompts = [FirstContact(), golden, FirstContactSingle()]
+    selector = RoundRobinState(db)
     async with SnakeLabTools(endpoint) as tools:
         while True:
             rotated_id = await rotate_if_needed(snake, db, wait_for_run)
             if rotated_id is not None:
                 golden_id = rotated_id
                 prompts = [Comparison(golden_id, golden_id, golden_id), ComparisonSingle()]
-            latest_id = await converse(llm, output, db, tools, prompts)
+            parameter = selector.begin()
+            prompts[-1] = (FirstContactSingle(parameter) if isinstance(prompts[-1], FirstContactSingle)
+                           else ComparisonSingle(parameter))
+            latest_id = await converse(llm, output, db, tools, prompts, parameter=parameter)
             await wait_for_run(snake, db, latest_id)
             while snake.is_simulation_running():
                 await asyncio.sleep(DSnakeLab.STATUS_POLL_SECONDS)

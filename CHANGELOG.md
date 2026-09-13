@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-09-13 @ 17:46
+
 - Add a Source filter when Prompt is selected in the Event Log, preserving the selected source during automatic refresh.
 
 ## [1.0.3] - 2026-09-13 @ 17:28

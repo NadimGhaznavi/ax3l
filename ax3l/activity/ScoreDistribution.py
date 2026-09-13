@@ -15,22 +15,23 @@ def distribution(scores: list[int | None]) -> dict:
         size = max(1, math.ceil((high - low + 1) / 40))
         bins = dict(start=low - .5, end=high + .5, size=size)
         for name, values, color in (
-            ("All runs", all_scores, "#80ff98"),
-            ("Oldest half", older_scores, "#ffad55"),
+            ("All runs", all_scores, "#4c9be8"),
+            ("Oldest half", older_scores, "#f09445"),
         ):
             figure.add_trace(go.Histogram(
                 x=values, name=name, xbins=bins, bingroup="scores",
                 histfunc="count", marker_color=color, opacity=.85,
+                marker_line=dict(color="#101923", width=1),
                 hovertemplate="Score: %{x}<br>Runs: %{y}<extra>%{fullData.name}</extra>",
             ))
         figure.update_layout(
             barmode="overlay", bargap=.08, template="plotly_dark",
-            paper_bgcolor="#050a06", plot_bgcolor="#0a140d",
-            font=dict(family="Courier New, monospace", color="#80ff98"),
+            paper_bgcolor="#101720", plot_bgcolor="#151f2b",
+            font=dict(family="Courier New, monospace", color="#d5dfeb"),
             xaxis_title="Run high score", yaxis_title="Number of runs",
             yaxis=dict(rangemode="tozero", dtick=1 if len(all_scores) < 20 else None),
-            legend=dict(orientation="h", y=1.15),
-            margin=dict(l=65, r=25, t=85, b=65),
+            legend=dict(orientation="h", x=.5, xanchor="center", y=-.22, yanchor="top"),
+            margin=dict(l=65, r=25, t=30, b=115),
         )
     return dict(
         total=len(scores), half=half, scored=len(all_scores), older_scored=len(older_scores),

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Integrate epsilon and reward pair tuning into the seven-entry round robin, with pair reports, bound MCP calls, retry feedback, and complete-cycle seed rotation. Existing experiment events must be reset before using the new order.
+
 - Show the last successful dashboard refresh date/time in UTC beside the Snake Lab server status, using the same font size as Current Highscore.
 
 ## [0.99.13] - 2026-09-13 @ 14:11

@@ -3,20 +3,24 @@
 import json
 
 from ax3l.app.snakelab.SingleParameters import SINGLE_PARAMETERS
+from ax3l.app.snakelab.PairParameters import PAIR_PARAMETERS
 from ax3l.constants.DEventCategory import DEventCategory as Events
+
+
+ROUND_ROBIN_ORDER = list(SINGLE_PARAMETERS) + list(PAIR_PARAMETERS)
 
 
 class RoundRobinState:
     def __init__(self, db):
         self.db = db
-        self.order = list(SINGLE_PARAMETERS)
+        self.order = list(ROUND_ROBIN_ORDER)
 
     def begin(self):
         """Resume an unfinished turn, or advance once past an accepted proposal.
 
         The acceptance event is already durable before MCP replies. Using it as
         the completion marker also handles a lost reply without skipping a turn.
-        Like the legacy selector, refuse to reinterpret a changed parameter order.
+        Refuse to reinterpret checkpoints from a different experiment order.
         """
         rows = self.db.query("""
             SELECT e.event_id, m.content,
@@ -32,7 +36,7 @@ class RoundRobinState:
         if rows:
             saved = json.loads(rows[0]["content"])
             if saved["parameter_order"] != self.order:
-                raise ValueError("Search parameter order changed; migrate the saved checkpoint before resuming")
+                raise ValueError("Search parameter order changed; reset experiment events before resuming")
             index = saved["index"]
             if type(index) is not int or not 0 <= index < len(self.order):
                 raise ValueError("Invalid round-robin checkpoint index")

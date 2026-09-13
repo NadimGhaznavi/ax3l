@@ -104,7 +104,11 @@ class ConfigPageTests(unittest.TestCase):
                      process_id=RUN_ID)
         with patch("ax3l.server.ReportingServer.DbMgr"), patch(
             "ax3l.server.ReportingServer.EventLogDb"
-        ) as log, patch("ax3l.server.ReportingServer.SnakeLab.is_simulation_running", return_value=True):
+        ) as log, patch("ax3l.server.ReportingServer.SnakeLab") as snake:
+            snake.return_value.is_simulation_running.return_value = True
+            snake.return_value.get_high_score.return_value = 37
+            snake.return_value.get_num_sims.return_value = 1
+            log.return_value.experiment_cycles.return_value = 0
             log.return_value.recent.return_value = [event]
             _, page = self.request("/")
         self.assertIn(f'Submitted <a href="/simulations/{RUN_ID}/config">config</a>.', page)

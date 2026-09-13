@@ -21,6 +21,8 @@ async def converse(llm, output, db, tools, prompts) -> str:
 
     outcome, level = "Simulation submitted.", "INFO"
     try:
+        tool_name = tools.definition["function"]["name"]
+        argument_names = set(tools.definition["function"]["parameters"]["properties"])
         messages = [json.loads(prompt.to_json()) for prompt in prompts]
         for message in messages:
             log(Events.Conversation, Events.Conversation.PROMPT, json.dumps(message, ensure_ascii=False))
@@ -47,10 +49,10 @@ async def converse(llm, output, db, tools, prompts) -> str:
             choice = json.loads(body)["choices"][0]
             reply = choice["message"]
             calls = reply.get("tool_calls", [])
-            if len(calls) != 1 or calls[0]["function"]["name"] != "submit_single_value":
+            if len(calls) != 1 or calls[0]["function"]["name"] != tool_name:
                 names = [call["function"]["name"] for call in calls]
                 raise ValueError(
-                    f"Expected exactly one submit_single_value tool call; received {names!r}, "
+                    f"Expected exactly one {tool_name} tool call; received {names!r}, "
                     f"finish_reason={choice.get('finish_reason')!r}. See reply event {reply_id}."
                 )
             call = calls[0]
@@ -58,10 +60,11 @@ async def converse(llm, output, db, tools, prompts) -> str:
             messages.append(reply)
             log(Events.Tool, Events.Tool.STARTED, json.dumps(call))
             try:
-                if not isinstance(arguments, dict) or set(arguments) != {"value"}:
+                if not isinstance(arguments, dict) or set(arguments) != argument_names:
                     result = {"status": "rejected", "code": "invalid_arguments",
                               "prompt": {"role": "user", "content":
-                                  'Call submit_single_value with only {"value": number}.'}}
+                                  f"Call {tool_name} with exactly these numeric fields: "
+                                  + ", ".join(sorted(argument_names)) + "."}}
                 else:
                     result = await tools.submit(arguments)
                 if result["status"] not in ("ok", "rejected"):

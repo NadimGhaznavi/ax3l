@@ -101,7 +101,7 @@ class LoopTests(unittest.IsolatedAsyncioTestCase):
         llm = Mock(url='fixture')
         llm.complete.side_effect = [reply(.002), reply(.003)]
         db = Mock()
-        tools = Mock(definition={'type': 'function'})
+        tools = Mock(definition={'function': {'name': 'submit_single_value', 'parameters': {'properties': {'value': {}}}}})
         tools.submit = AsyncMock(side_effect=[{'status': 'rejected', 'prompt': {'role': 'user', 'content': 'Duplicate value'}}, {'status': 'ok', 'run_id': 'next'}])
         self.assertEqual(await converse(llm, Path('/tmp'), db, tools, [Prompt('initial')]), 'next')
         first, second = [json.loads(call.args[0]) for call in llm.complete.call_args_list]
@@ -121,7 +121,7 @@ class LoopTests(unittest.IsolatedAsyncioTestCase):
                 prose = {'role': 'assistant', 'content': 'Try increasing the learning rate.', **tool_fields}
                 llm.complete.return_value = (200, '', json.dumps({'choices': [
                     {'message': prose, 'finish_reason': 'stop'}]}).encode())
-                tools = Mock(definition={'type': 'function'})
+                tools = Mock(definition={'function': {'name': 'submit_single_value', 'parameters': {'properties': {'value': {}}}}})
                 tools.submit = AsyncMock()
                 with self.assertRaisesRegex(ValueError, r"received \[\], finish_reason='stop'. See reply event"):
                     await converse(llm, Path('/tmp'), db, tools, [Prompt('initial')])
@@ -141,7 +141,7 @@ class LoopTests(unittest.IsolatedAsyncioTestCase):
     async def test_ambiguous_tool_failure_stops_without_resubmission(self):
         llm, db = Mock(url='fixture'), Mock()
         llm.complete.return_value = reply(.003)
-        tools = Mock(definition={})
+        tools = Mock(definition={'function': {'name': 'submit_single_value', 'parameters': {'properties': {'value': {}}}}})
         tools.submit = AsyncMock(side_effect=TimeoutError('timeout'))
         with self.assertRaises(TimeoutError):
             await converse(llm, Path('/tmp'), db, tools, [Prompt('initial')])

@@ -12,6 +12,10 @@ from ax3l.app.snakelab.prompts.Comparison import Comparison
 from ax3l.app.snakelab.prompts.ComparisonSingle import ComparisonSingle
 from ax3l.app.snakelab.prompts.FirstContact import FirstContact
 from ax3l.app.snakelab.prompts.FirstContactSingle import FirstContactSingle
+from ax3l.app.snakelab.prompts.FirstContactEpsilonPair import FirstContactEpsilonPair
+from ax3l.app.snakelab.prompts.FirstContactRewardPair import FirstContactRewardPair
+from ax3l.app.snakelab.prompts.ComparisonEpsilonPair import ComparisonEpsilonPair
+from ax3l.app.snakelab.prompts.ComparisonRewardPair import ComparisonRewardPair
 from ax3l.app.snakelab.prompts.GoldenConfig import GoldenConfig
 from ax3l.constants.DEventCategory import DEventCategory as Events
 from ax3l.constants.DSnakeLab import DSnakeLab
@@ -99,8 +103,13 @@ async def optimize(llm, output, db, endpoint):
             golden_id = rotated_id
             first_contact = False
         parameter = selector.begin()
-        prompts = [Comparison(golden_id, parameter),
-                   FirstContactSingle(parameter) if first_contact else ComparisonSingle(parameter)]
+        if parameter == "epsilon_pair":
+            prompts = [ComparisonEpsilonPair(golden_id), FirstContactEpsilonPair()]
+        elif parameter == "reward_pair":
+            prompts = [ComparisonRewardPair(golden_id), FirstContactRewardPair()]
+        else:
+            prompts = [Comparison(golden_id, parameter),
+                       FirstContactSingle(parameter) if first_contact else ComparisonSingle(parameter)]
         if first_contact:
             prompts.insert(0, FirstContact())
         async with SnakeLabTools(endpoint, parameter) as tools:

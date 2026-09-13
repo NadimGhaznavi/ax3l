@@ -1,19 +1,19 @@
-# Single-parameter optimization
+# Round-robin optimization
 
 The optimizer visits hidden size, sequence length, batch size, learning rate,
-and gamma in schema order, wrapping after gamma. Each conversation may change
-only its assigned parameter. Before asking the LLM, Ax3l stores the parameter
+and gamma in schema order, followed by `epsilon_pair` and `reward_pair`, then
+wraps to hidden size. Each conversation may change only its assigned single or pair. Before asking the LLM, Ax3l stores the parameter
 order and current index as a `round_robin_checkpoint` event in its database.
 Restarting during thinking or validation retries resumes that parameter. An
 accepted proposal advances the next turn once, even if the MCP reply was lost;
 existing startup recovery finishes its simulation and comparison first.
 Golden and seed changes preserve position. A changed schema parameter order
-requires migrating the checkpoint before resuming. Existing databases start at
-the first parameter; wiping events also clears these checkpoints.
+requires resetting experiment events before resuming. There is no upgrade path
+for old five-entry checkpoints. A fresh experiment starts at hidden size.
 
 Seed rotation occurs after `DSnakeLab.SEED_STAGNANT_ROUNDS` (3) complete
-round-robin cycles without a new high score. Each cycle includes all five
-parameters and counts only after its last simulation has been compared.
+round-robin cycles without a new high score. Each cycle includes all seven
+entries and counts only after its last simulation has been compared.
 A new golden configuration resets the count; a cycle containing an improvement
 does not count as stagnant. Rotation increments the seed and reruns the golden
 configuration to establish a fresh score baseline. The count survives restarts.
@@ -97,8 +97,8 @@ serially; external writers to SnakeLab are outside that serialization boundary.
 
 The single-parameter search space is `hidden_size`, `sequence_length`, `batch_size`,
 `learning_rate`, and `gamma`. Each conversation chooses a value for its assigned parameter.
-Reward distance pairs and epsilon initial/decay are excluded, along with seed
-and schema-fixed settings. Comparison histories hold all other settings equal
+Reward distance values and epsilon initial/decay are tuned in their own pair
+entries. Seed and schema-fixed settings cannot be proposed. Comparison histories hold all other settings equal
 to the current golden configuration for each parameter.
 
 ## Conversation snippets
@@ -129,15 +129,19 @@ in a copy, validates the full candidate, and rejects unchanged or previously
 stored configurations. Either value may remain unchanged if the other changes.
 Accepted candidates are submitted once and logged through the shared single/pair
 submission workflow. Backend failures propagate without automatic retries.
-Pair conversation dispatch and round-robin entries are not yet connected.
+Both pair entries are active in the round robin. The conversation dispatcher
+uses the discovered tool name and argument fields for the assigned entry.
 
-### Active single-parameter flow
+### Active optimization flow
 
 The optimization flow sends text-only prompts. The initial conversation uses
-`FirstContact`, `GoldenConfig`, and `FirstContactSingle()`.
+`FirstContact`, `Comparison`, and `FirstContactSingle()`.
 Subsequent conversations use `Comparison` and `ComparisonSingle` to choose the
-next single-parameter change from high-score history. Seed baseline conversations use
-those same two comparison prompts. `LossPlot` and `ComparisonPlot` are no
+next single-parameter change from high-score history. Epsilon turns use
+`ComparisonEpsilonPair` and `FirstContactEpsilonPair`; reward turns use
+`ComparisonRewardPair` and `FirstContactRewardPair`. Each pair turn includes its
+report and pair instructions. After seed rotation, the next entry uses the new
+golden baseline. `LossPlot` and `ComparisonPlot` are no
 longer included, so this flow does not require PNG rendering or a vision model.
 
 `SnakeLab().get_num_sims()` returns the number of rows in Snake Lab's
@@ -154,7 +158,7 @@ then waits until Snake Lab reports idle. With an existing database it skips
 seeding and waits for idle directly.
 
 The loop resolves the current golden configuration and submits proposals through
-`submit_single_value`. Each serialized prompt is stored in a `prompt_sent` entry
+`submit_single_value` or `submit_pair_values`. Each serialized prompt is stored in a `prompt_sent` entry
 linked to its conversation, using the same snapshot sent to the model.
 Invalid or duplicate proposals receive correction prompts. After an accepted
 submission completes, the loop compares high scores, updates the golden

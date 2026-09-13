@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Score Distribution Histogram</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 1.5rem; padding: 1rem; border: 1px solid #347746; background: #050a06; color: #80ff98; font: 15px/1.6 "Courier New", Courier, monospace; }
+    h1 { font-size: 1.5rem; }
+    a { color: #80ff98; text-underline-offset: .2em; }
+    p { color: #a0cbaa; }
+    @media (max-width: 600px) { body { margin: .5rem; padding: .5rem; } }
+  </style>
+</head>
+<body>
+  <a href="/">Back to event log</a>
+  <h1>Score Distribution Histogram</h1>
+  <p>All runs: {{ total }} ({{ scored }} with scores). Oldest half: {{ half }} ({{ older_scored }} with scores).</p>
+  <p>Green shows all runs; orange overlays the oldest half using the same score bins and raw counts.
+    Each run contributes its recorded high score, across all configurations, seeds, and statuses.
+    The oldest half is selected in submission order, rounding down for odd totals.
+    Runs without a score are excluded from the bars. Reload this page to update the data.</p>
+  <main>
+    {% if chart %}
+    {{ chart | safe }}
+    <noscript>Enable JavaScript to view the interactive histogram.</noscript>
+    {% else %}
+    <p>No scores recorded yet.</p>
+    {% endif %}
+  </main>
+</body>
+</html>

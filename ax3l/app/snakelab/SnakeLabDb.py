@@ -1,7 +1,7 @@
 """Read Snake Lab simulation data through AX3L's database manager."""
 
 import json
-from ax3l.app.snakelab.SingleParameters import SINGLE_PARAMETERS
+from ax3l.app.snakelab.SingleParameters import SCHEMA, SINGLE_PARAMETERS
 from ax3l.app.DbMgr import DbMgr
 
 
@@ -106,6 +106,39 @@ class SnakeLabDb:
             ]}
             for initial in sorted(grouped)
         ]
+
+    def get_reward_report(self, golden_run_id: str) -> dict:
+        """Return the full legal distance-reward grid across comparable seeds."""
+        fields = SCHEMA["properties"]["game"]["properties"]["rewards"]["properties"]
+        closer = fields["closer_to_food"]
+        further = fields["further_from_food"]
+        grid = {
+            str(first): {str(second): []
+                         for second in range(further["minimum"], further["maximum"] + 1)}
+            for first in range(closer["minimum"], closer["maximum"] + 1)
+        }
+        rows = self._db.query("""
+            SELECT r.status, r.high_score,
+                   JSON_EXTRACT(r.config, '$.game.rewards.closer_to_food') AS closer_to_food,
+                   JSON_EXTRACT(r.config, '$.game.rewards.further_from_food') AS further_from_food
+            FROM simulation_runs r JOIN simulation_runs g ON g.run_id = %s
+            WHERE JSON_EQUALS(
+                JSON_REMOVE(r.config, '$.seed', '$.game.rewards.closer_to_food', '$.game.rewards.further_from_food'),
+                JSON_REMOVE(g.config, '$.seed', '$.game.rewards.closer_to_food', '$.game.rewards.further_from_food'))
+            ORDER BY r.id
+        """, (golden_run_id,))
+        for row in rows:
+            first = json.loads(row["closer_to_food"])
+            second = json.loads(row["further_from_food"])
+            # Historical configurations outside today's legal grid have no cell.
+            if first not in range(closer["minimum"], closer["maximum"] + 1) or second not in range(further["minimum"], further["maximum"] + 1):
+                continue
+            if row["status"] == "completed" and row["high_score"] is not None:
+                grid[str(int(first))][str(int(second))].append(row["high_score"])
+        for pairs in grid.values():
+            for scores in pairs.values():
+                scores.sort()
+        return grid
 
     def get_parameter_report(self, golden_run_id: str, parameter: str) -> list[dict]:
         path, _ = SINGLE_PARAMETERS[parameter]

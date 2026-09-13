@@ -103,6 +103,31 @@ to the current golden configuration for each parameter.
 
 ## Conversation snippets
 
+### Pair MCP tool
+
+`submit_pair_values(value_1, value_2)` forwards a joint proposal to Ax3l.
+Bind `AX3L_CONVERSATION_PARAMETER` to `epsilon_pair` or `reward_pair`:
+
+| Assignment | value_1 | value_2 |
+| --- | --- | --- |
+| epsilon_pair | epsilon.initial | epsilon.decay |
+| reward_pair | game.rewards.closer_to_food | game.rewards.further_from_food |
+
+The bound tool description includes these mappings and their schema rules.
+The LLM supplies only the two numeric values; the MCP server supplies the pair
+identity. Strings and booleans are rejected. Range, integer constraints for
+rewards, duplicate checks, and simulation submission belong to Ax3l.
+The forwarded ZMQ method is `submit_pair_values`, with payload
+`{"pair": "epsilon_pair", "value_1": 0.96, "value_2": 0.97}`.
+Replies pass through unchanged and transport errors are not retried.
+Unbound sessions permit discovery but reject submissions; single assignments
+reject pair submissions and pair assignments reject single submissions.
+`SnakeLabTools` discovers and calls the tool for its assigned single or pair.
+The Ax3l pair handler, conversation dispatch, and round-robin entries are not
+yet connected, so this tool alone does not enable live pair tuning.
+
+### Active single-parameter flow
+
 The optimization flow sends text-only prompts. The initial conversation uses
 `FirstContact`, `GoldenConfig`, and `FirstContactSingle()`.
 Subsequent conversations use `Comparison` and `ComparisonSingle` to choose the

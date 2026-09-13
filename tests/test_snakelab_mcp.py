@@ -36,12 +36,58 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
         entry = configuration(ROOT)["mcpServers"]["snakelab"]
         async with Client(StdioServerParameters(**entry), read_timeout_seconds=10) as client:
             result = await client.list_tools()
-            self.assertEqual([tool.name for tool in result.tools], ["submit_single_value"])
-            schema = result.tools[0].input_schema
+            tools = {tool.name: tool for tool in result.tools}
+            self.assertEqual(set(tools), {"submit_single_value", "submit_pair_values"})
+            schema = tools["submit_single_value"].input_schema
             self.assertEqual(set(schema["required"]), {"value"})
             self.assertEqual(set(schema["properties"]), {"value"})
             result = await client.call_tool("submit_single_value", {"value": 16})
             self.assertTrue(result.is_error)
+            schema = tools["submit_pair_values"].input_schema
+            self.assertEqual(set(schema["required"]), {"value_1", "value_2"})
+            self.assertEqual(set(schema["properties"]), {"value_1", "value_2"})
+            result = await client.call_tool("submit_pair_values", {"value_1": .96, "value_2": .97})
+            self.assertTrue(result.is_error)
+
+    async def test_pair_tools_bind_assignments_and_forward_replies(self):
+        from ax3l.interface.SnakeLabTools import SnakeLabTools
+        from ax3l.zmq.ZMQServer import ZMQServer
+
+        requests = []
+        reply = {"status": "ok", "run_id": "accepted-run"}
+
+        def handle(message):
+            requests.append(message)
+            return reply
+
+        with ZMQServer("tcp://127.0.0.1:*", handle) as server:
+            for pair, names, values in (
+                ("epsilon_pair", ("epsilon.initial", "epsilon.decay"), (.96, .97)),
+                ("reward_pair", ("game.rewards.closer_to_food", "game.rewards.further_from_food"), (2, -2)),
+            ):
+                async with SnakeLabTools(server.endpoint, pair) as tools:
+                    definition = tools.definition["function"]
+                    self.assertEqual(definition["name"], "submit_pair_values")
+                    self.assertEqual(set(definition["parameters"]["properties"]), {"value_1", "value_2"})
+                    for index, name in enumerate(names, start=1):
+                        self.assertIn(f"value_{index} = {name}", definition["description"])
+                    self.assertIn("minimum", definition["description"])
+                    arguments = dict(zip(("value_1", "value_2"), values))
+                    for response in ({"status": "ok", "run_id": "accepted-run"},
+                                     {"status": "rejected", "code": "invalid_value"}):
+                        reply = response
+                        self.assertEqual(await tools.submit(arguments), response)
+                        self.assertEqual(requests[-1].method, "submit_pair_values")
+                        self.assertEqual(requests[-1].payload, {"pair": pair, **arguments})
+                    count = len(requests)
+                    for invalid in ({"value_1": "2", "value_2": values[1]},
+                                    {"value_1": values[0], "value_2": True},
+                                    {"value_1": values[0]}):
+                        with self.assertRaises(RuntimeError):
+                            await tools.submit(invalid)
+                    self.assertEqual(len(requests), count)
+                    result = await tools._client.call_tool("submit_single_value", {"value": 2})
+                    self.assertTrue(result.is_error)
 
     async def test_mcp_forwards_proposals_and_returns_ax3l_replies(self):
         entry = configuration(ROOT)["mcpServers"]["snakelab"]

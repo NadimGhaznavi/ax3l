@@ -65,11 +65,12 @@
   <main>
     <table aria-label="Event log">
       <thead>
-        <tr><th scope="col">Date</th><th scope="col">Time</th><th scope="col">ID</th><th scope="col">Level</th><th scope="col">Category</th><th scope="col">Event</th><th scope="col">Message</th></tr>
+        <tr><th scope="col">Date</th><th scope="col">Time</th><th scope="col">ID</th><th scope="col">Level</th><th scope="col">Category</th><th scope="col">Event</th><th scope="col" class="source-column" hidden>Source</th><th scope="col">Message</th></tr>
         <tr>
           <td></td><td></td><td></td><td></td>
           <td><select id="category-filter" aria-label="Filter by category"><option value="*">*</option></select></td>
           <td><select id="event-filter" aria-label="Filter by event"><option value="*">*</option></select></td>
+          <td class="source-column" hidden></td>
           <td></td>
         </tr>
       </thead>
@@ -82,6 +83,7 @@
           <td class="metadata" title="{{ event.log_level }}">{{ event.log_level }}</td>
           <td title="{{ event.category }}">{{ event.category }}</td>
           <td title="{{ event.name }}">{{ event_label(event.category, event.name) }}</td>
+          <td class="source-column metadata" hidden>{{ event.source_name or '' }}</td>
           {% if event.name == simulation_events.SUBMITTED and event.category == simulation_events.CATEGORY %}
           <td class="content">Submitted <a href="/simulations/{{ event.process_id }}/config">config</a>.</td>
           {% elif event.prompt_text is defined %}
@@ -121,6 +123,8 @@
       { id: 'category-filter', column: 4, value: '*' },
       { id: 'event-filter', column: 5, value: '*' }
     ];
+    const eventChoices = {{ event_choices | tojson }};
+    const promptLabel = {{ prompt_label | tojson }};
 
     function applyFilters() {
       const rows = main.querySelectorAll('.entry');
@@ -132,23 +136,53 @@
         if (!row.hidden) visible += 1;
       }
       main.querySelector('#no-filter-matches').hidden = rows.length === 0 || visible > 0;
+      const showSource = filters[1].value === promptLabel;
+      for (const cell of main.querySelectorAll('.source-column')) {
+        cell.hidden = !showSource;
+      }
+      for (const cell of main.querySelectorAll('.empty')) {
+        cell.colSpan = showSource ? 8 : 7;
+      }
+    }
+
+    function populateFilter(filter, values) {
+      const select = main.querySelector(`#${filter.id}`);
+      values.delete('*');
+      if (!values.has(filter.value)) filter.value = '*';
+      select.replaceChildren(new Option('*', '*'));
+      for (const value of Array.from(values).sort((a, b) => a.localeCompare(b))) {
+        select.add(new Option(value, value));
+      }
+      select.value = filter.value;
+    }
+
+    function updateEventChoices(preserveSelection = false) {
+      const category = filters[0].value;
+      const values = new Set(category === '*'
+        ? Object.values(eventChoices).flat()
+        : eventChoices[category] || []);
+      // Include historical events that are no longer in the catalog.
+      for (const row of main.querySelectorAll('.entry')) {
+        if (category === '*' || row.cells[4].textContent === category) {
+          values.add(row.cells[5].textContent);
+        }
+      }
+      // Refresh must not clear a selection when its last row ages out.
+      if (preserveSelection && filters[1].value !== '*') values.add(filters[1].value);
+      populateFilter(filters[1], values);
     }
 
     function initializeFilters() {
       const rows = Array.from(main.querySelectorAll('.entry'));
+      const categories = new Set([...Object.keys(eventChoices), ...rows.map(row => row.cells[4].textContent)]);
+      if (filters[0].value !== '*') categories.add(filters[0].value);
+      populateFilter(filters[0], categories);
+      updateEventChoices(true);
       for (const filter of filters) {
         const select = main.querySelector(`#${filter.id}`);
-        const values = new Set(rows.map(row => row.cells[filter.column].textContent));
-        // Keep an active filter even if its last matching entry ages out on refresh.
-        if (filter.value !== '*') values.add(filter.value);
-        values.delete('*');
-        select.replaceChildren(new Option('*', '*'));
-        for (const value of Array.from(values).sort((a, b) => a.localeCompare(b))) {
-          select.add(new Option(value, value));
-        }
-        select.value = filter.value;
         select.addEventListener('change', () => {
           filter.value = select.value;
+          if (filter.id === 'category-filter') updateEventChoices();
           applyFilters();
         });
       }

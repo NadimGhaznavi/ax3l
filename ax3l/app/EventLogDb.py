@@ -13,7 +13,7 @@ class EventLogDb:
         """Return the latest 500 events, newest first."""
         rows = self._db.query("""
             SELECT e.event_id, e.occurred_at, e.name, e.category,
-                   e.log_level, e.process_id, m.content
+                   e.log_level, e.process_id, e.source_name, m.content
             FROM events e
             LEFT JOIN event_messages m USING (event_id)
             ORDER BY e.occurred_at DESC, e.event_id DESC

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.99.10] - 2026-09-13 @ 13:59
+
 - Run the report server with the deployment virtual environment's Python so it can load Plotly and the other installed application dependencies.
 
 ## [0.99.9] - 2026-09-13 @ 13:53

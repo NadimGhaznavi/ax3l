@@ -11,6 +11,7 @@
     header, .server-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem; padding: 1rem; border: 1px solid var(--border); background: #0a140d; }
     h1, .server-bar h2 { margin: 0; font-size: 1.5rem; letter-spacing: .06em; }
     .server-bar { margin-bottom: 1rem; }
+    .experiment-status { flex-direction: column; align-items: flex-start; gap: 0; }
     .note { margin: 1rem 0; padding: .6rem 1rem; border: 1px solid var(--border); color: var(--muted); }
     main { border: 1px solid var(--border); overflow-x: auto; }
     table { width: 100%; table-layout: auto; border-collapse: collapse; }
@@ -34,9 +35,11 @@
   <section class="server-bar" aria-labelledby="snake-lab-status">
     <h2 id="snake-lab-status" role="status">Snake Lab Server: {{ snake_lab_status }}</h2>
   </section>
-  <section class="server-bar" aria-labelledby="experiment-status">
+  <section class="server-bar experiment-status" aria-labelledby="experiment-status">
     <h2 id="experiment-status">Experiment Status</h2>
     <span id="experiment-high-score" role="status">Current Highscore: {{ high_score if high_score is not none else '—' }}</span>
+    <span id="simulations-submitted" role="status">Simulations Submitted: {{ simulations_submitted }}</span>
+    <span id="experiment-cycles" role="status">Experiment Cycles: {{ experiment_cycles }}</span>
   </section>
   <header>
     <h1>Ax3l Event Log</h1>
@@ -160,6 +163,8 @@
         document.querySelector('.note').textContent = page.querySelector('.note').textContent;
         document.querySelector('#snake-lab-status').textContent = page.querySelector('#snake-lab-status').textContent;
         document.querySelector('#experiment-high-score').textContent = page.querySelector('#experiment-high-score').textContent;
+        document.querySelector('#simulations-submitted').textContent = page.querySelector('#simulations-submitted').textContent;
+        document.querySelector('#experiment-cycles').textContent = page.querySelector('#experiment-cycles').textContent;
         main.scrollLeft = scrollLeft;
         window.scrollTo(scrollX, scrollY);
         status.textContent = '';

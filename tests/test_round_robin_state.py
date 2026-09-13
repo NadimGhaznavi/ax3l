@@ -121,8 +121,23 @@ class RoundRobinTests(unittest.TestCase):
         self.db.log('proposal_invalid')
         self.db.log('proposal_accepted', process_id='pending')
         self.assertEqual(EventLogDb(self.db).stagnant_rounds(), 0)
+        self.assertEqual(EventLogDb(self.db).experiment_cycles(), 0)
         self.db.log('configuration_compared', process_id='pending')
         self.assertEqual(EventLogDb(self.db).stagnant_rounds(), 1)
+        self.assertEqual(EventLogDb(self.db).experiment_cycles(), 1)
+
+    def test_experiment_cycles_survive_improvements_seeds_and_restarts(self):
+        self.assertEqual(EventLogDb(self.db).experiment_cycles(), 0)
+        self.db.log('configuration_compared', process_id='uncheckpointed')
+        for turn in range(12):
+            self.complete_turn(str(turn), improved=turn in (2, 4, 8))
+            self.db.log('configuration_compared', process_id=str(turn))
+            if turn == 6:
+                self.db.log('golden_config_seed_incremented', process_id='baseline')
+                self.db.log('golden_config_created', process_id='baseline')
+            self.db.connection.close()
+            self.db = EventDb(self.path)
+            self.assertEqual(EventLogDb(self.db).experiment_cycles(), (turn + 1) // len(self.order))
 
     def test_improvement_on_last_parameter_does_not_count_that_cycle(self):
         for turn in range(10):

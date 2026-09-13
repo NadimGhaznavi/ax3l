@@ -23,7 +23,7 @@ class HighscoreTests(unittest.TestCase):
         line, points = figure['data']
         self.assertEqual(line['x'], [1, 3, 6, 12, 15])
         self.assertEqual(line['y'], [38, 39, 50, 40, 40])
-        self.assertEqual(line['line']['shape'], 'hv')
+        self.assertEqual(line['line']['shape'], 'spline')
         self.assertEqual(points['customdata'][-1][0], 2)
         self.assertEqual(points['x'], [1, 3, 6, 12])
         self.assertIsNone(highscores([], 0)['chart'])

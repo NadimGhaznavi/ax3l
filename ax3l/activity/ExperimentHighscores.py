@@ -17,7 +17,7 @@ def highscores(history: list[dict], total: int) -> dict:
     figure.add_trace(go.Scatter(
         x=x + ([end] if end > x[-1] else []),
         y=y + ([y[-1]] if end > x[-1] else []),
-        mode="lines", line=dict(shape="hv", color="#4c9be8", width=4),
+        mode="lines", line=dict(shape="spline", color="#4c9be8", width=4),
         name="High score", hoverinfo="skip", showlegend=True,
     ))
     figure.add_trace(go.Scatter(

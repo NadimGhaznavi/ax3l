@@ -42,8 +42,7 @@ class ModelServicesTests(unittest.TestCase):
             result = subprocess.run(['bash', '-c', command], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(shlex.split(result.stdout), [
-                str(binary), '--chat-template-file', str(directory / DQwenV.CHAT_TEMPLATE),
-                '--model', str(directory / DQwenV.GGUF),
+                str(binary), '--model', str(directory / DQwenV.GGUF),
                 '--mmproj', str(projector), '-c', str(DQwenV.CONTEXT_SIZE), '--host', '0.0.0.0',
                 '--port', '27770', '--metrics', '--jinja', '--mcp-servers-config', str(directory / 'mcp.json'),
             ])

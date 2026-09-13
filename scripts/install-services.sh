@@ -73,7 +73,6 @@ print(Path(DLlama.MODEL_DIR) / DPhi.GGUF)
 print(Path(DLlama.MODEL_DIR) / DQwenV.GGUF)
 print(Path(DLlama.MODEL_DIR) / DQwenV.MMPROJ)
 print(DQwenV.CONTEXT_SIZE)
-print(DQwenV.CHAT_TEMPLATE)
 PY
 )
     mapfile -t paths <<< "$llm_paths"
@@ -83,7 +82,6 @@ PY
     qwenv_model=${paths[4]}
     qwenv_mmproj=${paths[5]}
     qwenv_context=${paths[6]}
-    qwenv_template="$install_dir/${paths[7]}"
     model=$qwen_model
     if [[ $selected_model == phi ]]; then model=$phi_model; fi
     if [[ $selected_model == qwenv ]]; then
@@ -100,7 +98,7 @@ PY
     }
     qwen_command="$llm_binary --model $qwen_model --host $llm_host --port $llm_port --metrics --jinja --mcp-servers-config $config_dir/mcp.json"
     phi_command="$llm_binary --model $phi_model --host $llm_host --port $llm_port --metrics --jinja --mcp-servers-config $config_dir/mcp.json"
-    qwenv_command="$llm_binary --chat-template-file $qwenv_template --model $qwenv_model --mmproj $qwenv_mmproj -c $qwenv_context --host $llm_host --port $llm_port --metrics --jinja --mcp-servers-config $config_dir/mcp.json"
+    qwenv_command="$llm_binary --model $qwenv_model --mmproj $qwenv_mmproj -c $qwenv_context --host $llm_host --port $llm_port --metrics --jinja --mcp-servers-config $config_dir/mcp.json"
 fi
 
 [[ -d $install_dir && -f $config_dir/database.env ]] || {

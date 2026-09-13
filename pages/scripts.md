@@ -48,6 +48,9 @@ Qwen Vision uses `DQwenV.GGUF`, `DQwenV.MMPROJ`, and a 4096-token context.
 Place both GGUF files in `DLlama.MODEL_DIR` (`/opt/prod/models`) before starting
 `qwenv-server` in production. It uses the shared executable configured by
 `DLlama`, with `--mmproj`, `-c 4096`, and the existing host, port, and metrics options.
+All models use their bundled chat templates with Jinja enabled. The former
+Qwen2.5-VL tool-template override has been removed; use the default Qwen3.5 for
+Snake Lab tool submissions.
 
 To deploy changes, update your checkout to the desired release, then run
 `scripts/upgrade.sh -env dev`, or as root on the target machine,

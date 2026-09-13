@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Remove the Qwen2.5-VL custom tool chat template, missing-tool reminder retries, and extra prose-response warnings in the initial prompt. Use bundled model templates and standard required-tool metadata; missing tool calls now end the conversation with a logged error. Keep validation feedback and submission safety checks.
+
 ## [0.99.0] - 2026-09-13 @ 10:12
 
 - Rename `LearningRateLoop.py` to `SnakeLabLoop.py` and expand proposals to hidden size, sequence length, batch size, learning rate, and gamma. Keep reward-distance and epsilon pairs out of this iteration; use schema-backed single-parameter prompts, tool validation, per-parameter comparison histories, and actual configuration changes in comparison logs.

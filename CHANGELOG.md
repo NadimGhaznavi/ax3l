@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.6] - 2026-09-13 @ 19:36
+
+- Recover proposal monitoring after a Snake Lab restart: read stored terminal results for forgotten runs, compare completed proposals, and skip interrupted proposals while retaining the golden configuration.
+
 ## [1.0.5] - 2026-09-13 @ 17:56
 
 ## [1.0.4] - 2026-09-13 @ 17:46

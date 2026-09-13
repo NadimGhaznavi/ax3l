@@ -9,6 +9,16 @@ from ax3l.app.DbMgr import DbMgr
 from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb
 
 
+class SnakeLabQueryError(RuntimeError):
+    def __init__(self, error):
+        super().__init__(f"Snake Lab query failed: {error}")
+        self.code = error.get("code") if isinstance(error, dict) else None
+
+
+class SimulationUnavailable(RuntimeError):
+    """A run has left the server without a durable terminal result."""
+
+
 class SnakeLab:
     def __init__(self, endpoint: str = DSnakeLab.ENDPOINT):
         self.endpoint = endpoint
@@ -146,7 +156,19 @@ class SnakeLab:
 
     def get_simulation_status(self, run_id: str) -> str:
         UUID(run_id)
-        payload = self._request("simulation.status", {"run_id": run_id})
+        try:
+            payload = self._request("simulation.status", {"run_id": run_id})
+        except SnakeLabQueryError as error:
+            if error.code != "run_not_found":
+                raise
+            # The control server only remembers runs from its current process.
+            result = self.get_run_result(run_id)
+            if result is not None and result["status"] in ("completed", "failed", "cancelled"):
+                return result["status"]
+            raise SimulationUnavailable(
+                f"Simulation {run_id} is unknown to the current Snake Lab server "
+                "and has no stored terminal result."
+            ) from error
         if payload.get("run_id") != run_id or payload.get("state") not in (
             "queued", "running", "paused", "cancelling", "completed", "failed", "cancelled"
         ):
@@ -178,7 +200,7 @@ class SnakeLab:
         if response.get("request_id") != request_id:
             raise ValueError("Snake Lab response request_id does not match")
         if response.get("status") == "error":
-            raise RuntimeError(f"Snake Lab query failed: {response.get('error')}")
+            raise SnakeLabQueryError(response.get("error"))
         if response.get("status") != "ok":
             raise ValueError("Snake Lab response has an invalid status")
         payload = response.get("payload")

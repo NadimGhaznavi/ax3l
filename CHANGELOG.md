@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Reset event and SnakeLab simulation auto-increment counters after a successful database wipe, so new IDs start at 1.
+
 ## [0.99.6] - 2026-09-13 @ 13:01
 
 - Add Category and Event dropdown filters beneath the event log headers, defaulting to `*` (all) and preserving selections during automatic refresh.

@@ -8,7 +8,7 @@ from ax3l.interface.SnakeLab import SnakeLab
 
 
 class Comparison(DynamicPrompt):
-    def __init__(self, golden_run_id: str, latest_run_id: str, current_golden_run_id: str, parameter: str):
+    def __init__(self, current_golden_run_id: str, parameter: str):
         self._current_golden_run_id = current_golden_run_id
         self._parameter = parameter
         self._snake = SnakeLab()

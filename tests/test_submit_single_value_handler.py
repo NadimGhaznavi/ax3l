@@ -29,6 +29,7 @@ class SubmitSingleValueHandlerTests(unittest.TestCase):
             with self.subTest(proposal=proposal):
                 result = self.handler.submit(proposal)
                 self.assertEqual(result['code'], 'invalid_value')
+                self.assertEqual(result['source_name'], 'InvalidValue')
                 self.assertIn('Invalid value:', result['prompt']['content'])
         self.snake.submit_simulation.assert_not_called()
         self.events.current_golden_config.assert_not_called()
@@ -37,6 +38,7 @@ class SubmitSingleValueHandlerTests(unittest.TestCase):
         rate = self.baseline['training']['learning_rate']
         result = self.handler.submit({'parameter': 'learning_rate', 'value': rate})
         self.assertEqual(result['code'], 'duplicate_config')
+        self.assertEqual(result['source_name'], 'NoDupes')
         self.snake.is_config_unique.assert_not_called()
         self.snake.is_config_unique.return_value = False
         result = self.handler.submit({'parameter': 'learning_rate', 'value': 0.003})

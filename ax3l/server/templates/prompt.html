@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Prompt #{{ event.event_id }} · Ax3l</title>
+  <title>Prompt{% if event.source_name %} ({{ event.source_name }}){% endif %}: #{{ event.event_id }} · Ax3l</title>
   <style>
     :root { color-scheme: dark; --green: #80ff98; --muted: #a0cbaa; --border: #347746; }
     * { box-sizing: border-box; }
@@ -26,7 +26,7 @@
   </style>
 </head>
 <body>
-  <header><h1>Prompt #{{ event.event_id }}</h1><a href="/">Back to event log</a></header>
+  <header><h1>Prompt{% if event.source_name %} ({{ event.source_name }}){% endif %}: #{{ event.event_id }}</h1><a href="/">Back to event log</a></header>
   <main>
     <section>
       <h2>Prompt sent to the LLM</h2>

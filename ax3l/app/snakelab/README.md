@@ -1,19 +1,19 @@
-# Single-parameter optimization
+# Round-robin optimization
 
 The optimizer visits hidden size, sequence length, batch size, learning rate,
-and gamma in schema order, wrapping after gamma. Each conversation may change
-only its assigned parameter. Before asking the LLM, Ax3l stores the parameter
+and gamma in schema order, followed by `epsilon_pair` and `reward_pair`, then
+wraps to hidden size. Each conversation may change only its assigned single or pair. Before asking the LLM, Ax3l stores the parameter
 order and current index as a `round_robin_checkpoint` event in its database.
 Restarting during thinking or validation retries resumes that parameter. An
 accepted proposal advances the next turn once, even if the MCP reply was lost;
 existing startup recovery finishes its simulation and comparison first.
 Golden and seed changes preserve position. A changed schema parameter order
-requires migrating the checkpoint before resuming. Existing databases start at
-the first parameter; wiping events also clears these checkpoints.
+requires resetting experiment events before resuming. There is no upgrade path
+for old five-entry checkpoints. A fresh experiment starts at hidden size.
 
 Seed rotation occurs after `DSnakeLab.SEED_STAGNANT_ROUNDS` (3) complete
-round-robin cycles without a new high score. Each cycle includes all five
-parameters and counts only after its last simulation has been compared.
+round-robin cycles without a new high score. Each cycle includes all seven
+entries and counts only after its last simulation has been compared.
 A new golden configuration resets the count; a cycle containing an improvement
 does not count as stagnant. Rotation increments the seed and reruns the golden
 configuration to establish a fresh score baseline. The count survives restarts.
@@ -25,8 +25,10 @@ stdio. Register domain tool functions in `tools/server.py` with `@mcp.tool()`.
 It exposes `submit_single_value(value)` through `SubmitSingleValue`.
 Ax3l starts a dedicated MCP session for each conversation, binding its parameter
 through `AX3L_CONVERSATION_PARAMETER`. The LLM supplies only a JSON integer or number.
-The tool description contains only the assigned parameter’s meaning and schema rules.
-Conversation prompts show only its golden value, high score, and comparable history. MCP rejects strings and booleans as numeric values.
+The tool description identifies the assigned parameter and includes its schema rules.
+FirstContactSingle and ComparisonSingle include the assigned parameter’s schema description
+before requesting a value. Other conversation prompts show its golden value, high score,
+and comparable history. MCP rejects strings and booleans as numeric values.
 Parameter existence, permitted ranges, duplicates, and submission decisions
 belong to Ax3l, not the MCP tool.
 
@@ -81,13 +83,12 @@ name, and JSON-schema constraints before building a candidate from the golden
 configuration. It changes only the selected parameter. A legal but unchanged
 configuration is rejected; `SnakeLab.is_config_unique(config)` then checks all
 stored runs through `SnakeLabDb`, regardless of status or project version.
-Equality compares the full JSON configuration, including seed, while ignoring
-object key order and equivalent numeric representations. This uses MariaDB's
-`JSON_EQUALS` (MariaDB 10.7 or newer).
+Equality compares all 26 numeric columns in `configurations`, including seed,
+while ignoring object key order and equivalent numeric representations.
 
 Illegal values return `status: rejected`, `code: invalid_value`, and an
 `InvalidValue` prompt. Duplicates return `code: duplicate_config` and a
-`NoDupesSingle` prompt. These prompt messages travel back in the MCP result;
+`NoDupes` prompt. These prompt messages travel back in the MCP result;
 the handler does not start a separate LLM conversation. Accepted candidates
 return `status: ok` and their submitted `run_id`, with proposal and submission
 events logged. Golden selection is unchanged. The listener handles requests
@@ -95,17 +96,51 @@ serially; external writers to SnakeLab are outside that serialization boundary.
 
 The single-parameter search space is `hidden_size`, `sequence_length`, `batch_size`,
 `learning_rate`, and `gamma`. Each conversation chooses a value for its assigned parameter.
-Reward distance pairs and epsilon initial/decay are excluded, along with seed
-and schema-fixed settings. Comparison histories hold all other settings equal
+Reward distance values and epsilon initial/decay are tuned in their own pair
+entries. Seed and schema-fixed settings cannot be proposed. Comparison histories hold all other settings equal
 to the current golden configuration for each parameter.
 
 ## Conversation snippets
 
+### Pair MCP tool
+
+`submit_pair_values(value_1, value_2)` forwards a joint proposal to Ax3l.
+Bind `AX3L_CONVERSATION_PARAMETER` to `epsilon_pair` or `reward_pair`:
+
+| Assignment | value_1 | value_2 |
+| --- | --- | --- |
+| epsilon_pair | epsilon.initial | epsilon.decay |
+| reward_pair | game.rewards.closer_to_food | game.rewards.further_from_food |
+
+The bound tool description includes these mappings and their schema rules.
+The LLM supplies only the two numeric values; the MCP server supplies the pair
+identity. Strings and booleans are rejected. Range, integer constraints for
+rewards, duplicate checks, and simulation submission belong to Ax3l.
+The forwarded ZMQ method is `submit_pair_values`, with payload
+`{"pair": "epsilon_pair", "value_1": 0.96, "value_2": 0.97}`.
+Replies pass through unchanged and transport errors are not retried.
+Unbound sessions permit discovery but reject submissions; single assignments
+reject pair submissions and pair assignments reject single submissions.
+`SnakeLabTools` discovers and calls the tool for its assigned single or pair.
+Ax3l dispatches this method to `SubmitPairValuesHandler`. It validates both
+values before reading the golden configuration, changes only the assigned pair
+in a copy, validates the full candidate, and rejects unchanged or previously
+stored configurations. Either value may remain unchanged if the other changes.
+Accepted candidates are submitted once and logged through the shared single/pair
+submission workflow. Backend failures propagate without automatic retries.
+Both pair entries are active in the round robin. The conversation dispatcher
+uses the discovered tool name and argument fields for the assigned entry.
+
+### Active optimization flow
+
 The optimization flow sends text-only prompts. The initial conversation uses
-`FirstContact`, `GoldenConfig`, and `FirstContactSingle()`.
+`FirstContact`, `Comparison`, and `FirstContactSingle()`.
 Subsequent conversations use `Comparison` and `ComparisonSingle` to choose the
-next single-parameter change from high-score history. Seed baseline conversations use
-those same two comparison prompts. `LossPlot` and `ComparisonPlot` are no
+next single-parameter change from high-score history. Epsilon turns use
+`ComparisonEpsilonPair` and `FirstContactEpsilonPair`; reward turns use
+`ComparisonRewardPair` and `FirstContactRewardPair`. Each pair turn includes its
+report and pair instructions. After seed rotation, the next entry uses the new
+golden baseline. `LossPlot` and `ComparisonPlot` are no
 longer included, so this flow does not require PNG rendering or a vision model.
 
 `SnakeLab().get_num_sims()` returns the number of rows in Snake Lab's
@@ -116,13 +151,22 @@ SnakeLab credentials are needed. Each call opens and closes its connection witho
 initializing tables. Simulation submissions still go through SnakeLab's ZMQ API.
 
 At startup, `main-loop.py` checks the simulation count. If it is zero, it
-submits the JSON spec's default configuration once and records the submission
-and golden creation. It polls the submitted run through its terminal status,
-then waits until Snake Lab reports idle. With an existing database it skips
-seeding and waits for idle directly.
+submits the JSON spec's default configuration once and records the submission.
+It polls the run through its terminal status and accepts the initial golden config
+once its completed score is available. A restart before that acceptance resumes
+the recorded initial submission. With an existing golden config it skips seeding.
+
+The report server's `/experiment-highscores` page plots accepted config scores
+against the total simulation count at acceptance. The `experiment_highscores`
+table stores each score, seed, and count atomically with its golden creation event;
+the event supplies the run reference and reason. Seed rotation records the new
+baseline even when its score drops. The step line remains flat across unsuccessful
+or pending submissions, extending to the current submission count. The page uses
+self-contained Plotly JavaScript; reload it to update. A fresh installation starts
+an empty history, and wiping events also deletes their score snapshots.
 
 The loop resolves the current golden configuration and submits proposals through
-`submit_single_value`. Each serialized prompt is stored in a `prompt_sent` entry
+`submit_single_value` or `submit_pair_values`. Each serialized prompt is stored in a `prompt_sent` entry
 linked to its conversation, using the same snapshot sent to the model.
 Invalid or duplicate proposals receive correction prompts. After an accepted
 submission completes, the loop compares high scores, updates the golden

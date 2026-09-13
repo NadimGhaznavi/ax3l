@@ -18,6 +18,7 @@ class MainLoopTests(unittest.TestCase):
             with self.subTest(enabled=enabled), tempfile.TemporaryDirectory() as folder:
                 output = Path(folder) / "snakelab"
                 db = Mock()
+                db.query.return_value = [{"process_id": "golden", "reason": "Initial"}]
                 llm = Mock(url="http://example/v1/chat/completions")
                 optimize = Mock()
                 with patch.object(DAx3l, "RAW_LOGS_ENABLED", enabled), patch.dict(main.__globals__, {"DbMgr": lambda: db, "LLM": lambda url: llm, "run_optimization": optimize}), patch("ax3l.interface.SnakeLab.SnakeLab.get_num_sims", return_value=1), patch("sys.stdout", new_callable=io.StringIO):

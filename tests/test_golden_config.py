@@ -19,6 +19,7 @@ class GoldenConfigTests(unittest.TestCase):
                        {"training": {"learning_rate": 0.003}, "seed": 1970}]
             snake.return_value.get_config.side_effect = configs
             prompt = GoldenConfig(Mock())
+            self.assertEqual(prompt.source_name, "GoldenConfig")
             self.assertEqual(prompt.run_id, "first-run")
             self.assertIsInstance(prompt, DynamicPrompt)
             self.assertIn("Seeded database with default config.", prompt.to_md())

@@ -94,8 +94,9 @@ The `configurations` table stores one row per accepted run, linked to
 schema, replacing dots with underscores: `training.learning_rate` becomes
 `training_learning_rate`, and `game.rewards.food` becomes `game_rewards_food`.
 `seed` uses `BIGINT UNSIGNED`; other integers use `INT UNSIGNED` and numbers
-use `DOUBLE`. Configuration and run creation commit together. The original
-`simulation_runs.config` JSON remains available.
+use `DOUBLE`. Configuration and run creation commit together. AX3L reconstructs
+nested configurations from these columns for lookups and uses them directly for
+duplicate checks and tuning reports.
 
 Repeated configurations have separate rows for each run. Join to run status
 when searching completed experiments:

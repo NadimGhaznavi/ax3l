@@ -10,6 +10,7 @@ import traceback
 
 from ax3l.app.snakelab.SnakeLabLoop import run_optimization
 from ax3l.app.DbMgr import DbMgr
+from ax3l.app.EventLogDb import EventLogDb
 from ax3l.app.ConfigurationLog import ConfigurationLog
 from ax3l.app.snakelab.GenerateDefaultConfig import GenerateDefaultConfig
 from ax3l.constants.DEventCategory import DEventCategory
@@ -24,15 +25,22 @@ def initialize_simulation(db: DbMgr) -> None:
     """Submit the first simulation and wait for its cycle to finish."""
     snake = SnakeLab()
     if snake.get_num_sims() != 0:
-        return
-    run_id = snake.submit_simulation(GenerateDefaultConfig().run())
-    submitted_id = db.log(
-        DEventCategory.SnakeLab.SUBMITTED, DEventCategory.SnakeLab.CATEGORY, "INFO", "Submitted config.",
-        process_id=run_id,
-    )
-    ConfigurationLog(db).golden_config_created(
-        run_id, reason="Seeded database with default config.", parent_event_id=submitted_id,
-    )
+        if EventLogDb(db).current_golden_config() is not None:
+            return
+        # Finish the initial baseline after a restart before its acceptance.
+        rows = db.query("""
+            SELECT event_id, process_id FROM events
+            WHERE category = %s AND name = %s ORDER BY event_id LIMIT 1
+        """, (DEventCategory.SnakeLab.CATEGORY, DEventCategory.SnakeLab.SUBMITTED))
+        if not rows:
+            raise RuntimeError("Stored simulations have no initial submission event")
+        run_id, submitted_id = rows[0]["process_id"], rows[0]["event_id"]
+    else:
+        run_id = snake.submit_simulation(GenerateDefaultConfig().run())
+        submitted_id = db.log(
+            DEventCategory.SnakeLab.SUBMITTED, DEventCategory.SnakeLab.CATEGORY, "INFO", "Submitted config.",
+            process_id=run_id,
+        )
     started = False
     while True:
         time.sleep(DSnakeLab.STATUS_POLL_SECONDS)
@@ -50,6 +58,15 @@ def initialize_simulation(db: DbMgr) -> None:
                 f"Simulation {state} before running status was observed.",
                 process_id=run_id, parent_event_id=submitted_id,
             )
+            if state == "completed":
+                result = snake.get_run_result(run_id)
+                if result is None or result["high_score"] is None:
+                    raise ValueError("Initial baseline requires a recorded high score")
+                ConfigurationLog(db).golden_config_created(
+                    run_id, reason="Seeded database with default config.", parent_event_id=submitted_id,
+                    experiment_score={"simulations": snake.get_num_sims(), "score": result["high_score"],
+                                      "seed": result["config"]["seed"]},
+                )
             return
 
 

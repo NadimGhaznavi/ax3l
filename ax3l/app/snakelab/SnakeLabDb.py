@@ -1,8 +1,47 @@
 """Read Snake Lab simulation data through AX3L's database manager."""
 
-import json
-from ax3l.app.snakelab.SingleParameters import SINGLE_PARAMETERS
+from ax3l.app.snakelab.SingleParameters import SCHEMA, SINGLE_PARAMETERS
 from ax3l.app.DbMgr import DbMgr
+
+
+def _configuration_fields(node, path=()):
+    for name, field in node["properties"].items():
+        parts = path + (name,)
+        if field["type"] == "object":
+            yield from _configuration_fields(field, parts)
+        else:
+            yield "_".join(parts), parts, field["type"]
+
+
+CONFIGURATION_FIELDS = tuple(_configuration_fields(SCHEMA))
+CONFIGURATION_COLUMNS = ", ".join(column for column, _, _ in CONFIGURATION_FIELDS)
+
+
+def _config_from_row(row):
+    config = {}
+    for column, path, kind in CONFIGURATION_FIELDS:
+        target = config
+        for part in path[:-1]:
+            target = target.setdefault(part, {})
+        target[path[-1]] = int(row[column]) if kind == "integer" else float(row[column])
+    return config
+
+
+def _config_values(config):
+    values = []
+    for _, path, _ in CONFIGURATION_FIELDS:
+        value = config
+        for part in path:
+            value = value[part]
+        values.append(value)
+    return tuple(values)
+
+
+def _comparable(excluded):
+    return " AND ".join(
+        f"c.{column} = g.{column}"
+        for column, _, _ in CONFIGURATION_FIELDS if column not in excluded
+    )
 
 
 class SnakeLabDb:
@@ -27,39 +66,33 @@ class SnakeLabDb:
 
     def get_config(self, run_id: str) -> dict | None:
         rows = self._db.query(
-            "SELECT config FROM simulation_runs WHERE run_id = %s", (run_id,)
+            f"SELECT {CONFIGURATION_COLUMNS} FROM configurations WHERE run_id = %s", (run_id,)
         )
-        return json.loads(rows[0]["config"]) if rows else None
+        return _config_from_row(rows[0]) if rows else None
 
     def is_config_unique(self, config: dict) -> bool:
-        """Compare the full config across all runs, independent of JSON key order."""
-        rows = self._db.query(
-            "SELECT 1 FROM simulation_runs WHERE JSON_EQUALS(config, %s) LIMIT 1",
-            (json.dumps(config, allow_nan=False),),
-        )
-        return not rows
+        """Compare all configuration values across every run and status."""
+        return self.find_config_run(config) is None
 
     def get_run_result(self, run_id: str) -> dict | None:
         rows = self._db.query(
-            "SELECT run_id, status, high_score, config FROM simulation_runs WHERE run_id = %s",
+            "SELECT r.run_id, r.status, r.high_score, c.* FROM simulation_runs r "
+            "JOIN configurations c ON c.run_id = r.run_id WHERE r.run_id = %s",
             (run_id,),
         )
         if not rows:
             return None
-        result = rows[0]
-        result["config"] = json.loads(result["config"])
-        return result
+        row = rows[0]
+        return {**{key: row[key] for key in ("run_id", "status", "high_score")},
+                "config": _config_from_row(row)}
 
     def get_learning_rate_history(self) -> list[dict]:
-        rows = self._db.query("""
-            SELECT run_id, status, high_score,
-                   JSON_EXTRACT(config, '$.training.learning_rate') AS learning_rate
-            FROM simulation_runs
-            ORDER BY JSON_EXTRACT(config, '$.training.learning_rate') + 0, id
+        return self._db.query("""
+            SELECT r.run_id, r.status, r.high_score,
+                   c.training_learning_rate AS learning_rate
+            FROM simulation_runs r JOIN configurations c ON c.run_id = r.run_id
+            ORDER BY c.training_learning_rate, r.id
         """)
-        for row in rows:
-            row["learning_rate"] = json.loads(row["learning_rate"])
-        return rows
 
     def get_episode_losses(self, run_id: str) -> list[tuple[int, float | None]]:
         """Read losses in episode order, preserving episodes with no training loss."""
@@ -70,29 +103,92 @@ class SnakeLabDb:
         return [(row["episode"], row["loss"]) for row in rows]
 
     def find_config_run(self, config: dict) -> str | None:
-        rows = self._db.query("SELECT run_id FROM simulation_runs WHERE JSON_EQUALS(config, %s) ORDER BY id DESC LIMIT 1",
-                              (json.dumps(config, allow_nan=False),))
+        conditions = " AND ".join(f"c.{column} = %s" for column, _, _ in CONFIGURATION_FIELDS)
+        rows = self._db.query(
+            "SELECT r.run_id FROM simulation_runs r JOIN configurations c ON c.run_id = r.run_id "
+            f"WHERE {conditions} ORDER BY r.id DESC LIMIT 1", _config_values(config)
+        )
         return rows[0]["run_id"] if rows else None
 
     def get_learning_rate_report(self, golden_run_id: str) -> list[dict]:
         return self.get_parameter_report(golden_run_id, "learning_rate")
 
+    def get_epsilon_report(self, golden_run_id: str) -> list[dict]:
+        """Group comparable epsilon pairs, including gaps in observed values."""
+        conditions = _comparable({"seed", "epsilon_initial", "epsilon_decay"})
+        rows = self._db.query(f"""
+            SELECT r.status, r.high_score,
+                   c.epsilon_initial AS initial, c.epsilon_decay AS decay
+            FROM simulation_runs r JOIN configurations c ON c.run_id = r.run_id
+            JOIN configurations g ON g.run_id = %s
+            WHERE {conditions}
+            ORDER BY c.epsilon_initial, c.epsilon_decay, r.id
+        """, (golden_run_id,))
+        grouped = {}
+        decays = set()
+        for row in rows:
+            initial = row["initial"]
+            decay = row["decay"]
+            decays.add(decay)
+            scores = grouped.setdefault(initial, {}).setdefault(decay, [])
+            if row["status"] == "completed" and row["high_score"] is not None:
+                scores.append(row["high_score"])
+        return [
+            {"initial": initial, "pairs": [
+                {"decay": decay, "scores": sorted(grouped[initial].get(decay, []))}
+                for decay in sorted(decays)
+            ]}
+            for initial in sorted(grouped)
+        ]
+
+    def get_reward_report(self, golden_run_id: str) -> dict:
+        """Return the full legal distance-reward grid across comparable seeds."""
+        fields = SCHEMA["properties"]["game"]["properties"]["rewards"]["properties"]
+        closer = fields["closer_to_food"]
+        further = fields["further_from_food"]
+        grid = {
+            str(first): {str(second): []
+                         for second in range(further["minimum"], further["maximum"] + 1)}
+            for first in range(closer["minimum"], closer["maximum"] + 1)
+        }
+        conditions = _comparable({"seed", "game_rewards_closer_to_food", "game_rewards_further_from_food"})
+        rows = self._db.query(f"""
+            SELECT r.status, r.high_score,
+                   c.game_rewards_closer_to_food AS closer_to_food,
+                   c.game_rewards_further_from_food AS further_from_food
+            FROM simulation_runs r JOIN configurations c ON c.run_id = r.run_id
+            JOIN configurations g ON g.run_id = %s
+            WHERE {conditions}
+            ORDER BY r.id
+        """, (golden_run_id,))
+        for row in rows:
+            first = row["closer_to_food"]
+            second = row["further_from_food"]
+            # Historical configurations outside today's legal grid have no cell.
+            if first not in range(closer["minimum"], closer["maximum"] + 1) or second not in range(further["minimum"], further["maximum"] + 1):
+                continue
+            if row["status"] == "completed" and row["high_score"] is not None:
+                grid[str(int(first))][str(int(second))].append(row["high_score"])
+        for pairs in grid.values():
+            for scores in pairs.values():
+                scores.sort()
+        return grid
+
     def get_parameter_report(self, golden_run_id: str, parameter: str) -> list[dict]:
         path, _ = SINGLE_PARAMETERS[parameter]
-        json_path = "$." + ".".join(path)
+        column = "_".join(path)
+        conditions = _comparable({"seed", column})
         rows = self._db.query(f"""
             SELECT r.run_id, r.status, r.high_score,
-                   JSON_EXTRACT(r.config, '{json_path}') AS {parameter},
-                   JSON_EQUALS(JSON_EXTRACT(r.config, '$.seed'),
-                               JSON_EXTRACT(g.config, '$.seed')) AS current_seed
-            FROM simulation_runs r JOIN simulation_runs g ON g.run_id = %s
-            WHERE JSON_EQUALS(JSON_REMOVE(r.config, '$.seed', '{json_path}'),
-                              JSON_REMOVE(g.config, '$.seed', '{json_path}'))
-            ORDER BY JSON_EXTRACT(r.config, '{json_path}') + 0, r.id
+                   c.{column} AS {parameter}, c.seed = g.seed AS current_seed
+            FROM simulation_runs r JOIN configurations c ON c.run_id = r.run_id
+            JOIN configurations g ON g.run_id = %s
+            WHERE {conditions}
+            ORDER BY c.{column}, r.id
         """, (golden_run_id,))
         grouped = {}
         for row in rows:
-            value = json.loads(row[parameter])
+            value = row[parameter]
             entry = grouped.setdefault(value, {parameter: value, "results": [], "history": []})
             if row["current_seed"]:
                 entry["results"].append({key: row[key] for key in ("run_id", "status", "high_score")})

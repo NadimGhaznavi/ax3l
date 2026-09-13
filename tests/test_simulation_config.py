@@ -3,7 +3,8 @@ from datetime import datetime
 import unittest
 from unittest.mock import Mock, patch
 
-from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb
+from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb, CONFIGURATION_COLUMNS, CONFIGURATION_FIELDS, _config_values
+from ax3l.app.snakelab.GenerateDefaultConfig import GenerateDefaultConfig
 from ax3l.interface.SnakeLab import SnakeLab
 from ax3l.server.ReportingServer import make_server
 
@@ -47,11 +48,12 @@ class SimulationControlTests(unittest.TestCase):
     def test_configuration_lookup_uses_dal_and_closes_connection(self):
         with patch("ax3l.interface.SnakeLab.DbMgr") as factory:
             db = factory.return_value
-            db.query.return_value = [{"config": '{"seed":1970}'}]
-            self.assertEqual(SnakeLab().get_config(RUN_ID), {"seed": 1970})
+            config = GenerateDefaultConfig().run()
+            db.query.return_value = [dict(zip((c for c, _, _ in CONFIGURATION_FIELDS), _config_values(config)))]
+            self.assertEqual(SnakeLab().get_config(RUN_ID), config)
             factory.assert_called_once_with(database="snakelab", initialize_event_tables=False)
             db.query.assert_called_once_with(
-                "SELECT config FROM simulation_runs WHERE run_id = %s", (RUN_ID,),
+                f"SELECT {CONFIGURATION_COLUMNS} FROM configurations WHERE run_id = %s", (RUN_ID,),
             )
             db.close.assert_called_once()
             db.query.side_effect = RuntimeError("unavailable")
@@ -104,7 +106,11 @@ class ConfigPageTests(unittest.TestCase):
                      process_id=RUN_ID)
         with patch("ax3l.server.ReportingServer.DbMgr"), patch(
             "ax3l.server.ReportingServer.EventLogDb"
-        ) as log, patch("ax3l.server.ReportingServer.SnakeLab.is_simulation_running", return_value=True):
+        ) as log, patch("ax3l.server.ReportingServer.SnakeLab") as snake:
+            snake.return_value.is_simulation_running.return_value = True
+            snake.return_value.get_high_score.return_value = 37
+            snake.return_value.get_num_sims.return_value = 1
+            log.return_value.experiment_cycles.return_value = 0
             log.return_value.recent.return_value = [event]
             _, page = self.request("/")
         self.assertIn(f'Submitted <a href="/simulations/{RUN_ID}/config">config</a>.', page)

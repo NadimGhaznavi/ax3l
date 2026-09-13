@@ -21,7 +21,7 @@ def distribution(scores: list[int | None]) -> dict:
             figure.add_trace(go.Histogram(
                 x=values, name=name, xbins=bins, bingroup="scores",
                 histfunc="count", marker_color=color, opacity=.85,
-                marker_line=dict(color="#101923", width=1),
+                marker_line=dict(color="#101923", width=4),
                 hovertemplate="Score: %{x}<br>Runs: %{y}<extra>%{fullData.name}</extra>",
             ))
         figure.update_layout(

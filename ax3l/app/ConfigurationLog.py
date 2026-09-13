@@ -14,6 +14,7 @@ class ConfigurationLog:
         *,
         reason: str,
         parent_event_id: int | None = None,
+        experiment_score: dict | None = None,
     ) -> int:
         """Record creation with its comparison or initial-seeding reason."""
         if not isinstance(reason, str) or not reason.strip():
@@ -22,4 +23,5 @@ class ConfigurationLog:
         return self._db.log(
             category.GOLDEN_CREATED, category.CATEGORY, "INFO", reason,
             process_id=run_id, parent_event_id=parent_event_id,
+            **({"experiment_score": experiment_score} if experiment_score is not None else {}),
         )

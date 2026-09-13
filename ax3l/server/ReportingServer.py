@@ -14,6 +14,7 @@ from ax3l.app.EventLogDb import EventLogDb
 from ax3l.activity.ReplyReport import fields, reply_content
 from ax3l.activity.PromptReport import parts, summary
 from ax3l.activity.ScoreDistribution import distribution
+from ax3l.activity.ExperimentHighscores import highscores
 from ax3l.constants.DReportMgr import DReportMgr
 from ax3l.interface.SnakeLab import SnakeLab
 
@@ -33,6 +34,21 @@ def make_server(host: str, port: int) -> HTTPServer:
             if self.path == "/health":
                 body = b'{"status":"ok","service":"reporting-server","mode":"events"}'
                 content_type = "application/json"
+            elif self.path == "/experiment-highscores":
+                try:
+                    db = DbMgr()
+                    try:
+                        history = EventLogDb(db).experiment_highscores()
+                    finally:
+                        db.close()
+                    body = templates.get_template("experiment_highscores.html").render(
+                        **highscores(history, SnakeLab().get_num_sims())
+                    ).encode("utf-8")
+                    content_type = "text/html; charset=utf-8"
+                except Exception:
+                    traceback.print_exc()
+                    self.send_error(500, "Unable to load experiment highscores")
+                    return
             elif self.path == "/score-distribution":
                 try:
                     body = templates.get_template("score_distribution.html").render(

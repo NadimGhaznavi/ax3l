@@ -11,7 +11,7 @@ from ax3l.app.snakelab.SingleParameters import SINGLE_PARAMETERS
 from ax3l.app.DbMgr import DbMgr
 from ax3l.app.EventLogDb import EventLogDb
 from ax3l.app.snakelab.prompts.InvalidValue import InvalidValue
-from ax3l.app.snakelab.prompts.NoDupesSIngle import NoDupesSingle
+from ax3l.app.snakelab.prompts.NoDupes import NoDupes
 from ax3l.constants.DEventCategory import DEventCategory
 from ax3l.interface.SnakeLab import SnakeLab
 
@@ -24,14 +24,14 @@ class SubmitSingleValueHandler:
 
     def _reject(self, reason: str, *, duplicate: bool = False) -> dict:
         category = DEventCategory.Configuration
-        prompt = NoDupesSingle(reason) if duplicate else InvalidValue(reason)
+        prompt = NoDupes(reason) if duplicate else InvalidValue(reason)
         self._db.log(
             category.PROPOSAL_DUPLICATE if duplicate else category.PROPOSAL_INVALID,
             category.CATEGORY, "INFO", prompt.to_md(),
         )
         return {"status": "rejected", "reason": reason,
                 "code": "duplicate_config" if duplicate else "invalid_value",
-                "prompt": json.loads(prompt.to_json())}
+                "prompt": json.loads(prompt.to_json()), "source_name": prompt.source_name}
 
     def submit(self, payload: dict) -> dict:
         if set(payload) != {"parameter", "value"}:
@@ -54,6 +54,10 @@ class SubmitSingleValueHandler:
         if definition["type"] == "integer":
             value = int(value)
 
+        return self._submit_changes([(path, value)], f"{parameter}: {value}")
+
+    def _submit_changes(self, changes: list, description: str) -> dict:
+        """Apply validated values together and submit one unique configuration."""
         golden = EventLogDb(self._db).current_golden_config()
         if golden is None:
             raise RuntimeError("No golden configuration has been created")
@@ -61,10 +65,11 @@ class SubmitSingleValueHandler:
         if baseline is None:
             raise RuntimeError("The golden configuration's run was not found")
         candidate = deepcopy(baseline)
-        node = candidate
-        for key in path[:-1]:
-            node = node[key]
-        node[path[-1]] = value
+        for path, value in changes:
+            node = candidate
+            for key in path[:-1]:
+                node = node[key]
+            node[path[-1]] = value
         # A broken stored baseline is a server/data error, not a bad proposal.
         Draft202012Validator(self._schema).validate(candidate)
         if candidate == baseline:
@@ -75,7 +80,7 @@ class SubmitSingleValueHandler:
         run_id = self._snake.submit_simulation(candidate)
         category = DEventCategory.Configuration
         accepted_id = self._db.log(category.PROPOSAL_ACCEPTED, category.CATEGORY, "INFO",
-                                   f"{parameter}: {value}", process_id=run_id)
+                                   description, process_id=run_id)
         category = DEventCategory.SnakeLab
         self._db.log(category.SUBMITTED, category.CATEGORY, "INFO", "Submitted config.",
                      process_id=run_id, parent_event_id=accepted_id)

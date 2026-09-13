@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Style the score histogram in dark blue and orange with outlined bars, a chart border, and a bottom legend inside the border.
+
 ## [0.99.11] - 2026-09-13 @ 14:03
 
 - Run the report server as root to resolve deployment file permission errors.

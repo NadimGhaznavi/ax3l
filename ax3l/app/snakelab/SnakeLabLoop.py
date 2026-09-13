@@ -93,28 +93,29 @@ async def optimize(llm, output, db, endpoint):
             await wait_for_run(snake, db, latest_id)
             previous_golden_id = golden_id
             golden_id = compare(snake, db, golden_id, latest_id)
-        prompts = [Comparison(previous_golden_id, latest_id, golden_id), ComparisonSingle()]
-    elif EventLogDb(db).latest_seed_baseline() is not None:
-        prompts = [Comparison(golden_id, golden_id, golden_id), ComparisonSingle()]
     else:
-        prompts = [FirstContact(), golden, FirstContactSingle()]
+        previous_golden_id = latest_id = golden_id
+    first_contact = proposal is None and EventLogDb(db).latest_seed_baseline() is None
     selector = RoundRobinState(db)
-    async with SnakeLabTools(endpoint) as tools:
-        while True:
-            rotated_id = await rotate_if_needed(snake, db, wait_for_run)
-            if rotated_id is not None:
-                golden_id = rotated_id
-                prompts = [Comparison(golden_id, golden_id, golden_id), ComparisonSingle()]
-            parameter = selector.begin()
-            prompts[-1] = (FirstContactSingle(parameter) if isinstance(prompts[-1], FirstContactSingle)
-                           else ComparisonSingle(parameter))
-            latest_id = await converse(llm, output, db, tools, prompts, parameter=parameter)
-            await wait_for_run(snake, db, latest_id)
-            while snake.is_simulation_running():
-                await asyncio.sleep(DSnakeLab.STATUS_POLL_SECONDS)
-            previous_golden_id = golden_id
-            golden_id = compare(snake, db, previous_golden_id, latest_id)
-            prompts = [Comparison(previous_golden_id, latest_id, golden_id), ComparisonSingle()]
+    while True:
+        rotated_id = await rotate_if_needed(snake, db, wait_for_run)
+        if rotated_id is not None:
+            golden_id = rotated_id
+            previous_golden_id = latest_id = golden_id
+            first_contact = False
+        parameter = selector.begin()
+        prompts = [Comparison(previous_golden_id, latest_id, golden_id, parameter),
+                   FirstContactSingle(parameter) if first_contact else ComparisonSingle(parameter)]
+        if first_contact:
+            prompts.insert(0, FirstContact())
+        async with SnakeLabTools(endpoint, parameter) as tools:
+            latest_id = await converse(llm, output, db, tools, prompts)
+        await wait_for_run(snake, db, latest_id)
+        while snake.is_simulation_running():
+            await asyncio.sleep(DSnakeLab.STATUS_POLL_SECONDS)
+        previous_golden_id = golden_id
+        golden_id = compare(snake, db, previous_golden_id, latest_id)
+        first_contact = False
 
 
 def run_optimization(llm, output, db, endpoint):

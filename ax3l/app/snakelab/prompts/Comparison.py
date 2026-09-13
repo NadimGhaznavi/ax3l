@@ -1,4 +1,4 @@
-"""Present comparable simulation histories for each single parameter."""
+"""Present the assigned parameter's baseline and comparable history."""
 
 import json
 
@@ -8,27 +8,22 @@ from ax3l.interface.SnakeLab import SnakeLab
 
 
 class Comparison(DynamicPrompt):
-    def __init__(self, golden_run_id: str, latest_run_id: str, current_golden_run_id: str):
-        self._golden_run_id = golden_run_id
-        self._latest_run_id = latest_run_id
+    def __init__(self, golden_run_id: str, latest_run_id: str, current_golden_run_id: str, parameter: str):
         self._current_golden_run_id = current_golden_run_id
+        self._parameter = parameter
         self._snake = SnakeLab()
         super().__init__()
 
     def refresh(self) -> None:
-        history = {name: self._snake.get_parameter_report(self._current_golden_run_id, name)
-                   for name in SINGLE_PARAMETERS}
+        name = self._parameter
+        baseline = self._snake.get_run_result(self._current_golden_run_id)
+        value = baseline["config"]
+        for key in SINGLE_PARAMETERS[name][0]:
+            value = value[key]
+        history = self._snake.get_parameter_report(self._current_golden_run_id, name)
         self._content = (
-            "Compare the simulation results and choose the next single-parameter change to improve high score.\n"
-            f"Golden run before comparison: {self._golden_run_id}\n"
-            f"Latest simulation: {self._latest_run_id}\n"
-            f"Current golden run: {self._current_golden_run_id}\n"
-            "The current golden run is the baseline for the next submission. "
-            "A strictly higher high score wins; ties retain the existing golden run.\n\n"
-            "Each parameter has results ordered by its numeric value. results contains runs on the current baseline's seed; "
-            "history contains completed high scores from earlier seeds, sorted ascending, with repeats retained. "
-            "Within each parameter report, all other configuration settings match the current golden configuration. "
-            "An empty results list means untested on the current seed. Historical scores are evidence, "
-            "not the current score to beat. null high_score means no recorded score.\n"
-            f"```json\n{json.dumps(history, indent=2, ensure_ascii=False, allow_nan=False)}\n```"
+            f"Current golden: {name}={value}, high_score={baseline['high_score']}.\n"
+            "Comparable runs (other settings unchanged): results = current seed; "
+            "history = earlier-seed high scores. Empty results = untested on this seed.\n"
+            f"```json\n{json.dumps(history, ensure_ascii=False, allow_nan=False)}\n```"
         )

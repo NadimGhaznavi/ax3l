@@ -92,7 +92,7 @@ class SeedRotationTests(unittest.IsolatedAsyncioTestCase):
             selector.return_value.begin.return_value = 'hidden_size'
             with self.assertRaises(asyncio.CancelledError):
                 await optimize(Mock(), Path('/tmp'), Mock(), 'endpoint')
-            comparison.assert_called_once_with('rotated', 'rotated', 'rotated')
+            comparison.assert_called_once_with('rotated', 'rotated', 'rotated', 'hidden_size')
             prompts = conversation.call_args.args[4]
             self.assertEqual(len(prompts), 2)
             self.assertTrue(all(isinstance(json.loads(p.to_json())['content'], str) for p in prompts))

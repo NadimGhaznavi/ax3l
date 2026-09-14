@@ -25,6 +25,8 @@ class ComparisonRewardPair(DynamicPrompt):
         }
         self._content = (
             f"```json\n{json.dumps(report, ensure_ascii=False, allow_nan=False, indent=2)}\n```\n"
+            "\nrows = closer_to_food: 0..6\n"
+            "columns = further_from_food: -6..0\n\n"
             "Results rows are closer_to_food; columns are further_from_food. "
             "Both axes and scores are sorted ascending. Each cell contains "
             "completed-run high scores across all seeds, with all other settings "

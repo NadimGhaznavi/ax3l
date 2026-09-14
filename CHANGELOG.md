@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.7] - 2026-09-14 @ 04:22
+
 ### Added
 
 - Add manual local Ax3l database backups using the configured DEV or PROD database name.

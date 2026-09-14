@@ -1,6 +1,11 @@
 # ax3l
 Another AI Project
 
+Run `sudo scripts/backup-db.sh` for a manual backup of the local Ax3l database.
+It reads the database name from `prod_etc/ax3l/database.env` in the checkout
+for DEV, or `/etc/ax3l/database.env` for PROD, and writes a private,
+timestamped `*-db.dump` SQL file in the current directory. SnakeLab is not included.
+
 ## Development Style
 
 - Develop for our fixed platform: Ax3l, the locally hosted LLM, SnakeLab, MariaDB, and systemd. No third-party API or vendor integrations, portability layers, or abstractions for hypothetical platforms. This does not exclude the libraries we use to build the application.

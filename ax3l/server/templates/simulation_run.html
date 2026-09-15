@@ -9,6 +9,14 @@
 <body>
   <header><h1>Simulation Run</h1><a href="/">Back to event log</a></header>
   <main class="panel">
+    <section class="simulation-board-panel">
+      <h2>High-score Board</h2>
+      {% if board_svg %}
+      <figure>{{ board_svg | safe }}</figure>
+      {% else %}
+      <p class="note">No saved board is available for this run.</p>
+      {% endif %}
+    </section>
     <table aria-label="Simulation run">
       <tr><th scope="row">Run ID</th><td>{{ run.run_id }}</td></tr>
       <tr><th scope="row">Project Version</th><td>{{ run.project_version }}</td></tr>

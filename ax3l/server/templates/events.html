@@ -12,12 +12,17 @@
     <time id="last-refreshed" aria-label="Last successful refresh in UTC"></time>
   </section>
   <section class="server-bar experiment-status" aria-labelledby="experiment-status">
-    <h2 id="experiment-status">Experiment Status</h2>
+    <h2 id="experiment-status">Current Experiment</h2>
+    <div class="experiment-layout">
+    <section class="experiment-summary" aria-labelledby="status-title">
+    <h3 id="status-title">Status</h3>
     <div class="experiment-metrics">
+    <span id="experiment-all-time-high-score" role="status">All-Time Highscore: {{ all_time_high_score if all_time_high_score is not none else '—' }}</span>
     <span id="experiment-high-score" role="status">Current Highscore: {{ high_score if high_score is not none else '—' }}</span>
     <span id="simulations-submitted" role="status">Simulations Submitted: {{ simulations_submitted }}</span>
     <span id="experiment-cycles" role="status">Experiment Cycles: {{ experiment_cycles }}</span>
     </div>
+    </section>
     <section class="experiment-reports" aria-labelledby="reports-title">
     <h3 id="reports-title">Reports</h3>
     <nav class="report-links" aria-labelledby="reports-title">
@@ -26,6 +31,17 @@
     <a href="/golden-configurations">Golden Configurations</a>
     </nav>
     </section>
+    <section class="experiment-board" aria-labelledby="current-board-title">
+      <h3 id="current-board-title">Current Board</h3>
+      <div id="current-board">
+        {% if current_board_svg %}
+        {{ current_board_svg | safe }}
+        {% else %}
+        <p>No saved board is available for the current configuration.</p>
+        {% endif %}
+      </div>
+    </section>
+    </div>
   </section>
   <section class="event-log-panel" aria-labelledby="event-log-title">
   <header>
@@ -213,8 +229,10 @@
         document.querySelector('.note').textContent = page.querySelector('.note').textContent;
         document.querySelector('#snake-lab-status').textContent = page.querySelector('#snake-lab-status').textContent;
         document.querySelector('#experiment-high-score').textContent = page.querySelector('#experiment-high-score').textContent;
+        document.querySelector('#experiment-all-time-high-score').textContent = page.querySelector('#experiment-all-time-high-score').textContent;
         document.querySelector('#simulations-submitted').textContent = page.querySelector('#simulations-submitted').textContent;
         document.querySelector('#experiment-cycles').textContent = page.querySelector('#experiment-cycles').textContent;
+        document.querySelector('#current-board').replaceChildren(...page.querySelector('#current-board').childNodes);
         main.scrollLeft = scrollLeft;
         window.scrollTo(scrollX, scrollY);
         updateLastRefreshed();

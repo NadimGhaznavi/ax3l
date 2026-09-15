@@ -1,6 +1,8 @@
 """Simulation summary navigation and data lookup."""
 
 from datetime import datetime
+import json
+from xml.etree.ElementTree import fromstring
 from threading import Thread
 import unittest
 from unittest.mock import Mock, patch
@@ -10,9 +12,30 @@ from uuid import uuid4
 
 from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb
 from ax3l.server.ReportingServer import make_server
+from ax3l.activity.SimulationBoard import board_svg
+
+
+SNAPSHOT = {"board": {"grid_size": [4, 3], "snake_head": [2, 1],
+                      "snake_body": [[1, 1], [0, 1]], "food": [3, 2]}}
 
 
 class SimulationRunReportTests(unittest.TestCase):
+    def test_board_geometry_and_missing_snapshots(self):
+        svg = fromstring(board_svg(json.dumps(SNAPSHOT)))
+        ns = {'svg': 'http://www.w3.org/2000/svg'}
+        self.assertEqual(svg.attrib['viewBox'], '0 0 128 96')
+        self.assertEqual(len(svg.findall('svg:line', ns)), 9)
+        rectangles = svg.findall('svg:rect', ns)
+        self.assertEqual(len(rectangles), 4)
+        self.assertEqual((rectangles[-1].attrib['x'], rectangles[-1].attrib['y']), ('65', '33'))
+        food = svg.find('svg:circle', ns)
+        self.assertEqual((food.attrib['cx'], food.attrib['cy']), ('112.0', '80.0'))
+        full = {'board': {**SNAPSHOT['board'], 'food': None}}
+        self.assertIsNone(fromstring(board_svg(full)).find('svg:circle', ns))
+        for invalid in (None, 'invalid JSON', {}, {'board': {'grid_size': ['<script>', 3]}},
+                        {'board': {**SNAPSHOT['board'], 'snake_head': [-1, 0]}}):
+            self.assertIsNone(board_svg(invalid))
+
     def test_summary_lookup(self):
         db = Mock()
         run_id = str(uuid4())
@@ -37,6 +60,7 @@ class SimulationRunReportTests(unittest.TestCase):
                      category='SnakeLab', name='simulation_completed', parameter=None,
                      process_id=run_id, content='Simulation completed.')
         log.recent.return_value = [event]
+        log.current_golden_config.return_value = None
         server = make_server('127.0.0.1', 0)
         thread = Thread(target=server.serve_forever, daemon=True)
         thread.start()
@@ -57,6 +81,12 @@ class SimulationRunReportTests(unittest.TestCase):
                          '2026-09-15 12:30:45', 'Back to event log'):
             self.assertIn(expected, page)
         self.assertNotIn('<version>', page)
+        self.assertIn('No saved board is available', page)
+        snake.get_run_summary.return_value['high_score_snapshot'] = json.dumps(SNAPSHOT)
+        board_page = get(path)
+        self.assertIn('<svg ', board_page)
+        self.assertIn('viewBox="0 0 128 96"', board_page)
+        self.assertNotIn('No saved board is available', board_page)
         snake.get_run_summary.assert_called_with(run_id)
         snake.get_run_summary.return_value.update(high_score=None, completed_at=None)
         self.assertEqual(get(path).count('<td>—</td>'), 2)

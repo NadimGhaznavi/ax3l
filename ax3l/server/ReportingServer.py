@@ -16,6 +16,7 @@ from ax3l.activity.PromptReport import parts, summary
 from ax3l.activity.ScoreDistribution import distribution
 from ax3l.activity.ExperimentHighscores import highscores
 from ax3l.activity.GoldenConfigurations import parameter_change
+from ax3l.activity.SimulationBoard import board_svg
 from ax3l.constants.DReportMgr import DReportMgr
 from ax3l.constants.DLabel import FIELD_TO_LABEL_MAP
 from ax3l.interface.SnakeLab import SnakeLab
@@ -97,7 +98,7 @@ def make_server(host: str, port: int) -> HTTPServer:
                         self.send_error(404, "Simulation not found")
                         return
                     body = templates.get_template("simulation_run.html").render(
-                        run=run
+                        run=run, board_svg=board_svg(run.get("high_score_snapshot"))
                     ).encode("utf-8")
                     content_type = "text/html; charset=utf-8"
                 except Exception:
@@ -159,10 +160,17 @@ def make_server(host: str, port: int) -> HTTPServer:
                                 snake_lab_status = (
                                     "Running Simulation" if simulation_running else "Idle"
                                 )
+                            golden = log.current_golden_config()
+                            current_run = (
+                                SnakeLab().get_run_summary(golden["process_id"])
+                                if golden else None
+                            )
                             body = template.render(
                                 events=events,
                                 snake_lab_status=snake_lab_status,
-                                high_score=SnakeLab().get_high_score(),
+                                high_score=current_run["high_score"] if current_run else None,
+                                all_time_high_score=SnakeLab().get_high_score(),
+                                current_board_svg=board_svg(current_run.get("high_score_snapshot")) if current_run else None,
                                 simulations_submitted=SnakeLab().get_num_sims(),
                                 experiment_cycles=log.experiment_cycles(),
                             ).encode("utf-8")

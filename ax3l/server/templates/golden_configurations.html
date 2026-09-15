@@ -21,7 +21,7 @@
   <header><h1>Golden Configurations</h1><a href="/">Back to event log</a></header>
   <main>
     <table aria-label="Golden configurations">
-      <thead><tr><th scope="col">Date</th><th scope="col">Time</th><th scope="col">Golden Config</th><th scope="col">High Score</th><th scope="col">Parameter</th><th scope="col">Reason</th></tr></thead>
+      <thead><tr><th scope="col">Date</th><th scope="col">Time</th><th scope="col">Golden Config</th><th scope="col">High Score</th><th scope="col">Parameter</th><th scope="col">Change</th><th scope="col">Reason</th></tr></thead>
       <tbody>
         {% for config in configs %}
         <tr>
@@ -30,10 +30,11 @@
           <td>{% if config.process_id %}<a href="/simulations/{{ config.process_id }}/config">{{ config.process_id }}</a>{% endif %}</td>
           <td>{{ config.high_score if config.high_score is not none else '' }}</td>
           <td>{{ config.parameter or '' }}</td>
+          <td>{{ config.change }}</td>
           <td>{% if config.has_reason %}<a href="/events/{{ config.reply_id }}/reason">Reason</a>{% endif %}</td>
         </tr>
         {% else %}
-        <tr><td colspan="6">No golden configurations recorded.</td></tr>
+        <tr><td colspan="7">No golden configurations recorded.</td></tr>
         {% endfor %}
       </tbody>
     </table>

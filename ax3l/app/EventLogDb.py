@@ -54,8 +54,9 @@ class EventLogDb:
                                                '$.status')) = 'ok'
             )
             SELECT g.event_id, g.occurred_at, g.process_id, p.parameter, h.score AS high_score,
-                   r.event_id AS reply_id, rm.content AS response
+                   r.event_id AS reply_id, rm.content AS response, gm.content AS decision
             FROM events g
+            LEFT JOIN event_messages gm ON gm.event_id = g.event_id
             LEFT JOIN experiment_highscores h ON h.event_id = g.event_id
             LEFT JOIN successful_tools t ON t.event_id = (
                 SELECT MIN(event_id) FROM successful_tools WHERE run_id = g.process_id)

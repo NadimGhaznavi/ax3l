@@ -34,6 +34,7 @@ See the [development style in the README](README.md#development-style).
 - [Scripts](/pages/scripts)
 - [OS Setup](/pages/os-setup)
 - [Driver Setup](pages/driver-setup)
+- [Llama CPP Setup](/pages/llama-cpp)
 
 ---
 

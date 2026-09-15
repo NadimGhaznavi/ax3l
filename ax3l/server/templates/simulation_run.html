@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Simulation Run · Ax3l</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 1.5rem auto; padding: 1rem; max-width: 1200px; background: #050a06; color: #80ff98; font: 15px/1.6 "Courier New", Courier, monospace; }
+    header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; }
+    h1 { font-size: 1.5rem; }
+    a { color: inherit; }
+    p, td, th { overflow-wrap: anywhere; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    th, td { border: 1px solid #347746; padding: .5rem .75rem; text-align: left; }
+    th { width: 55%; color: #a0cbaa; font-weight: normal; }
+    tr:nth-child(even) { background: #13271a; }
+  </style>
+</head>
+<body>
+  <header><h1>Simulation Run</h1><a href="/">Back to event log</a></header>
+  <main>
+    <table aria-label="Simulation run">
+      <tr><th scope="row">Run ID</th><td>{{ run.run_id }}</td></tr>
+      <tr><th scope="row">Project Version</th><td>{{ run.project_version }}</td></tr>
+      <tr><th scope="row">High Score</th><td>{{ run.high_score if run.high_score is not none else '—' }}</td></tr>
+      <tr><th scope="row">Completed At</th><td>{{ run.completed_at.strftime('%Y-%m-%d %H:%M:%S') if run.completed_at is not none else '—' }}</td></tr>
+    </table>
+  </main>
+</body>
+</html>

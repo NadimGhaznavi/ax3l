@@ -74,6 +74,13 @@ class SnakeLabDb:
         """Compare all configuration values across every run and status."""
         return self.find_config_run(config) is None
 
+    def get_run_summary(self, run_id: str) -> dict | None:
+        rows = self._db.query(
+            "SELECT run_id, project_version, high_score, completed_at "
+            "FROM simulation_runs WHERE run_id = %s", (run_id,),
+        )
+        return rows[0] if rows else None
+
     def get_run_result(self, run_id: str) -> dict | None:
         rows = self._db.query(
             "SELECT r.run_id, r.status, r.high_score, c.* FROM simulation_runs r "

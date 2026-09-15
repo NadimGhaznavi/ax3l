@@ -13,6 +13,7 @@ from ax3l.app.EventLogDb import EventLogDb
 from ax3l.app.snakelab.prompts.InvalidValue import InvalidValue
 from ax3l.app.snakelab.prompts.NoDupes import NoDupes
 from ax3l.constants.DEventCategory import DEventCategory
+from ax3l.constants.DAx3l import DAx3l
 from ax3l.interface.SnakeLab import SnakeLab
 
 
@@ -83,5 +84,5 @@ class SubmitSingleValueHandler:
                                    description, process_id=run_id)
         category = DEventCategory.SnakeLab
         self._db.log(category.SUBMITTED, category.CATEGORY, "INFO", "Submitted config.",
-                     process_id=run_id, parent_event_id=accepted_id)
+                     process_id=run_id, parent_event_id=accepted_id, ax3l_version=DAx3l.VERSION)
         return {"status": "ok", "run_id": run_id}

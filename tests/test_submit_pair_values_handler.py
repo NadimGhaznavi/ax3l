@@ -4,6 +4,7 @@ from unittest.mock import Mock, patch
 
 from jsonschema import ValidationError
 
+from ax3l.constants.DAx3l import DAx3l
 from ax3l.app.snakelab.GenerateDefaultConfig import GenerateDefaultConfig
 from ax3l.app.snakelab.SubmitPairValuesHandler import SubmitPairValuesHandler
 
@@ -56,6 +57,7 @@ class SubmitPairValuesHandlerTests(unittest.TestCase):
                 first, second = values.values()
                 result = self.handler.submit({'pair': pair, 'value_1': first, 'value_2': second})
                 self.assertEqual(result, {'status': 'ok', 'run_id': 'new-run'})
+                self.assertEqual(self.db.log.call_args.kwargs['ax3l_version'], DAx3l.VERSION)
                 self.snake.is_config_unique.assert_called_once_with(expected)
                 self.snake.submit_simulation.assert_called_once_with(expected)
                 self.assertEqual(self.baseline, original)

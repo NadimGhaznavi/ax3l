@@ -5,7 +5,37 @@ Load its DB_* environment variables and set AX3L_TEST_DEV_DB=1 to run.
 
 import os
 import unittest
+from unittest.mock import Mock
 from uuid import uuid4
+
+
+class EventVersionTests(unittest.TestCase):
+    def test_version_is_written_with_submission_and_message_in_one_transaction(self):
+        from ax3l.app.DbMgr import DbMgr
+
+        db = object.__new__(DbMgr)
+        db._connection = Mock()
+        db.execute = Mock()
+        db.query = Mock(return_value=[{'event_id': 4}])
+        for version in ('1.0.7', None):
+            with self.subTest(version=version):
+                db.execute.reset_mock()
+                db._connection.reset_mock()
+                self.assertEqual(db.log('simulation_submitted', 'SnakeLab', 'INFO',
+                                        'Submitted config.', process_id='run',
+                                        ax3l_version=version), 4)
+                sql, values = db.execute.call_args_list[0].args
+                self.assertIn('ax3l_version', sql)
+                self.assertEqual(values, ('simulation_submitted', 'SnakeLab', 'INFO',
+                                          'run', None, None, None, version))
+                db._connection.commit.assert_called_once()
+        db._connection.reset_mock()
+        db.execute.side_effect = [1, RuntimeError('message write failed')]
+        with self.assertRaises(RuntimeError):
+            db.log('simulation_submitted', 'SnakeLab', 'INFO', 'Submitted config.',
+                   ax3l_version='1.0.7')
+        db._connection.commit.assert_not_called()
+        db._connection.rollback.assert_called_once()
 
 
 @unittest.skipUnless(os.environ.get("AX3L_TEST_DEV_DB") == "1", "requires DEV MariaDB")
@@ -76,6 +106,7 @@ class DbMgrTests(unittest.TestCase):
         prompt_id = self.db.log(
             "prompt_sent", "Conversation", "INFO", "Describe the configuration.",
             process_id=self.process_id, source_name="GoldenConfig", parameter="reward_pair",
+            ax3l_version="1.0.7",
         )
         content = "A tree's quiet shade 🌳\nSecond line"
         reply_id = self.db.log(
@@ -89,6 +120,8 @@ class DbMgrTests(unittest.TestCase):
             self.assertEqual(EventLogDb(reader).get(prompt_id)['source_name'], 'GoldenConfig')
             self.assertIsNone(EventLogDb(reader).get(reply_id)['source_name'])
             self.assertEqual(EventLogDb(reader).get(prompt_id)['parameter'], 'reward_pair')
+            self.assertEqual(EventLogDb(reader).get(prompt_id)['ax3l_version'], '1.0.7')
+            self.assertIsNone(EventLogDb(reader).get(reply_id)['ax3l_version'])
             self.assertIsNone(EventLogDb(reader).get(reply_id)['parameter'])
             recent = {row['event_id']: row for row in EventLogDb(reader).recent()}
             self.assertEqual(recent[prompt_id]['parameter'], 'reward_pair')

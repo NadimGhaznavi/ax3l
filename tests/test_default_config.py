@@ -7,6 +7,7 @@ from unittest.mock import Mock, patch
 
 from jsonschema import Draft202012Validator
 
+from ax3l.constants.DAx3l import DAx3l
 from ax3l.app.snakelab.GenerateDefaultConfig import GenerateDefaultConfig
 
 
@@ -48,6 +49,7 @@ class DefaultConfigTests(unittest.TestCase):
                         "simulation_submitted", "simulation_started", "simulation_completed", "golden_config_created",
                     ])
                     self.assertEqual(db.log.call_args_list[0].args[3], "Submitted config.")
+                    self.assertEqual(db.log.call_args_list[0].kwargs["ax3l_version"], DAx3l.VERSION)
                     created = db.log.call_args_list[-1]
                     self.assertEqual(created.args[1:4], (
                         "Configuration", "INFO", "Seeded database with default config.",

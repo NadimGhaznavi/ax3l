@@ -13,7 +13,7 @@ class EventLogDb:
         """Return the latest 500 events, newest first."""
         rows = self._db.query("""
             SELECT e.event_id, e.occurred_at, e.name, e.category,
-                   e.log_level, e.process_id, e.source_name, e.parameter, m.content
+                   e.log_level, e.process_id, e.source_name, e.parameter, e.ax3l_version, m.content
             FROM events e
             LEFT JOIN event_messages m USING (event_id)
             ORDER BY e.occurred_at DESC, e.event_id DESC
@@ -118,7 +118,7 @@ class EventLogDb:
     def pending_seed_rotation(self) -> dict[str, Any] | None:
         category = DEventCategory.Configuration
         rows = self._db.query("""
-            SELECT i.event_id, m.content, s.event_id AS submitted_event_id, s.process_id AS run_id
+            SELECT i.event_id, i.ax3l_version, m.content, s.event_id AS submitted_event_id, s.process_id AS run_id
             FROM events i JOIN event_messages m ON m.event_id = i.event_id
             LEFT JOIN events s ON s.parent_event_id = i.event_id AND s.name = %s AND s.category = %s
             WHERE i.name = %s AND i.category = %s

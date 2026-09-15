@@ -11,7 +11,7 @@ import zmq
 from ax3l.app.DbMgr import DbMgr
 from ax3l.constants.DEventCategory import DEventCategory
 from ax3l.app.EventLogDb import EventLogDb
-from ax3l.activity.ReplyReport import fields, reply_content
+from ax3l.activity.ReplyReport import fields, reply_content, reasoning_content
 from ax3l.activity.PromptReport import parts, summary
 from ax3l.activity.ScoreDistribution import distribution
 from ax3l.activity.ExperimentHighscores import highscores
@@ -41,6 +41,23 @@ def make_server(host: str, port: int) -> HTTPServer:
             if self.path == "/health":
                 body = b'{"status":"ok","service":"reporting-server","mode":"events"}'
                 content_type = "application/json"
+            elif self.path == "/golden-configurations":
+                try:
+                    db = DbMgr()
+                    try:
+                        configs = EventLogDb(db).golden_configurations()
+                    finally:
+                        db.close()
+                    for config in configs:
+                        config["has_reason"] = bool(reasoning_content(config.pop("response", None)))
+                    body = templates.get_template("golden_configurations.html").render(
+                        configs=configs
+                    ).encode("utf-8")
+                    content_type = "text/html; charset=utf-8"
+                except Exception:
+                    traceback.print_exc()
+                    self.send_error(500, "Unable to load golden configurations")
+                    return
             elif self.path == "/experiment-highscores":
                 try:
                     db = DbMgr()
@@ -89,7 +106,7 @@ def make_server(host: str, port: int) -> HTTPServer:
                     traceback.print_exc()
                     self.send_error(500, "Unable to load simulation config")
                     return
-            elif self.path == "/" or re.fullmatch(r"/events/[0-9]{1,20}", self.path):
+            elif self.path == "/" or re.fullmatch(r"/events/[0-9]{1,20}(?:/reason)?", self.path):
                 try:
                     db = DbMgr()
                     try:
@@ -129,7 +146,8 @@ def make_server(host: str, port: int) -> HTTPServer:
                                 experiment_cycles=log.experiment_cycles(),
                             ).encode("utf-8")
                         else:
-                            event = log.get(int(self.path.rsplit("/", 1)[1]))
+                            reason_page = self.path.endswith("/reason")
+                            event = log.get(int(self.path.split("/")[2]))
                             if (
                                 event is None
                                 or event["name"]
@@ -142,7 +160,18 @@ def make_server(host: str, port: int) -> HTTPServer:
                             ):
                                 self.send_error(404)
                                 return
-                            if event["name"] == DEventCategory.Conversation.PROMPT:
+                            if reason_page:
+                                reason = reasoning_content(event["content"])
+                                if event["name"] != DEventCategory.Conversation.RESPONSE or not reason:
+                                    self.send_error(404, "Reason not found")
+                                    return
+                                body = templates.get_template("reply.html").render(
+                                    event=event, reply_text=reason, sections=[],
+                                    page_title=f"Reason #{event['event_id']}",
+                                    message_title="Reason", back_url="/golden-configurations",
+                                    back_label="Back to golden configurations",
+                                ).encode("utf-8")
+                            elif event["name"] == DEventCategory.Conversation.PROMPT:
                                 body = (
                                     templates.get_template("prompt.html")
                                     .render(

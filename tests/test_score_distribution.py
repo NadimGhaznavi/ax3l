@@ -70,7 +70,8 @@ class ScoreDistributionTests(unittest.TestCase):
             with urlopen(url) as response:
                 page = response.read().decode()
                 self.assertEqual(response.headers['Cache-Control'], 'no-store')
-            self.assertIn('All runs: 4 (3 with scores). Oldest half: 2 (2 with scores).', page)
+            self.assertIn('All runs: 4 (3 scored).', page)
+            self.assertIn('Oldest half: 2 (2 scored).', page)
             self.assertIn('Plotly.newPlot', page)
             self.assertIn('id="score-histogram"', page)
             self.assertNotIn('<script src=', page)

@@ -4,36 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Ax3l Event Log</title>
-  <style>
-    :root { color-scheme: dark; --green: #80ff98; --muted: #a0cbaa; --border: #347746; }
-    * { box-sizing: border-box; }
-    body { margin: 1.5rem; padding: 1rem; border: 1px solid var(--border); background: #050a06; color: var(--green); font: 15px/1.6 "Courier New", Courier, monospace; }
-    header, .server-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem; padding: 1rem; border: 1px solid var(--border); background: #0a140d; }
-    h1, .server-bar h2 { margin: 0; font-size: 1.5rem; letter-spacing: .06em; }
-    .server-bar { margin-bottom: 1rem; }
-    .server-bar[aria-labelledby="snake-lab-status"] { flex-wrap: nowrap; }
-    #last-refreshed { white-space: nowrap; }
-    .experiment-status { flex-direction: column; align-items: flex-start; gap: 0; }
-    .note { margin: 1rem 0; padding: .6rem 1rem; border: 1px solid var(--border); color: var(--muted); }
-    main { border: 1px solid var(--border); overflow-x: auto; }
-    table { width: 100%; table-layout: auto; border-collapse: collapse; }
-    th, td { padding: .35rem .65rem; border: 1px solid var(--border); text-align: left; white-space: nowrap; }
-    th:not(:last-child), td:not(:last-child) { width: 1%; }
-    th { background: #0d1c11; color: var(--green); }
-    .entry { background: #08100a; }
-    .entry:nth-child(even) { background: #13271a; }
-    .entry:hover { background: #1d3825; }
-    .metadata { color: var(--muted); }
-    .content { max-width: 0; overflow: hidden; text-overflow: ellipsis; font: inherit; }
-    a { color: var(--green); text-underline-offset: .2em; }
-    a:focus-visible, select:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
-    select { padding: .35rem .65rem; border: 1px solid var(--border); background: #0a140d; color: var(--green); font: inherit; }
-    .empty { margin: 0; padding: 1rem; border: 1px solid var(--border); }
-    ::selection { background: var(--green); color: #050a06; }
-    @media (max-width: 600px) { body { margin: .5rem; padding: .5rem; } }
-  </style>
+  {% include "report_styles.html" %}
 </head>
-<body>
+<body class="events-page">
   <section class="server-bar" aria-labelledby="snake-lab-status">
     <h2 id="snake-lab-status" role="status">Snake Lab Server: {{ snake_lab_status }}</h2>
     <time id="last-refreshed" aria-label="Last successful refresh in UTC"></time>
@@ -63,8 +36,8 @@
     </div>
   </header>
   <p class="note">Latest {{ events | length }} entries (up to 500), newest first.</p>
-  <main>
-    <table aria-label="Event log">
+  <main class="panel">
+    <table class="wide-table" aria-label="Event log">
       <thead>
         <tr><th scope="col">Date</th><th scope="col">Time</th><th scope="col">ID</th><th scope="col">Level</th><th scope="col">Category</th><th scope="col">Event</th><th scope="col" class="parameter-column" hidden>Parameter</th><th scope="col">Message</th></tr>
         <tr>

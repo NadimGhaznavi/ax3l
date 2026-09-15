@@ -77,6 +77,14 @@ class SnakeLab:
         finally:
             db.close()
 
+    def get_run_summary(self, run_id: str) -> dict | None:
+        UUID(run_id)
+        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
+        try:
+            return SnakeLabDb(db).get_run_summary(run_id)
+        finally:
+            db.close()
+
     def get_run_result(self, run_id: str) -> dict | None:
         UUID(run_id)
         db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)

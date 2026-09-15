@@ -91,25 +91,3 @@ Built on Thu_Mar_28_02:18:24_PDT_2024
 Cuda compilation tools, release 12.4, V12.4.131
 Build cuda_12.4.r12.4/compiler.34097967_0
 ```
-
-## Download llama.cpp
-
-```sh
-git clone https://github.com/ggml-org/llama.cpp
-```
-
-## Build llama.cpp with CUDA support
-
-```sh
-cd llama.cpp
-cmake -B build -DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=ON
-cmake --build build --config Release -j 11
-cmake --install build --prefix /opt/prod/llama.cpp-0.4.0
-```
-
-Add the library search path to the system. **As root**:
-
-```sh
-echo '/opt/prod/llama.cpp-0.4.0/lib' > /etc/ld.so.conf.d/llama.cpp.conf
-ldconfig
-```

@@ -88,6 +88,23 @@ def make_server(host: str, port: int) -> HTTPServer:
                     self.send_error(500, "Unable to load score distribution")
                     return
             elif re.fullmatch(
+                r"/simulations/[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}",
+                self.path,
+            ):
+                try:
+                    run = SnakeLab().get_run_summary(self.path.split("/")[2])
+                    if run is None:
+                        self.send_error(404, "Simulation not found")
+                        return
+                    body = templates.get_template("simulation_run.html").render(
+                        run=run
+                    ).encode("utf-8")
+                    content_type = "text/html; charset=utf-8"
+                except Exception:
+                    traceback.print_exc()
+                    self.send_error(500, "Unable to load simulation run")
+                    return
+            elif re.fullmatch(
                 r"/simulations/[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}/config",
                 self.path,
             ):

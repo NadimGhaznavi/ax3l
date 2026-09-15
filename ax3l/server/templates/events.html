@@ -31,8 +31,7 @@
     <a href="/golden-configurations">Golden Configurations</a>
     </nav>
     </section>
-    <section class="experiment-board" aria-labelledby="current-board-title">
-      <h3 id="current-board-title">Current Board</h3>
+    <figure class="experiment-board" aria-labelledby="current-board-caption">
       <div id="current-board">
         {% if current_board_svg %}
         {{ current_board_svg | safe }}
@@ -40,7 +39,8 @@
         <p>No saved board is available for the current configuration.</p>
         {% endif %}
       </div>
-    </section>
+      <figcaption id="current-board-caption">Highscore Snapshot</figcaption>
+    </figure>
     </div>
   </section>
   <section class="event-log-panel" aria-labelledby="event-log-title">

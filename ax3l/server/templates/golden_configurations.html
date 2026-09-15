@@ -29,7 +29,7 @@
           <td>{{ config.occurred_at.strftime('%H:%M:%S') if config.occurred_at else '' }}</td>
           <td>{% if config.process_id %}<a href="/simulations/{{ config.process_id }}/config">{{ config.process_id }}</a>{% endif %}</td>
           <td>{{ config.high_score if config.high_score is not none else '' }}</td>
-          <td>{{ config.parameter or '' }}</td>
+          <td>{{ field_labels.get(config.parameter, config.parameter) or '' }}</td>
           <td>{{ config.change }}</td>
           <td>{% if config.has_reason %}<a href="/events/{{ config.reply_id }}/reason">Reason</a>{% endif %}</td>
         </tr>

@@ -88,6 +88,9 @@ class ExperimentStatusTests(unittest.TestCase):
                 self.assertIn('class="server-bar experiment-status"', page)
                 self.assertIn('href="/score-distribution">Score Distribution Histogram</a>', page)
                 self.assertIn('href="/experiment-highscores">Experiment Highscores</a>', page)
+                self.assertIn('href="/golden-configurations">Golden Configurations</a>', page)
+                self.assertLess(page.index('>Experiment Highscores</a>'),
+                                page.index('>Golden Configurations</a>'))
                 self.assertLess(page.index('>Score Distribution Histogram</a>'),
                                 page.index('>Experiment Highscores</a>'))
                 for element in ('simulations-submitted', 'experiment-cycles'):

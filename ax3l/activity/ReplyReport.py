@@ -4,6 +4,15 @@ import json
 from typing import Any
 
 
+def reasoning_content(content: str | None) -> str:
+    """Read only the first choice's captured reasoning, if present."""
+    try:
+        value = json.loads(content)["choices"][0]["message"].get("reasoning_content")
+    except (TypeError, ValueError, KeyError, IndexError, AttributeError):
+        return ""
+    return value if isinstance(value, str) else ""
+
+
 def reply_content(response: dict[str, Any]) -> str:
     message = response["choices"][0]["message"]
     text = message.get("content") or ""

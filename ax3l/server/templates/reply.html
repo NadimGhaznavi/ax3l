@@ -31,7 +31,7 @@
       <h2>Event</h2>
       <table aria-label="Event fields">
         {% for key, value in event.items() if key != 'content' %}
-        <tr><th scope="row">{{ key }}</th><td>{{ value if value is not none else '—' }}</td></tr>
+        <tr><th scope="row">{{ key }}</th><td>{{ (field_labels.get(value, value) if key == 'parameter' else value) if value is not none else '—' }}</td></tr>
         {% endfor %}
       </table>
     </section>
@@ -40,7 +40,7 @@
       <h2>{{ name | replace('_', ' ') | title }}</h2>
       <table aria-label="{{ name }} fields">
         {% for path, value in rows %}
-        <tr><th scope="row">{{ path }}</th><td>{{ value }}</td></tr>
+        <tr><th scope="row">{{ field_labels.get(path, path) }}</th><td>{{ value }}</td></tr>
         {% endfor %}
       </table>
     </section>

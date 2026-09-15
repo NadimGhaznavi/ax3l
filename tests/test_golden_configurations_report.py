@@ -106,7 +106,7 @@ class GoldenReportTests(unittest.TestCase):
                  reply_id=None, response=None, high_score=0),
         ]
         log.get.return_value = dict(event_id=6, name='reply_received', category='Conversation', content=response)
-        snake.get_config.return_value = {'seed': 42}
+        snake.get_config.return_value = {'seed': 42, 'training': {'learning_rate': 0.001}}
         server = make_server('127.0.0.1', 0)
         thread = Thread(target=server.serve_forever, daemon=True)
         thread.start()
@@ -131,7 +131,16 @@ class GoldenReportTests(unittest.TestCase):
         self.assertNotIn('Do not show assistant content', page)
         self.assertNotIn('<script>', page)
         self.assertIn('Back to golden configurations', page)
-        self.assertIn('42', get(f'/simulations/{run_id}/config'))
+        config_page = get(f'/simulations/{run_id}/config')
+        self.assertIn('42', config_page)
+        self.assertIn('Learning Rate', config_page)
+        self.assertNotIn('training.learning_rate', config_page)
+        log.golden_configurations.return_value[0].update(
+            parameter='reward_pair',
+            decision='game.rewards.further_from_food: -4 -> -2; game.rewards.closer_to_food: -2 -> -2.')
+        page = get('/golden-configurations')
+        self.assertIn('Food Reward: closer, further', page)
+        self.assertIn('-2 &gt; -2, -4 &gt; -2', page)
         log.get.return_value['content'] = '{}'
         with self.assertRaises(HTTPError) as error:
             get('/events/6/reason')

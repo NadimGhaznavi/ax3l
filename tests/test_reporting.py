@@ -16,10 +16,12 @@ class ExperimentStatusTests(unittest.TestCase):
         from pathlib import Path
         from jinja2 import Environment, FileSystemLoader, select_autoescape
         from ax3l.constants.DEventCategory import DEventCategory as Events
+        from ax3l.constants.DLabel import FIELD_TO_LABEL_MAP
 
         templates = Environment(
             loader=FileSystemLoader(Path(__file__).parents[1] / 'ax3l/server/templates'),
             autoescape=select_autoescape(['html']))
+        templates.globals['field_labels'] = FIELD_TO_LABEL_MAP
         for parameter in ('learning_rate', 'epsilon_pair', 'reward_pair', None, '<unsafe>'):
             with self.subTest(parameter=parameter):
                 event = dict(event_id=123, occurred_at=datetime.now(), log_level='INFO',
@@ -31,7 +33,7 @@ class ExperimentStatusTests(unittest.TestCase):
                 self.assertIn('id="parameter-filter"', page)
                 self.assertNotIn('source-filter', page)
                 self.assertNotIn('GoldenConfig', page)
-                expected = '&lt;unsafe&gt;' if parameter == '<unsafe>' else parameter or ''
+                expected = '&lt;unsafe&gt;' if parameter == '<unsafe>' else FIELD_TO_LABEL_MAP.get(parameter, parameter) or ''
                 self.assertIn(f'class="parameter-column metadata" hidden>{expected}</td>', page)
                 detail = templates.get_template('prompt.html').render(event=event, parts=[])
                 self.assertIn('GoldenConfig', detail)

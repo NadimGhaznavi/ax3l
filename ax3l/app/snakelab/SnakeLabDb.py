@@ -76,7 +76,7 @@ class SnakeLabDb:
 
     def get_run_summary(self, run_id: str) -> dict | None:
         rows = self._db.query(
-            "SELECT run_id, project_version, high_score, completed_at "
+            "SELECT run_id, project_version, high_score, completed_at, high_score_snapshot "
             "FROM simulation_runs WHERE run_id = %s", (run_id,),
         )
         return rows[0] if rows else None

@@ -4,19 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Experiment Highscores</title>
-  <style>
-    :root { color-scheme: dark; }
-    body { margin: 1.5rem; padding: 1rem; border: 1px solid #40566e; background: #0b1119; color: #d5dfeb; font: 15px/1.6 "Courier New", Courier, monospace; }
-    h1 { font-size: 1.5rem; }
-    a { color: #79b8f3; text-underline-offset: .2em; }
-    p { color: #a7b8cb; }
-    main { border: 1px solid #40566e; background: #101720; padding: .5rem; }
-    @media (max-width: 600px) { body { margin: .5rem; padding: .5rem; } }
-  </style>
+  {% include "report_styles.html" %}
 </head>
-<body>
-  <a href="/">Back to event log</a>
-  <h1>Experiment High Scores</h1>
+<body class="chart-page">
+  <header><h1>Experiment High Scores</h1><a href="/">Back to event log</a></header>
   <p>
     Simulations submitted: {{ total }}.
     The line shows the current accepted configuration’s high score over time.
@@ -24,7 +15,7 @@
     Hover over an accepted point to see the seed, run ID, and reason for acceptance.
     Reload to update.
   </p>
-  <main>
+  <main class="panel">
     {% if chart %}
     {{ chart | safe }}
     <noscript>Enable JavaScript to view the interactive chart.</noscript>

@@ -12,6 +12,7 @@ from uuid import uuid4
 
 from ax3l.app.EventLogDb import EventLogDb
 from ax3l.activity.ReplyReport import reasoning_content
+from ax3l.activity.GoldenConfigurations import parameter_change
 
 
 class GoldenHistoryTests(unittest.TestCase):
@@ -42,7 +43,7 @@ class GoldenHistoryTests(unittest.TestCase):
         event(6, 'Conversation', 'reply_received', 'conversation', response)
         event(7, 'Conversation', 'reply_received', 'unrelated', 'wrong response')
         event(8, 'Tool', 'tool_execution_completed', 'conversation', '{"status":"ok","run_id":"winner"}')
-        event(9, 'Configuration', 'golden_config_created', 'winner')
+        event(9, 'Configuration', 'golden_config_created', 'winner', 'High score: 55 > 0; network.size: 4 -> 6.')
         event(10, 'Configuration', 'golden_config_retained', 'winner')
         event(11, 'Configuration', 'golden_config_created', 'seed-baseline')
         event(12, 'Tool', 'tool_execution_completed', 'unrelated', 'invalid JSON')
@@ -56,6 +57,8 @@ class GoldenHistoryTests(unittest.TestCase):
         rows = EventLogDb(Db()).golden_configurations()
         self.assertEqual([r['process_id'] for r in rows], ['seed-baseline', 'winner', 'baseline'])
         self.assertEqual([r['high_score'] for r in rows], [None, 55, 0])
+        self.assertEqual(parameter_change(rows[1]['decision']), '4 > 6')
+        self.assertEqual(parameter_change(rows[2]['decision']), '')
         self.assertEqual(rows[1]['reply_id'], 6)
         self.assertEqual(rows[1]['parameter'], 'learning_rate')
         self.assertEqual(reasoning_content(rows[1]['response']), 'winning reason')
@@ -67,6 +70,19 @@ class GoldenHistoryTests(unittest.TestCase):
         for content in (None, '', 'invalid', 'null', '{}', '{"choices":[]}',
                         '{"choices":[{"message":{"content":"not reasoning"}}]}'):
             self.assertEqual(reasoning_content(content), '')
+
+    def test_recorded_value_changes(self):
+        for decision, expected in (
+            (None, ''),
+            ('Initial defaults', ''),
+            ('Fresh baseline after seed rotation. Score to beat: 55.', ''),
+            ('High score: 55 > 0; network.size: 4 -> 6.', '4 > 6'),
+            ('High score: 55 > 0; learning_rate: 1e-05 -> 0.001.', '1e-05 > 0.001'),
+            ('High score: 55 > 0; rewards.food: 0 -> 6; rewards.death: -4 -> -2.',
+             'rewards.food: 0 > 6; rewards.death: -4 > -2'),
+        ):
+            with self.subTest(decision=decision):
+                self.assertEqual(parameter_change(decision), expected)
 
 
 class GoldenReportTests(unittest.TestCase):
@@ -82,7 +98,8 @@ class GoldenReportTests(unittest.TestCase):
             'reasoning_content': reason, 'content': 'Do not show assistant content'}}]})
         log.golden_configurations.return_value = [
             dict(event_id=9, occurred_at=datetime(2026, 9, 15, 12, 30, 45),
-                 process_id=run_id, parameter='<parameter>', reply_id=6, response=response, high_score=55),
+                 process_id=run_id, parameter='<parameter>', reply_id=6, response=response, high_score=55,
+                 decision='High score: 55 > 0; network.size: 4 -> 6.'),
             dict(event_id=1, occurred_at=None, process_id=None, parameter=None,
                  reply_id=None, response=None, high_score=None),
             dict(event_id=0, occurred_at=None, process_id=None, parameter=None,
@@ -103,7 +120,7 @@ class GoldenReportTests(unittest.TestCase):
                 return result.read().decode()
 
         page = get('/golden-configurations')
-        for value in ('Date', 'Time', 'Golden Config', 'High Score', '<td>55</td>', '<td>0</td>', 'Parameter', 'Reason', '2026-09-15',
+        for value in ('Date', 'Time', 'Golden Config', 'High Score', '<td>55</td>', '<td>0</td>', 'Parameter', 'Change', '<td>4 &gt; 6</td>', 'Reason', '2026-09-15',
                       '12:30:45', '&lt;parameter&gt;', f'href="/simulations/{run_id}/config"'):
             self.assertIn(value, page)
         self.assertEqual(page.count('>Reason</a>'), 1)

@@ -199,3 +199,8 @@ the captured JSON for now. Database errors stop the loop.
 The active flow continues optimizing until stopped or an error occurs.
 Use `--output PATH` to choose the optional capture directory. Service
 installations run Ax3l from the installed `.venv`.
+
+Prompt events record the assigned single parameter or pair name in `events.parameter`,
+including retry feedback. The Event Log shows a Parameter column and filter when
+Prompt is selected; prompt details retain the source and include the parameter.
+This schema change requires recreating the event tables; existing tables are not migrated.

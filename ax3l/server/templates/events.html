@@ -65,12 +65,12 @@
   <main>
     <table aria-label="Event log">
       <thead>
-        <tr><th scope="col">Date</th><th scope="col">Time</th><th scope="col">ID</th><th scope="col">Level</th><th scope="col">Category</th><th scope="col">Event</th><th scope="col" class="source-column" hidden>Source</th><th scope="col">Message</th></tr>
+        <tr><th scope="col">Date</th><th scope="col">Time</th><th scope="col">ID</th><th scope="col">Level</th><th scope="col">Category</th><th scope="col">Event</th><th scope="col" class="parameter-column" hidden>Parameter</th><th scope="col">Message</th></tr>
         <tr>
           <td></td><td></td><td></td><td></td>
           <td><select id="category-filter" aria-label="Filter by category"><option value="*">*</option></select></td>
           <td><select id="event-filter" aria-label="Filter by event"><option value="*">*</option></select></td>
-          <td class="source-column" hidden><select id="source-filter" aria-label="Filter by source"><option value="*">*</option></select></td>
+          <td class="parameter-column" hidden><select id="parameter-filter" aria-label="Filter by parameter"><option value="*">*</option></select></td>
           <td></td>
         </tr>
       </thead>
@@ -83,7 +83,7 @@
           <td class="metadata" title="{{ event.log_level }}">{{ event.log_level }}</td>
           <td title="{{ event.category }}">{{ event.category }}</td>
           <td title="{{ event.name }}">{{ event_label(event.category, event.name) }}</td>
-          <td class="source-column metadata" hidden>{{ event.source_name or '' }}</td>
+          <td class="parameter-column metadata" hidden>{{ event.parameter or '' }}</td>
           {% if event.name == simulation_events.SUBMITTED and event.category == simulation_events.CATEGORY %}
           <td class="content">Submitted <a href="/simulations/{{ event.process_id }}/config">config</a>.</td>
           {% elif event.prompt_text is defined %}
@@ -122,7 +122,7 @@
     const filters = [
       { id: 'category-filter', column: 4, value: '*' },
       { id: 'event-filter', column: 5, value: '*' },
-      { id: 'source-filter', column: 6, value: '*' }
+      { id: 'parameter-filter', column: 6, value: '*' }
     ];
     const eventChoices = {{ event_choices | tojson }};
     const promptLabel = {{ prompt_label | tojson }};
@@ -137,12 +137,12 @@
         if (!row.hidden) visible += 1;
       }
       main.querySelector('#no-filter-matches').hidden = rows.length === 0 || visible > 0;
-      const showSource = filters[1].value === promptLabel;
-      for (const cell of main.querySelectorAll('.source-column')) {
-        cell.hidden = !showSource;
+      const showParameter = filters[1].value === promptLabel;
+      for (const cell of main.querySelectorAll('.parameter-column')) {
+        cell.hidden = !showParameter;
       }
       for (const cell of main.querySelectorAll('.empty')) {
-        cell.colSpan = showSource ? 8 : 7;
+        cell.colSpan = showParameter ? 8 : 7;
       }
     }
 
@@ -152,7 +152,7 @@
       if (!values.has(filter.value)) filter.value = '*';
       select.replaceChildren(new Option('*', '*'));
       for (const value of Array.from(values).sort((a, b) => a.localeCompare(b))) {
-        select.add(new Option(value === '' ? '(No source)' : value, value));
+        select.add(new Option(value === '' ? '(No parameter)' : value, value));
       }
       select.value = filter.value;
     }
@@ -173,8 +173,8 @@
       populateFilter(filters[1], values);
     }
 
-    function updateSourceChoices(preserveSelection = false) {
-      const source = filters[2];
+    function updateParameterChoices(preserveSelection = false) {
+      const parameter = filters[2];
       const values = new Set();
       if (filters[1].value === promptLabel) {
         for (const row of main.querySelectorAll('.entry')) {
@@ -183,9 +183,9 @@
             values.add(row.cells[6].textContent);
           }
         }
-        if (preserveSelection && source.value !== '*') values.add(source.value);
+        if (preserveSelection && parameter.value !== '*') values.add(parameter.value);
       }
-      populateFilter(source, values);
+      populateFilter(parameter, values);
     }
 
     function initializeFilters() {
@@ -194,13 +194,13 @@
       if (filters[0].value !== '*') categories.add(filters[0].value);
       populateFilter(filters[0], categories);
       updateEventChoices(true);
-      updateSourceChoices(true);
+      updateParameterChoices(true);
       for (const filter of filters) {
         const select = main.querySelector(`#${filter.id}`);
         select.addEventListener('change', () => {
           filter.value = select.value;
           if (filter.id === 'category-filter') updateEventChoices();
-          if (filter.id !== 'source-filter') updateSourceChoices();
+          if (filter.id !== 'parameter-filter') updateParameterChoices();
           applyFilters();
         });
       }

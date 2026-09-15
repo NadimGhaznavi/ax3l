@@ -9,7 +9,7 @@ from ax3l.constants.DAx3l import DAx3l
 from ax3l.constants.DEventCategory import DEventCategory as Events
 
 
-async def converse(llm, output, db, tools, prompts) -> str:
+async def converse(llm, output, db, tools, prompts, *, parameter: str | None = None) -> str:
     process_id = str(uuid4())
     print(f"Conversation: {process_id}", flush=True)
     conversation_id = db.log(Events.Conversation.STARTED, Events.Conversation.CATEGORY,
@@ -17,7 +17,8 @@ async def converse(llm, output, db, tools, prompts) -> str:
 
     def log(category, name, content, level="INFO", *, source_name=None):
         return db.log(name, category.CATEGORY, level, content, process_id=process_id,
-                      parent_event_id=conversation_id, source_name=source_name)
+                      parent_event_id=conversation_id, source_name=source_name,
+                      parameter=parameter if category is Events.Conversation and name == Events.Conversation.PROMPT else None)
 
     outcome, level = "Simulation submitted.", "INFO"
     try:

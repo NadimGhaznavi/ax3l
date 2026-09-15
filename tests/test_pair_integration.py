@@ -28,6 +28,8 @@ class PairIntegrationTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(asyncio.CancelledError):
                 await optimize(Mock(), Path('/tmp'), Mock(), 'endpoint')
             self.assertEqual([call.args[1] for call in tools.call_args_list], ROUND_ROBIN_ORDER + ROUND_ROBIN_ORDER[:1])
+            self.assertEqual([call.kwargs['parameter'] for call in conversation.call_args_list],
+                             ROUND_ROBIN_ORDER + ROUND_ROBIN_ORDER[:1])
             epsilon.assert_called_once_with('gold')
             reward.assert_called_once_with('gold')
             epsilon_prompts = conversation.call_args_list[5].args[4]
@@ -51,7 +53,11 @@ class PairIntegrationTests(unittest.IsolatedAsyncioTestCase):
             'properties': {'value_1': {}, 'value_2': {}}}}}, submit=AsyncMock(side_effect=[
                 {'status': 'rejected', 'prompt': {'role': 'user', 'content': 'Duplicate pair'}},
                 {'status': 'ok', 'run_id': 'next'}]))
-        self.assertEqual(await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('pair')]), 'next')
+        db = Mock()
+        self.assertEqual(await converse(llm, Path('/tmp'), db, tools, [Prompt('pair')],
+                                        parameter='epsilon_pair'), 'next')
+        prompt_logs = [call for call in db.log.call_args_list if call.args[0] == 'prompt_sent']
+        self.assertEqual([call.kwargs['parameter'] for call in prompt_logs], ['epsilon_pair'] * 4)
         self.assertEqual([call.args[0] for call in tools.submit.await_args_list], [
             {'value_1': .91, 'value_2': .95}, {'value_1': .92, 'value_2': .96}])
         messages = json.loads(llm.complete.call_args.args[0])['messages']

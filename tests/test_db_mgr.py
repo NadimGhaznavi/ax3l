@@ -75,7 +75,7 @@ class DbMgrTests(unittest.TestCase):
 
         prompt_id = self.db.log(
             "prompt_sent", "Conversation", "INFO", "Describe the configuration.",
-            process_id=self.process_id, source_name="GoldenConfig",
+            process_id=self.process_id, source_name="GoldenConfig", parameter="reward_pair",
         )
         content = "A tree's quiet shade 🌳\nSecond line"
         reply_id = self.db.log(
@@ -88,6 +88,10 @@ class DbMgrTests(unittest.TestCase):
             from ax3l.app.EventLogDb import EventLogDb
             self.assertEqual(EventLogDb(reader).get(prompt_id)['source_name'], 'GoldenConfig')
             self.assertIsNone(EventLogDb(reader).get(reply_id)['source_name'])
+            self.assertEqual(EventLogDb(reader).get(prompt_id)['parameter'], 'reward_pair')
+            self.assertIsNone(EventLogDb(reader).get(reply_id)['parameter'])
+            recent = {row['event_id']: row for row in EventLogDb(reader).recent()}
+            self.assertEqual(recent[prompt_id]['parameter'], 'reward_pair')
             rows = reader.query(
                 """SELECT e.name, e.category, e.log_level, e.process_id,
                           e.parent_event_id, m.content

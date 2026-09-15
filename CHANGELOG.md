@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Record the assigned parameter on initial and retry prompt events. Replace the Event Log Source column and filter with Parameter; retain source in prompt details. The new event column requires recreating the event tables before running this version.
+- Increase the number of rounds before a seed reset from 3 to 6.
+
 ## [1.0.7] - 2026-09-14 @ 04:22
 
 ### Added

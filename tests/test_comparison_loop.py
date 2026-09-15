@@ -110,7 +110,7 @@ class LoopTests(unittest.IsolatedAsyncioTestCase):
         db = Mock()
         tools = Mock(definition={'function': {'name': 'submit_single_value', 'parameters': {'properties': {'value': {}}}}})
         tools.submit = AsyncMock(side_effect=[{'status': 'rejected', 'source_name': 'NoDupes', 'prompt': {'role': 'user', 'content': 'Duplicate value'}}, {'status': 'ok', 'run_id': 'next'}])
-        self.assertEqual(await converse(llm, Path('/tmp'), db, tools, [Prompt('initial')]), 'next')
+        self.assertEqual(await converse(llm, Path('/tmp'), db, tools, [Prompt('initial')], parameter='learning_rate'), 'next')
         first, second = [json.loads(call.args[0]) for call in llm.complete.call_args_list]
         self.assertEqual(len(first['messages']), 1)
         self.assertEqual(second['messages'][2]['tool_call_id'], 'call-0.002')
@@ -120,6 +120,9 @@ class LoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(names.count('prompt_sent'), 2)
         prompt_logs = [call for call in db.log.call_args_list if call.args[0] == 'prompt_sent']
         self.assertEqual([call.kwargs['source_name'] for call in prompt_logs], ['Prompt', 'NoDupes'])
+        self.assertEqual([call.kwargs['parameter'] for call in prompt_logs], ['learning_rate'] * 2)
+        self.assertTrue(all(call.kwargs.get('parameter') is None
+                            for call in db.log.call_args_list if call.args[0] != 'prompt_sent'))
         self.assertEqual(first['messages'], [{'role': 'user', 'content': 'initial'}])
         self.assertEqual(names.count('tool_execution_completed'), 2)
         self.assertEqual(names[-1], 'conversation_ended')

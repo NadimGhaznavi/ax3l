@@ -4,7 +4,7 @@
     body { margin: 1.5rem auto; padding: 1rem; max-width: 1200px; background: #0b1119; color: var(--text); font: 15px/1.6 "Courier New", Courier, monospace; }
     header, section { border: 1px solid var(--border); margin-bottom: 1rem; background: #101720; }
     header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem; }
-    h1 { margin: 0; font-size: 1.5rem; }
+    h1, .server-bar h2 { margin: 0; font-size: 1.5rem; }
     h2 { margin: 0; padding: .6rem 1rem; border-bottom: 1px solid var(--border); background: #151f2b; font-size: 1rem; }
     a { color: var(--link); border: 1px solid var(--border); padding: .4rem .75rem; }
     a:hover { background: #23364b; }
@@ -27,6 +27,8 @@
     body.events-page { max-width: none; }
     .server-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem; padding: 1rem; }
     .server-bar h2 { padding: 0; border: 0; background: transparent; }
+    .event-log-panel { padding: 1rem; }
+    .event-log-panel > header { border: 0; padding: 0; }
     #last-refreshed { white-space: nowrap; }
     .experiment-status { flex-direction: column; align-items: flex-start; gap: .5rem; }
     .note { margin: 1rem 0; padding: .6rem 1rem; border: 1px solid var(--border); }

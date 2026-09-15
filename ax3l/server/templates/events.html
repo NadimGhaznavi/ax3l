@@ -20,8 +20,9 @@
     <a href="/experiment-highscores">Experiment Highscores</a>
     <a href="/golden-configurations">Golden Configurations</a>
   </section>
+  <section class="event-log-panel" aria-labelledby="event-log-title">
   <header>
-    <h1>Ax3l Event Log</h1>
+    <h1 id="event-log-title">Ax3l Event Log</h1>
     <div>
       <label for="refresh-interval">Refresh:</label>
       <select id="refresh-interval">
@@ -77,6 +78,7 @@
       </tbody>
     </table>
   </main>
+  </section>
   <script>
     const lastRefreshed = document.querySelector('#last-refreshed');
     function updateLastRefreshed() {

@@ -84,7 +84,7 @@
           <td class="metadata" title="{{ event.log_level }}">{{ event.log_level }}</td>
           <td title="{{ event.category }}">{{ event.category }}</td>
           <td title="{{ event.name }}">{{ event_label(event.category, event.name) }}</td>
-          <td class="parameter-column metadata" hidden>{{ event.parameter or '' }}</td>
+          <td class="parameter-column metadata" hidden>{{ field_labels.get(event.parameter, event.parameter) or '' }}</td>
           {% if event.name == simulation_events.SUBMITTED and event.category == simulation_events.CATEGORY %}
           <td class="content">Submitted <a href="/simulations/{{ event.process_id }}/config">config</a>.</td>
           {% elif event.prompt_text is defined %}

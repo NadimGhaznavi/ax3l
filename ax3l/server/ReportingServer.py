@@ -17,6 +17,7 @@ from ax3l.activity.ScoreDistribution import distribution
 from ax3l.activity.ExperimentHighscores import highscores
 from ax3l.activity.GoldenConfigurations import parameter_change
 from ax3l.constants.DReportMgr import DReportMgr
+from ax3l.constants.DLabel import FIELD_TO_LABEL_MAP
 from ax3l.interface.SnakeLab import SnakeLab
 
 
@@ -25,6 +26,7 @@ def make_server(host: str, port: int) -> HTTPServer:
         loader=FileSystemLoader(Path(__file__).with_name("templates")),
         autoescape=select_autoescape(["html"]),
     )
+    templates.globals["field_labels"] = FIELD_TO_LABEL_MAP
     template = templates.get_template("events.html")
     templates.globals["event_label"] = DEventCategory.label
     templates.globals["event_choices"] = {
@@ -51,7 +53,7 @@ def make_server(host: str, port: int) -> HTTPServer:
                         db.close()
                     for config in configs:
                         config["has_reason"] = bool(reasoning_content(config.pop("response", None)))
-                        config["change"] = parameter_change(config.get("decision"))
+                        config["change"] = parameter_change(config.get("decision"), config.get("parameter"))
                     body = templates.get_template("golden_configurations.html").render(
                         configs=configs
                     ).encode("utf-8")

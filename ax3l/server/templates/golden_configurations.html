@@ -4,23 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Golden Configurations · Ax3l</title>
-  <style>
-    :root { color-scheme: dark; }
-    body { margin: 1.5rem auto; padding: 1rem; max-width: 1200px; background: #050a06; color: #80ff98; font: 15px/1.6 "Courier New", Courier, monospace; }
-    header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; }
-    h1 { font-size: 1.5rem; }
-    a { color: inherit; }
-    main { overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { border: 1px solid #347746; padding: .5rem .75rem; text-align: left; white-space: nowrap; }
-    th { background: #0d1c11; }
-    tbody tr:nth-child(even) { background: #13271a; }
-  </style>
+  {% include "report_styles.html" %}
 </head>
 <body>
   <header><h1>Golden Configurations</h1><a href="/">Back to event log</a></header>
-  <main>
-    <table aria-label="Golden configurations">
+  <main class="panel">
+    <table class="wide-table" aria-label="Golden configurations">
       <thead><tr><th scope="col">Date</th><th scope="col">Time</th><th scope="col">Golden Config</th><th scope="col">High Score</th><th scope="col">Parameter</th><th scope="col">Change</th><th scope="col">Reason</th></tr></thead>
       <tbody>
         {% for config in configs %}

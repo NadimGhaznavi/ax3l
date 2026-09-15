@@ -41,6 +41,37 @@ class EventLogDb:
         """, (category.CATEGORY, category.GOLDEN_CREATED))
         return rows[0] if rows else None
 
+    def golden_configurations(self) -> list[dict[str, Any]]:
+        """Include every baseline/promotion and the response that proposed its run."""
+        return self._db.query("""
+            WITH successful_tools AS (
+                SELECT e.event_id, e.process_id,
+                       JSON_UNQUOTE(JSON_EXTRACT(CASE WHEN JSON_VALID(m.content) THEN m.content ELSE '{}' END,
+                                                 '$.run_id')) AS run_id
+                FROM events e JOIN event_messages m USING (event_id)
+                WHERE e.category = 'Tool' AND e.name = 'tool_execution_completed'
+                  AND JSON_UNQUOTE(JSON_EXTRACT(CASE WHEN JSON_VALID(m.content) THEN m.content ELSE '{}' END,
+                                               '$.status')) = 'ok'
+            )
+            SELECT g.event_id, g.occurred_at, g.process_id, p.parameter, h.score AS high_score,
+                   r.event_id AS reply_id, rm.content AS response
+            FROM events g
+            LEFT JOIN experiment_highscores h ON h.event_id = g.event_id
+            LEFT JOIN successful_tools t ON t.event_id = (
+                SELECT MIN(event_id) FROM successful_tools WHERE run_id = g.process_id)
+            LEFT JOIN events r ON r.event_id = (
+                SELECT MAX(event_id) FROM events
+                WHERE process_id = t.process_id AND event_id < t.event_id
+                  AND category = 'Conversation' AND name = 'reply_received')
+            LEFT JOIN event_messages rm ON rm.event_id = r.event_id
+            LEFT JOIN events p ON p.event_id = (
+                SELECT MAX(event_id) FROM events
+                WHERE process_id = r.process_id AND event_id < r.event_id
+                  AND category = 'Conversation' AND name = 'prompt_sent')
+            WHERE g.category = %s AND g.name = %s
+            ORDER BY g.occurred_at DESC, g.event_id DESC
+        """, (DEventCategory.Configuration.CATEGORY, DEventCategory.Configuration.GOLDEN_CREATED))
+
     def latest_snakelab_proposal(self) -> dict[str, Any] | None:
         """Recover the latest accepted run and its recorded comparison, if any."""
         category = DEventCategory.Configuration

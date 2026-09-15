@@ -20,6 +20,9 @@
     p { overflow-wrap: anywhere; color: var(--muted); }
     main.panel { border: 1px solid var(--border); background: #101720; overflow-x: auto; }
     .chart-page main { padding: .5rem; }
+    .report-description { padding: 1rem; }
+    .report-description p:first-child { margin-top: 0; }
+    .report-description p:last-child { margin-bottom: 0; }
     .wide-table { table-layout: auto; }
     .wide-table th { width: auto; background: #151f2b; }
     .wide-table th, .wide-table td { white-space: nowrap; }
@@ -31,6 +34,11 @@
     .event-log-panel > header { border: 0; padding: 0; }
     #last-refreshed { white-space: nowrap; }
     .experiment-status { flex-direction: column; align-items: flex-start; gap: .5rem; }
+    .experiment-metrics, .experiment-reports, .report-links { width: 100%; border: 1px solid var(--border); padding: .75rem 1rem; }
+    .experiment-metrics, .report-links { display: flex; flex-direction: column; align-items: flex-start; gap: .35rem; }
+    .experiment-reports { margin: 0; }
+    .experiment-reports h3 { margin: 0 0 .75rem; font-size: 1.1rem; }
+    .report-links a { border: 0; padding: 0; overflow-wrap: anywhere; }
     .note { margin: 1rem 0; padding: .6rem 1rem; border: 1px solid var(--border); }
     .events-page th:not(:last-child), .events-page td:not(:last-child) { width: 1%; }
     .entry:hover { background: #23364b; }

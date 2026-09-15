@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Record the Ax3l project version on simulation submission events, including default configurations, parameter proposals, and seed rotations. Seed rotation recovery preserves the version recorded before submission. Requires fresh event tables; no migration is provided.
 - Record the assigned parameter on initial and retry prompt events. Replace the Event Log Source column and filter with Parameter; retain source in prompt details. The new event column requires recreating the event tables before running this version.
-- Increase the number of rounds before a seed reset from 3 to 6.
+- Increase the number of rounds before a seed reset from 3 to 9.
 
 ## [1.0.7] - 2026-09-14 @ 04:22
 

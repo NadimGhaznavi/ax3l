@@ -13,12 +13,19 @@
   </section>
   <section class="server-bar experiment-status" aria-labelledby="experiment-status">
     <h2 id="experiment-status">Experiment Status</h2>
+    <div class="experiment-metrics">
     <span id="experiment-high-score" role="status">Current Highscore: {{ high_score if high_score is not none else '—' }}</span>
     <span id="simulations-submitted" role="status">Simulations Submitted: {{ simulations_submitted }}</span>
     <span id="experiment-cycles" role="status">Experiment Cycles: {{ experiment_cycles }}</span>
+    </div>
+    <section class="experiment-reports" aria-labelledby="reports-title">
+    <h3 id="reports-title">Reports</h3>
+    <nav class="report-links" aria-labelledby="reports-title">
     <a href="/score-distribution">Score Distribution Histogram</a>
     <a href="/experiment-highscores">Experiment Highscores</a>
     <a href="/golden-configurations">Golden Configurations</a>
+    </nav>
+    </section>
   </section>
   <section class="event-log-panel" aria-labelledby="event-log-title">
   <header>

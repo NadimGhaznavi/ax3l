@@ -8,6 +8,7 @@
 </head>
 <body class="chart-page">
   <header><h1>Experiment High Scores</h1><a href="/">Back to event log</a></header>
+  <section class="report-description" aria-label="About the high scores plot">
   <p>
     Simulations submitted: {{ total }}.
     The line shows the current accepted configuration’s high score over time.
@@ -15,6 +16,7 @@
     Hover over an accepted point to see the seed, run ID, and reason for acceptance.
     Reload to update.
   </p>
+  </section>
   <main class="panel">
     {% if chart %}
     {{ chart | safe }}
@@ -25,4 +27,3 @@
   </main>
 </body>
 </html>
-

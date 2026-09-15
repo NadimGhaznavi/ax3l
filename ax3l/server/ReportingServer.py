@@ -1,6 +1,7 @@
 import argparse
 import json
 import re
+import socket
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 import traceback
@@ -166,6 +167,7 @@ def make_server(host: str, port: int) -> HTTPServer:
                                 if golden else None
                             )
                             body = template.render(
+                                hostname=socket.gethostname(),
                                 events=events,
                                 snake_lab_status=snake_lab_status,
                                 high_score=current_run["high_score"] if current_run else None,

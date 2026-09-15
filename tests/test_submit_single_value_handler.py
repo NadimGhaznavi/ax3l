@@ -2,6 +2,7 @@ from copy import deepcopy
 import unittest
 from unittest.mock import Mock, patch
 
+from ax3l.constants.DAx3l import DAx3l
 from ax3l.app.snakelab.GenerateDefaultConfig import GenerateDefaultConfig
 from ax3l.app.snakelab.SubmitSingleValueHandler import SubmitSingleValueHandler
 
@@ -54,6 +55,7 @@ class SubmitSingleValueHandlerTests(unittest.TestCase):
         self.assertEqual(result, {'status': 'ok', 'run_id': 'new-run'})
         self.snake.is_config_unique.assert_called_once_with(candidate)
         self.snake.submit_simulation.assert_called_once_with(candidate)
+        self.assertEqual(self.db.log.call_args.kwargs["ax3l_version"], DAx3l.VERSION)
         self.assertEqual(self.baseline, original)
         self.assertEqual([c.args[0] for c in self.db.log.call_args_list],
                          ['proposal_accepted', 'simulation_submitted'])

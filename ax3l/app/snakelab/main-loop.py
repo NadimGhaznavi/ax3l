@@ -39,7 +39,7 @@ def initialize_simulation(db: DbMgr) -> None:
         run_id = snake.submit_simulation(GenerateDefaultConfig().run())
         submitted_id = db.log(
             DEventCategory.SnakeLab.SUBMITTED, DEventCategory.SnakeLab.CATEGORY, "INFO", "Submitted config.",
-            process_id=run_id,
+            process_id=run_id, ax3l_version=DAx3l.VERSION,
         )
     started = False
     while True:

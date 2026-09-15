@@ -11,6 +11,7 @@ from ax3l.app.ConfigurationLog import ConfigurationLog
 from ax3l.app.EventLogDb import EventLogDb
 from ax3l.constants.DEventCategory import DEventCategory as Events
 from ax3l.constants.DSnakeLab import DSnakeLab
+from ax3l.constants.DAx3l import DAx3l
 
 
 async def rotate_if_needed(snake, db, wait_for_run, *, resume_only=False) -> str | None:
@@ -29,8 +30,9 @@ async def rotate_if_needed(snake, db, wait_for_run, *, resume_only=False) -> str
         Draft202012Validator(schema).validate(config)
         intent_id = db.log(Events.Configuration.SEED_ROTATION_STARTED, Events.Configuration.CATEGORY,
                            "INFO", json.dumps({"config": config, "golden_run_id": golden_id}),
-                           process_id=str(uuid4()))
-        pending = {"event_id": intent_id, "run_id": None, "submitted_event_id": None}
+                           process_id=str(uuid4()), ax3l_version=DAx3l.VERSION)
+        pending = {"event_id": intent_id, "run_id": None, "submitted_event_id": None,
+                   "ax3l_version": DAx3l.VERSION}
     else:
         config = json.loads(pending["content"])["config"]
     run_id = pending["run_id"]
@@ -47,7 +49,7 @@ async def rotate_if_needed(snake, db, wait_for_run, *, resume_only=False) -> str
             process_id=run_id, parent_event_id=pending["event_id"])
         db.log(Events.SnakeLab.SUBMITTED, Events.SnakeLab.CATEGORY, "INFO",
                "Submitted config for a fresh baseline.", process_id=run_id,
-               parent_event_id=pending["submitted_event_id"])
+               parent_event_id=pending["submitted_event_id"], ax3l_version=pending.get("ax3l_version"))
     await wait_for_run(snake, db, run_id)
     result = snake.get_run_result(run_id)
     if result is None or result["status"] != "completed" or result["high_score"] is None:

@@ -80,7 +80,11 @@ class ExperimentStatusTests(unittest.TestCase):
         try:
             for submitted, cycles, score in ((0, 0, None), (17, 3, 60)):
                 snake.get_num_sims.return_value = submitted
-                snake.get_high_score.return_value = score
+                snake.get_high_score.return_value = 999
+                log.current_golden_config.return_value = {'process_id': 'current-run'} if score is not None else None
+                snake.get_run_summary.return_value = {'high_score': score, 'high_score_snapshot': {
+                    'board': {'grid_size': [4, 3], 'snake_head': [2, 1],
+                              'snake_body': [[1, 1]], 'food': [3, 2]}}}
                 log.experiment_cycles.return_value = cycles
                 with urlopen(f'http://127.0.0.1:{server.server_port}/') as response:
                     page = response.read().decode()
@@ -88,6 +92,14 @@ class ExperimentStatusTests(unittest.TestCase):
                 self.assertIn(f'Experiment Cycles: {cycles}', page)
                 self.assertIn(f"Current Highscore: {score if score is not None else '—'}", page)
                 self.assertIn('class="server-bar experiment-status"', page)
+                if score is not None:
+                    snake.get_run_summary.assert_called_with('current-run')
+                    self.assertIn('viewBox="0 0 128 96"', page)
+                else:
+                    self.assertIn('No saved board is available for the current configuration.', page)
+                self.assertIn('All-Time Highscore: 999', page)
+                self.assertIn("page.querySelector('#experiment-all-time-high-score').textContent", page)
+                self.assertIn("page.querySelector('#current-board').childNodes", page)
                 self.assertIn('href="/score-distribution">Score Distribution Histogram</a>', page)
                 self.assertIn('href="/experiment-highscores">Experiment Highscores</a>', page)
                 self.assertIn('href="/golden-configurations">Golden Configurations</a>', page)

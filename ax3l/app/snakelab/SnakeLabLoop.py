@@ -133,7 +133,7 @@ async def optimize(llm, output, db, endpoint):
         if first_contact:
             prompts.insert(0, FirstContact())
         async with SnakeLabTools(endpoint, parameter) as tools:
-            latest_id = await converse(llm, output, db, tools, prompts)
+            latest_id = await converse(llm, output, db, tools, prompts, parameter=parameter)
         await wait_for_run(snake, db, latest_id)
         while snake.is_simulation_running():
             await asyncio.sleep(DSnakeLab.STATUS_POLL_SECONDS)

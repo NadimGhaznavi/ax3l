@@ -11,6 +11,32 @@ from unittest.mock import patch
 
 
 class ExperimentStatusTests(unittest.TestCase):
+    def test_parameter_in_list_and_source_retained_in_detail(self):
+        from datetime import datetime
+        from pathlib import Path
+        from jinja2 import Environment, FileSystemLoader, select_autoescape
+        from ax3l.constants.DEventCategory import DEventCategory as Events
+
+        templates = Environment(
+            loader=FileSystemLoader(Path(__file__).parents[1] / 'ax3l/server/templates'),
+            autoescape=select_autoescape(['html']))
+        for parameter in ('learning_rate', 'epsilon_pair', 'reward_pair', None, '<unsafe>'):
+            with self.subTest(parameter=parameter):
+                event = dict(event_id=123, occurred_at=datetime.now(), log_level='INFO',
+                             category='Conversation', name='prompt_sent', source_name='GoldenConfig',
+                             parameter=parameter, content='Choose a value.', prompt_text='Choose a value.')
+                page = templates.get_template('events.html').render(
+                    events=[event], high_score=None, event_label=Events.label, event_choices={},
+                    prompt_label='Prompt', simulation_events=Events.SnakeLab, request_timeout_seconds=10)
+                self.assertIn('id="parameter-filter"', page)
+                self.assertNotIn('source-filter', page)
+                self.assertNotIn('GoldenConfig', page)
+                expected = '&lt;unsafe&gt;' if parameter == '<unsafe>' else parameter or ''
+                self.assertIn(f'class="parameter-column metadata" hidden>{expected}</td>', page)
+                detail = templates.get_template('prompt.html').render(event=event, parts=[])
+                self.assertIn('GoldenConfig', detail)
+                self.assertIn(f'<td>{expected or "—"}</td>', detail)
+
     def test_prompt_detail_source_title_and_escaping(self):
         from ax3l.server.ReportingServer import make_server
 

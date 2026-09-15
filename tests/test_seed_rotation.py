@@ -2,6 +2,7 @@ import json
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
+from ax3l.constants.DAx3l import DAx3l
 from ax3l.app.snakelab.GenerateDefaultConfig import GenerateDefaultConfig
 from ax3l.app.snakelab.SeedRotation import rotate_if_needed
 from ax3l.constants.DSnakeLab import DSnakeLab
@@ -9,8 +10,8 @@ from ax3l.constants.DSnakeLab import DSnakeLab
 
 class SeedRotationTests(unittest.IsolatedAsyncioTestCase):
     async def test_threshold_changes_only_seed_and_accepts_lower_baseline(self):
-        self.assertEqual(DSnakeLab.SEED_STAGNANT_ROUNDS, 3)
-        for rounds in (2, 3):
+        threshold = DSnakeLab.SEED_STAGNANT_ROUNDS
+        for rounds in (threshold - 1, threshold):
             with self.subTest(rounds=rounds), patch('ax3l.app.snakelab.SeedRotation.EventLogDb') as factory:
                 events = factory.return_value
                 events.pending_seed_rotation.return_value = None
@@ -24,12 +25,14 @@ class SeedRotationTests(unittest.IsolatedAsyncioTestCase):
                 snake.submit_simulation.return_value = 'new'
                 snake.get_run_result.return_value = {'status': 'completed', 'high_score': 1}
                 run_id = await rotate_if_needed(snake, db, wait)
-                if rounds == 2:
+                if rounds < threshold:
                     self.assertIsNone(run_id)
                     snake.submit_simulation.assert_not_called()
                     wait.assert_not_awaited()
                 else:
                     self.assertEqual(run_id, 'new')
+                    submission = next(c for c in db.log.call_args_list if c.args[0] == 'simulation_submitted')
+                    self.assertEqual(submission.kwargs['ax3l_version'], DAx3l.VERSION)
                     snake.submit_simulation.assert_called_once_with({**config, 'seed': config['seed'] + 1})
                     wait.assert_awaited_once_with(snake, db, 'new')
                     self.assertEqual(db.log.call_args.args[0], 'golden_config_created')
@@ -44,13 +47,15 @@ class SeedRotationTests(unittest.IsolatedAsyncioTestCase):
             config['seed'] += 1
             factory.return_value.pending_seed_rotation.return_value = {
                 'event_id': 2, 'run_id': None, 'submitted_event_id': None,
-                'content': json.dumps({'config': config})}
+                'content': json.dumps({'config': config}), 'ax3l_version': '0.9.0'}
             snake, db, wait = Mock(), Mock(), AsyncMock()
             snake.find_config_run.return_value = 'recovered'
             snake.get_run_result.return_value = {'status': 'completed', 'high_score': 0}
             self.assertEqual(await rotate_if_needed(snake, db, wait), 'recovered')
             snake.submit_simulation.assert_not_called()
             wait.assert_awaited_once_with(snake, db, 'recovered')
+            submission = next(c for c in db.log.call_args_list if c.args[0] == 'simulation_submitted')
+            self.assertEqual(submission.kwargs['ax3l_version'], '0.9.0')
 
     async def test_unknown_submission_or_failed_baseline_does_not_promote(self):
         for found in (None, 'failed'):

@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add a Golden Configurations report with every baseline and promotion, newest first, including its recorded high score and links to the saved configuration and the proposing LLM response's reasoning.
+- Add a Golden Configurations report with every baseline and promotion, newest first, including its recorded high score, parameter value change, and links to the saved configuration and the proposing LLM response's reasoning.
 
 ## [1.0.8] - 2026-09-15 @ 04:42
 

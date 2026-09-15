@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-15 @ 05:27
+
 ### Added
 
 - Add a Golden Configurations report with every baseline and promotion, newest first, including its recorded high score and links to the saved configuration and the proposing LLM response's reasoning.

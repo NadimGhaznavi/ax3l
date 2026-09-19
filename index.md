@@ -6,21 +6,25 @@ layout: single
 
 ![Ax3l Logo](/pages/images/ax3l.png)
 
-The **Ax3l Project uses** a locally hosted [Large Language Model (LLM)](https://en.wikipedia.org/wiki/Large_language_model) to run experiments and learn from their results. This project asks the question, "Can an LLM can tune the configuration of another AI that is learning to play Snake?". The project includes a rich reporting server to track ongoing progress.
+The **Ax3l Project uses** a locally hosted [Large Language Model (LLM)](https://en.wikipedia.org/wiki/Large_language_model) to run experiments and learn from their results. This project asks the question, "Can an LLM tune the configuration of another AI that is learning to play Snake?". The project includes a rich reporting server to track ongoing progress.
 
 Ax3l uses the [Snake Lab Server](https://snakelabserver.osoyalce.com), which accepts configuration requests for AI Snake simulations. Snake Lab runs the simulation and stores the results in a database.
 
 Ax3l analyzes those results, adjusts the configuration, and submits a new simulation. This creates a continuous experimental loop in which the LLM explores the configuration space and attempts to improve the Snake AI's performance over time.
 
-## Live Exeriment Data
+---
+
+## Live Experiment Data
 
 This is a long-running project expected to operate for well over a month. The current experiment began on **September 15, 2026**. Real-time project status can be viewed:
 
 - [Live Site](https://snakeweb.osoyalce.com) with event log
 - [Simulation Scores Distribution Histogram](https://snakeweb.osoyalce.com/reports/score-distribution.html)
-- [Simulation Highscore History Plot](https://snakeweb.osoyalce.com/reports/experiment-highscores.html)
+- [Simulation Highscore History](https://snakeweb.osoyalce.com/reports/experiment-highscores.html)
 - [Gallery of the Snake in Action](https://snakeweb.osoyalce.com/reports/top-100.html)
 - [A random sampling of the LLM's Thinking](https://snakeweb.osoyalce.com/reports/ax3l-thinking.html)
+
+---
 
 ## Project Documentation
 

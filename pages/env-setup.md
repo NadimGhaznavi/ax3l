@@ -11,5 +11,6 @@ layout: single
 - [LLM Model Setup](/pages/qwen-3.5-model-setup)
 - [Llama.cpp Setup](/pages/llama-cpp)
 
+---
 
-
+[Back](/)

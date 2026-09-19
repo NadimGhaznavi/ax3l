@@ -45,3 +45,6 @@ The MCP tool framework is a feature of llama.cpp and is well supported by the Qw
 - Monitors the `ax3l-server` service through systemd.
 - Monitors the selected Qwen, Phi, or Qwen Vision server through its `/health` endpoint.
 
+---
+
+[Back](/)

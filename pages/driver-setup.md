@@ -91,3 +91,7 @@ Built on Thu_Mar_28_02:18:24_PDT_2024
 Cuda compilation tools, release 12.4, V12.4.131
 Build cuda_12.4.r12.4/compiler.34097967_0
 ```
+
+---
+
+[Back](/env-setup)

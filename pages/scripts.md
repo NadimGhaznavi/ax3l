@@ -68,9 +68,9 @@ model file before switching to it in production.
 The operator runs releases:
 
 ```sh
-scripts/new-release.sh <version> "Release message" [next-feature-branch]
+scripts/new-release.sh <version> "Release message"
 ```
 
 Run from a clean feature branch with local `dev` and `main` up to date. The script
 updates the version and changelog, merges through `dev` to `main`, tags and pushes
-the release, then creates the next feature branch. It does not deploy the release.
+the release, then creates the next feature branch. It does not deploy the release on a remote system.

@@ -26,3 +26,7 @@ Add the library search path to the system. **As root**:
 echo '/opt/prod/llama.cpp-0.4.0/lib' > /etc/ld.so.conf.d/llama.cpp.conf
 ldconfig
 ```
+
+---
+
+[Back](/env-setup)

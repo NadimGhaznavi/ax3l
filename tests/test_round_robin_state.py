@@ -35,6 +35,21 @@ class EventDb:
 
 
 class RoundRobinTests(unittest.TestCase):
+    def test_exhausted_steps_survive_restart_and_count_toward_cycles(self):
+        self.db.log('golden_config_created')
+        for turn in range(21):
+            parameter = self.restart()
+            self.assertEqual(parameter, self.order[turn % len(self.order)])
+            if parameter in ('sequence_length', 'reward_pair'):
+                RoundRobinState(self.db).skip_exhausted(parameter)
+            else:
+                self.db.log('proposal_accepted', process_id=str(turn))
+                self.db.log('configuration_compared', process_id=str(turn))
+            self.assertEqual(EventLogDb(self.db).stagnant_rounds(), (turn + 1) // len(self.order))
+            self.assertEqual(EventLogDb(self.db).experiment_cycles(), (turn + 1) // len(self.order))
+        self.assertEqual(self.restart(), self.order[0])
+        self.assertEqual(self.restart(), self.order[0])
+
     def setUp(self):
         folder = tempfile.TemporaryDirectory()
         self.addCleanup(folder.cleanup)

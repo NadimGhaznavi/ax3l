@@ -16,6 +16,7 @@ class PairIntegrationTests(unittest.IsolatedAsyncioTestCase):
     async def test_cycle_selects_pair_reports_prompts_and_bound_tools(self):
         module = 'ax3l.app.snakelab.SnakeLabLoop.'
         snake = Mock()
+        snake.parameter_space_exhausted.return_value = False
         snake.is_simulation_running.return_value = False
         snake.get_run_result.return_value = {'status': 'completed', 'high_score': 37}
         golden = Mock(run_id='gold')

@@ -96,8 +96,8 @@ class EventLogDb:
         """Count complete ordered passes since the last golden creation.
 
         An improvement in the middle of a pass discards that partial pass.
-        Count comparisons, not acceptances, so pending runs and retries cannot
-        trigger rotation. Durable events make this calculation restart-safe.
+        Count comparisons and exhausted steps, not acceptances, so pending runs
+        and retries cannot trigger rotation. Durable events survive restarts.
         """
         return self._completed_rounds(since_golden=True)
 
@@ -110,7 +110,7 @@ class EventLogDb:
 
         category = DEventCategory.Configuration
         rows = self._db.query("""
-            SELECT c.process_id, m.content
+            SELECT c.event_id AS completion_id, c.process_id, m.content
             FROM events c
             JOIN events p ON p.event_id = (
                 SELECT MIN(event_id) FROM events
@@ -121,18 +121,31 @@ class EventLogDb:
             JOIN event_messages m ON m.event_id = checkpoint.event_id
             WHERE c.category = %s AND c.name = %s AND (%s = 0 OR c.event_id > COALESCE(
                 (SELECT MAX(event_id) FROM events WHERE category = %s AND name = %s), 0))
-            ORDER BY c.event_id
+            UNION ALL
+            SELECT c.event_id AS completion_id, NULL AS process_id, m.content
+            FROM events c
+            JOIN events checkpoint ON checkpoint.event_id = (
+                SELECT MAX(event_id) FROM events
+                WHERE event_id < c.event_id AND category = %s AND name = %s)
+            JOIN event_messages m ON m.event_id = checkpoint.event_id
+            WHERE c.category = %s AND c.name = %s AND (%s = 0 OR c.event_id > COALESCE(
+                (SELECT MAX(event_id) FROM events WHERE category = %s AND name = %s), 0))
+            ORDER BY completion_id
         """, (category.CATEGORY, category.PROPOSAL_ACCEPTED,
                category.CATEGORY, "round_robin_checkpoint",
                category.CATEGORY, category.COMPARED, int(since_golden),
+               category.CATEGORY, category.GOLDEN_CREATED,
+               category.CATEGORY, "round_robin_checkpoint",
+               category.CATEGORY, category.PARAMETER_SPACE_EXHAUSTED, int(since_golden),
                category.CATEGORY, category.GOLDEN_CREATED))
         order = ROUND_ROBIN_ORDER
         rounds, expected = 0, 0
         seen = set()
         for row in rows:
-            if row["process_id"] in seen:
+            identity = row["process_id"] if row["process_id"] is not None else row["completion_id"]
+            if identity in seen:
                 continue
-            seen.add(row["process_id"])
+            seen.add(identity)
             checkpoint = json.loads(row["content"])
             if checkpoint["parameter_order"] != order:
                 raise ValueError("Search parameter order changed; reset experiment events before resuming")

@@ -11,9 +11,17 @@ Golden and seed changes preserve position. A changed schema parameter order
 requires resetting experiment events before resuming. There is no upgrade path
 for old five-entry checkpoints. A fresh experiment starts at hidden size.
 
+Before opening an LLM conversation, Ax3l checks finite schema domains (currently
+hidden size, sequence length, batch size, and the 49 reward pairs). If every legal
+choice already has a run with the current seed and all other settings unchanged,
+it records `parameter_space_exhausted` and advances to the next step. Runs in any
+status count as existing choices, matching duplicate-proposal validation. Earlier
+seeds and different settings do not exhaust the current domain. Skips survive
+restarts and count as completed steps; continuous domains are not skipped.
+
 Seed rotation occurs after `DSnakeLab.SEED_STAGNANT_ROUNDS` (3) complete
 round-robin cycles without a new high score. Each cycle includes all seven
-entries and counts only after its last simulation has been compared.
+entries and counts only once each step has been compared or skipped as exhausted.
 A new golden configuration resets the count; a cycle containing an improvement
 does not count as stagnant. Rotation increments the seed and reruns the golden
 configuration to establish a fresh score baseline. The count survives restarts.

@@ -22,21 +22,15 @@ migration is provided.
 
 | Event | Category |
 | --- | --- |
-| `service_started` | System |
-| `service_stopped` | System |
-| `service_failed` | System |
 | `conversation_started` | Conversation |
 | `conversation_ended` | Conversation |
 | `prompt_sent` | Conversation |
 | `reply_received` | Conversation |
 | `llm_request_failed` | LLM |
-| `llm_usage_recorded` | Metrics |
 | `tool_execution_started` | Tool |
 | `tool_request_received` | Tool |
 | `tool_execution_completed` | Tool |
 | `tool_execution_failed` | Tool |
-| `wait_started` | Process |
-| `wait_ended` | Process |
 | `simulation_submitted` | SnakeLab |
 | `simulation_queued` | SnakeLab |
 | `simulation_started` | SnakeLab |

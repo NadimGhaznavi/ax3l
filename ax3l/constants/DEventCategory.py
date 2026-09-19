@@ -4,17 +4,6 @@ from ax3l.entities.EventCategory import EventCategory
 
 
 class DEventCategory:
-    class System(EventCategory):
-        CATEGORY = "System"
-        STARTED = "service_started"
-        STOPPED = "service_stopped"
-        FAILED = "service_failed"
-        LABELS = {
-            STARTED: "Service started",
-            STOPPED: "Service stopped",
-            FAILED: "Service failed",
-        }
-
     class Conversation(EventCategory):
         CATEGORY = "Conversation"
         STARTED = "conversation_started"
@@ -35,13 +24,6 @@ class DEventCategory:
             REQUEST_FAILED: "Request failed",
         }
 
-    class Metrics(EventCategory):
-        CATEGORY = "Metrics"
-        USAGE_RECORDED = "llm_usage_recorded"
-        LABELS = {
-            USAGE_RECORDED: "LLM usage",
-        }
-
     class Tool(EventCategory):
         CATEGORY = "Tool"
         RECEIVED = "tool_request_received"
@@ -53,17 +35,6 @@ class DEventCategory:
             STARTED: "Started",
             COMPLETED: "Completed",
             FAILED: "Failed",
-        }
-
-    class Process(EventCategory):
-        CATEGORY = "Process"
-        WAIT_STARTED = "wait_started"
-        WAIT_ENDED = "wait_ended"
-        SLEEP = "sleep"
-        LABELS = {
-            WAIT_STARTED: "Sleep",
-            WAIT_ENDED: "Sleep",
-            SLEEP: "Sleep",
         }
 
     class SnakeLab(EventCategory):
@@ -111,7 +82,7 @@ class DEventCategory:
             GOLDEN_SEED_INCREMENTED: "Golden seed incremented",
         }
 
-    ALL = (System, Conversation, LLM, Metrics, Tool, Process, SnakeLab, Configuration)
+    ALL = (Conversation, LLM, Tool, SnakeLab, Configuration)
     BY_NAME = {category.CATEGORY: category for category in ALL}
 
     @classmethod

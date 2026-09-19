@@ -50,4 +50,5 @@ class RoundRobinState:
         """Durably complete this turn without submitting a duplicate proposal."""
         self.db.log(Events.Configuration.PARAMETER_SPACE_EXHAUSTED, Events.Configuration.CATEGORY, "INFO",
                     f"Skipping {parameter}: all legal choices already exist for the current "
-                    "seed and otherwise identical configuration.")
+                    "seed and otherwise identical configuration. Advancing to the next round-robin step.",
+                    parameter=parameter)

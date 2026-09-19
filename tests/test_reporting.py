@@ -11,6 +11,35 @@ from unittest.mock import patch
 
 
 class ExperimentStatusTests(unittest.TestCase):
+    def test_exhausted_parameter_event_is_visible_and_filterable(self):
+        from datetime import datetime
+        from pathlib import Path
+        from unittest.mock import Mock
+        from jinja2 import Environment, FileSystemLoader, select_autoescape
+        from ax3l.app.snakelab.RoundRobinState import RoundRobinState
+        from ax3l.constants.DEventCategory import DEventCategory as Events
+        from ax3l.constants.DLabel import FIELD_TO_LABEL_MAP
+
+        db = Mock()
+        RoundRobinState(db).skip_exhausted('sequence_length')
+        db.log.assert_called_once()
+        name, category, level, content = db.log.call_args.args
+        self.assertEqual(db.log.call_args.kwargs['parameter'], 'sequence_length')
+        self.assertEqual((name, category, level), ('parameter_space_exhausted', 'Configuration', 'INFO'))
+        event = dict(event_id=123, occurred_at=datetime.now(), name=name, category=category,
+                     log_level=level, content=content, **db.log.call_args.kwargs)
+        templates = Environment(
+            loader=FileSystemLoader(Path(__file__).parents[1] / 'ax3l/server/templates'),
+            autoescape=select_autoescape(['html']))
+        templates.globals['field_labels'] = FIELD_TO_LABEL_MAP
+        page = templates.get_template('events.html').render(
+            events=[event], high_score=None, event_label=Events.label, event_choices={},
+            prompt_label='Prompt', simulation_events=Events.SnakeLab, request_timeout_seconds=10)
+        self.assertIn('Parameter space exhausted', page)
+        self.assertIn('Skipping sequence_length:', page)
+        self.assertIn('Advancing to the next round-robin step.', page)
+        self.assertIn('class="parameter-column metadata" hidden>Sequence Length</td>', page)
+
     def test_parameter_in_list_and_source_retained_in_detail(self):
         from datetime import datetime
         from pathlib import Path

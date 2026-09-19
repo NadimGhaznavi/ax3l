@@ -9,16 +9,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.7] - 2026-09-19 @ 19:58
+
+### Summary
+
+- Remove unused categories from the Report Server's Event Log.
+- Add static project website content.
+
+### Added
+
+- Add an explanation of the *golden config* and *seed changes* to the website.
+
+### Removed
+
+- Remove unused Metrics, Process, and System categories from the Event Log catalog and filter choices.
+
+### Changed
+
+- Clarify and verify that seed rotation occurs after nine complete round-robin
+  cycles without improvement, including exhausted parameter skips. Regression
+  coverage checks restart recovery and renewed eligibility on a different seed.
+
 ## [1.3.6] - 2026-09-19 @ 12:08
 
 ### HotFix Summary
 
-This release addresses the scenario (reached at simulation number 885 in QA) where all available, legal parameter choices have been exhausted for the current parameter (e.g. *sequence length*, which is finite). In that case, the system will skip that parameter. Other parameters will continue to be tuned. If a new configuration is found that achieves a new highscore, then the parameter will be searched again.
+This release addresses the scenario (reached at simulation number 885 in QA) where all legal choices for a finite parameter space, such as sequence length, have already been tried. Ax3l skips that parameter and advances to the next round-robin step. Exhaustion is checked against the current seed and otherwise identical settings, so a change to either can make choices available again.
 
 ### Fixed
 
 - Skip exhausted finite parameter spaces before starting an LLM conversation,
   preserving round-robin progress and seed-rotation cycle counts across restarts.
+- Record each skip as an INFO-level "Parameter space exhausted" entry in the
+  Display Manager Event Log, including the parameter for filtering and a message
+  explaining that Ax3l is advancing to the next round-robin step.
 
 ## [1.3.5] - 2026-09-19 @ 11:36
 

@@ -8,7 +8,7 @@ layout: single
 
 ## DB Collation Mismatch
 
-The *Snake Lab* and *Ax3l* DBs are using different collation settings making cross DB comparisons cumbersome.
+The *Snake Lab* and *Ax3l* DBs are using different collation settings, making comparisons across databases cumbersome.
 
 | Collation               | What it means                                                        | Good for                   |
 | ----------------------- | -------------------------------------------------------------------- | -------------------------- |

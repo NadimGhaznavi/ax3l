@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.6] - 2026-09-19 @ 12:08
+
 ### HotFix Summary
 
 This release addresses the scenario (reached at simulation number 885 in QA) where all available, legal parameter choices have been exhausted for the current parameter (e.g. *sequence length*, which is finite). In that case, the system will skip that parameter. Other parameters will continue to be tuned. If a new configuration is found that achieves a new highscore, then the parameter will be searched again.

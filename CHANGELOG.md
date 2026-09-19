@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.5] - 2026-09-19 @ 07:15
+
 ### Changed
 
 - Widen the Golden Configurations report from 1200px to 1600px to give its columns more room.

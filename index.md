@@ -6,40 +6,16 @@ layout: single
 
 ![Ax3l Logo](/pages/images/ax3l.png)
 
-# The Ax3l Project
+The **Ax3l Project uses** a locally hosted [Large Language Model (LLM)](https://en.wikipedia.org/wiki/Large_language_model) to run experiments and learn from their results. The experiment asks whether an LLM can tune the configuration of another AI that is learning to play Snake.
 
-The current phase involves setting up the environment.
+Ax3l uses the [Snake Lab Server](https://snakelabserver.osoyalce.com), which accepts configuration requests for AI Snake simulations. Snake Lab runs the simulation and stores the results in a database.
 
----
+Ax3l analyzes those results, adjusts the configuration, and submits a new simulation. This creates a continuous experimental loop in which the LLM explores the configuration space and attempts to improve the Snake AI's performance over time.
 
-# Components
+This is a long-running project expected to operate for well over a month. The current experiment began on **September 15, 2026**. Real-time project status can be viewed on the [Snake Website](https://snakeweb.osoyalce.com).
 
-- The `llama-server`
-- Watchdog service monitoring `ax3l-server` through systemd and `llm-server` through `/health`
-- The Ax3l agent service
-- An Ax3l report service
-- MariaDB for data persistence
 
----
+## Project Documentation
 
-# Development
-
-See the [development style in the README](README.md#development-style).
-
----
-
-# Links
-
+- [Environment Setup](/pages/env-setup)
 - [Architecture](/pages/architecture)
-- [Scripts](/pages/scripts)
-- [OS Setup](/pages/os-setup)
-- [Driver Setup](pages/driver-setup)
-- [Llama CPP Setup](/pages/llama-cpp)
-
----
-
-## Models
-
-- [Qwen 3.5 4B Setup](/pages/qwen-3.5-model-setup)
-- [Qwen 2.5 VL 3B Setup](/pages/qwen-2.5-VL-model-setup)
-- [Phi Setup](/pages/phi-model-setup)

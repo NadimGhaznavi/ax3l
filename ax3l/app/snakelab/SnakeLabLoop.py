@@ -8,6 +8,7 @@ from ax3l.app.EventLogDb import EventLogDb
 from ax3l.app.snakelab.ToolConversation import converse
 from ax3l.app.snakelab.SeedRotation import rotate_if_needed
 from ax3l.app.snakelab.RoundRobinState import RoundRobinState
+from ax3l.app.snakelab.ParameterSpace import finite_choices
 from ax3l.app.snakelab.prompts.Comparison import Comparison
 from ax3l.app.snakelab.prompts.ComparisonSingle import ComparisonSingle
 from ax3l.app.snakelab.prompts.FirstContact import FirstContact
@@ -123,6 +124,10 @@ async def optimize(llm, output, db, endpoint):
             golden_id = rotated_id
             first_contact = False
         parameter = selector.begin()
+        if (finite_choices(parameter) is not None
+                and snake.parameter_space_exhausted(golden_id, parameter)):
+            selector.skip_exhausted(parameter)
+            continue
         if parameter == "epsilon_pair":
             prompts = [ComparisonEpsilonPair(golden_id), FirstContactEpsilonPair()]
         elif parameter == "reward_pair":

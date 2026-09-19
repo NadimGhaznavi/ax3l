@@ -96,6 +96,25 @@ class ComparisonTests(unittest.TestCase):
 
 
 class LoopTests(unittest.IsolatedAsyncioTestCase):
+    async def test_exhausted_sequence_skips_without_prompt_or_submission(self):
+        snake = Mock()
+        snake.is_simulation_running.return_value = False
+        snake.get_run_result.return_value = result(10, .002)
+        snake.parameter_space_exhausted.return_value = True
+        golden = Mock(run_id='gold')
+        with patch(MODULE + 'SnakeLab', return_value=snake), patch(MODULE + 'GoldenConfig', return_value=golden), patch(MODULE + 'EventLogDb') as events, patch(MODULE + 'RoundRobinState') as selector, patch(MODULE + 'SnakeLabTools') as tools, patch(MODULE + 'Comparison') as prompt, patch(MODULE + 'converse') as conversation:
+            events.return_value.latest_snakelab_proposal.return_value = None
+            events.return_value.latest_seed_baseline.return_value = None
+            selector.return_value.begin.side_effect = ['sequence_length', asyncio.CancelledError()]
+            with self.assertRaises(asyncio.CancelledError):
+                await optimize(Mock(), Path('/tmp'), Mock(), 'endpoint')
+            snake.parameter_space_exhausted.assert_called_once_with('gold', 'sequence_length')
+            selector.return_value.skip_exhausted.assert_called_once_with('sequence_length')
+            self.assertEqual(selector.return_value.begin.call_count, 2)
+            tools.assert_not_called()
+            prompt.assert_not_called()
+            conversation.assert_not_called()
+
     def setUp(self):
         selector = patch(MODULE + 'RoundRobinState')
         selector.start().return_value.begin.return_value = 'learning_rate'

@@ -18,5 +18,7 @@ sudo apt install \
     vim
 ```
 
+---
 
+[Back](/env-setup)
 

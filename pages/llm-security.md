@@ -1,10 +1,8 @@
 ---
-title: Security Boundary
+title: LLM Security Architecture
 author_profile: true
 layout: single
 ---
-
-## Security Boundary
 
 The LLM is sandboxed.
 
@@ -17,3 +15,7 @@ capability. Connecting to an MCP server does not automatically expose all of its
 tools to the LLM. Ax3l controls the available operations and validates their inputs
 at the interface boundary. Contract and type violations fail immediately with
 clear errors.
+
+---
+
+[Back](/)

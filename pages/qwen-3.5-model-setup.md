@@ -79,3 +79,7 @@ INFO:hf-to-gguf:Model successfully exported to /opt/dev/models/intermediate/Qwen
 ```sh
 cp /opt/dev/models/quantized/Qwen3.5-4B-Q4_K_M.gguf /opt/prod/models/
 ```
+
+---
+
+[Back](/env-setup)

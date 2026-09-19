@@ -27,5 +27,6 @@ This is a long-running project expected to operate for well over a month. The cu
 - [Environment Setup](/pages/env-setup)
 - [Architecture](/pages/architecture)
 - [Runtime Behaviour](/pages/runtime-behaviour)
-- [AI Security Sandbox](/pages/ai-security)
+- [Project Scripts](/pages/scripts)
+- [LLM Security Architecture](/pages/llm-security)
 - [Ax3l on GitHub](https://github.com/NadimGhaznavi/ax3l)

@@ -19,7 +19,7 @@ status count as existing choices, matching duplicate-proposal validation. Earlie
 seeds and different settings do not exhaust the current domain. Skips survive
 restarts and count as completed steps; continuous domains are not skipped.
 
-Seed rotation occurs after `DSnakeLab.SEED_STAGNANT_ROUNDS` (3) complete
+Seed rotation occurs after `DSnakeLab.SEED_STAGNANT_ROUNDS` (9) complete
 round-robin cycles without a new high score. Each cycle includes all seven
 entries and counts only once each step has been compared or skipped as exhausted.
 A new golden configuration resets the count; a cycle containing an improvement

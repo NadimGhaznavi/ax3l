@@ -1,14 +1,18 @@
 import json
+import asyncio
 import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, patch
 
 from ax3l.app.Prompt import Prompt
 from ax3l.app.EventLogDb import EventLogDb
 from ax3l.app.snakelab.RoundRobinState import RoundRobinState, ROUND_ROBIN_ORDER
 from ax3l.app.snakelab.ToolConversation import converse
+from ax3l.app.snakelab.SeedRotation import rotate_if_needed
+from ax3l.app.snakelab.GenerateDefaultConfig import GenerateDefaultConfig
+from ax3l.constants.DSnakeLab import DSnakeLab
 
 
 class EventDb:
@@ -25,7 +29,8 @@ class EventDb:
     def query(self, sql, params):
         return [dict(row) for row in self.connection.execute(sql.replace('%s', '?'), params)]
 
-    def log(self, name, category='Configuration', level='INFO', content='', *, process_id=None):
+    def log(self, name, category='Configuration', level='INFO', content='', *, process_id=None,
+            parameter=None):
         with self.connection:
             event_id = self.connection.execute(
                 'INSERT INTO events(name, category, process_id) VALUES (?, ?, ?)',
@@ -37,7 +42,7 @@ class EventDb:
 class RoundRobinTests(unittest.TestCase):
     def test_exhausted_steps_survive_restart_and_count_toward_cycles(self):
         self.db.log('golden_config_created')
-        for turn in range(21):
+        for turn in range(9 * len(self.order)):
             parameter = self.restart()
             self.assertEqual(parameter, self.order[turn % len(self.order)])
             if parameter in ('sequence_length', 'reward_pair'):
@@ -49,6 +54,38 @@ class RoundRobinTests(unittest.TestCase):
             self.assertEqual(EventLogDb(self.db).experiment_cycles(), (turn + 1) // len(self.order))
         self.assertEqual(self.restart(), self.order[0])
         self.assertEqual(self.restart(), self.order[0])
+
+    def test_rotation_after_ninth_complete_cycle_with_skips(self):
+        self.assertEqual(DSnakeLab.SEED_STAGNANT_ROUNDS, 9)
+        self.db.log('golden_config_created')
+        snake = Mock()
+        config = GenerateDefaultConfig().run()
+        snake.get_config.return_value = config
+        snake.find_config_run.return_value = None
+        snake.submit_simulation.return_value = 'new-seed'
+        snake.get_run_result.return_value = {'status': 'completed', 'high_score': 1}
+        events = Mock()
+        events.pending_seed_rotation.return_value = None
+        events.current_golden_config.return_value = {'process_id': 'gold'}
+        # Exercise the real persisted cycle counter through the rotation gate.
+        events.stagnant_rounds.side_effect = lambda: EventLogDb(self.db).stagnant_rounds()
+        wait = AsyncMock()
+        with patch('ax3l.app.snakelab.SeedRotation.EventLogDb', return_value=events):
+            for turn in range(9 * len(self.order)):
+                self.assertIsNone(asyncio.run(rotate_if_needed(snake, Mock(), wait)))
+                snake.submit_simulation.assert_not_called()
+                parameter = self.restart()
+                if parameter in ('sequence_length', 'reward_pair'):
+                    RoundRobinState(self.db).skip_exhausted(parameter)
+                else:
+                    self.db.log('proposal_accepted', process_id=str(turn))
+                    self.db.log('configuration_compared', process_id=str(turn))
+            self.assertEqual(asyncio.run(rotate_if_needed(snake, Mock(), wait)), 'new-seed')
+        snake.submit_simulation.assert_called_once_with({**config, 'seed': config['seed'] + 1})
+        wait.assert_awaited_once()
+        self.db.log('golden_config_created', process_id='new-seed')
+        self.assertEqual(EventLogDb(self.db).stagnant_rounds(), 0)
+        self.assertEqual(EventLogDb(self.db).experiment_cycles(), 9)
 
     def setUp(self):
         folder = tempfile.TemporaryDirectory()

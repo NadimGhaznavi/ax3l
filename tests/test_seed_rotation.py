@@ -89,6 +89,7 @@ class SeedRotationTests(unittest.IsolatedAsyncioTestCase):
         module = 'ax3l.app.snakelab.SnakeLabLoop.'
         snake, events = Mock(), Mock()
         snake.is_simulation_running.return_value = False
+        snake.parameter_space_exhausted.return_value = False
         snake.get_run_result.return_value = {'status': 'completed', 'high_score': 100}
         events.latest_snakelab_proposal.return_value = None
         events.latest_seed_baseline.return_value = None

@@ -2,6 +2,8 @@
 
 from ax3l.app.snakelab.SingleParameters import SCHEMA, SINGLE_PARAMETERS
 from ax3l.app.DbMgr import DbMgr
+from ax3l.app.snakelab.ParameterSpace import finite_choices, parameter_paths
+from fractions import Fraction
 
 
 def _configuration_fields(node, path=()):
@@ -47,6 +49,22 @@ def _comparable(excluded):
 class SnakeLabDb:
     def __init__(self, db: DbMgr):
         self._db = db
+
+    def parameter_space_exhausted(self, golden_run_id: str, parameter: str) -> bool:
+        choices = finite_choices(parameter)
+        if choices is None:
+            return False
+        columns = ["_".join(path) for path in parameter_paths(parameter)]
+        conditions = _comparable(set(columns))
+        rows = self._db.query(f"""
+            SELECT DISTINCT {', '.join('c.' + column for column in columns)}
+            FROM simulation_runs r JOIN configurations c ON c.run_id = r.run_id
+            JOIN configurations g ON g.run_id = %s
+            WHERE {conditions}
+        """, (golden_run_id,))
+        # Duplicate protection rejects existing configurations in every status.
+        tried = {tuple(Fraction(str(row[column])) for column in columns) for row in rows}
+        return choices <= tried
 
     def get_num_sims(self) -> int:
         """Count all stored runs, including repeated configurations and all statuses."""

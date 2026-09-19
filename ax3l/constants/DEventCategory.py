@@ -91,6 +91,7 @@ class DEventCategory:
         PROPOSAL_ACCEPTED = "proposal_accepted"
         PROPOSAL_INVALID = "proposal_rejected_invalid"
         PROPOSAL_DUPLICATE = "proposal_rejected_duplicate"
+        PARAMETER_SPACE_EXHAUSTED = "parameter_space_exhausted"
         COMPARED = "configuration_compared"
         GOLDEN_CREATED = "golden_config_created"
         GOLDEN_REPLACED = "golden_config_replaced"
@@ -101,6 +102,7 @@ class DEventCategory:
             PROPOSAL_ACCEPTED: "Proposal accepted",
             PROPOSAL_INVALID: "Invalid proposal",
             PROPOSAL_DUPLICATE: "Duplicate proposal",
+            PARAMETER_SPACE_EXHAUSTED: "Parameter space exhausted",
             COMPARED: "Compared",
             GOLDEN_CREATED: "Golden created",
             GOLDEN_REPLACED: "Golden replaced",

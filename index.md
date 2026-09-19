@@ -12,7 +12,14 @@ Ax3l uses the [Snake Lab Server](https://snakelabserver.osoyalce.com), which acc
 
 Ax3l analyzes those results, adjusts the configuration, and submits a new simulation. This creates a continuous experimental loop in which the LLM explores the configuration space and attempts to improve the Snake AI's performance over time.
 
-This is a long-running project expected to operate for well over a month. The current experiment began on **September 15, 2026**. Real-time project status can be viewed on the [Snake Website](https://snakeweb.osoyalce.com).
+## Live Exeriment Data
+
+This is a long-running project expected to operate for well over a month. The current experiment began on **September 15, 2026**. Real-time project status can be viewed:
+
+- [Live Site](https://snakeweb.osoyalce.com) with event log
+- [Simulation Scores Distribution Histogram](https://snakeweb.osoyalce.com/reports/score-distribution.html)
+- [Simulation Highscore History Plot](https://snakeweb.osoyalce.com/reports/experiment-highscores.html)
+- [Gallery of the Snake in Action]()
 
 
 ## Project Documentation
@@ -22,3 +29,4 @@ This is a long-running project expected to operate for well over a month. The cu
 - [Runtime Behaviour](/pages/runtime-behaviour)
 - [Runtime Behaviour](/pages/runtime-behaviour)
 - [AI Security Sandbox](/pages/ai-security)
+- [Ax3l on GitHub](https://github.com/NadimGhaznavi/ax3l)

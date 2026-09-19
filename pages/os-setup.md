@@ -6,7 +6,7 @@ layout: single
 
 ![Ax3l]({{ '/pages/images/ax3l.png' | relative_url }})
 
-## Pre-Requisites
+## Prerequisites
 
 The base OS was Debian 13.6, just the OS, server utilities, and the SSH server.
 

@@ -19,8 +19,8 @@ This is a long-running project expected to operate for well over a month. The cu
 - [Live Site](https://snakeweb.osoyalce.com) with event log
 - [Simulation Scores Distribution Histogram](https://snakeweb.osoyalce.com/reports/score-distribution.html)
 - [Simulation Highscore History Plot](https://snakeweb.osoyalce.com/reports/experiment-highscores.html)
-- [Gallery of the Snake in Action]()
-
+- [Gallery of the Snake in Action](https://snakeweb.osoyalce.com/reports/top-100.html)
+- [A random sampling of the LLM's Thinking](https://snakeweb.osoyalce.com/reports/ax3l-thinking.html)
 
 ## Project Documentation
 
@@ -29,4 +29,5 @@ This is a long-running project expected to operate for well over a month. The cu
 - [Runtime Behaviour](/pages/runtime-behaviour)
 - [Project Scripts](/pages/scripts)
 - [LLM Security Architecture](/pages/llm-security)
+- [Project Screenshots](/pages/gallery)
 - [Ax3l on GitHub](https://github.com/NadimGhaznavi/ax3l)

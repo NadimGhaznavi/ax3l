@@ -35,10 +35,10 @@ class PairIntegrationTests(unittest.IsolatedAsyncioTestCase):
             reward.assert_called_once_with('gold')
             epsilon_prompts = conversation.call_args_list[5].args[4]
             reward_prompts = conversation.call_args_list[6].args[4]
-            self.assertEqual(epsilon_prompts[0].to_md(), 'epsilon report')
-            self.assertIsInstance(epsilon_prompts[1], FirstContactEpsilonPair)
-            self.assertEqual(reward_prompts[0].to_md(), 'reward grid')
-            self.assertIsInstance(reward_prompts[1], FirstContactRewardPair)
+            self.assertEqual(epsilon_prompts[1].to_md(), 'epsilon report')
+            self.assertIsInstance(epsilon_prompts[2], FirstContactEpsilonPair)
+            self.assertEqual(reward_prompts[1].to_md(), 'reward grid')
+            self.assertIsInstance(reward_prompts[2], FirstContactRewardPair)
             self.assertEqual(wait.await_count, 7)
 
     async def test_pair_arguments_cannot_override_assignment_and_rejections_retry(self):

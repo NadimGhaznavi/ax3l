@@ -141,7 +141,9 @@ uses the discovered tool name and argument fields for the assigned entry.
 
 ### Active optimization flow
 
-The optimization flow sends text-only prompts. The initial conversation uses
+The optimization flow sends text-only prompts. Every conversation starts with
+`ProjectContext`, identifying Patrick Loeber's "Train an AI to Play Snake" tutorial
+and the LLM's responsibility for choosing parameters. The initial conversation then uses
 `FirstContact`, `Comparison`, and `FirstContactSingle()`.
 Subsequent conversations use `Comparison` and `ComparisonSingle` to choose the
 next single-parameter change from high-score history. Epsilon turns use

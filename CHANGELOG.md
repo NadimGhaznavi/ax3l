@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Show cumulative thirds in the score histogram: muted red for the oldest third, orange for the oldest two-thirds, and blue for all runs.
+
 ## [1.4.0] - 2026-09-20 @ 09:03
 
 ### Added

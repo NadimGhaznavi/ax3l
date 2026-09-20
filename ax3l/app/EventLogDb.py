@@ -18,7 +18,8 @@ class EventLogDb:
                    r.high_score AS simulation_high_score
             FROM events e
             LEFT JOIN event_messages m USING (event_id)
-            LEFT JOIN `{DSnakeLab.DATABASE}`.simulation_runs r ON r.run_id = e.process_id
+            LEFT JOIN `{DSnakeLab.DATABASE}`.simulation_runs r
+                ON r.run_id = e.process_id COLLATE utf8mb4_unicode_ci
                 AND e.category = 'SnakeLab' AND e.name = 'simulation_completed'
             ORDER BY e.occurred_at DESC, e.event_id DESC
             LIMIT 500

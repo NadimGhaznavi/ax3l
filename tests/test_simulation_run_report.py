@@ -2,6 +2,7 @@
 
 from datetime import datetime
 import json
+import sqlite3
 from xml.etree.ElementTree import fromstring
 from threading import Thread
 import unittest
@@ -11,6 +12,8 @@ from urllib.request import urlopen
 from uuid import uuid4
 
 from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb
+from ax3l.app.EventLogDb import EventLogDb
+from ax3l.constants.DSnakeLab import DSnakeLab
 from ax3l.server.ReportingServer import make_server
 from ax3l.activity.SimulationBoard import board_svg
 
@@ -20,6 +23,37 @@ SNAPSHOT = {"board": {"grid_size": [4, 3], "snake_head": [2, 1],
 
 
 class SimulationRunReportTests(unittest.TestCase):
+    def test_event_scores_come_from_the_separate_snakelab_database(self):
+        connection = sqlite3.connect(':memory:')
+        self.addCleanup(connection.close)
+        connection.row_factory = sqlite3.Row
+        connection.executescript(f"""
+            ATTACH DATABASE ':memory:' AS `{DSnakeLab.DATABASE}`;
+            CREATE TABLE events (event_id INTEGER, occurred_at TEXT, name TEXT,
+                category TEXT, log_level TEXT, process_id TEXT, source_name TEXT,
+                parameter TEXT, ax3l_version TEXT);
+            CREATE TABLE event_messages (event_id INTEGER, content TEXT);
+            CREATE TABLE `{DSnakeLab.DATABASE}`.simulation_runs (run_id TEXT, high_score INTEGER);
+            -- A conflicting local table ensures the lookup uses the correct database.
+            CREATE TABLE simulation_runs (run_id TEXT, high_score INTEGER);
+            INSERT INTO simulation_runs VALUES ('run-1', 999);
+            INSERT INTO `{DSnakeLab.DATABASE}`.simulation_runs VALUES ('run-1', 38), ('run-2', 0);
+            INSERT INTO events (event_id, category, name, process_id) VALUES
+                (1, 'SnakeLab', 'simulation_completed', 'run-1'),
+                (2, 'SnakeLab', 'simulation_completed', 'run-2'),
+                (3, 'SnakeLab', 'simulation_completed', 'missing'),
+                (4, 'SnakeLab', 'simulation_failed', 'run-1');
+            INSERT INTO event_messages VALUES (1, 'Simulation completed.');
+        """)
+        db = Mock()
+        db.query.side_effect = lambda sql: [dict(row) for row in connection.execute(sql)]
+        events = {event['event_id']: event for event in EventLogDb(db).recent()}
+        self.assertEqual(events[1]['simulation_high_score'], 38)
+        self.assertEqual(events[2]['simulation_high_score'], 0)
+        self.assertIsNone(events[3]['simulation_high_score'])
+        self.assertIsNone(events[4]['simulation_high_score'])
+        self.assertEqual(events[1]['content'], 'Simulation completed.')
+
     def test_board_geometry_and_missing_snapshots(self):
         svg = fromstring(board_svg(json.dumps(SNAPSHOT)))
         ns = {'svg': 'http://www.w3.org/2000/svg'}

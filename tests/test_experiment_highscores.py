@@ -20,15 +20,39 @@ class HighscoreTests(unittest.TestCase):
         with patch('plotly.graph_objects.Figure.to_html', autospec=True,
                    side_effect=lambda figure, **kwargs: figure.to_json()):
             figure = json.loads(highscores(history, 15)['chart'])
-        line, points = figure['data']
+        line, points, seed_points = figure['data']
         self.assertEqual(line['x'], [1, 3, 6, 12, 15])
         self.assertEqual(line['y'], [38, 39, 50, 40, 40])
         self.assertEqual(line['line']['shape'], 'spline')
-        self.assertEqual(points['customdata'][-1][0], 2)
-        self.assertEqual(points['x'], [1, 3, 6, 12])
+        self.assertEqual(seed_points['customdata'][-1][0], 2)
+        self.assertEqual(points['x'], [1, 3, 6])
+        self.assertEqual(seed_points['x'], [12])
+        self.assertEqual(seed_points['y'], [40])
+        self.assertEqual(line['line']['color'], '#4c9be8')
+        self.assertEqual(points['marker']['color'], '#f09445')
+        self.assertEqual(seed_points['marker']['color'], '#c792ea')
+        self.assertEqual(seed_points['customdata'][0][3], '<br>Seed change')
+        self.assertEqual([trace['name'] for trace in figure['data']],
+                         ['High score', 'Accepted config', 'Seed change'])
+        self.assertTrue(all(trace['showlegend'] for trace in figure['data']))
         self.assertIsNone(highscores([], 0)['chart'])
         self.assertIn('Plotly.newPlot', highscores([dict(simulations=1, score=0, seed=1,
                                                       run_id='a', reason='Initial')], 1)['chart'])
+
+    def test_seed_markers_require_consecutive_known_seeds(self):
+        for seeds, expected in (
+            ([7], ['#f09445']),
+            ([None, 0, 0, 1, None, 2, 0],
+             ['#f09445', '#f09445', '#f09445', '#c792ea', '#f09445', '#f09445', '#c792ea']),
+        ):
+            history = [dict(simulations=i + 1, score=10, seed=seed, run_id=str(i), reason='Accepted')
+                       for i, seed in enumerate(seeds)]
+            with patch('plotly.graph_objects.Figure.to_html', autospec=True,
+                       side_effect=lambda figure, **kwargs: figure.to_json()):
+                figure = json.loads(highscores(history, len(history))['chart'])
+            for trace, color in zip(figure['data'][1:], ['#f09445', '#c792ea']):
+                self.assertEqual(trace['marker']['color'], color)
+                self.assertEqual(trace['x'], [i + 1 for i, value in enumerate(expected) if value == color] or [None])
 
     def test_snapshot_commits_with_event_and_rolls_back_on_failure(self):
         db = object.__new__(DbMgr)
@@ -77,6 +101,7 @@ class HighscoreTests(unittest.TestCase):
                 page = response.read().decode()
                 self.assertEqual(response.headers['Cache-Control'], 'no-store')
             self.assertIn('Experiment Highscores', page)
+            self.assertIn('Purple points mark seed changes. Other points are orange.', page)
             self.assertIn('Plotly.newPlot', page)
             self.assertNotIn('<script src=', page)
             db.close.assert_called_once()

@@ -103,6 +103,6 @@ class SeedRotationTests(unittest.IsolatedAsyncioTestCase):
                 await optimize(Mock(), Path('/tmp'), Mock(), 'endpoint')
             comparison.assert_called_once_with('rotated', 'hidden_size')
             prompts = conversation.call_args.args[4]
-            self.assertEqual(len(prompts), 2)
+            self.assertEqual(len(prompts), 3)
             self.assertTrue(all(isinstance(json.loads(p.to_json())['content'], str) for p in prompts))
-            self.assertEqual(conversation.call_args.args[4][0].to_md(), 'new baseline')
+            self.assertEqual(conversation.call_args.args[4][1].to_md(), 'new baseline')

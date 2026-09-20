@@ -10,13 +10,15 @@
   <header><h1>Score Distribution Histogram</h1><a href="/">Back to event log</a></header>
   <section class="report-description" aria-label="About the histogram">
   <p>
-    All runs: {{ total }} ({{ scored }} scored).
-    Oldest half: {{ half }} ({{ older_scored }} scored).
+    Oldest third (1/3): {{ third }} ({{ oldest_scored }} scored).
+    Oldest two-thirds (2/3): {{ two_thirds }} ({{ older_scored }} scored).
+    All runs (3/3): {{ total }} ({{ scored }} scored).
   </p>
 
   <p>
-    Blue shows all scored runs. Orange shows the oldest half, using the same bins.
-    Runs are ordered by submission time; for odd totals, the older half is rounded down.
+    Muted red shows the oldest third, orange shows the oldest two-thirds, and blue shows all scored runs,
+    using the same bins. These groups are cumulative.
+    Runs are ordered by submission time; third boundaries are rounded down before excluding unscored runs.
     Runs without a score are excluded. Reload the page to refresh the data.
   </p>
   </section>

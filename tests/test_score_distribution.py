@@ -19,13 +19,20 @@ class ScoreDistributionTests(unittest.TestCase):
             result = distribution(scores)
         return result, json.loads(result['chart'])
 
-    def test_oldest_half_before_filtering_and_shared_bins(self):
+    def test_cumulative_thirds_before_filtering_and_shared_bins(self):
         result, figure = self.figure([0, None, 2, 100, 100, 9, 9])
-        self.assertEqual((result['total'], result['half'], result['older_scored']), (7, 3, 2))
-        all_runs, older = figure['data']
+        self.assertEqual((result['total'], result['third'], result['two_thirds']), (7, 2, 4))
+        self.assertEqual((result['scored'], result['older_scored'], result['oldest_scored']), (6, 3, 1))
+        all_runs, older, oldest = figure['data']
         self.assertEqual(all_runs['x'], [0, 2, 100, 100, 9, 9])
-        self.assertEqual(older['x'], [0, 2])
+        self.assertEqual(older['x'], [0, 2, 100])
+        self.assertEqual(oldest['x'], [0])
         self.assertEqual(all_runs['xbins'], older['xbins'])
+        self.assertEqual(all_runs['xbins'], oldest['xbins'])
+        self.assertEqual([trace['marker']['color'] for trace in figure['data']],
+                         ['#4c9be8', '#f09445', '#b86b6b'])
+        self.assertEqual([trace['name'] for trace in figure['data']],
+                         ['All runs (3/3)', 'Oldest two-thirds (2/3)', 'Oldest third (1/3)'])
         self.assertEqual(figure['layout']['barmode'], 'overlay')
         bins = all_runs['xbins']
         counts = []
@@ -35,14 +42,20 @@ class ScoreDistributionTests(unittest.TestCase):
                 bucket = int((score - bins['start']) // bins['size'])
                 tally[bucket] = tally.get(bucket, 0) + 1
             counts.append(tally)
-        self.assertTrue(all(count <= counts[0][bucket] for bucket, count in counts[1].items()))
+        for larger, smaller in zip(counts, counts[1:]):
+            self.assertTrue(all(count <= larger[bucket] for bucket, count in smaller.items()))
 
     def test_empty_single_and_identical_scores(self):
         for scores in ([], [None, None]):
             self.assertIsNone(distribution(scores)['chart'])
-        for scores, expected in (([0], []), ([7, 7, 7, 7], [7, 7])):
+        for scores, expected_older, expected_oldest in (
+            ([0], [], []), ([1, 2], [1], []),
+            ([7] * 4, [7] * 2, [7]), ([7] * 5, [7] * 3, [7]),
+            ([7] * 6, [7] * 4, [7] * 2),
+        ):
             _, figure = self.figure(scores)
-            self.assertEqual(figure['data'][1]['x'], expected)
+            self.assertEqual(figure['data'][1]['x'], expected_older)
+            self.assertEqual(figure['data'][2]['x'], expected_oldest)
             self.assertEqual(figure['data'][0]['xbins']['size'], 1)
 
     def test_interface_orders_all_runs_and_closes_connection(self):
@@ -70,8 +83,9 @@ class ScoreDistributionTests(unittest.TestCase):
             with urlopen(url) as response:
                 page = response.read().decode()
                 self.assertEqual(response.headers['Cache-Control'], 'no-store')
-            self.assertIn('All runs: 4 (3 scored).', page)
-            self.assertIn('Oldest half: 2 (2 scored).', page)
+            self.assertIn('All runs (3/3): 4 (3 scored).', page)
+            self.assertIn('Oldest two-thirds (2/3): 2 (2 scored).', page)
+            self.assertIn('Oldest third (1/3): 1 (1 scored).', page)
             self.assertIn('Plotly.newPlot', page)
             self.assertIn('id="score-histogram"', page)
             self.assertNotIn('<script src=', page)

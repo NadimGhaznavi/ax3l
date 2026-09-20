@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Begin every LLM optimization conversation with the Snake tutorial context and responsibility for choosing parameters.
+
 ## [1.3.10] - 2026-09-20 @ 06:52
 
 ### Fixed

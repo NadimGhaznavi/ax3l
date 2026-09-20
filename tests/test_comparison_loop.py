@@ -214,7 +214,7 @@ class LoopTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(comparison.call_args_list[0].args[2:], ('gold', 'last'))
                 self.assertEqual(comparison.call_count, 2)
                 self.assertEqual(prompt.call_args_list[0].args, ('gold', 'learning_rate'))
-                self.assertEqual(len(conversations.call_args_list[0].args[4]), 2)
+                self.assertEqual(len(conversations.call_args_list[0].args[4]), 3)
 
     async def test_restart_does_not_swallow_transport_failure(self):
         with self.assertRaises(TimeoutError):
@@ -230,7 +230,7 @@ class LoopTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_first_round_then_repeated_fresh_comparisons(self):
         conversations, comparison, prompt, wait = await self.exercise_loop()
-        self.assertEqual([len(c.args[4]) for c in conversations.call_args_list], [3, 2, 2])
+        self.assertEqual([len(c.args[4]) for c in conversations.call_args_list], [4, 3, 3])
         self.assertEqual(comparison.call_args_list[0].args[2:], ('gold', 'last'))
         self.assertEqual(comparison.call_args_list[1].args[2:], ('last', 'next'))
         self.assertEqual(prompt.call_args_list[0].args, ('gold', 'learning_rate'))
@@ -244,7 +244,7 @@ class LoopTests(unittest.IsolatedAsyncioTestCase):
     async def test_restart_uses_recorded_comparison_without_first_contact(self):
         snapshot = {'golden_run_id': 'old', 'latest_run_id': 'previous', 'current_golden_run_id': 'gold', 'reason': 'retained'}
         conversations, _, prompt, _ = await self.exercise_loop({'process_id': 'previous', 'comparison_id': 1, 'comparison': json.dumps(snapshot)})
-        self.assertEqual(len(conversations.call_args_list[0].args[4]), 2)
+        self.assertEqual(len(conversations.call_args_list[0].args[4]), 3)
         self.assertEqual(prompt.call_args_list[0].args, ('gold', 'learning_rate'))
 
     async def test_restart_monitors_pending_submission_before_requesting_next_value(self):

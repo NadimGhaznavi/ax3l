@@ -12,6 +12,7 @@ from ax3l.app.snakelab.ParameterSpace import finite_choices
 from ax3l.app.snakelab.prompts.Comparison import Comparison
 from ax3l.app.snakelab.prompts.ComparisonSingle import ComparisonSingle
 from ax3l.app.snakelab.prompts.FirstContact import FirstContact
+from ax3l.app.snakelab.prompts.ProjectContext import ProjectContext
 from ax3l.app.snakelab.prompts.FirstContactSingle import FirstContactSingle
 from ax3l.app.snakelab.prompts.FirstContactEpsilonPair import FirstContactEpsilonPair
 from ax3l.app.snakelab.prompts.FirstContactRewardPair import FirstContactRewardPair
@@ -137,6 +138,7 @@ async def optimize(llm, output, db, endpoint):
                        FirstContactSingle(parameter) if first_contact else ComparisonSingle(parameter)]
         if first_contact:
             prompts.insert(0, FirstContact())
+        prompts.insert(0, ProjectContext())
         async with SnakeLabTools(endpoint, parameter) as tools:
             latest_id = await converse(llm, output, db, tools, prompts, parameter=parameter)
         await wait_for_run(snake, db, latest_id)

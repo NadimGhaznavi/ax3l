@@ -12,6 +12,7 @@ configuration is the current baseline used to evaluate new proposals.
 
 | Prompt name | Description |
 | --- | --- |
+| `ProjectContext` | Opens every conversation with the tutorial context and the LLM's responsibility for choosing parameters. |
 | `FirstContact` | Introduces Patrick Loeber's AI Snake Game, sets the high-score objective, and encourages exploring apparently poor choices to gather data and discover higher plateaus. |
 | `FirstContactSingle` | Requests an untested value for the assigned parameter using `submit_single_value({"value": number})`. |
 | `Comparison` | Shows only the assigned parameter's golden value, high score, and comparable history on the current and earlier seeds. Used from the first conversation onward. |

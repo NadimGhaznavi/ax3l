@@ -58,7 +58,7 @@ class SimulationRunReportTests(unittest.TestCase):
             completed_at=datetime(2026, 9, 15, 12, 30, 45))
         event = dict(event_id=1, occurred_at=datetime.now(), log_level='INFO',
                      category='SnakeLab', name='simulation_completed', parameter=None,
-                     process_id=run_id, content='Simulation completed.')
+                     process_id=run_id, content='Simulation completed.', simulation_high_score=0)
         log.recent.return_value = [event]
         log.current_golden_config.return_value = None
         server = make_server('127.0.0.1', 0)
@@ -74,7 +74,12 @@ class SimulationRunReportTests(unittest.TestCase):
                 return response.read().decode()
 
         path = f'/simulations/{run_id}'
-        self.assertIn(f'href="{path}">Simulation completed.</a>', get('/'))
+        for score in (0, 38, None):
+            event['simulation_high_score'] = score
+            text = f'Simulation completed ({score})' if score is not None else 'Simulation completed.'
+            event_page = get('/')
+            self.assertIn(f'href="{path}">{text}</a>', event_page)
+            self.assertIn(f'title="{text}"', event_page)
         page = get(path)
         for expected in ('Simulation Run', 'Run ID', run_id, 'Project Version',
                          '&lt;version&gt;', 'High Score', '<td>0</td>', 'Completed At',

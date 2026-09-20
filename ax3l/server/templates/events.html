@@ -86,7 +86,8 @@
           {% if event.name == simulation_events.SUBMITTED and event.category == simulation_events.CATEGORY %}
           <td class="content">Submitted <a href="/simulations/{{ event.process_id }}/config">config</a>.</td>
           {% elif event.name == simulation_events.COMPLETED and event.category == simulation_events.CATEGORY and event.process_id %}
-          <td class="content" title="{{ event.content or '' }}"><a href="/simulations/{{ event.process_id }}">{{ event.content or 'Simulation completed.' }}</a></td>
+          {% set completed_text = 'Simulation completed (' ~ event.simulation_high_score ~ ')' if event.simulation_high_score is defined and event.simulation_high_score is not none else (event.content or 'Simulation completed.') %}
+          <td class="content" title="{{ completed_text }}"><a href="/simulations/{{ event.process_id }}">{{ completed_text }}</a></td>
           {% elif event.prompt_text is defined %}
           <td class="content" title="{{ event.prompt_text }}"><a href="/events/{{ event.event_id }}">{{ event.prompt_text }}</a></td>
           {% elif event.reply_text is defined %}

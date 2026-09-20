@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Show each simulation's high score in the Report Server's Simulation Completed event message, including existing entries.
+
 ## [1.3.7] - 2026-09-19 @ 19:58
 
 ### Summary

@@ -13,9 +13,12 @@ class EventLogDb:
         """Return the latest 500 events, newest first."""
         rows = self._db.query("""
             SELECT e.event_id, e.occurred_at, e.name, e.category,
-                   e.log_level, e.process_id, e.source_name, e.parameter, e.ax3l_version, m.content
+                   e.log_level, e.process_id, e.source_name, e.parameter, e.ax3l_version, m.content,
+                   r.high_score AS simulation_high_score
             FROM events e
             LEFT JOIN event_messages m USING (event_id)
+            LEFT JOIN simulation_runs r ON r.run_id = e.process_id
+                AND e.category = 'SnakeLab' AND e.name = 'simulation_completed'
             ORDER BY e.occurred_at DESC, e.event_id DESC
             LIMIT 500
         """)

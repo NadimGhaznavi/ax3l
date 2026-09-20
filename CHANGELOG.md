@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.9] - 2026-09-20 @ 06:45
+
 ### Fixed
 
 - Read Event Log simulation high scores from the SnakeLab database instead of the Ax3l database.

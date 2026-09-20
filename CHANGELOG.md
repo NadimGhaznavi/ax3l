@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.10] - 2026-09-20 @ 06:52
+
 ### Fixed
 
 - Normalize the event run ID comparison to SnakeLab's collation so differing database collations do not break the Event Log.

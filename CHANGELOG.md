@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-09-21 @ 17:31
+
 ### Removed
 
 - Remove Ax3l's static HTTP health endpoint and its production, dev, and QA port constants. Ax3l continues to serve tool requests over ZeroMQ; the dev/QA LLM health stub remains available.

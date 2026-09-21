@@ -4,12 +4,14 @@ After=ax3l-server@SUFFIX@.service qwen-server@SUFFIX@.service phi-server@SUFFIX@
 
 [Service]
 Type=simple
-User=@USER@
-Group=@USER@
+User=root
+Group=root
 WorkingDirectory=@APP@
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONDONTWRITEBYTECODE=1
-ExecStart=/usr/bin/python3 -m ax3l.server.Watchdog --ax3l-unit ax3l-server@SUFFIX@.service --llm-health-url http://127.0.0.1:@LLM_PORT@/health
+ExecStart=/usr/bin/python3 -m ax3l.server.Watchdog --ax3l-unit ax3l-server@SUFFIX@.service --llm-unit @MODEL@-server@SUFFIX@.service --report-unit reporting-server@SUFFIX@.service --llm-health-url http://127.0.0.1:@LLM_PORT@/health
+Restart=on-failure
+RestartSec=10
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=true

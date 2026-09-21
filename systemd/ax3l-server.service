@@ -13,7 +13,7 @@ Environment=BROWSER_PATH=@APP@/.chrome/browser
 Environment=XDG_CONFIG_HOME=/run/ax3l@SUFFIX@/chrome-config
 Environment=XDG_CACHE_HOME=/run/ax3l@SUFFIX@/chrome-cache
 EnvironmentFile=@CONFIG@/database.env
-ExecStart=@APP@/.venv/bin/python -m ax3l.server.Ax3lServer --port @AX3L_PORT@ --zmq-endpoint @AX3L_ZMQ_ENDPOINT@ @AX3L_ARGS@
+ExecStart=@APP@/.venv/bin/python -m ax3l.server.Ax3lServer --zmq-endpoint @AX3L_ZMQ_ENDPOINT@ @AX3L_ARGS@
 StateDirectory=ax3l@SUFFIX@
 RuntimeDirectory=ax3l@SUFFIX@
 KillSignal=SIGINT

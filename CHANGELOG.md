@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-09-21 @ 17:31
+
+### Removed
+
+- Remove Ax3l's static HTTP health endpoint and its production, dev, and QA port constants. Ax3l continues to serve tool requests over ZeroMQ; the dev/QA LLM health stub remains available.
+
+### Added
+
+- Make the watchdog restart inactive or failed Ax3l, reporting, and selected model services, and recover repeated LLM health failures with startup grace and journal logging limited to problems and recovery. Successful watchdog checks and dev/QA LLM stub health requests remain silent.
+
+- Add coding guidelines adapted from R3el for Ax3l's architecture and development practices, including changelog updates, and direct repository agents to follow them through `AGENTS.md`.
+
 ## [1.4.2] - 2026-09-20 @ 12:30
 
 ### Changed

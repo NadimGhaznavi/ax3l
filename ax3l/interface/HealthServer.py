@@ -17,6 +17,10 @@ class HealthServer:
         payload = json.dumps({"status": "ok", "service": service, "mode": mode}).encode()
 
         class Handler(BaseHTTPRequestHandler):
+            def log_request(self, code="-", size="-"):
+                if code != 200:
+                    super().log_request(code, size)
+
             def do_GET(self):
                 if self.path != "/health":
                     self.send_error(404)
@@ -28,5 +32,4 @@ class HealthServer:
                 self.wfile.write(payload)
 
         server = HTTPServer(("127.0.0.1", port), Handler)
-        print(f"{service}: {mode}, listening on 127.0.0.1:{server.server_port}", flush=True)
         return server

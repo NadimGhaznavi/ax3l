@@ -8,6 +8,9 @@ timestamped `*-db.dump` SQL file in the current directory. SnakeLab is not inclu
 
 ## Development Style
 
+Read and follow the [Coding Guidelines](pages/coding-guidelines.md) for the
+full development guidance, including changelog updates.
+
 - Develop for our fixed platform: Ax3l, the locally hosted LLM, SnakeLab, MariaDB, and systemd. No third-party API or vendor integrations, portability layers, or abstractions for hypothetical platforms. This does not exclude the libraries we use to build the application.
 - Run one LLM model at a time. Model evaluation and generic harness support are established; do not design for concurrent models.
 - Work in short iterations with thin, working slices. Implement only the data and behavior the current slice needs.

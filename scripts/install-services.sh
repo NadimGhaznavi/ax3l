@@ -47,11 +47,11 @@ from ax3l.constants.DLlama import DLlama
 from ax3l.constants.DReportMgr import DReportMgr
 
 attribute = {"dev": "PORT_DEV", "qa": "PORT_QA", "prod": "PORT"}[sys.argv[1]]
-print(*(getattr(constants, attribute) for constants in (DLlama, DAx3l, DReportMgr)))
+print(*(getattr(constants, attribute) for constants in (DLlama, DReportMgr)))
 print(getattr(DAx3l, {"dev": "ZMQ_ENDPOINT_DEV", "qa": "ZMQ_ENDPOINT_QA", "prod": "ZMQ_ENDPOINT"}[sys.argv[1]]))
 PY
 )
-read -r llm_port ax3l_port report_port <<< "$ports"
+read -r llm_port report_port <<< "$ports"
 ax3l_zmq_endpoint=${ports##*$'\n'}
 ax3l_args=
 if [[ $install_env == prod ]]; then
@@ -130,8 +130,8 @@ for name in qwen-server phi-server qwenv-server ax3l-server reporting-server wat
     sed -e "s|@ENV@|$install_env|g" -e "s|@USER@|$service_account|g" \
         -e "s|@APP@|$install_dir|g" -e "s|@CONFIG@|$config_dir|g" \
         -e "s|@SUFFIX@|$suffix|g" -e "s|@QWEN_COMMAND@|$qwen_command|g" -e "s|@PHI_COMMAND@|$phi_command|g" \
-        -e "s|@QWENV_COMMAND@|$qwenv_command|g" \
-        -e "s|@LLM_PORT@|$llm_port|g" -e "s|@AX3L_PORT@|$ax3l_port|g" \
+        -e "s|@QWENV_COMMAND@|$qwenv_command|g" -e "s|@MODEL@|$selected_model|g" \
+        -e "s|@LLM_PORT@|$llm_port|g" \
         -e "s|@REPORT_PORT@|$report_port|g" \
         -e "s|@AX3L_ZMQ_ENDPOINT@|$ax3l_zmq_endpoint|g" \
         -e "s|@AX3L_ARGS@|$ax3l_args|g" \

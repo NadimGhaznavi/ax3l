@@ -138,6 +138,11 @@ exec /usr/bin/systemd-analyze "$@"
                         unit = self.units / f'{name}{suffix}.service'
                         self.assertEqual(unit.stat().st_mode & 0o777, 0o644)
                         self.assertNotIn('@', unit.read_text())
+                    watchdog = (self.units / f'watchdog{suffix}.service').read_text()
+                    self.assertIn(f'--llm-unit {model}-server{suffix}.service', watchdog)
+                    self.assertIn(f'--report-unit reporting-server{suffix}.service', watchdog)
+                    self.assertIn('User=root', watchdog)
+                    self.assertIn('Restart=on-failure', watchdog)
                     self.assertEqual(self.credentials.stat().st_mode & 0o777, 0o600)
                     self.assertEqual(self.credentials.read_text(), 'DB_PASSWORD=fixture-secret\n')
                     self.assertEqual(self.config.stat().st_mode & 0o777, 0o750)

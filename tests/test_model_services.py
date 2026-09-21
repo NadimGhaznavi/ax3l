@@ -55,9 +55,9 @@ class ModelServicesTests(unittest.TestCase):
         for environment, suffix, port in [('dev', '-dev', 27768), ('qa', '-qa', 27769), ('prod', '', 27770)]:
             with self.subTest(environment=environment), tempfile.TemporaryDirectory() as folder:
                 values = {
-                    'ENV': environment, 'SUFFIX': suffix, 'USER': 'nobody',
+                    'ENV': environment, 'SUFFIX': suffix, 'USER': 'nobody', 'MODEL': 'qwen',
                     'APP': str(ROOT), 'CONFIG': '/tmp/ax3l-test', 'LLM_PORT': str(port),
-                    'AX3L_PORT': '27771', 'REPORT_PORT': '27772',
+                    'REPORT_PORT': '27772',
                     'AX3L_ZMQ_ENDPOINT': 'tcp://127.0.0.1:61968',
                     'AX3L_ARGS': '--llm-url http://127.0.0.1:27770 --output /var/lib/ax3l/snakelab' if environment == 'prod' else '',
                     'QWEN_COMMAND': '/usr/bin/true --model /models/Qwen.gguf',

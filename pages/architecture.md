@@ -42,8 +42,11 @@ The MCP tool framework is a feature of llama.cpp and is well supported by the Qw
 
 ## Watchdog service
 
-- Monitors the `ax3l-server` service through systemd.
-- Monitors the selected Qwen, Phi, or Qwen Vision server through its `/health` endpoint.
+- Checks Ax3l, reporting, and the model selected during service installation every 10 seconds; restarts inactive or failed units through systemd.
+- Restarts the selected model after three consecutive failed `/health` checks, with a 60-second grace period at watchdog startup and after model restarts.
+- Logs only problems and recovery attempts to the systemd journal; successful polls are silent, including health requests to the dev/QA LLM stub. Runs as root to manage system services.
+- Does not detect a stalled optimization loop in an otherwise active Ax3l process. Stop the watchdog before intentionally stopping individual services (`services.sh stop` does this automatically).
+- Reinstall services with `-model` when changing the model monitored by the watchdog.
 
 ---
 

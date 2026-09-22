@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Combine runtime, LLM time, and Steps per Simulation in one plot, with minutes on the left axis and a distinct purple steps line on the right axis, sharing the same simulation buckets.
+
 ## [1.6.3] - 2026-09-22 @ 05:09
 
 ### Changed

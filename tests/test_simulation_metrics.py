@@ -9,30 +9,53 @@ from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import urlopen
 
-from ax3l.activity.SimulationMetrics import metrics
+from ax3l.activity.SimulationMetrics import buckets, metrics
 from ax3l.app.DbMgr import DbMgr
 from ax3l.app.EventLogDb import EventLogDb
 
 
 class MetricsReportTests(unittest.TestCase):
-    def test_lines_numbering_units_and_missing_timings(self):
+    def test_consecutive_buckets_statistics_and_partial_tail(self):
+        rows = [dict(runtime_seconds=i * 10, llm_seconds=i, high_score=i,
+                     total_steps=i * 100, steps_per_episode=i * 5) for i in range(1, 42)]
+        summaries = buckets(rows, 20)
+        self.assertEqual([(b['first'], b['last'], b['count']) for b in summaries],
+                         [(1, 20, 20), (21, 40, 20), (41, 41, 1)])
+        self.assertEqual(sum(b['count'] for b in summaries), len(rows))
+        self.assertEqual([b['runtime_seconds'] for b in summaries], [105, 305, 410])
+        self.assertEqual(summaries[0]['high_score'], 10.5)
+        self.assertEqual(summaries[0]['median_high_score'], 10.5)
+        self.assertEqual(summaries[0]['total_steps'], 1050)
+        self.assertEqual(summaries[0]['steps_per_episode'], 52.5)
+        for size, expected in ((10, 5), (20, 3), (50, 1)):
+            self.assertEqual(len(buckets(rows, size)), expected)
+        self.assertEqual(buckets(rows[:40], 20)[-1]['count'], 20)
         with patch('plotly.graph_objects.Figure.to_html', autospec=True, return_value='chart') as html:
-            result = metrics([
-                dict(run_id='baseline', runtime_seconds=100, llm_seconds=0),
-                dict(run_id='retry', runtime_seconds=50, llm_seconds=12.5),
-                dict(run_id='missing', runtime_seconds=60, llm_seconds=None),
-            ])
+            result = metrics(rows)
             figure = html.call_args.args[0]
-        self.assertEqual(result, {'chart': 'chart', 'total': 3})
+        self.assertEqual(result['bucket_size'], 20)
+        self.assertEqual(result['bucket_count'], 3)
         self.assertEqual([trace.name for trace in figure.data], ['Simulation Runtime', 'LLM Time'])
         for trace in figure.data:
             self.assertEqual(list(trace.x), [1, 2, 3])
             self.assertEqual(trace.line.shape, 'spline')
-        self.assertEqual(list(figure.data[0].y), [100, 50, 60])
-        self.assertEqual(list(figure.data[1].y), [0, 12.5, None])
-        self.assertFalse(figure.data[1].connectgaps)
-        self.assertEqual(figure.layout.yaxis.title.text, 'Time (seconds)')
-        self.assertEqual(metrics([]), {'chart': None, 'total': 0})
+        self.assertEqual(list(figure.data[0].y), [105, 305, 410])
+        self.assertEqual(list(figure.data[1].y), [10.5, 30.5, 41])
+        self.assertEqual(figure.layout.yaxis.title.text, 'Mean time (seconds)')
+        self.assertIsNone(metrics([])['chart'])
+
+    def test_missing_metrics_do_not_drop_runs_or_become_zero(self):
+        rows = [dict(runtime_seconds=10, llm_seconds=0, high_score=0,
+                     total_steps=100, steps_per_episode=50),
+                dict.fromkeys(('runtime_seconds', 'llm_seconds', 'high_score',
+                               'total_steps', 'steps_per_episode'))]
+        bucket = buckets(rows, 20)[0]
+        self.assertEqual(bucket['count'], 2)
+        self.assertEqual(bucket['runtime_seconds'], 10)
+        self.assertEqual(bucket['runtime_seconds_count'], 1)
+        self.assertEqual(bucket['high_score'], 0)
+        self.assertEqual(bucket['llm_seconds'], 0)
+        self.assertIsNone(buckets(rows[1:], 20)[0]['runtime_seconds'])
 
     def test_page_empty_state_and_database_cleanup(self):
         from ax3l.server.ReportingServer import make_server
@@ -51,17 +74,24 @@ class MetricsReportTests(unittest.TestCase):
         self.assertIn('No successfully completed simulations', page)
         self.assertIn('class="chart-page"', page)
         db.close.assert_called_once()
-        log.simulation_metrics.return_value = [dict(run_id='run', runtime_seconds=10, llm_seconds=2)]
+        log.simulation_metrics.return_value = [dict(run_id='run', runtime_seconds=10, llm_seconds=2, high_score=3, total_steps=100, steps_per_episode=50)]
         with urlopen(url) as response:
             page = response.read().decode()
         self.assertIn('id="simulation-runtime"', page)
         self.assertIn('Simulation Runtime', page)
         self.assertIn('LLM Time', page)
+        for size in (10, 20, 50, 7):
+            with urlopen(url + f'?bucket_size={size}') as response:
+                self.assertIn(f'value="{size}"', response.read().decode())
+        for value in ('0', '-1', 'abc', '1.5', '', '10&bucket_size=20'):
+            with self.assertRaises(HTTPError) as error:
+                urlopen(url + '?bucket_size=' + value)
+            self.assertEqual(error.exception.code, 400)
         log.simulation_metrics.side_effect = RuntimeError('database unavailable')
         with patch('ax3l.server.ReportingServer.traceback.print_exc'), self.assertRaises(HTTPError) as error:
             urlopen(url)
         self.assertEqual(error.exception.code, 500)
-        self.assertEqual(db.close.call_count, 3)
+        self.assertEqual(db.close.call_count, 7)
 
 
 @unittest.skipUnless(os.environ.get('AX3L_TEST_DEV_DB') == '1', 'requires disposable DEV MariaDB')
@@ -79,7 +109,10 @@ class MetricsDatabaseTests(unittest.TestCase):
         db.execute('CREATE TEMPORARY TABLE event_messages (event_id BIGINT PRIMARY KEY, content LONGTEXT)')
         db.execute('''CREATE TEMPORARY TABLE snakelab.simulation_runs (
             id INT PRIMARY KEY, run_id CHAR(36) COLLATE utf8mb4_unicode_ci,
-            status VARCHAR(20), started_at DATETIME(6), completed_at DATETIME(6))''')
+            high_score INT DEFAULT 10, status VARCHAR(20), started_at DATETIME(6), completed_at DATETIME(6))''')
+        db.execute('''CREATE TEMPORARY TABLE snakelab.simulation_episodes (
+            run_id CHAR(36) COLLATE utf8mb4_unicode_ci, episode INT, steps INT)''')
+        db.execute("INSERT INTO snakelab.simulation_episodes VALUES ('retry', 1, 100), ('retry', 2, 300)")
         start = datetime(2026, 9, 22)
         for id, run, status, offset, duration in (
             (1, 'baseline', 'completed', 0, 10),
@@ -89,7 +122,7 @@ class MetricsDatabaseTests(unittest.TestCase):
             (5, 'missing', 'completed', 60, 10),
             (6, 'cancelled', 'cancelled', 80, 1),
         ):
-            db.execute('INSERT INTO snakelab.simulation_runs VALUES (%s,%s,%s,%s,%s)',
+            db.execute('INSERT INTO snakelab.simulation_runs (id, run_id, status, started_at, completed_at) VALUES (%s,%s,%s,%s,%s)',
                        (id, run, status, start + timedelta(seconds=offset),
                         start + timedelta(seconds=offset + duration) if duration is not None else None))
 
@@ -117,3 +150,7 @@ class MetricsDatabaseTests(unittest.TestCase):
         self.assertEqual(float(rows[0]['llm_seconds']), 0)
         self.assertEqual(float(rows[1]['llm_seconds']), 12.5)
         self.assertIsNone(rows[2]['llm_seconds'])
+        self.assertEqual(rows[1]['total_steps'], 400)
+        self.assertEqual(rows[1]['steps_per_episode'], 200)
+        self.assertIsNone(rows[0]['total_steps'])
+        self.assertEqual(rows[1]['high_score'], 10)

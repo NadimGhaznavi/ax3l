@@ -9,11 +9,21 @@
 <body class="chart-page">
   <header><h1>Simulation Metrics</h1><a href="/">Back to event log</a></header>
   <section class="report-description" aria-label="About simulation metrics">
-    <p>Successfully completed simulations: {{ total }}. Simulations are numbered oldest first, starting at 1.</p>
-    <p>Simulation Runtime is the time from simulation start to completion.
-      LLM Time sums the logged prompt-to-response intervals for the conversation that submitted each simulation,
-      including retries. Runs without an LLM conversation show zero; incomplete timing records leave gaps.
-      Hover to see times and run IDs. Reload to update.</p>
+    <form action="/simulation-metrics" method="get">
+      <label for="bucket-size">Simulations per bucket</label>
+      <input id="bucket-size" name="bucket_size" type="number" min="1" step="1" required
+             list="bucket-sizes" value="{{ bucket_size }}">
+      <datalist id="bucket-sizes"><option value="10"><option value="20"><option value="50"></datalist>
+      <button type="submit">Apply</button>
+    </form>
+    <p>Successfully completed simulations: {{ total }}. Buckets: {{ bucket_count }}.
+      Every completed simulation belongs to one consecutive bucket in simulation order, oldest first.
+      The final bucket includes any remaining runs.</p>
+    <p>Lines show mean Simulation Runtime and mean LLM Time per bucket, in seconds.
+      LLM Time includes prompt-to-response intervals and retries; runs without an LLM conversation contribute zero.
+      Missing values are excluded from each statistic, with gaps when no values are available.
+      Hover for simulation ranges, counts, mean and median high scores, and step summaries.
+      Mean steps per episode averages each run’s steps per episode equally. Reload to update.</p>
   </section>
   <main class="panel">
     <h2>Simulation Runtime</h2>
@@ -21,7 +31,7 @@
     {{ chart | safe }}
     <noscript>Enable JavaScript to view the interactive chart.</noscript>
     {% else %}
-    <p>No successfully completed simulations with runtime data recorded yet.</p>
+    <p>No successfully completed simulations recorded yet.</p>
     {% endif %}
   </main>
 </body>

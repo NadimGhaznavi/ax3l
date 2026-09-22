@@ -38,7 +38,7 @@
     </section>
     <section class="panel">
       <h2>Steps / second</h2>
-      <p class="report-description">Total steps divided by total simulation runtime in seconds for each bucket.
+      <p class="report-description">Mean of each simulation's total steps divided by its runtime in seconds, with equal weight for each simulation in the bucket.
         Only runs with recorded steps and a positive runtime contribute; LLM time is excluded.</p>
       {% if rate_chart %}
       {{ rate_chart | safe }}

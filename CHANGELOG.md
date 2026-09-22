@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Calculate bucket Steps / second as the mean of individual simulation rates, giving each valid simulation equal weight.
+
 ## [1.6.5] - 2026-09-22 @ 05:25
 
 ### Added

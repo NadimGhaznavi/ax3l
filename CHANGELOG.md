@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.2] - 2026-09-22 @ 04:57
+
+### Changed
+
+- Thin the Simulation Metrics data:
+  - Aggregate Simulation Metrics into consecutive simulation buckets (default 20, configurable), plotting mean runtime and LLM time and showing high-score and step summaries in hover details. Include every completed simulation and the final partial bucket.
+
 ## [1.6.0] - 2026-09-22 @ 04:46
 
 ### Added

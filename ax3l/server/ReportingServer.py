@@ -5,6 +5,7 @@ import socket
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 import traceback
+from urllib.parse import parse_qs, urlsplit
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 import zmq
@@ -65,7 +66,18 @@ def make_server(host: str, port: int) -> HTTPServer:
                     traceback.print_exc()
                     self.send_error(500, "Unable to load golden configurations")
                     return
-            elif self.path == "/simulation-metrics":
+            elif urlsplit(self.path).path == "/simulation-metrics":
+                sizes = parse_qs(urlsplit(self.path).query, keep_blank_values=True).get(
+                    "bucket_size", [str(DReportMgr.SIMULATION_BUCKET_SIZE)])
+                try:
+                    if len(sizes) != 1:
+                        raise ValueError
+                    bucket_size = int(sizes[0])
+                    if bucket_size < 1:
+                        raise ValueError
+                except ValueError:
+                    self.send_error(400, "Bucket size must be a positive integer")
+                    return
                 try:
                     db = DbMgr()
                     try:
@@ -73,7 +85,7 @@ def make_server(host: str, port: int) -> HTTPServer:
                     finally:
                         db.close()
                     body = templates.get_template("simulation_metrics.html").render(
-                        **metrics(history)
+                        **metrics(history, bucket_size)
                     ).encode("utf-8")
                     content_type = "text/html; charset=utf-8"
                 except Exception:

@@ -33,25 +33,28 @@ class MetricsReportTests(unittest.TestCase):
         with patch('plotly.graph_objects.Figure.to_html', autospec=True, return_value='chart') as html:
             result = metrics(rows)
             figure = html.call_args_list[0].args[0]
-            steps_figure = html.call_args_list[1].args[0]
         self.assertEqual(result['bucket_size'], 20)
         self.assertEqual(result['bucket_count'], 3)
-        self.assertEqual([trace.name for trace in figure.data], ['Simulation Runtime', 'LLM Time'])
+        self.assertEqual([trace.name for trace in figure.data], ['Simulation Runtime', 'LLM Time', 'Steps per Simulation'])
         for trace in figure.data:
             self.assertEqual(list(trace.x), [1, 2, 3])
             self.assertEqual(trace.line.shape, 'spline')
         self.assertEqual(list(figure.data[0].y), [105 / 60, 305 / 60, 410 / 60])
         self.assertEqual(list(figure.data[1].y), [10.5 / 60, 30.5 / 60, 41 / 60])
         self.assertEqual(figure.layout.yaxis.title.text, 'Mean time (minutes)')
-        self.assertEqual(list(steps_figure.data[0].x), [1, 2, 3])
-        self.assertEqual(list(steps_figure.data[0].y), [1050, 3050, 4100])
-        self.assertEqual(steps_figure.data[0].line.shape, 'spline')
-        self.assertEqual(steps_figure.layout.xaxis.title, figure.layout.xaxis.title)
+        self.assertEqual(list(figure.data[2].x), [1, 2, 3])
+        self.assertEqual(list(figure.data[2].y), [1050, 3050, 4100])
+        self.assertEqual(figure.data[2].line.shape, 'spline')
+        self.assertEqual(figure.data[2].yaxis, 'y2')
+        self.assertTrue(all(trace.yaxis in (None, 'y') for trace in figure.data[:2]))
+        self.assertEqual(figure.layout.yaxis2.side, 'right')
+        self.assertEqual(figure.layout.yaxis2.overlaying, 'y')
+        self.assertEqual(figure.layout.yaxis2.title.text, 'Mean steps per simulation')
+        self.assertEqual(len({trace.line.color for trace in figure.data}), 3)
         self.assertIn('min', figure.data[0].hovertemplate)
         self.assertTrue(html.call_args_list[0].kwargs['include_plotlyjs'])
-        self.assertFalse(html.call_args_list[1].kwargs['include_plotlyjs'])
+        html.assert_called_once()
         self.assertIsNone(metrics([])['chart'])
-        self.assertIsNone(metrics([])['steps_chart'])
 
     def test_missing_metrics_do_not_drop_runs_or_become_zero(self):
         rows = [dict(runtime_seconds=10, llm_seconds=0, high_score=0,
@@ -67,9 +70,9 @@ class MetricsReportTests(unittest.TestCase):
         self.assertIsNone(buckets(rows[1:], 20)[0]['runtime_seconds'])
         with patch('plotly.graph_objects.Figure.to_html', autospec=True, return_value='chart') as html:
             metrics(rows, 1)
-            steps_figure = html.call_args_list[1].args[0]
-        self.assertEqual(list(steps_figure.data[0].y), [100, None])
-        self.assertFalse(steps_figure.data[0].connectgaps)
+            figure = html.call_args.args[0]
+        self.assertEqual(list(figure.data[2].y), [100, None])
+        self.assertFalse(figure.data[2].connectgaps)
 
     def test_page_empty_state_and_database_cleanup(self):
         from ax3l.server.ReportingServer import make_server
@@ -92,8 +95,8 @@ class MetricsReportTests(unittest.TestCase):
         with urlopen(url) as response:
             page = response.read().decode()
         self.assertIn('id="simulation-runtime"', page)
-        self.assertIn('id="steps-per-simulation"', page)
-        self.assertIn('<h2>Steps per Simulation</h2>', page)
+        self.assertNotIn('id="steps-per-simulation"', page)
+        self.assertIn('<h2>Simulation Runtime and Steps per Simulation</h2>', page)
         self.assertIn('Simulation Runtime', page)
         self.assertIn('LLM Time', page)
         for size in (10, 20, 50, 7):

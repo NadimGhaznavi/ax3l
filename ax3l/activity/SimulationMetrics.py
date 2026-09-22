@@ -26,7 +26,7 @@ def buckets(history: list[dict], bucket_size: int) -> list[dict]:
 
 def metrics(history: list[dict], bucket_size: int = DReportMgr.SIMULATION_BUCKET_SIZE) -> dict:
     summaries = buckets(history, bucket_size)
-    result = dict(chart=None, steps_chart=None, total=len(history), bucket_size=bucket_size, bucket_count=len(summaries))
+    result = dict(chart=None, total=len(history), bucket_size=bucket_size, bucket_count=len(summaries))
     if not summaries:
         return result
 
@@ -59,33 +59,32 @@ def metrics(history: list[dict], bucket_size: int = DReportMgr.SIMULATION_BUCKET
                           "<br>Mean total steps: %{customdata[5]}<br>Mean steps per episode: %{customdata[6]}"
                           "<extra>%{fullData.name}</extra>",
         ))
-    steps_figure = go.Figure(go.Scatter(
+    figure.add_trace(go.Scatter(
         x=[bucket["number"] for bucket in summaries],
         y=[bucket["total_steps"] for bucket in summaries],
         customdata=[[bucket["first"], bucket["last"], bucket["count"],
                      bucket["total_steps_count"]] for bucket in summaries],
-        mode="lines+markers", name="Steps per Simulation", connectgaps=False,
-        line=dict(shape="spline", color="#4c9be8", width=4), marker=dict(size=6),
+        mode="lines+markers", name="Steps per Simulation", connectgaps=False, yaxis="y2",
+        line=dict(shape="spline", color="#c792ea", width=4), marker=dict(size=6),
         hovertemplate="Bucket: %{x}<br>Simulations: %{customdata[0]}–%{customdata[1]}"
                       " (%{customdata[2]} runs)<br>Mean total steps: %{y:,.2f}"
                       " (%{customdata[3]} runs)<extra>%{fullData.name}</extra>",
     ))
-    for plot, key, div_id, y_title in (
-        (figure, "chart", "simulation-runtime", "Mean time (minutes)"),
-        (steps_figure, "steps_chart", "steps-per-simulation", "Mean steps per simulation"),
-    ):
-        plot.update_layout(
-            template="plotly_dark", paper_bgcolor="#101720", plot_bgcolor="#151f2b",
-            font=dict(family="Courier New, monospace", color="#d5dfeb"),
-            xaxis_title=f"Simulation bucket ({bucket_size} runs per bucket)", yaxis_title=y_title,
-            xaxis=dict(rangemode="tozero", dtick=1 if len(summaries) < 20 else None),
-            yaxis=dict(rangemode="tozero"),
-            showlegend=True,
-            legend=dict(orientation="h", x=.5, xanchor="center", y=-.22, yanchor="top"),
-            margin=dict(l=65, r=25, t=30, b=115),
-        )
-        result[key] = plot.to_html(
-            full_html=False, include_plotlyjs=key == "chart", div_id=div_id, default_height="65vh",
-            config={"responsive": True, "displaylogo": False},
-        )
+    figure.update_layout(
+        template="plotly_dark", paper_bgcolor="#101720", plot_bgcolor="#151f2b",
+        font=dict(family="Courier New, monospace", color="#d5dfeb"),
+        xaxis_title=f"Simulation bucket ({bucket_size} runs per bucket)",
+        xaxis=dict(rangemode="tozero", dtick=1 if len(summaries) < 20 else None),
+        yaxis=dict(title="Mean time (minutes)", rangemode="tozero"),
+        yaxis2=dict(title=dict(text="Mean steps per simulation", font=dict(color="#c792ea")),
+                    tickfont=dict(color="#c792ea"), overlaying="y", side="right",
+                    rangemode="tozero", showgrid=False),
+        showlegend=True,
+        legend=dict(orientation="h", x=.5, xanchor="center", y=-.22, yanchor="top"),
+        margin=dict(l=65, r=85, t=30, b=115),
+    )
+    result["chart"] = figure.to_html(
+        full_html=False, include_plotlyjs=True, div_id="simulation-runtime", default_height="65vh",
+        config={"responsive": True, "displaylogo": False},
+    )
     return result

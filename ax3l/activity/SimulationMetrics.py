@@ -20,13 +20,21 @@ def buckets(history: list[dict], bucket_size: int) -> list[dict]:
             bucket[field + "_count"] = len(values)
             if field == "high_score":
                 bucket["median_high_score"] = median(values) if values else None
+        timed_runs = [run for run in runs if run["total_steps"] is not None
+                      and run["runtime_seconds"] is not None and run["runtime_seconds"] > 0]
+        bucket["steps_per_second_count"] = len(timed_runs)
+        bucket["steps_per_second"] = (
+            sum(float(run["total_steps"]) for run in timed_runs)
+            / sum(float(run["runtime_seconds"]) for run in timed_runs)
+            if timed_runs else None
+        )
         result.append(bucket)
     return result
 
 
 def metrics(history: list[dict], bucket_size: int = DReportMgr.SIMULATION_BUCKET_SIZE) -> dict:
     summaries = buckets(history, bucket_size)
-    result = dict(chart=None, total=len(history), bucket_size=bucket_size, bucket_count=len(summaries))
+    result = dict(chart=None, rate_chart=None, total=len(history), bucket_size=bucket_size, bucket_count=len(summaries))
     if not summaries:
         return result
 
@@ -70,21 +78,39 @@ def metrics(history: list[dict], bucket_size: int = DReportMgr.SIMULATION_BUCKET
                       " (%{customdata[2]} runs)<br>Mean total steps: %{y:,.2f}"
                       " (%{customdata[3]} runs)<extra>%{fullData.name}</extra>",
     ))
-    figure.update_layout(
+    layout = dict(
         template="plotly_dark", paper_bgcolor="#101720", plot_bgcolor="#151f2b",
         font=dict(family="Courier New, monospace", color="#d5dfeb"),
         xaxis_title=f"Simulation bucket ({bucket_size} runs per bucket)",
         xaxis=dict(rangemode="tozero", dtick=1 if len(summaries) < 20 else None),
-        yaxis=dict(title="Mean time (minutes)", rangemode="tozero"),
-        yaxis2=dict(title=dict(text="Mean steps per simulation", font=dict(color="#c792ea")),
-                    tickfont=dict(color="#c792ea"), overlaying="y", side="right",
-                    rangemode="tozero", showgrid=False),
         showlegend=True,
         legend=dict(orientation="h", x=.5, xanchor="center", y=-.22, yanchor="top"),
         margin=dict(l=65, r=85, t=30, b=115),
     )
+    figure.update_layout(**layout,
+        yaxis=dict(title="Mean time (minutes)", rangemode="tozero"),
+        yaxis2=dict(title=dict(text="Mean steps per simulation", font=dict(color="#c792ea")),
+                    tickfont=dict(color="#c792ea"), overlaying="y", side="right",
+                    rangemode="tozero", showgrid=False),
+    )
     result["chart"] = figure.to_html(
         full_html=False, include_plotlyjs=True, div_id="simulation-runtime", default_height="65vh",
+        config={"responsive": True, "displaylogo": False},
+    )
+    rate = go.Figure(go.Scatter(
+        x=[bucket["number"] for bucket in summaries],
+        y=[bucket["steps_per_second"] for bucket in summaries],
+        customdata=[[bucket["first"], bucket["last"], bucket["count"],
+                     bucket["steps_per_second_count"]] for bucket in summaries],
+        mode="lines+markers", name="Steps / second", connectgaps=False,
+        line=dict(shape="spline", color="#4c9be8", width=4), marker=dict(size=6),
+        hovertemplate="Bucket: %{x}<br>Simulations: %{customdata[0]}–%{customdata[1]}"
+                      " (%{customdata[2]} runs)<br>Steps / second: %{y:,.2f}"
+                      " (%{customdata[3]} runs)<extra></extra>",
+    ))
+    rate.update_layout(**layout, yaxis=dict(title="Steps / second", rangemode="tozero"))
+    result["rate_chart"] = rate.to_html(
+        full_html=False, include_plotlyjs=False, div_id="steps-per-second", default_height="65vh",
         config={"responsive": True, "displaylogo": False},
     )
     return result

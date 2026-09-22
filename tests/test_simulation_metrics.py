@@ -53,7 +53,15 @@ class MetricsReportTests(unittest.TestCase):
         self.assertEqual(len({trace.line.color for trace in figure.data}), 3)
         self.assertIn('min', figure.data[0].hovertemplate)
         self.assertTrue(html.call_args_list[0].kwargs['include_plotlyjs'])
-        html.assert_called_once()
+        self.assertEqual(html.call_count, 2)
+        rate = html.call_args_list[1].args[0]
+        self.assertEqual(list(rate.data[0].x), [1, 2, 3])
+        self.assertEqual(list(rate.data[0].y), [10, 10, 10])
+        self.assertEqual(rate.data[0].line.shape, 'spline')
+        self.assertEqual(rate.layout.yaxis.title.text, 'Steps / second')
+        self.assertEqual(rate.layout.xaxis.title, figure.layout.xaxis.title)
+        self.assertFalse(html.call_args_list[1].kwargs['include_plotlyjs'])
+        self.assertIsNone(metrics([])['rate_chart'])
         self.assertIsNone(metrics([])['chart'])
 
     def test_missing_metrics_do_not_drop_runs_or_become_zero(self):
@@ -70,9 +78,27 @@ class MetricsReportTests(unittest.TestCase):
         self.assertIsNone(buckets(rows[1:], 20)[0]['runtime_seconds'])
         with patch('plotly.graph_objects.Figure.to_html', autospec=True, return_value='chart') as html:
             metrics(rows, 1)
-            figure = html.call_args.args[0]
+            figure = html.call_args_list[0].args[0]
         self.assertEqual(list(figure.data[2].y), [100, None])
         self.assertFalse(figure.data[2].connectgaps)
+
+    def test_rate_uses_paired_totals_and_ignores_unusable_durations(self):
+        def run(steps, seconds):
+            return dict(total_steps=steps, runtime_seconds=seconds, llm_seconds=1000,
+                        high_score=None, steps_per_episode=None)
+        rows = [run(100, 10), run(900, 30), run(999, None), run(None, 100),
+                run(999, 0), run(999, -1)]
+        summary = buckets(rows, 20)[0]
+        self.assertEqual(summary['count'], 6)
+        self.assertEqual(summary['steps_per_second_count'], 2)
+        self.assertEqual(summary['steps_per_second'], 25)
+        self.assertEqual(buckets([run(0, 10)], 20)[0]['steps_per_second'], 0)
+        self.assertIsNone(buckets(rows[2:], 20)[0]['steps_per_second'])
+        with patch('plotly.graph_objects.Figure.to_html', autospec=True, return_value='chart') as html:
+            metrics(rows, 2)
+            rate = html.call_args_list[1].args[0]
+        self.assertEqual(list(rate.data[0].y), [25, None, None])
+        self.assertFalse(rate.data[0].connectgaps)
 
     def test_page_empty_state_and_database_cleanup(self):
         from ax3l.server.ReportingServer import make_server
@@ -95,6 +121,10 @@ class MetricsReportTests(unittest.TestCase):
         with urlopen(url) as response:
             page = response.read().decode()
         self.assertIn('id="simulation-runtime"', page)
+        self.assertIn('id="steps-per-second"', page)
+        self.assertIn('<h2>Steps / second</h2>', page)
+        self.assertEqual(page.count('<section class="panel">'), 2)
+        self.assertIn('class="metrics-plots"', page)
         self.assertNotIn('id="steps-per-simulation"', page)
         self.assertIn('<h2>Simulation Runtime and Steps per Simulation</h2>', page)
         self.assertIn('Simulation Runtime', page)

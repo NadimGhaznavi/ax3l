@@ -82,7 +82,7 @@ class MetricsReportTests(unittest.TestCase):
         self.assertEqual(list(figure.data[2].y), [100, None])
         self.assertFalse(figure.data[2].connectgaps)
 
-    def test_rate_uses_paired_totals_and_ignores_unusable_durations(self):
+    def test_rate_averages_simulation_rates_and_ignores_unusable_durations(self):
         def run(steps, seconds):
             return dict(total_steps=steps, runtime_seconds=seconds, llm_seconds=1000,
                         high_score=None, steps_per_episode=None)
@@ -91,13 +91,13 @@ class MetricsReportTests(unittest.TestCase):
         summary = buckets(rows, 20)[0]
         self.assertEqual(summary['count'], 6)
         self.assertEqual(summary['steps_per_second_count'], 2)
-        self.assertEqual(summary['steps_per_second'], 25)
+        self.assertEqual(summary['steps_per_second'], 20)
         self.assertEqual(buckets([run(0, 10)], 20)[0]['steps_per_second'], 0)
         self.assertIsNone(buckets(rows[2:], 20)[0]['steps_per_second'])
         with patch('plotly.graph_objects.Figure.to_html', autospec=True, return_value='chart') as html:
             metrics(rows, 2)
             rate = html.call_args_list[1].args[0]
-        self.assertEqual(list(rate.data[0].y), [25, None, None])
+        self.assertEqual(list(rate.data[0].y), [20, None, None])
         self.assertFalse(rate.data[0].connectgaps)
 
     def test_page_empty_state_and_database_cleanup(self):

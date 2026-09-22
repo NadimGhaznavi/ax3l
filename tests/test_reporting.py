@@ -132,6 +132,9 @@ class ExperimentStatusTests(unittest.TestCase):
                 self.assertIn('href="/score-distribution">Score Distribution Histogram</a>', page)
                 self.assertIn('href="/experiment-highscores">Experiment Highscores</a>', page)
                 self.assertIn('href="/golden-configurations">Golden Configurations</a>', page)
+                self.assertIn('href="/simulation-metrics">Simulation Metrics</a>', page)
+                self.assertLess(page.index('>Golden Configurations</a>'),
+                                page.index('>Simulation Metrics</a>'))
                 self.assertLess(page.index('>Experiment Highscores</a>'),
                                 page.index('>Golden Configurations</a>'))
                 self.assertLess(page.index('>Score Distribution Histogram</a>'),

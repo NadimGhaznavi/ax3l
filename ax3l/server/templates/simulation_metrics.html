@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Simulation Metrics · Ax3l</title>
+  {% include "report_styles.html" %}
+</head>
+<body class="chart-page">
+  <header><h1>Simulation Metrics</h1><a href="/">Back to event log</a></header>
+  <section class="report-description" aria-label="About simulation metrics">
+    <p>Successfully completed simulations: {{ total }}. Simulations are numbered oldest first, starting at 1.</p>
+    <p>Simulation Runtime is the time from simulation start to completion.
+      LLM Time sums the logged prompt-to-response intervals for the conversation that submitted each simulation,
+      including retries. Runs without an LLM conversation show zero; incomplete timing records leave gaps.
+      Hover to see times and run IDs. Reload to update.</p>
+  </section>
+  <main class="panel">
+    <h2>Simulation Runtime</h2>
+    {% if chart %}
+    {{ chart | safe }}
+    <noscript>Enable JavaScript to view the interactive chart.</noscript>
+    {% else %}
+    <p>No successfully completed simulations with runtime data recorded yet.</p>
+    {% endif %}
+  </main>
+</body>
+</html>

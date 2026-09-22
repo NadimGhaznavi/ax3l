@@ -225,18 +225,22 @@ class EventLogDb:
                     AND p.name = 'prompt_sent'
                 WHERE r.category = 'Conversation' AND r.name = 'reply_received'
             )
-            SELECT s.run_id,
+            SELECT s.run_id, s.high_score,
+                   ep.total_steps, ep.total_steps / NULLIF(ep.episodes, 0) AS steps_per_episode,
                    TIMESTAMPDIFF(MICROSECOND, s.started_at, s.completed_at) / 1000000.0 AS runtime_seconds,
                    CASE WHEN t.event_id IS NULL THEN 0
                         WHEN COUNT(q.event_id) = 0 OR COUNT(q.seconds) < COUNT(q.event_id) THEN NULL
                         ELSE SUM(q.seconds) END AS llm_seconds
             FROM `{DSnakeLab.DATABASE}`.simulation_runs s
+            LEFT JOIN (
+                SELECT run_id, SUM(steps) AS total_steps, COUNT(*) AS episodes
+                FROM `{DSnakeLab.DATABASE}`.simulation_episodes GROUP BY run_id
+            ) ep ON ep.run_id = s.run_id
             LEFT JOIN submissions t ON t.event_id = (
                 SELECT MIN(event_id) FROM submissions
                 WHERE run_id COLLATE utf8mb4_unicode_ci = s.run_id)
             LEFT JOIN requests q ON q.process_id = t.process_id AND q.event_id < t.event_id
-            WHERE s.status = 'completed' AND s.started_at IS NOT NULL
-              AND s.completed_at IS NOT NULL AND s.completed_at >= s.started_at
-            GROUP BY s.id, s.run_id, s.started_at, s.completed_at, t.event_id
-            ORDER BY s.started_at, s.id
+            WHERE s.status = 'completed'
+            GROUP BY s.id, s.run_id, s.started_at, s.completed_at, s.high_score, ep.total_steps, ep.episodes, t.event_id
+            ORDER BY s.id
         """)

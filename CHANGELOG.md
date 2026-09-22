@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.3] - 2026-09-22 @ 05:09
+
+### Changed
+
+- Display Simulation Runtime and LLM Time in minutes on the Simulation Metrics page.
+
+### Added
+
+- Add a matching Steps per Simulation plot showing mean total steps per run with the same configurable sequential buckets.
+
 ## [1.6.2] - 2026-09-22 @ 04:57
 
 ### Changed

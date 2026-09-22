@@ -19,16 +19,19 @@
     <p>Successfully completed simulations: {{ total }}. Buckets: {{ bucket_count }}.
       Every completed simulation belongs to one consecutive bucket in simulation order, oldest first.
       The final bucket includes any remaining runs.</p>
-    <p>Lines show mean Simulation Runtime and mean LLM Time per bucket, in seconds.
+    <p>Lines show mean Simulation Runtime and mean LLM Time per bucket, in minutes.
       LLM Time includes prompt-to-response intervals and retries; runs without an LLM conversation contribute zero.
       Missing values are excluded from each statistic, with gaps when no values are available.
       Hover for simulation ranges, counts, mean and median high scores, and step summaries.
+      Steps per Simulation shows the mean total steps per run in each of the same buckets.
       Mean steps per episode averages each run’s steps per episode equally. Reload to update.</p>
   </section>
   <main class="panel">
     <h2>Simulation Runtime</h2>
     {% if chart %}
     {{ chart | safe }}
+    <h2>Steps per Simulation</h2>
+    {{ steps_chart | safe }}
     <noscript>Enable JavaScript to view the interactive chart.</noscript>
     {% else %}
     <p>No successfully completed simulations recorded yet.</p>

@@ -26,7 +26,8 @@
       Steps per Simulation shows the mean total steps per run on the right axis, using the same buckets.
       Mean steps per episode averages each run’s steps per episode equally. Reload to update.</p>
   </section>
-  <main class="panel">
+  <main class="metrics-plots">
+    <section class="panel">
     <h2>Simulation Runtime and Steps per Simulation</h2>
     {% if chart %}
     {{ chart | safe }}
@@ -34,6 +35,18 @@
     {% else %}
     <p>No successfully completed simulations recorded yet.</p>
     {% endif %}
+    </section>
+    <section class="panel">
+      <h2>Steps / second</h2>
+      <p class="report-description">Total steps divided by total simulation runtime in seconds for each bucket.
+        Only runs with recorded steps and a positive runtime contribute; LLM time is excluded.</p>
+      {% if rate_chart %}
+      {{ rate_chart | safe }}
+      <noscript>Enable JavaScript to view the interactive chart.</noscript>
+      {% else %}
+      <p>No successfully completed simulations recorded yet.</p>
+      {% endif %}
+    </section>
   </main>
 </body>
 </html>

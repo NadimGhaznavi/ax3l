@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add Simulation Metrics below Golden Configurations in the Report Server, with matching plot styling and smoothed Simulation Runtime and LLM Time lines for successfully completed simulations, numbered oldest first. LLM time sums logged prompt-to-response intervals, including proposal retries.
+
 ## [1.5.0] - 2026-09-21 @ 17:31
 
 ### Removed

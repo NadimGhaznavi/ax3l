@@ -18,6 +18,7 @@ from ax3l.activity.ScoreDistribution import distribution
 from ax3l.activity.ExperimentHighscores import highscores
 from ax3l.activity.GoldenConfigurations import parameter_change
 from ax3l.activity.SimulationBoard import board_svg
+from ax3l.activity.SimulationMetrics import metrics
 from ax3l.constants.DReportMgr import DReportMgr
 from ax3l.constants.DLabel import FIELD_TO_LABEL_MAP
 from ax3l.interface.SnakeLab import SnakeLab
@@ -63,6 +64,21 @@ def make_server(host: str, port: int) -> HTTPServer:
                 except Exception:
                     traceback.print_exc()
                     self.send_error(500, "Unable to load golden configurations")
+                    return
+            elif self.path == "/simulation-metrics":
+                try:
+                    db = DbMgr()
+                    try:
+                        history = EventLogDb(db).simulation_metrics()
+                    finally:
+                        db.close()
+                    body = templates.get_template("simulation_metrics.html").render(
+                        **metrics(history)
+                    ).encode("utf-8")
+                    content_type = "text/html; charset=utf-8"
+                except Exception:
+                    traceback.print_exc()
+                    self.send_error(500, "Unable to load simulation metrics")
                     return
             elif self.path == "/experiment-highscores":
                 try:

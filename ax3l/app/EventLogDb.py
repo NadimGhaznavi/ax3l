@@ -198,3 +198,45 @@ class EventLogDb:
             JOIN event_messages m USING (event_id)
             ORDER BY h.event_id
         """)
+
+    def simulation_metrics(self) -> list[dict[str, Any]]:
+        """Read completed run times and prompt/response time for their conversations.
+
+        Initial context messages share one request, so pair each reply with only
+        the last preceding prompt. Tool processing between requests is excluded.
+        """
+        return self._db.query(f"""
+            WITH submissions AS (
+                SELECT e.event_id, e.process_id,
+                       JSON_UNQUOTE(JSON_EXTRACT(m.content, '$.run_id')) AS run_id
+                FROM events e JOIN event_messages m USING (event_id)
+                WHERE e.category = 'Tool' AND e.name = 'tool_execution_completed'
+                  AND JSON_UNQUOTE(JSON_EXTRACT(
+                      CASE WHEN JSON_VALID(m.content) THEN m.content ELSE '{{}}' END,
+                      '$.status')) = 'ok'
+            ), requests AS (
+                SELECT r.event_id, r.process_id,
+                       TIMESTAMPDIFF(MICROSECOND, p.occurred_at, r.occurred_at) / 1000000.0 AS seconds
+                FROM events r
+                LEFT JOIN events p ON p.event_id = (
+                    SELECT MAX(event_id) FROM events
+                    WHERE process_id = r.process_id AND event_id < r.event_id
+                      AND category = 'Conversation' AND name IN ('prompt_sent', 'reply_received'))
+                    AND p.name = 'prompt_sent'
+                WHERE r.category = 'Conversation' AND r.name = 'reply_received'
+            )
+            SELECT s.run_id,
+                   TIMESTAMPDIFF(MICROSECOND, s.started_at, s.completed_at) / 1000000.0 AS runtime_seconds,
+                   CASE WHEN t.event_id IS NULL THEN 0
+                        WHEN COUNT(q.event_id) = 0 OR COUNT(q.seconds) < COUNT(q.event_id) THEN NULL
+                        ELSE SUM(q.seconds) END AS llm_seconds
+            FROM `{DSnakeLab.DATABASE}`.simulation_runs s
+            LEFT JOIN submissions t ON t.event_id = (
+                SELECT MIN(event_id) FROM submissions
+                WHERE run_id COLLATE utf8mb4_unicode_ci = s.run_id)
+            LEFT JOIN requests q ON q.process_id = t.process_id AND q.event_id < t.event_id
+            WHERE s.status = 'completed' AND s.started_at IS NOT NULL
+              AND s.completed_at IS NOT NULL AND s.completed_at >= s.started_at
+            GROUP BY s.id, s.run_id, s.started_at, s.completed_at, t.event_id
+            ORDER BY s.started_at, s.id
+        """)

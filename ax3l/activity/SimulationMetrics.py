@@ -24,8 +24,7 @@ def buckets(history: list[dict], bucket_size: int) -> list[dict]:
                       and run["runtime_seconds"] is not None and run["runtime_seconds"] > 0]
         bucket["steps_per_second_count"] = len(timed_runs)
         bucket["steps_per_second"] = (
-            sum(float(run["total_steps"]) for run in timed_runs)
-            / sum(float(run["runtime_seconds"]) for run in timed_runs)
+            mean(float(run["total_steps"]) / float(run["runtime_seconds"]) for run in timed_runs)
             if timed_runs else None
         )
         result.append(bucket)

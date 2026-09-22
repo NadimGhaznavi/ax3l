@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add a Steps / second plot using bucket total steps divided by total simulation runtime, below the combined metrics plot in a separate bordered box with a gap between plots.
+
 ## [1.6.4] - 2026-09-22 @ 05:15
 
 ### Changed

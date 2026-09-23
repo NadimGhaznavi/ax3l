@@ -108,6 +108,7 @@ class ExperimentStatusTests(unittest.TestCase):
         thread.start()
         try:
             for submitted, cycles, score in ((0, 0, None), (17, 3, 60)):
+                snake.get_episode_totals.return_value = {"games_played": submitted * 10, "moves_made": submitted * 100}
                 snake.get_num_sims.return_value = submitted
                 snake.get_high_score.return_value = 999
                 log.current_golden_config.return_value = {'process_id': 'current-run'} if score is not None else None
@@ -119,6 +120,9 @@ class ExperimentStatusTests(unittest.TestCase):
                     page = response.read().decode()
                 self.assertIn(f'Simulations Submitted: {submitted}', page)
                 self.assertIn(f'Experiment Cycles: {cycles}', page)
+                self.assertIn(f'Game Played: {submitted * 10}', page)
+                self.assertIn(f'Moves Made: {submitted * 100}', page)
+                self.assertLess(page.index('Experiment Cycles:'), page.index('Simulations Submitted:'))
                 self.assertIn(f"Current Highscore: {score if score is not None else '—'}", page)
                 self.assertIn('class="server-bar experiment-status"', page)
                 if score is not None:
@@ -139,7 +143,7 @@ class ExperimentStatusTests(unittest.TestCase):
                                 page.index('>Golden Configurations</a>'))
                 self.assertLess(page.index('>Score Distribution Histogram</a>'),
                                 page.index('>Experiment Highscores</a>'))
-                for element in ('simulations-submitted', 'experiment-cycles'):
+                for element in ('simulations-submitted', 'experiment-cycles', 'games-played', 'moves-made'):
                     self.assertIn(f"page.querySelector('#{element}').textContent", page)
         finally:
             server.shutdown()
@@ -163,6 +167,11 @@ class ReportingTests(unittest.TestCase):
         ))
         self.enterContext(patch(
             "ax3l.server.ReportingServer.SnakeLab.get_num_sims", return_value=17,
+        ))
+
+        self.enterContext(patch(
+            "ax3l.server.ReportingServer.SnakeLab.get_episode_totals",
+            return_value={"games_played": 170, "moves_made": 1700},
         ))
 
         db = DbMgr()

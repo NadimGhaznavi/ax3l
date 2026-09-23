@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Show Experiment Cycles before Simulations Submitted in Report Server status, and add Game Played and Moves Made totals from simulation episodes, including automatic refresh.
+
 ## [1.6.6] - 2026-09-22 @ 05:43
 
 ### Changed

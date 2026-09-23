@@ -70,6 +70,15 @@ class SnakeLabDb:
         """Count all stored runs, including repeated configurations and all statuses."""
         return self._db.query("SELECT COUNT(*) AS num_sims FROM simulation_runs")[0]["num_sims"]
 
+    def get_episode_totals(self) -> dict[str, int]:
+        """Return games played and moves made across all stored episodes."""
+        row = self._db.query(
+            "SELECT COUNT(*) AS games_played, COALESCE(SUM(steps), 0) AS moves_made "
+            "FROM simulation_episodes"
+        )[0]
+        return {"games_played": int(row["games_played"]),
+                "moves_made": int(row["moves_made"])}
+
     def get_high_score(self) -> int | None:
         """Return the highest recorded score across all runs, or None before any score."""
         return self._db.query(

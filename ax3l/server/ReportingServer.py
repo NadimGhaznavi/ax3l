@@ -203,6 +203,7 @@ def make_server(host: str, port: int) -> HTTPServer:
                                 current_board_svg=board_svg(current_run.get("high_score_snapshot")) if current_run else None,
                                 simulations_submitted=SnakeLab().get_num_sims(),
                                 experiment_cycles=log.experiment_cycles(),
+                                **SnakeLab().get_episode_totals(),
                             ).encode("utf-8")
                         else:
                             reason_page = self.path.endswith("/reason")

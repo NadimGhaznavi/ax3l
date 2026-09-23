@@ -35,6 +35,14 @@ class SnakeLab:
         finally:
             db.close()
 
+    def get_episode_totals(self) -> dict[str, int]:
+        """Return total games and moves recorded by Snake Lab."""
+        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
+        try:
+            return SnakeLabDb(db).get_episode_totals()
+        finally:
+            db.close()
+
     def get_high_score(self) -> int | None:
         """Return the experiment's highest recorded score across configs and seeds."""
         db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)

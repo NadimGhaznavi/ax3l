@@ -20,8 +20,10 @@
     <span id="experiment-hostname">Hostname: {{ hostname }}</span>
     <span id="experiment-all-time-high-score" role="status">All-Time Highscore: {{ all_time_high_score if all_time_high_score is not none else '—' }}</span>
     <span id="experiment-high-score" role="status">Current Highscore: {{ high_score if high_score is not none else '—' }}</span>
-    <span id="simulations-submitted" role="status">Simulations Submitted: {{ simulations_submitted }}</span>
     <span id="experiment-cycles" role="status">Experiment Cycles: {{ experiment_cycles }}</span>
+    <span id="simulations-submitted" role="status">Simulations Submitted: {{ simulations_submitted }}</span>
+    <span id="games-played" role="status">Game Played: {{ games_played }}</span>
+    <span id="moves-made" role="status">Moves Made: {{ moves_made }}</span>
     </div>
     </section>
     <section class="experiment-reports" aria-labelledby="reports-title">
@@ -235,6 +237,8 @@
         document.querySelector('#experiment-all-time-high-score').textContent = page.querySelector('#experiment-all-time-high-score').textContent;
         document.querySelector('#simulations-submitted').textContent = page.querySelector('#simulations-submitted').textContent;
         document.querySelector('#experiment-cycles').textContent = page.querySelector('#experiment-cycles').textContent;
+        document.querySelector('#games-played').textContent = page.querySelector('#games-played').textContent;
+        document.querySelector('#moves-made').textContent = page.querySelector('#moves-made').textContent;
         document.querySelector('#current-board').replaceChildren(...page.querySelector('#current-board').childNodes);
         main.scrollLeft = scrollLeft;
         window.scrollTo(scrollX, scrollY);

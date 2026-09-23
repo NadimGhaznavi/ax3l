@@ -44,6 +44,24 @@ def make_server(host: str, port: int) -> HTTPServer:
     templates.globals["request_timeout_seconds"] = DReportMgr.REQUEST_TIMEOUT_SECONDS
 
     class Handler(BaseHTTPRequestHandler):
+        def send_error(self, code, message=None, explain=None):
+            try:
+                super().send_error(code, message, explain)
+            except (BrokenPipeError, ConnectionResetError):
+                self.close_connection = True
+
+        def _send_page(self, body: bytes, content_type: str):
+            try:
+                self.send_response(200)
+                self.send_header("Content-Type", content_type)
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(body)
+            except (BrokenPipeError, ConnectionResetError):
+                # The browser can cancel a refresh or leave before the page arrives.
+                self.close_connection = True
+
         def do_GET(self):
             if self.path == "/health":
                 body = b'{"status":"ok","service":"reporting-server","mode":"events"}'
@@ -279,12 +297,7 @@ def make_server(host: str, port: int) -> HTTPServer:
             else:
                 self.send_error(404)
                 return
-            self.send_response(200)
-            self.send_header("Content-Type", content_type)
-            self.send_header("Content-Length", str(len(body)))
-            self.send_header("Cache-Control", "no-store")
-            self.end_headers()
-            self.wfile.write(body)
+            self._send_page(body, content_type)
 
     return HTTPServer((host, port), Handler)
 

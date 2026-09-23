@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Rename "Experiment Cycles" to "Completed Experiments" in the Report Server Status section.
+
 ## [1.6.10] - 2026-09-23 @ 17:14
 
 ### Fixed

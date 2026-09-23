@@ -172,10 +172,10 @@ class ExperimentStatusTests(unittest.TestCase):
                 with urlopen(f'http://127.0.0.1:{server.server_port}/') as response:
                     page = response.read().decode()
                 self.assertIn(f'Simulations Submitted: {submitted:,}', page)
-                self.assertIn(f'Experiment Cycles: {cycles:,}', page)
+                self.assertIn(f'Completed Experiments: {cycles:,}', page)
                 self.assertIn(f'Games Played: {submitted * 10:,}', page)
                 self.assertIn(f'Moves Made: {submitted * 100:,}', page)
-                self.assertLess(page.index('Experiment Cycles:'), page.index('Simulations Submitted:'))
+                self.assertLess(page.index('Completed Experiments:'), page.index('Simulations Submitted:'))
                 self.assertIn(f"Current Highscore: {format(score, ',') if score is not None else '—'}", page)
                 self.assertIn('class="server-bar experiment-status"', page)
                 if score is not None:

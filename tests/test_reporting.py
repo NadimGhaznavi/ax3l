@@ -124,7 +124,7 @@ class ExperimentStatusTests(unittest.TestCase):
                     page = response.read().decode()
                 self.assertIn(f'Simulations Submitted: {submitted:,}', page)
                 self.assertIn(f'Experiment Cycles: {cycles:,}', page)
-                self.assertIn(f'Game Played: {submitted * 10:,}', page)
+                self.assertIn(f'Games Played: {submitted * 10:,}', page)
                 self.assertIn(f'Moves Made: {submitted * 100:,}', page)
                 self.assertLess(page.index('Experiment Cycles:'), page.index('Simulations Submitted:'))
                 self.assertIn(f"Current Highscore: {format(score, ',') if score is not None else '—'}", page)

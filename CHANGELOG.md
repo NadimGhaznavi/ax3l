@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.9] - 2026-09-23 @ 17:07
+
+### Fixed
+
+- Correct the Report Server Status label to "Games Played".
+
 ## [1.6.8] - 2026-09-23 @ 17:02
 
 ### Changed

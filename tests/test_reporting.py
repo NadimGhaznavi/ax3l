@@ -10,6 +10,55 @@ from uuid import uuid4
 from unittest.mock import patch
 
 
+class ClientDisconnectTests(unittest.TestCase):
+    def test_disconnect_during_response_headers_or_body(self):
+        from io import BytesIO
+        from unittest.mock import Mock
+        from ax3l.server.ReportingServer import make_server
+
+        with patch('ax3l.server.ReportingServer.HTTPServer',
+                   side_effect=lambda address, handler: handler):
+            handler = make_server('127.0.0.1', 0)
+        for path in ('/health', '/missing',
+                     '/simulations/00000000-0000-0000-0000-000000000001'):
+            for error in (BrokenPipeError, ConnectionResetError):
+                for write in (1, 2):
+                    with self.subTest(path=path, error=error, write=write):
+                        request = Mock()
+                        request.makefile.return_value = BytesIO(
+                            f'GET {path} HTTP/1.0\r\n\r\n'.encode())
+                        request.sendall.side_effect = [None] * (write - 1) + [error()]
+                        with patch.object(handler, 'log_message'), patch(
+                            'ax3l.server.ReportingServer.traceback.print_exc'
+                        ) as traceback_log, patch(
+                            'ax3l.server.ReportingServer.SnakeLab'
+                        ) as snake:
+                            snake.return_value.get_run_summary.return_value = None
+                            instance = handler(request, ('127.0.0.1', 1234), Mock())
+                        self.assertTrue(instance.close_connection)
+                        self.assertEqual(request.sendall.call_count, write)
+                        traceback_log.assert_not_called()
+
+    def test_unexpected_write_errors_propagate(self):
+        from io import BytesIO
+        from unittest.mock import Mock
+        from ax3l.server.ReportingServer import make_server
+
+        with patch('ax3l.server.ReportingServer.HTTPServer',
+                   side_effect=lambda address, handler: handler):
+            handler = make_server('127.0.0.1', 0)
+        for path in ('/health', '/missing'):
+            with self.subTest(path=path):
+                request = Mock()
+                request.makefile.return_value = BytesIO(
+                    f'GET {path} HTTP/1.0\r\n\r\n'.encode())
+                request.sendall.side_effect = OSError('Unexpected write failure')
+                with patch.object(handler, 'log_message'), self.assertRaisesRegex(
+                    OSError, 'Unexpected write failure'
+                ):
+                    handler(request, ('127.0.0.1', 1234), Mock())
+
+
 class ExperimentStatusTests(unittest.TestCase):
     def test_exhausted_parameter_event_is_visible_and_filterable(self):
         from datetime import datetime

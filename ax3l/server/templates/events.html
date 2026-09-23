@@ -18,12 +18,12 @@
     <h3 id="status-title">Status</h3>
     <div class="experiment-metrics">
     <span id="experiment-hostname">Hostname: {{ hostname }}</span>
-    <span id="experiment-all-time-high-score" role="status">All-Time Highscore: {{ all_time_high_score if all_time_high_score is not none else '—' }}</span>
-    <span id="experiment-high-score" role="status">Current Highscore: {{ high_score if high_score is not none else '—' }}</span>
-    <span id="experiment-cycles" role="status">Experiment Cycles: {{ experiment_cycles }}</span>
-    <span id="simulations-submitted" role="status">Simulations Submitted: {{ simulations_submitted }}</span>
-    <span id="games-played" role="status">Game Played: {{ games_played }}</span>
-    <span id="moves-made" role="status">Moves Made: {{ moves_made }}</span>
+    <span id="experiment-all-time-high-score" role="status">All-Time Highscore: {{ "{:,}".format(all_time_high_score) if all_time_high_score is not none else '—' }}</span>
+    <span id="experiment-high-score" role="status">Current Highscore: {{ "{:,}".format(high_score) if high_score is not none else '—' }}</span>
+    <span id="experiment-cycles" role="status">Experiment Cycles: {{ "{:,}".format(experiment_cycles) }}</span>
+    <span id="simulations-submitted" role="status">Simulations Submitted: {{ "{:,}".format(simulations_submitted) }}</span>
+    <span id="games-played" role="status">Game Played: {{ "{:,}".format(games_played) }}</span>
+    <span id="moves-made" role="status">Moves Made: {{ "{:,}".format(moves_made) }}</span>
     </div>
     </section>
     <section class="experiment-reports" aria-labelledby="reports-title">

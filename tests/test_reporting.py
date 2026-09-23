@@ -33,7 +33,9 @@ class ExperimentStatusTests(unittest.TestCase):
             autoescape=select_autoescape(['html']))
         templates.globals['field_labels'] = FIELD_TO_LABEL_MAP
         page = templates.get_template('events.html').render(
-            events=[event], high_score=None, event_label=Events.label, event_choices={},
+            events=[event], high_score=None, all_time_high_score=None,
+            experiment_cycles=0, simulations_submitted=0, games_played=0, moves_made=0,
+            event_label=Events.label, event_choices={},
             prompt_label='Prompt', simulation_events=Events.SnakeLab, request_timeout_seconds=10)
         self.assertIn('Parameter space exhausted', page)
         self.assertIn('Skipping sequence_length:', page)
@@ -57,7 +59,9 @@ class ExperimentStatusTests(unittest.TestCase):
                              category='Conversation', name='prompt_sent', source_name='GoldenConfig',
                              parameter=parameter, content='Choose a value.', prompt_text='Choose a value.')
                 page = templates.get_template('events.html').render(
-                    events=[event], high_score=None, event_label=Events.label, event_choices={},
+                    events=[event], high_score=None, all_time_high_score=None,
+                    experiment_cycles=0, simulations_submitted=0, games_played=0, moves_made=0,
+                    event_label=Events.label, event_choices={},
                     prompt_label='Prompt', simulation_events=Events.SnakeLab, request_timeout_seconds=10)
                 self.assertIn('id="parameter-filter"', page)
                 self.assertNotIn('source-filter', page)
@@ -107,10 +111,10 @@ class ExperimentStatusTests(unittest.TestCase):
         thread = Thread(target=server.serve_forever, daemon=True)
         thread.start()
         try:
-            for submitted, cycles, score in ((0, 0, None), (17, 3, 60)):
+            for submitted, cycles, score in ((0, 0, None), (17123, 3456, 60123)):
                 snake.get_episode_totals.return_value = {"games_played": submitted * 10, "moves_made": submitted * 100}
                 snake.get_num_sims.return_value = submitted
-                snake.get_high_score.return_value = 999
+                snake.get_high_score.return_value = 999999
                 log.current_golden_config.return_value = {'process_id': 'current-run'} if score is not None else None
                 snake.get_run_summary.return_value = {'high_score': score, 'high_score_snapshot': {
                     'board': {'grid_size': [4, 3], 'snake_head': [2, 1],
@@ -118,19 +122,19 @@ class ExperimentStatusTests(unittest.TestCase):
                 log.experiment_cycles.return_value = cycles
                 with urlopen(f'http://127.0.0.1:{server.server_port}/') as response:
                     page = response.read().decode()
-                self.assertIn(f'Simulations Submitted: {submitted}', page)
-                self.assertIn(f'Experiment Cycles: {cycles}', page)
-                self.assertIn(f'Game Played: {submitted * 10}', page)
-                self.assertIn(f'Moves Made: {submitted * 100}', page)
+                self.assertIn(f'Simulations Submitted: {submitted:,}', page)
+                self.assertIn(f'Experiment Cycles: {cycles:,}', page)
+                self.assertIn(f'Game Played: {submitted * 10:,}', page)
+                self.assertIn(f'Moves Made: {submitted * 100:,}', page)
                 self.assertLess(page.index('Experiment Cycles:'), page.index('Simulations Submitted:'))
-                self.assertIn(f"Current Highscore: {score if score is not None else '—'}", page)
+                self.assertIn(f"Current Highscore: {format(score, ',') if score is not None else '—'}", page)
                 self.assertIn('class="server-bar experiment-status"', page)
                 if score is not None:
                     snake.get_run_summary.assert_called_with('current-run')
                     self.assertIn('viewBox="0 0 128 96"', page)
                 else:
                     self.assertIn('No saved board is available for the current configuration.', page)
-                self.assertIn('All-Time Highscore: 999', page)
+                self.assertIn('All-Time Highscore: 999,999', page)
                 self.assertIn("page.querySelector('#experiment-all-time-high-score').textContent", page)
                 self.assertIn("page.querySelector('#current-board').childNodes", page)
                 self.assertIn('href="/score-distribution">Score Distribution Histogram</a>', page)

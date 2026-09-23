@@ -4,7 +4,7 @@ class DAx3l:
     RAW_LOGS_ENABLED: Final[bool] = False
     HTTP_TIMEOUT_SECONDS: Final[int] = 300
 
-    VERSION: Final[str] = "1.6.10"
+    VERSION: Final[str] = "2.3.4"
 
     BASE_DIR: Final[str] = "/opt/prod/ax3l"
     BASE_DIR_QA: Final[str] = "/opt/qa/ax3l"

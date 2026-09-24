@@ -1,10 +1,9 @@
 """Run installer orchestration in a disposable checkout with host actions stubbed.
 
 Only absolute host paths and EUID checks are redirected in the fixture script.
-Rendering, MCP generation, file copying, chmod, and systemd validation are real.
+Rendering, file copying, chmod, and systemd validation are real.
 Package/browser provisioning, ownership changes, and systemctl are simulated.
 """
-import json
 import os
 from pathlib import Path
 import shutil
@@ -146,11 +145,10 @@ exec /usr/bin/systemd-analyze "$@"
                     self.assertEqual(self.credentials.stat().st_mode & 0o777, 0o600)
                     self.assertEqual(self.credentials.read_text(), 'DB_PASSWORD=fixture-secret\n')
                     self.assertEqual(self.config.stat().st_mode & 0o777, 0o750)
-                    self.assertEqual((self.config / 'mcp.json').stat().st_mode & 0o777, 0o640)
-                    mcp = json.loads((self.config / 'mcp.json').read_text())['mcpServers']['snakelab']
-                    self.assertEqual(mcp['command'], str(self.app / '.venv/bin/python'))
-                    from ax3l.constants.DAx3l import DAx3l
-                    self.assertEqual(mcp['env']['AX3L_ZMQ_ENDPOINT'], getattr(DAx3l, 'ZMQ_ENDPOINT' + ('' if environment == 'prod' else '_' + environment.upper())))
+                    self.assertFalse((self.config / 'mcp.json').exists())
+                    for name in ('qwen-server', 'phi-server', 'qwenv-server'):
+                        command = (self.units / f'{name}{suffix}.service').read_text()
+                        self.assertNotIn('--mcp-servers-config', command)
                     self.assertEqual((self.app / '.venv/lib/package.py').stat().st_mode & 0o777, 0o640)
                     self.assertEqual((self.app / '.venv/bin/python').stat().st_mode & 0o777, 0o750)
                     self.assertTrue((self.app / 'ax3l/app/snakelab/tools/__main__.py').is_file())

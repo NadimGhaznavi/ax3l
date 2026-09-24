@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.5] - 2026-09-24 @ 18:26
+
 ### Changed
 
 - Stop registering SnakeLab tools with the web chat model services. Automated optimization retains its private MCP tool sessions.

@@ -40,23 +40,20 @@ and comparable history. MCP rejects strings and booleans as numeric values.
 Parameter existence, permitted ranges, duplicates, and submission decisions
 belong to Ax3l, not the MCP tool.
 
-`scripts/install-services.sh` generates the installation's `mcp.json` and adds
-`--mcp-servers-config` to all three production model commands. It installs the
-project requirements in `<app>/.venv`, used by both Ax3l and the MCP child process.
-Installation needs Python's venv/pip support and package-index access for this step.
-DEV/QA retain their existing health-only LLM stubs.
+`scripts/install-services.sh` keeps SnakeLab tools out of llama-server's global
+MCP registration, so the web chat client cannot discover or call them. The
+optimization loop configures its own bound MCP sessions automatically and
+supplies the appropriate tool definition with each LLM request. Reinstall the
+service units and restart the model service to apply this to an existing install.
 
-For a checkout, generate the same configuration with:
+The installer installs the project requirements in `<app>/.venv`, used by both
+Ax3l and its MCP child processes. Installation needs Python's venv/pip support
+and package-index access for this step. DEV/QA retain their health-only LLM stubs.
 
-```sh
-python3 scripts/generate-mcp-config.py --app /opt/dev/ax3l > tmp/mcp.json
-```
-
-This unbound configuration supports discovery only. Submission requires an
-Ax3l-assigned `AX3L_CONVERSATION_PARAMETER` in the MCP process environment.
-The optimization loop configures its own bound MCP sessions automatically.
-Pass that file to a llama-server build supporting `--mcp-servers-config`.
-llama-server discovers the tool names through MCP. The tool forwards requests
+`scripts/generate-mcp-config.py` remains available for standalone MCP testing;
+do not register its output with the web client's llama-server. Submission
+requires an Ax3l-assigned `AX3L_CONVERSATION_PARAMETER` in the MCP process
+environment. The tool forwards requests
 over ZeroMQ using the project-wide `ax3l/zmq/ZMQMsg.py` and `ZMQClient.py`:
 
 ```json
@@ -83,7 +80,7 @@ Ax3l starts `ZMQServer` alongside its HTTP health server and keeps it available
 while the LLM request runs. Domain dispatch lives in `server/ToolHandler.py`;
 SnakeLab validation and submission live in `SubmitSingleValueHandler.py`.
 The installer assigns endpoint ports 61968 (DEV), 61969 (QA), and 61970 (PROD)
-to both the listener and the generated MCP config. `--zmq-endpoint` overrides
+to the listener; Ax3l passes its endpoint to each private MCP session. `--zmq-endpoint` overrides
 the listener endpoint for manual runs.
 
 The handler verifies the exact payload fields, finite numeric values, parameter

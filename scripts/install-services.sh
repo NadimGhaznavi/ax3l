@@ -101,9 +101,9 @@ PY
         printf 'Install llama.cpp at %s and the model at %s first.\n' "$llm_binary" "$model" >&2
         exit 1
     }
-    qwen_command="$llm_binary --model $qwen_model -c $qwen_context --host $llm_host --port $llm_port --metrics --jinja --mcp-servers-config $config_dir/mcp.json"
-    phi_command="$llm_binary --model $phi_model --host $llm_host --port $llm_port --metrics --jinja --mcp-servers-config $config_dir/mcp.json"
-    qwenv_command="$llm_binary --model $qwenv_model --mmproj $qwenv_mmproj -c $qwenv_context --host $llm_host --port $llm_port --metrics --jinja --mcp-servers-config $config_dir/mcp.json"
+    qwen_command="$llm_binary --model $qwen_model -c $qwen_context --host $llm_host --port $llm_port --metrics --jinja"
+    phi_command="$llm_binary --model $phi_model --host $llm_host --port $llm_port --metrics --jinja"
+    qwenv_command="$llm_binary --model $qwenv_model --mmproj $qwenv_mmproj -c $qwenv_context --host $llm_host --port $llm_port --metrics --jinja"
 fi
 
 [[ -d $install_dir && -f $config_dir/database.env ]] || {
@@ -114,14 +114,13 @@ fi
 unit_dir=$(mktemp -d)
 trap 'rm -rf -- "$unit_dir"' EXIT
 units=()
-python3 "$checkout_dir/scripts/generate-mcp-config.py" --app "$install_dir" --zmq-endpoint "$ax3l_zmq_endpoint" > "$unit_dir/mcp.json"
 if [[ ! -x $install_dir/.venv/bin/python ]]; then
     "${system_admin[@]}" python3 -m venv "$install_dir/.venv"
 fi
 "${system_admin[@]}" "$install_dir/.venv/bin/python" -m pip install -r "$checkout_dir/requirements.txt"
 "${system_admin[@]}" "$install_dir/.venv/bin/python" "$checkout_dir/scripts/install-chrome.py" --app "$install_dir"
 # Repair environments created under install.sh's former inherited umask 077.
-# Model services launch MCP as the service account, rather than as root.
+# Ax3l launches its private MCP sessions as the service account.
 "${system_admin[@]}" chgrp -R "$service_account" "$install_dir/.venv"
 "${system_admin[@]}" chmod -R g+rX "$install_dir/.venv"
 for name in qwen-server phi-server qwenv-server ax3l-server reporting-server watchdog; do
@@ -153,12 +152,10 @@ while IFS= read -r -d '' source; do
         -- "$source" "$install_dir/$source"
 done < <(find ax3l -type f \( -name '*.py' -o -name '*.schema.json' -o -name '*.jinja' -o -path 'ax3l/server/templates/*.html' \) -print0)
 
-# install.sh creates this directory under umask 077. Model services need to
-# traverse it to read MCP registration; database credentials retain mode 600.
+# install.sh creates this directory under umask 077. Allow service-account
+# traversal; database credentials retain mode 600.
 "${system_admin[@]}" chgrp "$service_account" "$config_dir"
 "${system_admin[@]}" chmod 750 "$config_dir"
-"${system_admin[@]}" install -m 640 -o "$service_account" -g "$service_account" \
-    -- "$unit_dir/mcp.json" "$config_dir/mcp.json"
 
 for unit in "${units[@]}"; do
     "${system_admin[@]}" install -m 644 -- "$unit_dir/$unit" "/etc/systemd/system/$unit"

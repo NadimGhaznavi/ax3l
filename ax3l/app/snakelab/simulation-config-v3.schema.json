@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://snake-lab.local/schemas/simulation-config-v3.schema.json",
+  "title": "Snake Lab simulation configuration",
+  "description": "Configuration for one serial Snake Lab simulation run, optimized for joint LLM hypothesis probing.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "epochs": {
+      "title": "Number of epochs",
+      "description": "Number of complete Snake episodes to execute. Capped to prevent compute abuse while allowing convergence.",
+      "type": "integer",
+      "default": 1500,
+      "minimum": 500,
+      "maximum": 3000,
+      "x-snakelab-unit": "episodes"
+    },
+    "seed": {
+      "title": "Simulation seed",
+      "description": "Master seed used to derive model, exploration, replay, and episode seeds.",
+      "type": "integer",
+      "default": 1970,
+      "minimum": 0
+    },
+    "game": {
+      "title": "Game environment",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "board_width": {
+          "type": "integer",
+          "const": 20,
+          "default": 20,
+          "x-snakelab-unit": "cells",
+          "description": "Width of the Snake board in cells."
+        },
+        "board_height": {
+          "type": "integer",
+          "const": 20,
+          "default": 20,
+          "x-snakelab-unit": "cells",
+          "description": "Height of the Snake board in cells."
+        },
+        "initial_snake_length": {
+          "type": "integer",
+          "const": 3,
+          "default": 3,
+          "x-snakelab-unit": "cells",
+          "description": "Snake length at the start of each episode."
+        },
+        "max_moves_multiplier": {
+          "description": "Ends an episode when moves exceed this value times the current snake length. Lower values aggressively penalize stalling.",
+          "type": "integer",
+          "default": 50,
+          "minimum": 20,
+          "maximum": 100
+        },
+        "rewards": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "food": {
+              "type": "integer",
+              "const": 10,
+              "default": 10,
+              "description": "Reward for eating food."
+            },
+            "wall": {
+              "type": "integer",
+              "const": -10,
+              "default": -10,
+              "description": "Penalty for colliding with a wall."
+            },
+            "snake": {
+              "type": "integer",
+              "const": -10,
+              "default": -10,
+              "description": "Penalty for colliding with the snake."
+            },
+            "max_moves": {
+              "type": "integer",
+              "const": -10,
+              "default": -10,
+              "description": "Penalty when the maximum move limit is reached."
+            },
+            "empty": {
+              "type": "integer",
+              "const": 0,
+              "default": 0,
+              "description": "Reward for a normal move that does not eat food."
+            },
+            "closer_to_food": {
+              "type": "integer",
+              "default": 1,
+              "minimum": 0,
+              "maximum": 6,
+              "multipleOf": 1,
+              "description": "Reward for moving closer to the food. Kept low to prevent 'circling' exploitation."
+            },
+            "further_from_food": {
+              "type": "integer",
+              "default": -1,
+              "minimum": -6,
+              "maximum": 0,
+              "multipleOf": 1,
+              "description": "Penalty for moving farther from the food. Kept low to prevent 'circling' exploitation."
+            }
+          },
+          "required": [
+            "food",
+            "wall",
+            "snake",
+            "max_moves",
+            "empty",
+            "closer_to_food",
+            "further_from_food"
+          ]
+        }
+      },
+      "required": [
+        "board_width",
+        "board_height",
+        "initial_snake_length",
+        "max_moves_multiplier",
+        "rewards"
+      ]
+    },
+    "model": {
+      "title": "Recurrent model",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hidden_size": {
+          "type": "integer",
+          "default": 224,
+          "minimum": 64,
+          "maximum": 384,
+          "multipleOf": 16,
+          "x-snakelab-unit": "neurons",
+         

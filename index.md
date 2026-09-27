@@ -36,4 +36,3 @@ This is a long-running project expected to operate for well over a month. The cu
 - [Project Screenshots](/pages/gallery)
 - [Ax3l on GitHub](https://github.com/NadimGhaznavi/ax3l)
 
-

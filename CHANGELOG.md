@@ -9,11 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.3.11] - 2026-09-27 @ 06:51
+## [2.3.12] - 2026-09-27 @ 09:52
 
-## [2.3.9] - 2026-09-26 @ 17:22
-
-## [2.3.8] - 2026-09-26 @ 17:17
+- Support for the mycount project requires a refresh of this site.
 
 ## [2.3.6] - 2026-09-26 @ 17:02
 

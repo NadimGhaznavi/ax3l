@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Widen the Score Distribution page by 25% and show a separate bar for each integer score.
+
 ## [2.3.13] - 2026-10-01 @ 17:15
 
 ### Changed

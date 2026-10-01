@@ -35,6 +35,7 @@ class ScoreDistributionTests(unittest.TestCase):
                          ['All runs (3/3)', 'Oldest two-thirds (2/3)', 'Oldest third (1/3)'])
         self.assertEqual(figure['layout']['barmode'], 'overlay')
         bins = all_runs['xbins']
+        self.assertEqual(bins, {'start': -.5, 'end': 100.5, 'size': 1})
         counts = []
         for trace in figure['data']:
             tally = {}

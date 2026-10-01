@@ -40,6 +40,6 @@ def distribution(scores: list[int | None]) -> dict:
         total=len(scores), third=third, two_thirds=two_thirds,
         scored=len(all_scores), older_scored=len(older_scores), oldest_scored=len(oldest_scores),
         chart=figure.to_html(full_html=False, include_plotlyjs=True,
-                             div_id="score-histogram", default_height="65vh",
+                             div_id="score-histogram", default_height="39vh",
                              config={"responsive": True, "displaylogo": False}) if all_scores else None,
     )

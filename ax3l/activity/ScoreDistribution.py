@@ -1,7 +1,5 @@
 """Interactive score histogram with shared bins for cumulative thirds."""
 
-import math
-
 import plotly.graph_objects as go
 
 
@@ -14,8 +12,7 @@ def distribution(scores: list[int | None]) -> dict:
     figure = go.Figure()
     if all_scores:
         low, high = min(all_scores), max(all_scores)
-        size = max(1, math.ceil((high - low + 1) / 40))
-        bins = dict(start=low - .5, end=high + .5, size=size)
+        bins = dict(start=low - .5, end=high + .5, size=1)
         for name, values, color in (
             ("All runs (3/3)", all_scores, "#4c9be8"),
             ("Oldest two-thirds (2/3)", older_scores, "#f09445"),

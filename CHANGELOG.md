@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.13] - 2026-10-01 @ 17:15
+
 ### Changed
 
 - Reduce the Score Distribution plot height to 60% of its previous size.

@@ -77,6 +77,7 @@ print(Path(DLlama.MODEL_DIR) / DQwenV.GGUF)
 print(Path(DLlama.MODEL_DIR) / DQwenV.MMPROJ)
 print(DQwenV.CONTEXT_SIZE)
 print(DQwen.CONTEXT_SIZE)
+print(Path(DLlama.MODEL_DIR) / DQwen.MMPROJ)
 PY
 )
     mapfile -t paths <<< "$llm_paths"
@@ -87,12 +88,17 @@ PY
     qwenv_mmproj=${paths[5]}
     qwenv_context=${paths[6]}
     qwen_context=${paths[7]}
+    qwen_mmproj=${paths[8]}
     model=$qwen_model
+    mmproj=$qwen_mmproj
     if [[ $selected_model == phi ]]; then model=$phi_model; fi
     if [[ $selected_model == qwenv ]]; then
         model=$qwenv_model
-        [[ -r $qwenv_mmproj ]] || {
-            printf 'Install the vision projector at %s first.\n' "$qwenv_mmproj" >&2
+        mmproj=$qwenv_mmproj
+    fi
+    if [[ $selected_model == qwen || $selected_model == qwenv ]]; then
+        [[ -r $mmproj ]] || {
+            printf 'Install the vision projector at %s first.\n' "$mmproj" >&2
             exit 1
         }
     fi
@@ -101,7 +107,7 @@ PY
         printf 'Install llama.cpp at %s and the model at %s first.\n' "$llm_binary" "$model" >&2
         exit 1
     }
-    qwen_command="$llm_binary --model $qwen_model -c $qwen_context --host $llm_host --port $llm_port --metrics --jinja"
+    qwen_command="$llm_binary --model $qwen_model --mmproj $qwen_mmproj -c $qwen_context --host $llm_host --port $llm_port --metrics --jinja"
     phi_command="$llm_binary --model $phi_model --host $llm_host --port $llm_port --metrics --jinja"
     qwenv_command="$llm_binary --model $qwenv_model --mmproj $qwenv_mmproj -c $qwenv_context --host $llm_host --port $llm_port --metrics --jinja"
 fi

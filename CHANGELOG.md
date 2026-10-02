@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Load the Qwen 3.5 4B vision projector in generated production systemd services and require it before service installation.
+- Document Qwen 3.5 4B vision projector conversion, installation, server loading, and capability verification.
+
 ## [2.3.14] - 2026-10-01 @ 17:20
 
 ### Changed

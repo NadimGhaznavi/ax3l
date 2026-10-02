@@ -20,5 +20,5 @@ sudo apt install \
 
 ---
 
-[Back](/env-setup)
+[Back](/pages/env-setup)
 

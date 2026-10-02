@@ -43,8 +43,9 @@ class InstallServicesTests(unittest.TestCase):
         from ax3l.constants.DQwenV import DQwenV
         self.models = {'qwen': DQwen.GGUF, 'phi': DPhi.GGUF, 'qwenv': DQwenV.GGUF}
         self.projector = DQwenV.MMPROJ
+        self.qwen_projector = DQwen.MMPROJ
         (self.root / 'models').mkdir()
-        for name in [*self.models.values(), self.projector]:
+        for name in [*self.models.values(), self.projector, self.qwen_projector]:
             (self.root / 'models' / name).touch()
         self.executable(self.bin / 'sudo', '#!/bin/sh\nexec "$@"\n')
         self.executable(self.bin / 'sleep', '#!/bin/sh\nexit 0\n')
@@ -149,6 +150,8 @@ exec /usr/bin/systemd-analyze "$@"
                     for name in ('qwen-server', 'phi-server', 'qwenv-server'):
                         command = (self.units / f'{name}{suffix}.service').read_text()
                         self.assertNotIn('--mcp-servers-config', command)
+                        if name == 'qwen-server' and environment == 'prod':
+                            self.assertIn(f'--mmproj {self.root}/models/{self.qwen_projector}', command)
                     self.assertEqual((self.app / '.venv/lib/package.py').stat().st_mode & 0o777, 0o640)
                     self.assertEqual((self.app / '.venv/bin/python').stat().st_mode & 0o777, 0o750)
                     self.assertTrue((self.app / 'ax3l/app/snakelab/tools/__main__.py').is_file())
@@ -190,9 +193,10 @@ exec /usr/bin/systemd-analyze "$@"
         result = self.run_installer('-env', 'dev')
         self.assertIn('Run install.sh', result.stderr)
         self.prepare('prod')
-        for name, model in [(self.projector, 'qwenv'), (self.models['qwen'], 'qwen')]:
+        for name, model in [(self.projector, 'qwenv'), (self.qwen_projector, 'qwen'), (self.models['qwen'], 'qwen')]:
             (self.root / 'models' / name).unlink()
             result = self.run_installer('-env', 'prod', '-model', model)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn('first.', result.stderr)
+            (self.root / 'models' / name).touch()
         self.assertFalse(self.log.exists())

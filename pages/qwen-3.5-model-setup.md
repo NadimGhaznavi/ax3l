@@ -1,5 +1,5 @@
 ---
-title: Qwen Model Setup
+title: Qwen 3.5 Model Setup
 author_profile: true
 layout: single
 ---
@@ -50,7 +50,11 @@ $ git rev-parse HEAD
 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a
 ```
 
-## Convert the model to GGUF
+## Convert the language model to GGUF
+
+Qwen 3.5 4B supports vision. In llama.cpp, the language model and vision
+encoder/projector are exported as separate GGUF files. Both must be loaded
+to accept images.
 
 ```sh
 cd /opt/dev/llama.cpp
@@ -65,7 +69,22 @@ python convert_hf_to_gguf.py \
 INFO:hf-to-gguf:Model successfully exported to /opt/dev/models/intermediate/Qwen3.5-4B-BF16.gguf
 ```
 
-## Quantize the model
+## Convert the vision/multimodal projector
+
+Use the same source model to export the vision component in F16:
+
+```sh
+cd /opt/dev/llama.cpp
+python convert_hf_to_gguf.py \
+    /opt/dev/Qwen3.5-4B \
+    --mmproj \
+    --outfile /opt/dev/models/intermediate/mmproj-Qwen3.5-4B-F16.gguf \
+    --outtype f16
+```
+
+## Quantize only the language model
+
+Keep the vision projector in F16; quantize the language model to Q4_K_M:
 
 ```sh
 ./build/bin/llama-quantize \
@@ -74,12 +93,47 @@ INFO:hf-to-gguf:Model successfully exported to /opt/dev/models/intermediate/Qwen
     Q4_K_M
 ```
 
-## Install the Models
+## Install the model and vision projector
 
 ```sh
 cp /opt/dev/models/quantized/Qwen3.5-4B-Q4_K_M.gguf /opt/prod/models/
+cp /opt/dev/models/intermediate/mmproj-Qwen3.5-4B-F16.gguf /opt/prod/models/
 ```
+
+## Run with vision support
+
+Load both files with llama-server:
+
+```sh
+/opt/prod/llama.cpp/bin/llama-server \
+    --model /opt/prod/models/Qwen3.5-4B-Q4_K_M.gguf \
+    --mmproj /opt/prod/models/mmproj-Qwen3.5-4B-F16.gguf \
+    -c 12288 \
+    --host 0.0.0.0 \
+    --port 27770 \
+    --metrics \
+    --jinja
+```
+
+For a systemd deployment, include the same `--mmproj` argument in the
+service's `ExecStart` command. Ax3l's `scripts/install-services.sh -env prod`
+includes this argument for Qwen 3.5 and requires the projector file above
+before installing the service. Stop the existing service before
+running the standalone command above to avoid a port conflict.
+
+After starting the server, check its advertised capabilities:
+
+```sh
+curl -fsS http://127.0.0.1:27770/props
+```
+
+The response should contain `"vision": true` inside `modalities`. Refresh the
+web client so it picks up the updated capabilities and allows image uploads.
+Loading only the language-model GGUF leaves vision disabled.
+
+See llama.cpp's [multimodal documentation](https://github.com/ggml-org/llama.cpp/blob/master/docs/multimodal.md)
+for the model and projector loading options.
 
 ---
 
-[Back](/env-setup)
+[Back](/pages/env-setup)

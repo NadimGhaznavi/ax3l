@@ -6,11 +6,11 @@ layout: single
 
 ![Ax3l Logo](/pages/images/ax3l.png)
 
-The **Ax3l Project uses** a locally hosted [Large Language Model (LLM)](https://en.wikipedia.org/wiki/Large_language_model) to run experiments and learn from their results. This project asks the question, "Can an LLM tune the configuration of another AI that is learning to play Snake?". The project includes a rich reporting server to track ongoing progress.
+The **Ax3l Project uses** a small, locally hosted AI ask the question, *"Can an AI improve another AI's performance by adjusting it's model and operating environment settings?"*
 
-Ax3l uses the [Snake Lab Server](https://snakelabserver.osoyalce.com), which accepts configuration requests for AI Snake simulations. Snake Lab runs the simulation and stores the results in a database.
+This project uses the [Snake Lab Server](https://snakelabserver.osoyalce.com) which houses a small and simple AI. The Snake Lab AI is trainable. The Snake Lab Server accepts a configuration to set the AI's operating parameters and the training environment. The Snake Lab server runs a training simulation. The high score and other simulation results are stored in a database.
 
-Ax3l analyzes those results, adjusts the configuration, and submits a new simulation. This creates a continuous experimental loop in which the LLM explores the configuration space and attempts to improve the Snake AI's performance over time.
+The Ax3l system submits simulation configurations and analyzes the result data. It adjusts the configuration and submits a new simulation. This creates a continuous experimental loop in which the Ax3l AI explores the configuration space and attempts to improve the Snake AI's performance over time.
 
 ---
 

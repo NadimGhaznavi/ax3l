@@ -6,7 +6,7 @@ layout: single
 
 ![Ax3l Logo](/pages/images/ax3l.png)
 
-The **Ax3l Project uses** [Qwen 3.5 4B](https://huggingface.co/Qwen/Qwen3.5-4B), small, locally hosted AI tp ask the question, *"Can an AI improve another AI's performance by adjusting it's model and operating environment settings?"*
+The **Ax3l Project uses** [Qwen 3.5 4B](https://huggingface.co/Qwen/Qwen3.5-4B), small, locally hosted AI to ask the question, *"Can an AI improve another AI's performance by adjusting it's model and operating environment settings?"*
 
 This project uses the [Snake Lab Server](https://snakelabserver.osoyalce.com) which houses a small and simple AI. The Snake Lab AI is trainable. The Snake Lab Server accepts a configuration to set the AI's hyper-parameters and configure the training environment. The Snake Lab server also runs the training simulation. The high score and other simulation results are stored in a database.
 

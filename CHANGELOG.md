@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added CMDB application metadata.
+- Updated `scripts/new-release.sh` script.
+
 ## [2.4.1] - 2026-10-03 @ 05:31
 
 - Website's project description updated.

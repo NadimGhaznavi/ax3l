@@ -5,7 +5,7 @@ from copy import deepcopy
 from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from threading import Thread
+from threading import Event, Thread
 import unittest
 from unittest.mock import patch
 from urllib.error import HTTPError
@@ -141,6 +141,7 @@ class AnimationReportTests(unittest.TestCase):
         self.log.current_golden_config.return_value = {'process_id': self.run_id}
         self.log.experiment_cycles.return_value = 1
         self.snake = self.enterContext(patch('ax3l.server.ReportingServer.SnakeLab')).return_value
+        self.enterContext(patch('ax3l.app.ReportBackground.SnakeLab', return_value=self.snake))
         self.snake.get_run_summary.return_value = dict(run_id=self.run_id, high_score=1,
             project_version='2.0.0', completed_at=None, high_score_snapshot=game_frames()[-1])
         self.snake.get_highscore_frames.return_value = game_frames()
@@ -161,6 +162,17 @@ class AnimationReportTests(unittest.TestCase):
             return response.read().decode()
 
     def test_both_reports_cache_and_serve_gif_after_restart(self):
+        published = Event()
+        save = SimulationGifStore.save
+
+        def publish(store, run_id, animation):
+            path = save(store, run_id, animation)
+            published.set()
+            return path
+
+        with patch.object(SimulationGifStore, 'save', publish):
+            self.page('/')
+            self.assertTrue(published.wait(3), 'Background GIF was not saved')
         for path in ('/', f'/simulations/{self.run_id}'):
             page = self.page(path)
             self.assertIn(f'src="{self.gif_url}"', page)
@@ -194,6 +206,41 @@ class AnimationReportTests(unittest.TestCase):
             for path in ('/', f'/simulations/{self.run_id}'):
                 self.assertIn('<svg ', self.page(path))
         self.assertFalse(list(Path(self.directory).rglob('*.gif')))
+
+    def test_slow_gif_and_totals_do_not_block_pages_or_health(self):
+        gif_started, totals_started, release = Event(), Event(), Event()
+        self.addCleanup(release.set)
+
+        def retrieve(run_id):
+            gif_started.set()
+            if not release.wait(5):
+                raise TimeoutError('Test did not release GIF worker')
+            return game_frames()
+
+        def totals():
+            totals_started.set()
+            if not release.wait(5):
+                raise TimeoutError('Test did not release totals worker')
+            return dict(games_played=2, moves_made=4)
+
+        self.snake.get_highscore_frames.side_effect = retrieve
+        self.snake.get_episode_totals.side_effect = totals
+        try:
+            # These requests must complete while both workers are still blocked.
+            for path in ('/', f'/simulations/{self.run_id}', '/health', '/'):
+                with urlopen(self.base + path, timeout=1) as response:
+                    page = response.read().decode()
+                if path == '/':
+                    self.assertIn('Games Played: —', page)
+                    self.assertIn('Moves Made: —', page)
+                if path != '/health':
+                    self.assertIn('<svg ', page)
+            self.assertTrue(gif_started.wait(1))
+            self.assertTrue(totals_started.wait(1))
+            self.snake.get_highscore_frames.assert_called_once_with(self.run_id)
+            self.snake.get_episode_totals.assert_called_once_with()
+        finally:
+            release.set()
 
     def test_missing_files_and_traversal_are_not_served(self):
         for path in (self.gif_url, self.gif_url.replace('v2-', 'v3-'),

@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+The **Philippa** release is dedicated to [Philippa Fawcett](https://en.wikipedia.org/wiki/Philippa_Fawcett).
+
+- Generate missing high-score GIFs in the background, showing the saved SVG until the animation is ready.
+- Cache games-played and moves-made totals in memory and refresh stale totals in a separate background worker every 60 seconds while reports are viewed. Keep the last successful totals during refreshes and database outages; no database changes.
+
 ## [2.5.0] - 2026-10-10 @ 11:06
 
 - Play high-score GIFs at 20 ms per move, pause on the final frame for 1 second, and loop forever. Use a new renderer cache version to regenerate animations with the updated timing.

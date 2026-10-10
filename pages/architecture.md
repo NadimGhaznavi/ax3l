@@ -44,15 +44,17 @@ The MCP tool framework is a feature of llama.cpp and is well supported by the Qw
 - Caches games-played and moves-made totals in memory. Views schedule a background refresh when the cache is older than 60 seconds, using a separate worker from GIF generation. Reports show the last successful totals during refreshes and database outages, or an em dash before the first result. Missing captures and transport failures are retried at most once per minute when viewed.
 - Also caches completed experiments, submitted simulations, all-time high score, and control-service status in a separate background worker, refreshing stale results on views after 60 seconds. Report reads do not initialize database tables. The event query limits the latest 500 events before joining their details; operations taking at least one second are logged for diagnosis.
 
-GIFs loop forever at 40 ms per move by default, holding the final frame for
+GIFs loop forever at 75 ms per move by default, holding the final frame for
 1 second before restarting. Each food pickup inserts a stationary sequence at
-20 ms per frame: the snake moves onto the food at its previous length, and a
+50 ms per frame: the snake moves onto the food at its previous length, and a
 darker shade of the food colour travels from head to tail. The captured growth
 frame and replacement food appear after that sequence, then normal playback
-resumes. These display frames do not alter the captured game data.
+resumes. These display frames do not alter the captured game data. GIF delays
+use 10 ms ticks; cumulative rounding alternates 80 and 70 ms move delays to
+preserve the requested average speed.
 The reporting entry point accepts
-`--gif-dir` (default `/opt/prod/ax3l/games`) and `--gif-duration-ms` (a positive
-multiple of 10). The production service keeps GIFs in
+`--gif-dir` (default `/opt/prod/ax3l/games`) and `--gif-duration-ms` (at least
+10 ms). The production service keeps GIFs in
 `/opt/prod/ax3l/games`; DEV and QA use their own installed application's `games`
 directory. These directories are writable through systemd's
 `ReadWritePaths` even with `ProtectSystem=strict`. Removing a cached GIF causes

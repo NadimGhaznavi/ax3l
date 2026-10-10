@@ -7,21 +7,32 @@ from PIL import Image, ImageDraw
 
 
 class SimulationAnimation:
-    VERSION = 3
+    VERSION = 4
     FINAL_FRAME_DURATION_MS = 1000
-    FOOD_FRAME_DURATION_MS = 20
+    FOOD_FRAME_DURATION_MS = 50
     CELL_SIZE = 32
     COLOURS = ("#101720", "#23364b", "#4c9be8", "#79b8f3", "#f09445", "#b8682f")
 
     @classmethod
-    def render(cls, frames: list[dict], duration_ms: int = 40) -> bytes:
+    def render(cls, frames: list[dict], duration_ms: int = 75) -> bytes:
         """Insert food-travel frames before growth, then resume captured moves."""
-        images = cls._images(frames, duration_ms)
+        images = cls._gif_timing(cls._images(frames, duration_ms))
         first = next(images)
         with BytesIO() as output:
             first.save(output, format="GIF", save_all=True, append_images=images,
                        loop=0, disposal=1, optimize=False)
             return output.getvalue()
+
+    @staticmethod
+    def _gif_timing(images: Iterator[Image.Image]) -> Iterator[Image.Image]:
+        """Round cumulative time to GIF ticks without accumulating timing drift."""
+        elapsed_ms = encoded_ms = 0
+        for image in images:
+            elapsed_ms += image.info["duration"]
+            next_ms = ((elapsed_ms + 5) // 10) * 10
+            image.info["duration"] = next_ms - encoded_ms
+            encoded_ms = next_ms
+            yield image
 
     @classmethod
     def _images(cls, frames: list[dict], duration_ms: int) -> Iterator[Image.Image]:

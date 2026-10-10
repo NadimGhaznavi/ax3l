@@ -47,8 +47,8 @@ class SimulationAnimationTests(unittest.TestCase):
                 pixels = frame.convert('RGB')
                 heads.append([pixels.getpixel((x * 32 + 16, 48)) for x in (1, 2, 3)])
             # Identical penultimate and terminal boards share their elapsed time.
-            self.assertEqual(durations, [40, 40, 20, 20, 1040])
-            self.assertEqual(sum(durations), 3 * 40 + 2 * 20 + 1000)
+            self.assertEqual(durations, [80, 70, 50, 50, 1080])
+            self.assertEqual(sum(durations), 1330)
             for colours, head in ((heads[0], 0), (heads[1], 1), (heads[-1], 2)):
                 self.assertEqual(colours[head], (121, 184, 243))
             self.assertEqual(heads[-1][1], (76, 155, 232))
@@ -63,12 +63,19 @@ class SimulationAnimationTests(unittest.TestCase):
         with Image.open(BytesIO(SimulationAnimation.render(game_frames()[:3]))) as gif:
             self.assertEqual(gif.info['loop'], 0)
             self.assertEqual([frame.info['duration'] for frame in ImageSequence.Iterator(gif)],
-                             [40, 40, 20, 20, 1000])
+                             [80, 70, 50, 50, 1000])
 
     def test_custom_move_duration_keeps_final_pause(self):
         with Image.open(BytesIO(SimulationAnimation.render(game_frames()[:3], 120))) as gif:
             self.assertEqual([frame.info['duration'] for frame in ImageSequence.Iterator(gif)],
-                             [120, 120, 20, 20, 1000])
+                             [120, 120, 50, 50, 1000])
+
+    def test_move_rounding_preserves_average_without_drift(self):
+        frames = [deepcopy(game_frames()[index % 2]) for index in range(21)]
+        with Image.open(BytesIO(SimulationAnimation.render(frames))) as gif:
+            durations = [frame.info['duration'] for frame in ImageSequence.Iterator(gif)]
+        self.assertEqual(durations, [80, 70] * 10 + [1000])
+        self.assertEqual(sum(durations), 20 * 75 + 1000)
 
     def test_food_travels_along_frozen_length_five_snake_before_growth(self):
         before = dict(grid_size=[8, 4], snake_head=[4, 1],
@@ -82,7 +89,7 @@ class SimulationAnimationTests(unittest.TestCase):
             self.assertEqual(gif.info['loop'], 0)
             playback = [(image.convert('RGB'), image.info['duration'])
                         for image in ImageSequence.Iterator(gif)]
-        self.assertEqual([duration for _, duration in playback], [40, *([20] * 5), 1000])
+        self.assertEqual([duration for _, duration in playback], [80, *([50] * 5), 1000])
         frozen_snake = [[5, 1], [4, 1], [3, 1], [3, 2], [2, 2]]
 
         def colour(image, position):
@@ -107,7 +114,7 @@ class SimulationAnimationTests(unittest.TestCase):
     def test_moves_without_food_do_not_insert_animation(self):
         with Image.open(BytesIO(SimulationAnimation.render(game_frames()[:2]))) as gif:
             self.assertEqual([frame.info['duration'] for frame in ImageSequence.Iterator(gif)],
-                             [40, 1000])
+                             [80, 1000])
 
     def test_consecutive_pickups_each_animate_their_own_snake_length(self):
         first = dict(grid_size=[5, 2], snake_head=[1, 0], snake_body=[[0, 0]],
@@ -119,7 +126,7 @@ class SimulationAnimationTests(unittest.TestCase):
         with Image.open(BytesIO(SimulationAnimation.render([dict(board=board)
                                                            for board in (first, second, third)]))) as gif:
             self.assertEqual([frame.info['duration'] for frame in ImageSequence.Iterator(gif)],
-                             [40, 20, 20, 40, 20, 20, 20, 1000])
+                             [80, 50, 50, 70, 50, 50, 50, 1000])
 
     def test_atomic_write_and_failure_cleanup(self):
         with TemporaryDirectory() as directory:
@@ -208,7 +215,7 @@ class AnimationReportTests(unittest.TestCase):
         self.addCleanup(self.thread.join)
         self.addCleanup(self.server.shutdown)
         self.base = f'http://127.0.0.1:{self.server.server_port}'
-        self.gif_url = f'/simulation-gifs/v3-40ms/{self.run_id}.gif'
+        self.gif_url = f'/simulation-gifs/v4-75ms/{self.run_id}.gif'
 
     def page(self, path):
         with urlopen(self.base + path) as response:
@@ -238,7 +245,7 @@ class AnimationReportTests(unittest.TestCase):
                 self.assertGreater(gif.n_frames, 1)
                 self.assertEqual(gif.info['loop'], 0)
                 self.assertEqual([frame.info['duration'] for frame in ImageSequence.Iterator(gif)],
-                                 [40, 40, 20, 20, 1040])
+                                 [80, 70, 50, 50, 1080])
         cached = list(Path(self.directory).rglob('*.gif'))
         self.assertEqual(len(cached), 1)
         self.snake.get_highscore_frames.side_effect = AssertionError('Must reuse saved GIF')
@@ -318,14 +325,14 @@ class AnimationReportTests(unittest.TestCase):
             release.set()
 
     def test_missing_files_and_traversal_are_not_served(self):
-        for path in (self.gif_url, self.gif_url.replace('v3-', 'v4-'),
+        for path in (self.gif_url, self.gif_url.replace('v4-', 'v5-'),
                      '/simulation-gifs/../../requirements.txt',
-                     f'/simulation-gifs/v3-40ms/{uuid4()}.gif'):
+                     f'/simulation-gifs/v4-75ms/{uuid4()}.gif'):
             with self.subTest(path=path), self.assertRaises(HTTPError) as error:
                 self.page(path)
             self.assertEqual(error.exception.code, 404)
 
     def test_invalid_speed_is_rejected(self):
-        for duration in (0, -10, 15):
+        for duration in (0, -10, 9):
             with self.assertRaises(ValueError):
                 make_server('127.0.0.1', 0, Path(self.directory), duration)

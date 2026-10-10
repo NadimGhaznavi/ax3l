@@ -12,7 +12,7 @@ class SimulationAnimation:
     COLOURS = ("#101720", "#23364b", "#4c9be8", "#79b8f3", "#f09445")
 
     @classmethod
-    def render(cls, frames: list[dict], duration_ms: int = 20) -> bytes:
+    def render(cls, frames: list[dict], duration_ms: int = 40) -> bytes:
         """Encode all moves, preserving elapsed time for identical boards."""
         images = (cls._board(frame["board"]) for frame in frames)
         first = next(images)

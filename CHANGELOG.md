@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Slow high-score GIF playback to 40 ms per move, retaining the 1-second final pause and continuous looping.
+
 ## [2.5.1] - 2026-10-10 @ 11:28
 
 The **Philippa** release is dedicated to [Philippa Fawcett](https://en.wikipedia.org/wiki/Philippa_Fawcett).

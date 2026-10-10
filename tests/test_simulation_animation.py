@@ -47,8 +47,8 @@ class SimulationAnimationTests(unittest.TestCase):
                 pixels = frame.convert('RGB')
                 heads.append([pixels.getpixel((x * 32 + 16, 48)) for x in (1, 2, 3)])
             # Identical penultimate and terminal boards share their elapsed time.
-            self.assertEqual(durations, [20, 20, 1020])
-            self.assertEqual(sum(durations), 3 * 20 + 1000)
+            self.assertEqual(durations, [40, 40, 1040])
+            self.assertEqual(sum(durations), 3 * 40 + 1000)
             for index, colours in enumerate(heads):
                 self.assertEqual(colours[index], (121, 184, 243))
             self.assertEqual(heads[-1][1], (76, 155, 232))
@@ -63,7 +63,7 @@ class SimulationAnimationTests(unittest.TestCase):
         with Image.open(BytesIO(SimulationAnimation.render(game_frames()[:3]))) as gif:
             self.assertEqual(gif.info['loop'], 0)
             self.assertEqual([frame.info['duration'] for frame in ImageSequence.Iterator(gif)],
-                             [20, 20, 1000])
+                             [40, 40, 1000])
 
     def test_custom_move_duration_keeps_final_pause(self):
         with Image.open(BytesIO(SimulationAnimation.render(game_frames()[:3], 120))) as gif:
@@ -155,7 +155,7 @@ class AnimationReportTests(unittest.TestCase):
         self.addCleanup(self.thread.join)
         self.addCleanup(self.server.shutdown)
         self.base = f'http://127.0.0.1:{self.server.server_port}'
-        self.gif_url = f'/simulation-gifs/v2-20ms/{self.run_id}.gif'
+        self.gif_url = f'/simulation-gifs/v2-40ms/{self.run_id}.gif'
 
     def page(self, path):
         with urlopen(self.base + path) as response:
@@ -185,7 +185,7 @@ class AnimationReportTests(unittest.TestCase):
                 self.assertGreater(gif.n_frames, 1)
                 self.assertEqual(gif.info['loop'], 0)
                 self.assertEqual([frame.info['duration'] for frame in ImageSequence.Iterator(gif)],
-                                 [20, 20, 1020])
+                                 [40, 40, 1040])
         cached = list(Path(self.directory).rglob('*.gif'))
         self.assertEqual(len(cached), 1)
         self.snake.get_highscore_frames.side_effect = AssertionError('Must reuse saved GIF')
@@ -245,7 +245,7 @@ class AnimationReportTests(unittest.TestCase):
     def test_missing_files_and_traversal_are_not_served(self):
         for path in (self.gif_url, self.gif_url.replace('v2-', 'v3-'),
                      '/simulation-gifs/../../requirements.txt',
-                     f'/simulation-gifs/v2-20ms/{uuid4()}.gif'):
+                     f'/simulation-gifs/v2-40ms/{uuid4()}.gif'):
             with self.subTest(path=path), self.assertRaises(HTTPError) as error:
                 self.page(path)
             self.assertEqual(error.exception.code, 404)

@@ -4,7 +4,7 @@ from pathlib import Path
 
 class DReportMgr:
     GIF_DIRECTORY: Final[Path] = Path("/opt/prod/ax3l/games")
-    GIF_DURATION_MS: Final[int] = 20
+    GIF_DURATION_MS: Final[int] = 40
     BACKGROUND_REFRESH_SECONDS: Final[int] = 60
     SIMULATION_BUCKET_SIZE: Final[int] = 20
     REQUEST_TIMEOUT_SECONDS: Final[int] = 30

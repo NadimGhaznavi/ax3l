@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.6] - 2026-10-10 @ 13:03
+
 The **Tatiana** release is dedicated to **Tatiana Ehrenfest**:
 
 *A Dutch mathematician known for her work in graph theory, particularly the mathematics of sequences and combinatorics. Tatiana contributed to the development of de Bruijn sequences.*

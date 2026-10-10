@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.4] - 2026-10-10 @ 12:41
+
+- Slow high-score GIF moves to an average of 75 ms and food digestion to 50 ms per segment. Round cumulative playback to GIF's 10 ms ticks and regenerate cached animations under a new renderer version.
+
 ## [2.5.3] - 2026-10-10 @ 11:59
 
 The **Rózsa** release is dedicated to [Rózsa Péter](https://en.wikipedia.org/wiki/R%C3%B3zsa_P%C3%A9ter).

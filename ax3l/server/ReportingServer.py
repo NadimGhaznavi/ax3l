@@ -32,8 +32,8 @@ from ax3l.interface.SnakeLab import SnakeLab
 
 def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIRECTORY,
                 gif_duration_ms: int = DReportMgr.GIF_DURATION_MS) -> HTTPServer:
-    if gif_duration_ms < 10 or gif_duration_ms % 10:
-        raise ValueError("GIF frame duration must be a positive multiple of 10 ms")
+    if gif_duration_ms < 10:
+        raise ValueError("GIF frame duration must be at least 10 ms")
     gifs = SimulationGifStore(gif_directory, SimulationAnimation.VERSION, gif_duration_ms)
     background = ReportBackground(gifs, gif_duration_ms)
 
@@ -343,7 +343,7 @@ if __name__ == "__main__":
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--gif-dir", type=Path, default=DReportMgr.GIF_DIRECTORY)
     parser.add_argument("--gif-duration-ms", type=int, default=DReportMgr.GIF_DURATION_MS,
-                        help="Frame duration in milliseconds, a positive multiple of 10")
+                        help="Move duration in milliseconds, at least 10 (rounded to GIF ticks)")
     args = parser.parse_args()
     with make_server(args.host, args.port, args.gif_dir, args.gif_duration_ms) as server:
         print(f"Event log: http://{args.host}:{server.server_port}/", flush=True)

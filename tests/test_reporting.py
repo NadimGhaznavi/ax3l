@@ -16,9 +16,9 @@ class ClientDisconnectTests(unittest.TestCase):
         from unittest.mock import Mock
         from ax3l.server.ReportingServer import make_server
 
-        with patch('ax3l.server.ReportingServer.HTTPServer',
-                   side_effect=lambda address, handler: handler):
-            handler = make_server('127.0.0.1', 0)
+        server = make_server('127.0.0.1', 0)
+        self.addCleanup(server.server_close)
+        handler = server.RequestHandlerClass
         for path in ('/health', '/missing',
                      '/simulations/00000000-0000-0000-0000-000000000001'):
             for error in (BrokenPipeError, ConnectionResetError):
@@ -44,9 +44,9 @@ class ClientDisconnectTests(unittest.TestCase):
         from unittest.mock import Mock
         from ax3l.server.ReportingServer import make_server
 
-        with patch('ax3l.server.ReportingServer.HTTPServer',
-                   side_effect=lambda address, handler: handler):
-            handler = make_server('127.0.0.1', 0)
+        server = make_server('127.0.0.1', 0)
+        self.addCleanup(server.server_close)
+        handler = server.RequestHandlerClass
         for path in ('/health', '/missing'):
             with self.subTest(path=path):
                 request = Mock()
@@ -156,6 +156,9 @@ class ExperimentStatusTests(unittest.TestCase):
         log.recent.return_value = []
         snake = self.enterContext(patch('ax3l.server.ReportingServer.SnakeLab')).return_value
         snake.get_highscore_frames.return_value = None
+        self.enterContext(patch('ax3l.app.ReportBackground.SnakeLab', return_value=snake))
+        self.enterContext(patch('ax3l.app.ReportBackground.ReportBackground.episode_totals',
+                               side_effect=lambda: snake.get_episode_totals()))
         snake.is_simulation_running.return_value = False
         server = make_server('127.0.0.1', 0)
         thread = Thread(target=server.serve_forever, daemon=True)

@@ -161,6 +161,7 @@ exec /usr/bin/systemd-analyze "$@"
                     self.assertTrue((self.app / 'games').is_dir())
                     self.assertTrue((self.app / 'ax3l/activity/SimulationAnimation.py').is_file())
                     self.assertTrue((self.app / 'ax3l/interface/SimulationGifStore.py').is_file())
+                    self.assertTrue((self.app / 'ax3l/app/ReportBackground.py').is_file())
                     calls = self.log.read_text()
                     self.assertLess(calls.index('verify'), calls.index('systemctl stop'))
                     self.assertIn(f'systemctl start {model}-server{suffix}.service', calls)
@@ -172,6 +173,7 @@ exec /usr/bin/systemd-analyze "$@"
         result = self.run_installer('-env', 'dev')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.app / '.venv').stat().st_mode & 0o777, 0o755)
+        self.assertTrue((self.app / 'ax3l/app/ReportBackground.py').is_file())
         self.assertIn('systemctl start qwen-server-dev.service', self.log.read_text())
 
     def test_provisioning_failures_do_not_stop_services(self):

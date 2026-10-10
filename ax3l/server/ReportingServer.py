@@ -12,6 +12,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 import zmq
 
 from ax3l.app.DbMgr import DbMgr
+from ax3l.app.ReportBackground import ReportBackground
 from ax3l.constants.DEventCategory import DEventCategory
 from ax3l.app.EventLogDb import EventLogDb
 from ax3l.activity.ReplyReport import fields, reply_content, reasoning_content
@@ -33,17 +34,11 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
     if gif_duration_ms < 10 or gif_duration_ms % 10:
         raise ValueError("GIF frame duration must be a positive multiple of 10 ms")
     gifs = SimulationGifStore(gif_directory, SimulationAnimation.VERSION, gif_duration_ms)
+    background = ReportBackground(gifs, gif_duration_ms)
 
     def animation_url(run_id: str) -> str | None:
-        if not gifs.path(run_id).is_file():
-            try:
-                frames = SnakeLab().get_highscore_frames(run_id)
-            except zmq.ZMQError:
-                # A saved SVG remains available while the control service is offline.
-                return None
-            if frames is None:
-                return None
-            gifs.save(run_id, SimulationAnimation.render(frames, gif_duration_ms))
+        if not background.animation_ready(run_id):
+            return None
         return f"/simulation-gifs/{gifs.directory.name}/{UUID(run_id)}.gif"
 
     templates = Environment(
@@ -255,7 +250,7 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
                                 current_board_gif_url=animation_url(golden["process_id"]) if current_run else None,
                                 simulations_submitted=SnakeLab().get_num_sims(),
                                 experiment_cycles=log.experiment_cycles(),
-                                **SnakeLab().get_episode_totals(),
+                                **background.episode_totals(),
                             ).encode("utf-8")
                         else:
                             reason_page = self.path.endswith("/reason")
@@ -333,7 +328,14 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
                 return
             self._send_page(body, content_type)
 
-    return HTTPServer((host, port), Handler)
+    class ReportServer(HTTPServer):
+        def server_close(self):
+            try:
+                super().server_close()
+            finally:
+                background.close()
+
+    return ReportServer((host, port), Handler)
 
 
 if __name__ == "__main__":

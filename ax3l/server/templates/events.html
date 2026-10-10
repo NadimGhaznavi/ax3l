@@ -22,8 +22,8 @@
     <span id="experiment-high-score" role="status">Current Highscore: {{ "{:,}".format(high_score) if high_score is not none else '—' }}</span>
     <span id="experiment-cycles" role="status">Completed Experiments: {{ "{:,}".format(experiment_cycles) }}</span>
     <span id="simulations-submitted" role="status">Simulations Submitted: {{ "{:,}".format(simulations_submitted) }}</span>
-    <span id="games-played" role="status">Games Played: {{ "{:,}".format(games_played) }}</span>
-    <span id="moves-made" role="status">Moves Made: {{ "{:,}".format(moves_made) }}</span>
+    <span id="games-played" role="status">Games Played: {{ "{:,}".format(games_played) if games_played is not none else '—' }}</span>
+    <span id="moves-made" role="status">Moves Made: {{ "{:,}".format(moves_made) if moves_made is not none else '—' }}</span>
     </div>
     </section>
     <section class="experiment-reports" aria-labelledby="reports-title">

@@ -1,15 +1,16 @@
 import argparse
 import json
+import logging
 import re
 import socket
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 import traceback
+from time import perf_counter
 from urllib.parse import parse_qs, urlsplit
 from uuid import UUID
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-import zmq
 
 from ax3l.app.DbMgr import DbMgr
 from ax3l.app.ReportBackground import ReportBackground
@@ -40,6 +41,15 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
         if not background.animation_ready(run_id):
             return None
         return f"/simulation-gifs/{gifs.directory.name}/{UUID(run_id)}.gif"
+
+    def timed(label, operation):
+        started = perf_counter()
+        try:
+            return operation()
+        finally:
+            elapsed = perf_counter() - started
+            if elapsed >= 1:
+                logging.warning("Report %s took %.3f seconds", label, elapsed)
 
     templates = Environment(
         loader=FileSystemLoader(Path(__file__).with_name("templates")),
@@ -94,7 +104,7 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
                 content_type = "image/gif"
             elif self.path == "/golden-configurations":
                 try:
-                    db = DbMgr()
+                    db = DbMgr(initialize_event_tables=False)
                     try:
                         configs = EventLogDb(db).golden_configurations()
                     finally:
@@ -123,7 +133,7 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
                     self.send_error(400, "Bucket size must be a positive integer")
                     return
                 try:
-                    db = DbMgr()
+                    db = DbMgr(initialize_event_tables=False)
                     try:
                         history = EventLogDb(db).simulation_metrics()
                     finally:
@@ -138,7 +148,7 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
                     return
             elif self.path == "/experiment-highscores":
                 try:
-                    db = DbMgr()
+                    db = DbMgr(initialize_event_tables=False)
                     try:
                         history = EventLogDb(db).experiment_highscores()
                     finally:
@@ -205,11 +215,11 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
                     return
             elif self.path == "/" or re.fullmatch(r"/events/[0-9]{1,20}(?:/reason)?", self.path):
                 try:
-                    db = DbMgr()
+                    db = timed("database connection", lambda: DbMgr(initialize_event_tables=False))
                     try:
                         log = EventLogDb(db)
                         if self.path == "/":
-                            events = log.recent()
+                            events = timed("recent events query", log.recent)
                             for event in events:
                                 if (
                                     event["name"] == DEventCategory.Conversation.RESPONSE
@@ -227,29 +237,18 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
                                     event["prompt_text"] = summary(
                                         json.loads(event["content"])
                                     )
-                            try:
-                                simulation_running = SnakeLab().is_simulation_running()
-                            except zmq.ZMQError:
-                                snake_lab_status = "Service Unavailable"
-                            else:
-                                snake_lab_status = (
-                                    "Running Simulation" if simulation_running else "Idle"
-                                )
-                            golden = log.current_golden_config()
+                            golden = timed("current configuration query", log.current_golden_config)
                             current_run = (
-                                SnakeLab().get_run_summary(golden["process_id"])
+                                timed("current run query", lambda: SnakeLab().get_run_summary(golden["process_id"]))
                                 if golden else None
                             )
                             body = template.render(
                                 hostname=socket.gethostname(),
                                 events=events,
-                                snake_lab_status=snake_lab_status,
                                 high_score=current_run["high_score"] if current_run else None,
-                                all_time_high_score=SnakeLab().get_high_score(),
                                 current_board_svg=board_svg(current_run.get("high_score_snapshot")) if current_run else None,
                                 current_board_gif_url=animation_url(golden["process_id"]) if current_run else None,
-                                simulations_submitted=SnakeLab().get_num_sims(),
-                                experiment_cycles=log.experiment_cycles(),
+                                **background.status(),
                                 **background.episode_totals(),
                             ).encode("utf-8")
                         else:

@@ -26,6 +26,33 @@ SNAPSHOT = {"board": {"grid_size": [4, 3], "snake_head": [2, 1],
 
 class SimulationRunReportTests(unittest.TestCase):
     @unittest.skipUnless(os.environ.get('AX3L_TEST_DEV_DB') == '1', 'requires DEV MariaDB')
+    def test_mariadb_event_limit_with_temporary_fixtures(self):
+        self.assertEqual(os.environ['DB_NAME'], 'ax3l_dev')
+        db = DbMgr(initialize_event_tables=False)
+        self.addCleanup(db.close)
+        db.execute('''CREATE TEMPORARY TABLE events (
+            event_id INTEGER, occurred_at DATETIME, name VARCHAR(100), category VARCHAR(50),
+            log_level VARCHAR(10), process_id CHAR(36), source_name VARCHAR(255),
+            parameter VARCHAR(100), ax3l_version VARCHAR(100)
+        ) CHARACTER SET utf8mb4 COLLATE utf8mb4_uca1400_ai_ci''')
+        db.execute('''CREATE TEMPORARY TABLE event_messages (event_id INTEGER, content TEXT)
+            CHARACTER SET utf8mb4 COLLATE utf8mb4_uca1400_ai_ci''')
+        db.execute('''CREATE TEMPORARY TABLE simulation_runs (
+            run_id CHAR(36) PRIMARY KEY, high_score INTEGER
+        ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci''')
+        run_id = str(uuid4())
+        db.execute('INSERT INTO simulation_runs VALUES (%s, 38)', (run_id,))
+        for event_id in range(1, 506):
+            db.execute('''INSERT INTO events (event_id, occurred_at, category, name, process_id)
+                VALUES (%s, '2026-10-10 12:00:00', 'SnakeLab', 'simulation_completed', %s)''',
+                (event_id, run_id))
+        # Keep all fixtures connection-local, without writing the Snake Lab database.
+        with patch('ax3l.app.EventLogDb.DSnakeLab.DATABASE', os.environ['DB_NAME']):
+            events = EventLogDb(db).recent()
+        self.assertEqual([event['event_id'] for event in events], list(range(505, 5, -1)))
+        self.assertTrue(all(event['simulation_high_score'] == 38 for event in events))
+
+    @unittest.skipUnless(os.environ.get('AX3L_TEST_DEV_DB') == '1', 'requires DEV MariaDB')
     def test_mariadb_event_scores_with_different_database_collations(self):
         self.assertEqual(os.environ['DB_NAME'], 'ax3l_dev')
         db = DbMgr(initialize_event_tables=False)
@@ -79,6 +106,13 @@ class SimulationRunReportTests(unittest.TestCase):
         self.assertIsNone(events[3]['simulation_high_score'])
         self.assertIsNone(events[4]['simulation_high_score'])
         self.assertEqual(events[1]['content'], 'Simulation completed.')
+        connection.executemany('''INSERT INTO events (event_id, category, name, process_id)
+            VALUES (?, 'SnakeLab', 'simulation_completed', 'run-1')''',
+            [(event_id,) for event_id in range(5, 506)])
+        limited = EventLogDb(db).recent()
+        self.assertEqual(len(limited), 500)
+        self.assertEqual([event['event_id'] for event in limited], list(range(505, 5, -1)))
+        self.assertTrue(all(event['simulation_high_score'] == 38 for event in limited))
 
     def test_board_geometry_and_missing_snapshots(self):
         svg = fromstring(board_svg(json.dumps(SNAPSHOT)))
@@ -114,6 +148,8 @@ class SimulationRunReportTests(unittest.TestCase):
         snake = self.enterContext(patch('ax3l.server.ReportingServer.SnakeLab')).return_value
         snake.get_highscore_frames.return_value = None
         self.enterContext(patch('ax3l.app.ReportBackground.SnakeLab', return_value=snake))
+        self.enterContext(patch('ax3l.app.ReportBackground.DbMgr'))
+        self.enterContext(patch('ax3l.app.ReportBackground.EventLogDb', return_value=log))
         snake.get_high_score.return_value = 0
         snake.get_num_sims.return_value = 1
         snake.get_episode_totals.return_value = {'games_played': 0, 'moves_made': 0}

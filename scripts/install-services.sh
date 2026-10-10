@@ -129,6 +129,7 @@ fi
 # Ax3l launches its private MCP sessions as the service account.
 "${system_admin[@]}" chgrp -R "$service_account" "$install_dir/.venv"
 "${system_admin[@]}" chmod -R g+rX "$install_dir/.venv"
+"${system_admin[@]}" install -d -m 755 "$install_dir/games"
 for name in qwen-server phi-server qwenv-server ax3l-server reporting-server watchdog; do
     unit="$name$suffix.service"
     units+=("$unit")

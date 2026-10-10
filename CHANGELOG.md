@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-10-10 @ 11:06
+
+- Play high-score GIFs at 20 ms per move, pause on the final frame for 1 second, and loop forever. Use a new renderer cache version to regenerate animations with the updated timing.
+- Show looping GIFs of captured high-score games in simulation reports and the current experiment panel, with saved SVG fallback when frames are unavailable.
+- Cache generated GIFs on the filesystem by run ID, renderer version, and playback speed; no database changes.
+
 ## [2.4.2] - 2026-10-05 @ 18:15
 
 - Added CMDB application metadata.

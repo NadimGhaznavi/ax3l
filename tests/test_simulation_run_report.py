@@ -112,6 +112,11 @@ class SimulationRunReportTests(unittest.TestCase):
         self.enterContext(patch('ax3l.server.ReportingServer.DbMgr'))
         log = self.enterContext(patch('ax3l.server.ReportingServer.EventLogDb')).return_value
         snake = self.enterContext(patch('ax3l.server.ReportingServer.SnakeLab')).return_value
+        snake.get_highscore_frames.return_value = None
+        snake.get_high_score.return_value = 0
+        snake.get_num_sims.return_value = 1
+        snake.get_episode_totals.return_value = {'games_played': 0, 'moves_made': 0}
+        log.experiment_cycles.return_value = 0
         run_id = str(uuid4())
         snake.get_run_summary.return_value = dict(
             run_id=run_id, project_version='<version>', high_score=0,

@@ -37,13 +37,15 @@
     </section>
     <figure class="experiment-board" aria-labelledby="current-board-caption">
       <div id="current-board">
-        {% if current_board_svg %}
+        {% if current_board_gif_url %}
+        <img class="simulation-board" src="{{ current_board_gif_url }}" alt="Animated high-score Snake Lab game">
+        {% elif current_board_svg %}
         {{ current_board_svg | safe }}
         {% else %}
         <p>No saved board is available for the current configuration.</p>
         {% endif %}
       </div>
-      <figcaption id="current-board-caption">Highscore Snapshot</figcaption>
+      <figcaption id="current-board-caption">{{ 'Highscore Game' if current_board_gif_url else 'Highscore Snapshot' }}</figcaption>
     </figure>
     </div>
   </section>
@@ -239,7 +241,12 @@
         document.querySelector('#experiment-cycles').textContent = page.querySelector('#experiment-cycles').textContent;
         document.querySelector('#games-played').textContent = page.querySelector('#games-played').textContent;
         document.querySelector('#moves-made').textContent = page.querySelector('#moves-made').textContent;
-        document.querySelector('#current-board').replaceChildren(...page.querySelector('#current-board').childNodes);
+        const currentBoard = document.querySelector('#current-board');
+        const nextBoard = page.querySelector('#current-board');
+        if (currentBoard.querySelector('img')?.getAttribute('src') !== nextBoard.querySelector('img')?.getAttribute('src') || !currentBoard.querySelector('img')) {
+          currentBoard.replaceChildren(...page.querySelector('#current-board').childNodes);
+        }
+        document.querySelector('#current-board-caption').textContent = page.querySelector('#current-board-caption').textContent;
         main.scrollLeft = scrollLeft;
         window.scrollTo(scrollX, scrollY);
         updateLastRefreshed();

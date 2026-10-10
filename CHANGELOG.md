@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.1] - 2026-10-10 @ 11:28
+
 The **Philippa** release is dedicated to [Philippa Fawcett](https://en.wikipedia.org/wiki/Philippa_Fawcett).
 
 - Generate missing high-score GIFs in the background, showing the saved SVG until the animation is ready.

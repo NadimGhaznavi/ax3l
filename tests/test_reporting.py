@@ -155,6 +155,7 @@ class ExperimentStatusTests(unittest.TestCase):
         log = self.enterContext(patch('ax3l.server.ReportingServer.EventLogDb')).return_value
         log.recent.return_value = []
         snake = self.enterContext(patch('ax3l.server.ReportingServer.SnakeLab')).return_value
+        snake.get_highscore_frames.return_value = None
         snake.is_simulation_running.return_value = False
         server = make_server('127.0.0.1', 0)
         thread = Thread(target=server.serve_forever, daemon=True)
@@ -164,7 +165,8 @@ class ExperimentStatusTests(unittest.TestCase):
                 snake.get_episode_totals.return_value = {"games_played": submitted * 10, "moves_made": submitted * 100}
                 snake.get_num_sims.return_value = submitted
                 snake.get_high_score.return_value = 999999
-                log.current_golden_config.return_value = {'process_id': 'current-run'} if score is not None else None
+                run_id = '93d64bca-c3ae-404f-902d-804547a156e6'
+                log.current_golden_config.return_value = {'process_id': run_id} if score is not None else None
                 snake.get_run_summary.return_value = {'high_score': score, 'high_score_snapshot': {
                     'board': {'grid_size': [4, 3], 'snake_head': [2, 1],
                               'snake_body': [[1, 1]], 'food': [3, 2]}}}
@@ -179,7 +181,7 @@ class ExperimentStatusTests(unittest.TestCase):
                 self.assertIn(f"Current Highscore: {format(score, ',') if score is not None else '—'}", page)
                 self.assertIn('class="server-bar experiment-status"', page)
                 if score is not None:
-                    snake.get_run_summary.assert_called_with('current-run')
+                    snake.get_run_summary.assert_called_with(run_id)
                     self.assertIn('viewBox="0 0 128 96"', page)
                 else:
                     self.assertIn('No saved board is available for the current configuration.', page)

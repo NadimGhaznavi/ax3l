@@ -39,6 +39,17 @@ The MCP tool framework is a feature of llama.cpp and is well supported by the Qw
 - Presents a histogram showing score distribution across simulation runs.
 - Presents a plot of the high score over time, including the dips due to seed rotation events.
 - Presents an event log with filtering.
+- Retrieves captured high-score games from Snake Lab over ZMQ and shows animated GIFs in simulation reports and the current experiment panel. Runs without captured frames retain their saved SVG board; control-service transport outages also use that fallback.
+- Generates GIFs on first view and reuses files named by run ID, under a directory containing the renderer version and frame duration. No animation metadata is stored in the database.
+
+GIFs loop forever at 20 ms per move by default, holding the final frame for
+1 second before restarting. The reporting entry point accepts
+`--gif-dir` (default `/opt/prod/ax3l/games`) and `--gif-duration-ms` (a positive
+multiple of 10). The production service keeps GIFs in
+`/opt/prod/ax3l/games`; DEV and QA use their own installed application's `games`
+directory. These directories are writable through systemd's
+`ReadWritePaths` even with `ProtectSystem=strict`. Removing a cached GIF causes
+it to be regenerated on the next view. Old Snake Lab runs are not backfilled.
 
 ## Watchdog service
 

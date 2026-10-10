@@ -6,6 +6,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 import traceback
 from urllib.parse import parse_qs, urlsplit
+from uuid import UUID
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 import zmq
@@ -19,13 +20,32 @@ from ax3l.activity.ScoreDistribution import distribution
 from ax3l.activity.ExperimentHighscores import highscores
 from ax3l.activity.GoldenConfigurations import parameter_change
 from ax3l.activity.SimulationBoard import board_svg
+from ax3l.activity.SimulationAnimation import SimulationAnimation
+from ax3l.interface.SimulationGifStore import SimulationGifStore
 from ax3l.activity.SimulationMetrics import metrics
 from ax3l.constants.DReportMgr import DReportMgr
 from ax3l.constants.DLabel import FIELD_TO_LABEL_MAP
 from ax3l.interface.SnakeLab import SnakeLab
 
 
-def make_server(host: str, port: int) -> HTTPServer:
+def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIRECTORY,
+                gif_duration_ms: int = DReportMgr.GIF_DURATION_MS) -> HTTPServer:
+    if gif_duration_ms < 10 or gif_duration_ms % 10:
+        raise ValueError("GIF frame duration must be a positive multiple of 10 ms")
+    gifs = SimulationGifStore(gif_directory, SimulationAnimation.VERSION, gif_duration_ms)
+
+    def animation_url(run_id: str) -> str | None:
+        if not gifs.path(run_id).is_file():
+            try:
+                frames = SnakeLab().get_highscore_frames(run_id)
+            except zmq.ZMQError:
+                # A saved SVG remains available while the control service is offline.
+                return None
+            if frames is None:
+                return None
+            gifs.save(run_id, SimulationAnimation.render(frames, gif_duration_ms))
+        return f"/simulation-gifs/{gifs.directory.name}/{UUID(run_id)}.gif"
+
     templates = Environment(
         loader=FileSystemLoader(Path(__file__).with_name("templates")),
         autoescape=select_autoescape(["html"]),
@@ -66,6 +86,17 @@ def make_server(host: str, port: int) -> HTTPServer:
             if self.path == "/health":
                 body = b'{"status":"ok","service":"reporting-server","mode":"events"}'
                 content_type = "application/json"
+            elif re.fullmatch(
+                r"/simulation-gifs/v[0-9]+-[0-9]+ms/[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\.gif",
+                self.path,
+            ):
+                _, _, version, filename = self.path.split("/")
+                path = gifs.path(filename[:-4])
+                if version != gifs.directory.name or not path.is_file():
+                    self.send_error(404, "Animation not found")
+                    return
+                body = path.read_bytes()
+                content_type = "image/gif"
             elif self.path == "/golden-configurations":
                 try:
                     db = DbMgr()
@@ -140,12 +171,14 @@ def make_server(host: str, port: int) -> HTTPServer:
                 self.path,
             ):
                 try:
-                    run = SnakeLab().get_run_summary(self.path.split("/")[2])
+                    run_id = self.path.split("/")[2]
+                    run = SnakeLab().get_run_summary(run_id)
                     if run is None:
                         self.send_error(404, "Simulation not found")
                         return
                     body = templates.get_template("simulation_run.html").render(
-                        run=run, board_svg=board_svg(run.get("high_score_snapshot"))
+                        run=run, board_gif_url=animation_url(run_id),
+                        board_svg=board_svg(run.get("high_score_snapshot"))
                     ).encode("utf-8")
                     content_type = "text/html; charset=utf-8"
                 except Exception:
@@ -219,6 +252,7 @@ def make_server(host: str, port: int) -> HTTPServer:
                                 high_score=current_run["high_score"] if current_run else None,
                                 all_time_high_score=SnakeLab().get_high_score(),
                                 current_board_svg=board_svg(current_run.get("high_score_snapshot")) if current_run else None,
+                                current_board_gif_url=animation_url(golden["process_id"]) if current_run else None,
                                 simulations_submitted=SnakeLab().get_num_sims(),
                                 experiment_cycles=log.experiment_cycles(),
                                 **SnakeLab().get_episode_totals(),
@@ -306,8 +340,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Show the application event log.")
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--host", default="0.0.0.0")
+    parser.add_argument("--gif-dir", type=Path, default=DReportMgr.GIF_DIRECTORY)
+    parser.add_argument("--gif-duration-ms", type=int, default=DReportMgr.GIF_DURATION_MS,
+                        help="Frame duration in milliseconds, a positive multiple of 10")
     args = parser.parse_args()
-    with make_server(args.host, args.port) as server:
+    with make_server(args.host, args.port, args.gif_dir, args.gif_duration_ms) as server:
         print(f"Event log: http://{args.host}:{server.server_port}/", flush=True)
         try:
             server.serve_forever()

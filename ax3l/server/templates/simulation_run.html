@@ -10,8 +10,10 @@
   <header><h1>Simulation Run</h1><a href="/">Back to event log</a></header>
   <main class="panel">
     <section class="simulation-board-panel">
-      <h2>High-score Board</h2>
-      {% if board_svg %}
+      <h2>{{ 'High-score Game' if board_gif_url else 'High-score Board' }}</h2>
+      {% if board_gif_url %}
+      <figure><img class="simulation-board" src="{{ board_gif_url }}" alt="Animated high-score Snake Lab game"></figure>
+      {% elif board_svg %}
       <figure>{{ board_svg | safe }}</figure>
       {% else %}
       <p class="note">No saved board is available for this run.</p>

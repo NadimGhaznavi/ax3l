@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+The **Rózsa** release is dedicated to [Rózsa Péter](https://en.wikipedia.org/wiki/R%C3%B3zsa_P%C3%A9ter).
 - Cache the remaining homepage status calculations in the background, including reconstruction of completed experiments.
 - Limit the event list to the latest 500 events before joining messages and simulation scores. Use read-only report connections without table initialization, and log slow homepage operations.
 

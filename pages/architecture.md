@@ -43,8 +43,13 @@ The MCP tool framework is a feature of llama.cpp and is well supported by the Qw
 - Schedules missing GIFs in a background worker on first view and reuses files named by run ID, under a directory containing the renderer version and frame duration. The report shows its saved SVG until the GIF is available on a subsequent refresh. No animation metadata is stored in the database.
 - Caches games-played and moves-made totals in memory. Views schedule a background refresh when the cache is older than 60 seconds, using a separate worker from GIF generation. Reports show the last successful totals during refreshes and database outages, or an em dash before the first result. Missing captures and transport failures are retried at most once per minute when viewed.
 
-GIFs loop forever at 20 ms per move by default, holding the final frame for
-1 second before restarting. The reporting entry point accepts
+GIFs loop forever at 40 ms per move by default, holding the final frame for
+1 second before restarting. Each food pickup inserts a stationary sequence at
+20 ms per frame: the snake moves onto the food at its previous length, and a
+darker shade of the food colour travels from head to tail. The captured growth
+frame and replacement food appear after that sequence, then normal playback
+resumes. These display frames do not alter the captured game data.
+The reporting entry point accepts
 `--gif-dir` (default `/opt/prod/ax3l/games`) and `--gif-duration-ms` (a positive
 multiple of 10). The production service keeps GIFs in
 `/opt/prod/ax3l/games`; DEV and QA use their own installed application's `games`

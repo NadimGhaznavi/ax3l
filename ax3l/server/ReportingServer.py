@@ -3,10 +3,11 @@ import json
 import logging
 import re
 import socket
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
 from pathlib import Path
 import traceback
 from time import perf_counter
+from threading import Lock
 from urllib.parse import parse_qs, urlsplit
 from uuid import UUID
 
@@ -36,11 +37,17 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
         raise ValueError("GIF frame duration must be at least 10 ms")
     gifs = SimulationGifStore(gif_directory, SimulationAnimation.VERSION, gif_duration_ms)
     background = ReportBackground(gifs, gif_duration_ms)
+    background_lock = Lock()
 
     def animation_url(run_id: str) -> str | None:
-        if not background.animation_ready(run_id):
-            return None
+        with background_lock:
+            if not background.animation_ready(run_id):
+                return None
         return f"/simulation-gifs/{gifs.directory.name}/{UUID(run_id)}.gif"
+
+    def background_values():
+        with background_lock:
+            return {**background.status(), **background.episode_totals()}
 
     def timed(label, operation):
         started = perf_counter()
@@ -69,6 +76,8 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
     templates.globals["request_timeout_seconds"] = DReportMgr.REQUEST_TIMEOUT_SECONDS
 
     class Handler(BaseHTTPRequestHandler):
+        timeout = DReportMgr.REQUEST_TIMEOUT_SECONDS
+
         def send_error(self, code, message=None, explain=None):
             try:
                 super().send_error(code, message, explain)
@@ -248,8 +257,7 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
                                 high_score=current_run["high_score"] if current_run else None,
                                 current_board_svg=board_svg(current_run.get("high_score_snapshot")) if current_run else None,
                                 current_board_gif_url=animation_url(golden["process_id"]) if current_run else None,
-                                **background.status(),
-                                **background.episode_totals(),
+                                **background_values(),
                             ).encode("utf-8")
                         else:
                             reason_page = self.path.endswith("/reason")
@@ -327,7 +335,7 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
                 return
             self._send_page(body, content_type)
 
-    class ReportServer(HTTPServer):
+    class ReportServer(ThreadingHTTPServer):
         def server_close(self):
             try:
                 super().server_close()

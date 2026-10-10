@@ -7,7 +7,7 @@ from PIL import Image, ImageDraw
 
 
 class SimulationAnimation:
-    VERSION = 4
+    VERSION = 5
     FINAL_FRAME_DURATION_MS = 1000
     FOOD_FRAME_DURATION_MS = 50
     CELL_SIZE = 32
@@ -15,7 +15,7 @@ class SimulationAnimation:
 
     @classmethod
     def render(cls, frames: list[dict], duration_ms: int = 75) -> bytes:
-        """Insert food-travel frames before growth, then resume captured moves."""
+        """Digest food to the visible tail, revealing growth on the next move."""
         images = cls._gif_timing(cls._images(frames, duration_ms))
         first = next(images)
         with BytesIO() as output:
@@ -37,8 +37,11 @@ class SimulationAnimation:
     @classmethod
     def _images(cls, frames: list[dict], duration_ms: int) -> Iterator[Image.Image]:
         previous = None
+        digestion_head = None
         for index, frame in enumerate(frames):
             board = frame["board"]
+            if board["snake_head"] != digestion_head:
+                digestion_head = None
             if (previous is not None and board["score"] > previous["score"]
                     and board["snake_head"] == previous["food"]):
                 # Move onto the food at the old length, delaying growth and new food.
@@ -48,12 +51,19 @@ class SimulationAnimation:
                     image = cls._board(eating, segment)
                     image.info["duration"] = cls.FOOD_FRAME_DURATION_MS
                     yield image
+                digestion_head = board["snake_head"]
+                previous = board
+                if index != len(frames) - 1:
+                    continue
+            if digestion_head is not None:
+                # Keep the old length until a captured move advances the head.
+                board = {**board, "snake_body": board["snake_body"][:-1]}
             image = cls._board(board)
             image.info["duration"] = (
                 cls.FINAL_FRAME_DURATION_MS if index == len(frames) - 1 else duration_ms
             )
             yield image
-            previous = board
+            previous = frame["board"]
 
     @classmethod
     def _board(cls, board: dict, food_segment: int | None = None) -> Image.Image:

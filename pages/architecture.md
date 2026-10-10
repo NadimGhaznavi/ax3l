@@ -39,6 +39,7 @@ The MCP tool framework is a feature of llama.cpp and is well supported by the Qw
 - Presents a histogram showing score distribution across simulation runs.
 - Presents a plot of the high score over time, including the dips due to seed rotation events.
 - Presents an event log with filtering.
+- Handles HTTP connections in separate threads with a 30-second client timeout, so idle browser connections cannot block other pages or health checks. Shared background cache scheduling is serialized.
 - Retrieves captured high-score games from Snake Lab over ZMQ and shows animated GIFs in simulation reports and the current experiment panel. Runs without captured frames retain their saved SVG board; control-service transport outages also use that fallback.
 - Schedules missing GIFs in a background worker on first view and reuses files named by run ID, under a directory containing the renderer version and frame duration. The report shows its saved SVG until the GIF is available on a subsequent refresh. No animation metadata is stored in the database.
 - Caches games-played and moves-made totals in memory. Views schedule a background refresh when the cache is older than 60 seconds, using a separate worker from GIF generation. Reports show the last successful totals during refreshes and database outages, or an em dash before the first result. Missing captures and transport failures are retried at most once per minute when viewed.
@@ -48,8 +49,11 @@ GIFs loop forever at 75 ms per move by default, holding the final frame for
 1 second before restarting. Each food pickup inserts a stationary sequence at
 50 ms per frame: the snake moves onto the food at its previous length, and a
 darker shade of the food colour travels from head to tail. The captured growth
-frame and replacement food appear after that sequence, then normal playback
-resumes. These display frames do not alter the captured game data. GIF delays
+appears on the next captured move: the head advances and the visible tail stays
+in place with its normal body colour. The pickup's full-length board is skipped
+so the previous tail square does not flash after digestion. If the game ends
+before another move, the final board keeps the visible length. These display
+frames do not alter the captured game data. GIF delays
 use 10 ms ticks; cumulative rounding alternates 80 and 70 ms move delays to
 preserve the requested average speed.
 The reporting entry point accepts

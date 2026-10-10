@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from io import BytesIO
 from pathlib import Path
+import socket
 from tempfile import TemporaryDirectory
 from threading import Event, Thread
 import unittest
@@ -46,12 +47,13 @@ class SimulationAnimationTests(unittest.TestCase):
                 durations.append(frame.info['duration'])
                 pixels = frame.convert('RGB')
                 heads.append([pixels.getpixel((x * 32 + 16, 48)) for x in (1, 2, 3)])
-            # Identical penultimate and terminal boards share their elapsed time.
-            self.assertEqual(durations, [80, 70, 50, 50, 1080])
-            self.assertEqual(sum(durations), 1330)
+            # Digestion resumes at the terminal board without a growth-only frame.
+            self.assertEqual(durations, [80, 70, 50, 50, 1000])
+            self.assertEqual(sum(durations), 1250)
             for colours, head in ((heads[0], 0), (heads[1], 1), (heads[-1], 2)):
                 self.assertEqual(colours[head], (121, 184, 243))
             self.assertEqual(heads[-1][1], (76, 155, 232))
+            self.assertEqual(pixels.getpixel((48, 48)), (16, 23, 32))
             self.assertEqual(pixels.getpixel((0, 0)), (35, 54, 75))
 
     def test_single_frame(self):
@@ -83,7 +85,9 @@ class SimulationAnimationTests(unittest.TestCase):
                       food=[5, 1], direction=[1, 0], score=0)
         after = {**before, 'snake_head': [5, 1],
                  'snake_body': [[4, 1], *before['snake_body']], 'food': [6, 3], 'score': 1}
-        frames = [dict(board=before), dict(board=after)]
+        moved = {**after, 'snake_head': [6, 1],
+                 'snake_body': [[5, 1], *after['snake_body'][:-1]]}
+        frames = [dict(board=before), dict(board=after), dict(board=moved)]
         original = deepcopy(frames)
         with Image.open(BytesIO(SimulationAnimation.render(frames))) as gif:
             self.assertEqual(gif.info['loop'], 0)
@@ -105,8 +109,10 @@ class SimulationAnimationTests(unittest.TestCase):
             self.assertEqual(colour(image, [1, 2]), (16, 23, 32))
             self.assertEqual(colour(image, [6, 3]), (16, 23, 32))
         final, _ = playback[-1]
-        self.assertEqual(colour(final, [5, 1]), (121, 184, 243))
-        for position in after['snake_body']:
+        self.assertEqual(colour(final, [6, 1]), (121, 184, 243))
+        self.assertEqual(colour(final, frozen_snake[-1]), (76, 155, 232))
+        self.assertEqual(colour(final, [1, 2]), (16, 23, 32))
+        for position in moved['snake_body']:
             self.assertEqual(colour(final, position), (76, 155, 232))
         self.assertEqual(colour(final, [6, 3]), (240, 148, 69))
         self.assertEqual(frames, original)
@@ -126,7 +132,7 @@ class SimulationAnimationTests(unittest.TestCase):
         with Image.open(BytesIO(SimulationAnimation.render([dict(board=board)
                                                            for board in (first, second, third)]))) as gif:
             self.assertEqual([frame.info['duration'] for frame in ImageSequence.Iterator(gif)],
-                             [80, 50, 50, 70, 50, 50, 50, 1000])
+                             [80, 50, 50, 50, 50, 50, 1000])
 
     def test_atomic_write_and_failure_cleanup(self):
         with TemporaryDirectory() as directory:
@@ -215,11 +221,20 @@ class AnimationReportTests(unittest.TestCase):
         self.addCleanup(self.thread.join)
         self.addCleanup(self.server.shutdown)
         self.base = f'http://127.0.0.1:{self.server.server_port}'
-        self.gif_url = f'/simulation-gifs/v4-75ms/{self.run_id}.gif'
+        self.gif_url = f'/simulation-gifs/v5-75ms/{self.run_id}.gif'
 
     def page(self, path):
         with urlopen(self.base + path) as response:
             return response.read().decode()
+
+    def test_idle_browser_connection_does_not_block_health_or_pages(self):
+        with socket.create_connection(('127.0.0.1', self.server.server_port)) as idle:
+            # The accepted connection sends a partial request and waits.
+            idle.sendall(b'GET / HTTP/1.1\r\n')
+            with urlopen(self.base + '/health', timeout=2) as response:
+                self.assertEqual(response.status, 200)
+            with urlopen(self.base + '/', timeout=2) as response:
+                self.assertEqual(response.status, 200)
 
     def test_both_reports_cache_and_serve_gif_after_restart(self):
         published = Event()
@@ -245,7 +260,7 @@ class AnimationReportTests(unittest.TestCase):
                 self.assertGreater(gif.n_frames, 1)
                 self.assertEqual(gif.info['loop'], 0)
                 self.assertEqual([frame.info['duration'] for frame in ImageSequence.Iterator(gif)],
-                                 [80, 70, 50, 50, 1080])
+                                 [80, 70, 50, 50, 1000])
         cached = list(Path(self.directory).rglob('*.gif'))
         self.assertEqual(len(cached), 1)
         self.snake.get_highscore_frames.side_effect = AssertionError('Must reuse saved GIF')
@@ -325,9 +340,9 @@ class AnimationReportTests(unittest.TestCase):
             release.set()
 
     def test_missing_files_and_traversal_are_not_served(self):
-        for path in (self.gif_url, self.gif_url.replace('v4-', 'v5-'),
+        for path in (self.gif_url, self.gif_url.replace('v5-', 'v6-'),
                      '/simulation-gifs/../../requirements.txt',
-                     f'/simulation-gifs/v4-75ms/{uuid4()}.gif'):
+                     f'/simulation-gifs/v5-75ms/{uuid4()}.gif'):
             with self.subTest(path=path), self.assertRaises(HTTPError) as error:
                 self.page(path)
             self.assertEqual(error.exception.code, 404)

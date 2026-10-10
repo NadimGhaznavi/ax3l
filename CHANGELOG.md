@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Animate food travelling from head to tail at 20 ms per segment while the snake holds still, then show captured growth and resume normal playback. Regenerate GIFs under a new renderer cache version.
+
 - Slow high-score GIF playback to 40 ms per move, retaining the 1-second final pause and continuous looping.
 
 ## [2.5.1] - 2026-10-10 @ 11:28

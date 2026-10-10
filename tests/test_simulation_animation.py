@@ -193,6 +193,8 @@ class AnimationReportTests(unittest.TestCase):
         self.log.experiment_cycles.return_value = 1
         self.snake = self.enterContext(patch('ax3l.server.ReportingServer.SnakeLab')).return_value
         self.enterContext(patch('ax3l.app.ReportBackground.SnakeLab', return_value=self.snake))
+        self.enterContext(patch('ax3l.app.ReportBackground.DbMgr'))
+        self.enterContext(patch('ax3l.app.ReportBackground.EventLogDb', return_value=self.log))
         self.snake.get_run_summary.return_value = dict(run_id=self.run_id, high_score=1,
             project_version='2.0.0', completed_at=None, high_score_snapshot=game_frames()[-1])
         self.snake.get_highscore_frames.return_value = game_frames()
@@ -290,6 +292,28 @@ class AnimationReportTests(unittest.TestCase):
             self.assertTrue(totals_started.wait(1))
             self.snake.get_highscore_frames.assert_called_once_with(self.run_id)
             self.snake.get_episode_totals.assert_called_once_with()
+        finally:
+            release.set()
+
+    def test_slow_experiment_history_does_not_block_homepage_or_health(self):
+        started, release = Event(), Event()
+        self.addCleanup(release.set)
+
+        def cycles():
+            started.set()
+            if not release.wait(5):
+                raise TimeoutError('Test did not release experiment history')
+            return 100
+
+        self.log.experiment_cycles.side_effect = cycles
+        try:
+            for path in ('/', '/health', '/'):
+                with urlopen(self.base + path, timeout=1) as response:
+                    page = response.read().decode()
+                if path == '/':
+                    self.assertIn('Completed Experiments: —', page)
+            self.assertTrue(started.wait(1))
+            self.log.experiment_cycles.assert_called_once_with()
         finally:
             release.set()
 

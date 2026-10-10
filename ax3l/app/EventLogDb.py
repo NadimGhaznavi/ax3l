@@ -13,10 +13,17 @@ class EventLogDb:
     def recent(self) -> list[dict[str, Any]]:
         """Return the latest 500 events, newest first."""
         rows = self._db.query(f"""
+            WITH recent_events AS (
+                SELECT event_id, occurred_at, name, category, log_level,
+                       process_id, source_name, parameter, ax3l_version
+                FROM events
+                ORDER BY occurred_at DESC, event_id DESC
+                LIMIT 500
+            )
             SELECT e.event_id, e.occurred_at, e.name, e.category,
                    e.log_level, e.process_id, e.source_name, e.parameter, e.ax3l_version, m.content,
                    r.high_score AS simulation_high_score
-            FROM events e
+            FROM recent_events e
             LEFT JOIN event_messages m USING (event_id)
             LEFT JOIN `{DSnakeLab.DATABASE}`.simulation_runs r
                 ON r.run_id = e.process_id COLLATE utf8mb4_unicode_ci

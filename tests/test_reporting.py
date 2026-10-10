@@ -159,6 +159,10 @@ class ExperimentStatusTests(unittest.TestCase):
         self.enterContext(patch('ax3l.app.ReportBackground.SnakeLab', return_value=snake))
         self.enterContext(patch('ax3l.app.ReportBackground.ReportBackground.episode_totals',
                                side_effect=lambda: snake.get_episode_totals()))
+        self.enterContext(patch('ax3l.app.ReportBackground.ReportBackground.status',
+            side_effect=lambda: dict(snake_lab_status='Idle',
+                simulations_submitted=snake.get_num_sims(),
+                all_time_high_score=snake.get_high_score(), experiment_cycles=log.experiment_cycles())))
         snake.is_simulation_running.return_value = False
         server = make_server('127.0.0.1', 0)
         thread = Thread(target=server.serve_forever, daemon=True)

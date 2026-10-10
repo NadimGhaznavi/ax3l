@@ -5,10 +5,10 @@ class DAx3l:
     RAW_LOGS_ENABLED: Final[bool] = False
     HTTP_TIMEOUT_SECONDS: Final[int] = 300
 
-    VERSION: Final[str] = "2.4.2"
+    VERSION: Final[str] = "2.5.0"
     CMDB_SUBTYPE: Final[str] = "Lab Experiment"
     CMDB_SUPPLIER: Final[str] = "Nadim-Daniel"
-    CMDB_CODENAME: Final[str] = "Cougar"
+    CMDB_CODENAME: Final[str] = "Olga"
 
     BASE_DIR: Final[str] = "/opt/prod/ax3l"
     BASE_DIR_QA: Final[str] = "/opt/qa/ax3l"

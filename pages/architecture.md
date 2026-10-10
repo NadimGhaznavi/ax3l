@@ -42,6 +42,7 @@ The MCP tool framework is a feature of llama.cpp and is well supported by the Qw
 - Retrieves captured high-score games from Snake Lab over ZMQ and shows animated GIFs in simulation reports and the current experiment panel. Runs without captured frames retain their saved SVG board; control-service transport outages also use that fallback.
 - Schedules missing GIFs in a background worker on first view and reuses files named by run ID, under a directory containing the renderer version and frame duration. The report shows its saved SVG until the GIF is available on a subsequent refresh. No animation metadata is stored in the database.
 - Caches games-played and moves-made totals in memory. Views schedule a background refresh when the cache is older than 60 seconds, using a separate worker from GIF generation. Reports show the last successful totals during refreshes and database outages, or an em dash before the first result. Missing captures and transport failures are retried at most once per minute when viewed.
+- Also caches completed experiments, submitted simulations, all-time high score, and control-service status in a separate background worker, refreshing stale results on views after 60 seconds. Report reads do not initialize database tables. The event query limits the latest 500 events before joining their details; operations taking at least one second are logged for diagnosis.
 
 GIFs loop forever at 40 ms per move by default, holding the final frame for
 1 second before restarting. Each food pickup inserts a stationary sequence at

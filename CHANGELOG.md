@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+The **Xenia** release is dedicated to [Xenia de la Ossa](https://en.wikipedia.org/wiki/Xenia_de_la_Ossa).
+
+- Updated sidebar.
+
 ## [2.5.6] - 2026-10-10 @ 13:03
 
 The **Tatiana** release is dedicated to **Tatiana Ehrenfest**:

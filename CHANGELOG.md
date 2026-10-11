@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+This release celebrates Cree culture: This is the **nīso** (2) release.
+
+- Use the site's logo as the favicon.
+
 ## [2.7.0] - 2026-10-11 @ 05:03
 
 This release is in memory of **Leptictis** who died out about 30 million years ago.

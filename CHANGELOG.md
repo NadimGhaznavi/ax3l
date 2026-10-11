@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-10-11 @ 02:09
+
 The **Huia** was a large bird native to New Zealand. The last sighting was in 1907. This release is dedicated to its memory.
 
 - Port snake-web-code’s GIF panel with embedded simulation number, high score, and live current score. Bundle its font and regenerate cached animations.

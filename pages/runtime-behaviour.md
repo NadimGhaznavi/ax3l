@@ -4,6 +4,8 @@ author_profile: true
 layout: single
 ---
 
+![Ax3l Runtime](/pages/images/ax3l-runtime.png)
+
 The runtime behaviour has two phases: an initial phase, which runs once and finishes quickly, and the **Round Robin Phase**, which governs subsequent operation.
 
 ## Initial Experiment Startup

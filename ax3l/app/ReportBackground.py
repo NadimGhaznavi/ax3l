@@ -33,7 +33,7 @@ class ReportBackground:
                               "all_time_high_score": None, "snake_lab_status": "Loading"}
         self._status_refresh_after = 0.0
 
-    def animation_ready(self, run_id: str) -> bool:
+    def animation_ready(self, run_id: str, simulation_id: int) -> bool:
         """Return immediately; schedule one job per missing animation."""
         job = self._gif_jobs.get(run_id)
         if job is not None and job.done():
@@ -45,17 +45,18 @@ class ReportBackground:
             return True
         if (run_id not in self._gif_jobs
                 and monotonic() >= self._gif_retry_after.get(run_id, 0)):
-            self._gif_jobs[run_id] = self._animations.submit(self._generate, run_id)
+            self._gif_jobs[run_id] = self._animations.submit(self._generate, run_id, simulation_id)
         return False
 
-    def _generate(self, run_id: str) -> None:
+    def _generate(self, run_id: str, simulation_id: int) -> None:
         try:
             frames = SnakeLab().get_highscore_frames(run_id)
         except zmq.ZMQError:
             logging.exception("Unable to retrieve high-score frames for %s", run_id)
             return
         if frames is not None:
-            self._gifs.save(run_id, SimulationAnimation.render(frames, self._duration_ms))
+            self._gifs.save(run_id, SimulationAnimation.render(frames, self._duration_ms,
+                                                             simulation_id=simulation_id))
 
     def episode_totals(self) -> dict[str, int | None]:
         """Serve the last completed result while refreshing a stale cache."""

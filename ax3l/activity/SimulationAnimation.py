@@ -2,21 +2,31 @@
 
 from io import BytesIO
 from collections.abc import Iterator
+from pathlib import Path
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 
 class SimulationAnimation:
-    VERSION = 5
+    VERSION = 6
     FINAL_FRAME_DURATION_MS = 1000
     FOOD_FRAME_DURATION_MS = 50
     CELL_SIZE = 32
-    COLOURS = ("#101720", "#23364b", "#4c9be8", "#79b8f3", "#f09445", "#b8682f")
+    PANEL_PADDING = 24
+    HEADER_HEIGHT = 88
+    FOOTER_HEIGHT = 48
+    FONT_SIZE = 24
+    COLOURS = ("#101720", "#23364b", "#4c9be8", "#79b8f3", "#f09445", "#b8682f",
+               "#40566e", "#d5dfeb", "#a7b8cb")
 
     @classmethod
-    def render(cls, frames: list[dict], duration_ms: int = 75) -> bytes:
+    def render(cls, frames: list[dict], duration_ms: int = 75, *, simulation_id: int) -> bytes:
         """Digest food to the visible tail, revealing growth on the next move."""
-        images = cls._gif_timing(cls._images(frames, duration_ms))
+        font = ImageFont.truetype(str(Path(__file__).with_name('fonts') / 'DejaVuSansMono.ttf'),
+                                  cls.FONT_SIZE)
+        high_score = frames[-1]['board']['score']
+        images = cls._gif_timing(cls._panel(image, simulation_id, high_score, font)
+                                for image in cls._images(frames, duration_ms))
         first = next(images)
         with BytesIO() as output:
             first.save(output, format="GIF", save_all=True, append_images=images,
@@ -50,6 +60,7 @@ class SimulationAnimation:
                 for segment in range(1 + len(eating["snake_body"])):
                     image = cls._board(eating, segment)
                     image.info["duration"] = cls.FOOD_FRAME_DURATION_MS
+                    image.info["score"] = frame["board"]["score"]
                     yield image
                 digestion_head = board["snake_head"]
                 previous = board
@@ -62,8 +73,36 @@ class SimulationAnimation:
             image.info["duration"] = (
                 cls.FINAL_FRAME_DURATION_MS if index == len(frames) - 1 else duration_ms
             )
+            image.info["score"] = frame["board"]["score"]
             yield image
             previous = frame["board"]
+
+    @classmethod
+    def _panel(cls, board: Image.Image, simulation_id: int, high_score: int,
+               font: ImageFont.FreeTypeFont) -> Image.Image:
+        """Keep labels and a fixed-width live score inside every animation frame."""
+        heading = f'Simulation #{simulation_id}'
+        highscore = f'High Score: {high_score}'
+        digits = max(2, len(str(high_score)))
+        current = f'Current Score: {board.info["score"]:>{digits}}'
+        padding = cls.PANEL_PADDING
+        width = max(board.width, int(max(font.getlength(text)
+                                         for text in (heading, highscore, current))) + 1) + 2 * padding
+        height = 2 * padding + cls.HEADER_HEIGHT + board.height + cls.FOOTER_HEIGHT
+        image = Image.new('P', (width, height), 0)
+        image.putpalette(board.getpalette())
+        image.paste(board, ((width - board.width) // 2, padding + cls.HEADER_HEIGHT))
+        draw = ImageDraw.Draw(image)
+        draw.rectangle((0, 0, width - 1, height - 1), outline=6, width=2)
+        board_x, board_y = (width - board.width) // 2, padding + cls.HEADER_HEIGHT
+        draw.rectangle((board_x, board_y, board_x + board.width - 1, board_y + board.height - 1),
+                       outline=6)
+        draw.text((width / 2, padding), heading, font=font, fill=7, anchor='mt')
+        draw.text((width / 2, padding + 36), highscore, font=font, fill=7, anchor='mt')
+        draw.text((width - padding, padding + cls.HEADER_HEIGHT + board.height + 18),
+                  current, font=font, fill=8, anchor='rt')
+        image.info['duration'] = board.info['duration']
+        return image
 
     @classmethod
     def _board(cls, board: dict, food_segment: int | None = None) -> Image.Image:

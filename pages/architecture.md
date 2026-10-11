@@ -4,7 +4,7 @@ author_profile: true
 layout: single
 ---
 
-![Ax3l]({{ '/pages/images/ax3l.png' | relative_url }})
+![Ax3l Architecture]({{ '/pages/images/ax3l-architecture.png' | relative_url }})
 
 The project runs on [Debian Linux](https://debian.org) and uses [systemd](https://systemd.io/) to run the components as services.
 

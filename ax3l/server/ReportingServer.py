@@ -39,9 +39,9 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
     background = ReportBackground(gifs, gif_duration_ms)
     background_lock = Lock()
 
-    def animation_url(run_id: str) -> str | None:
+    def animation_url(run_id: str, simulation_id: int) -> str | None:
         with background_lock:
-            if not background.animation_ready(run_id):
+            if not background.animation_ready(run_id, simulation_id):
                 return None
         return f"/simulation-gifs/{gifs.directory.name}/{UUID(run_id)}.gif"
 
@@ -191,7 +191,7 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
                         self.send_error(404, "Simulation not found")
                         return
                     body = templates.get_template("simulation_run.html").render(
-                        run=run, board_gif_url=animation_url(run_id),
+                        run=run, board_gif_url=animation_url(run_id, run["id"]),
                         board_svg=board_svg(run.get("high_score_snapshot"))
                     ).encode("utf-8")
                     content_type = "text/html; charset=utf-8"
@@ -256,7 +256,7 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
                                 events=events,
                                 high_score=current_run["high_score"] if current_run else None,
                                 current_board_svg=board_svg(current_run.get("high_score_snapshot")) if current_run else None,
-                                current_board_gif_url=animation_url(golden["process_id"]) if current_run else None,
+                                current_board_gif_url=animation_url(golden["process_id"], current_run["id"]) if current_run else None,
                                 **background_values(),
                             ).encode("utf-8")
                         else:

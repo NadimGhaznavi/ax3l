@@ -133,10 +133,11 @@ class SimulationRunReportTests(unittest.TestCase):
     def test_summary_lookup(self):
         db = Mock()
         run_id = str(uuid4())
-        row = dict(run_id=run_id, project_version='0.14.0', high_score=0, completed_at=None)
+        row = dict(id=123, run_id=run_id, project_version='0.14.0', high_score=0, completed_at=None)
         db.query.return_value = [row]
         self.assertEqual(SnakeLabDb(db).get_run_summary(run_id), row)
         sql, params = db.query.call_args.args
+        self.assertIn('SELECT id, run_id,', sql)
         self.assertIn('FROM simulation_runs WHERE run_id = %s', sql)
         self.assertEqual(params, (run_id,))
         db.query.return_value = []
@@ -156,7 +157,7 @@ class SimulationRunReportTests(unittest.TestCase):
         log.experiment_cycles.return_value = 0
         run_id = str(uuid4())
         snake.get_run_summary.return_value = dict(
-            run_id=run_id, project_version='<version>', high_score=0,
+            id=123, run_id=run_id, project_version='<version>', high_score=0,
             completed_at=datetime(2026, 9, 15, 12, 30, 45))
         event = dict(event_id=1, occurred_at=datetime.now(), log_level='INFO',
                      category='SnakeLab', name='simulation_completed', parameter=None,

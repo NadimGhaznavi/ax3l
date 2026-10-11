@@ -174,7 +174,7 @@ class ExperimentStatusTests(unittest.TestCase):
                 snake.get_high_score.return_value = 999999
                 run_id = '93d64bca-c3ae-404f-902d-804547a156e6'
                 log.current_golden_config.return_value = {'process_id': run_id} if score is not None else None
-                snake.get_run_summary.return_value = {'high_score': score, 'high_score_snapshot': {
+                snake.get_run_summary.return_value = {'id': 123, 'high_score': score, 'high_score_snapshot': {
                     'board': {'grid_size': [4, 3], 'snake_head': [2, 1],
                               'snake_body': [[1, 1]], 'food': [3, 2]}}}
                 log.experiment_cycles.return_value = cycles

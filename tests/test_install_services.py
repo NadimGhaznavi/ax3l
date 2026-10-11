@@ -160,6 +160,8 @@ exec /usr/bin/systemd-analyze "$@"
                     self.assertIn(f'ReadWritePaths={self.app}/games', reporting)
                     self.assertTrue((self.app / 'games').is_dir())
                     self.assertTrue((self.app / 'ax3l/activity/SimulationAnimation.py').is_file())
+                    self.assertTrue((self.app / 'ax3l/activity/fonts/DejaVuSansMono.ttf').is_file())
+                    self.assertTrue((self.app / 'ax3l/activity/fonts/LICENSE.txt').is_file())
                     self.assertTrue((self.app / 'ax3l/interface/SimulationGifStore.py').is_file())
                     self.assertTrue((self.app / 'ax3l/app/ReportBackground.py').is_file())
                     calls = self.log.read_text()

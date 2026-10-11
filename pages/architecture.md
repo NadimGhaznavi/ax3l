@@ -45,6 +45,10 @@ The MCP tool framework is a feature of llama.cpp and is well supported by the Qw
 - Caches games-played and moves-made totals in memory. Views schedule a background refresh when the cache is older than 60 seconds, using a separate worker from GIF generation. Reports show the last successful totals during refreshes and database outages, or an em dash before the first result. Missing captures and transport failures are retried at most once per minute when viewed.
 - Also caches completed experiments, submitted simulations, all-time high score, and control-service status in a separate background worker, refreshing stale results on views after 60 seconds. Report reads do not initialize database tables. The event query limits the latest 500 events before joining their details; operations taking at least one second are logged for diagnosis.
 
+GIFs embed the simulation number, captured high score, and current score in a bordered
+panel using the bundled DejaVu Sans Mono font. The live score updates on food pickup,
+including during digestion.
+
 GIFs loop forever at 75 ms per move by default, holding the final frame for
 1 second before restarting. Each food pickup inserts a stationary sequence at
 50 ms per frame: the snake moves onto the food at its previous length, and a

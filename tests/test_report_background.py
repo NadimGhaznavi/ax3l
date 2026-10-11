@@ -97,13 +97,13 @@ class ReportBackgroundTests(unittest.TestCase):
     def test_missing_capture_deduplicates_and_retries_after_one_minute(self):
         run_id = str(uuid4())
         self.snake.get_highscore_frames.return_value = None
-        self.assertFalse(self.background.animation_ready(run_id))
+        self.assertFalse(self.background.animation_ready(run_id, 123))
         self.background._gif_jobs[run_id].result(timeout=2)
         for _ in range(5):
-            self.assertFalse(self.background.animation_ready(run_id))
+            self.assertFalse(self.background.animation_ready(run_id, 123))
         self.snake.get_highscore_frames.assert_called_once_with(run_id)
         self.clock.return_value = 70
-        self.assertFalse(self.background.animation_ready(run_id))
+        self.assertFalse(self.background.animation_ready(run_id, 123))
         self.background._gif_jobs[run_id].result(timeout=2)
         self.assertEqual(self.snake.get_highscore_frames.call_count, 2)
 

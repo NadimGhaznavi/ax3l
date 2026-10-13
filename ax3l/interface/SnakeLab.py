@@ -51,8 +51,8 @@ class SnakeLab:
         finally:
             db.close()
 
-    def get_run_scores(self) -> list[int | None]:
-        """Return all recorded run scores, oldest submissions first."""
+    def get_run_scores(self) -> dict[int, int | None]:
+        """Return the latest score per simulation ID, oldest submissions first."""
         db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
         try:
             return SnakeLabDb(db).get_run_scores()

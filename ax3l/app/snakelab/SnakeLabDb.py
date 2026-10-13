@@ -85,11 +85,11 @@ class SnakeLabDb:
             "SELECT MAX(high_score) AS high_score FROM simulation_runs"
         )[0]["high_score"]
 
-    def get_run_scores(self) -> list[int | None]:
-        """Return every run's score in submission order, including unscored runs."""
-        return [row["high_score"] for row in self._db.query(
-            "SELECT high_score FROM simulation_runs ORDER BY id"
-        )]
+    def get_run_scores(self) -> dict[int, int | None]:
+        """Return every simulation ID and latest score, including unscored runs."""
+        return {row["id"]: row["high_score"] for row in self._db.query(
+            "SELECT id, high_score FROM simulation_runs ORDER BY id"
+        )}
 
     def get_config(self, run_id: str) -> dict | None:
         rows = self._db.query(

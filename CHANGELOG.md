@@ -9,9 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+This release celebrates Cree language; This is the THREE release: **Nisto**.
+
+- Replace the Score Distribution Histogram with a looping blue-bar GIF showing
+  separate complete blocks of 200 simulations and a final all-simulations frame.
+  Keep axes fixed and embed simulation ranges and counts; show each block for
+  two seconds and the final frame for five seconds.
+
 ## [2.7.2] - 2026-10-11 @ 16:00
 
-This release celebrates Cree culture: This is the **nīso** (2) release.
+This release celebrates Cree language: This is the **nīso** (2) release.
 
 - Use the site's logo as the favicon.
 

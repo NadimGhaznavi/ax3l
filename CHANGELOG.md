@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.8.1] - 2026-10-12 @ 21:43
+
 This release celebrates the Cree language. Four in Cree is *nēwo*.
 
 - Show 500 simulations per score-distribution frame, with a fixed Y scale based

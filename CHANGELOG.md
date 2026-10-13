@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Make score-distribution frames cumulative every 500 simulations, using the
+  final all-simulations axes throughout. Reduce every GIF font by another 25%.
+
 ## [2.8.1] - 2026-10-12 @ 21:43
 
 This release celebrates the Cree language. Four in Cree is *nēwo*.

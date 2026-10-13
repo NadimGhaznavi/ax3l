@@ -1,4 +1,4 @@
-"""Check GIF blocks, encoded frames, shared scales, and HTTP rendering."""
+"""Check cumulative GIF frames, encoded frames, shared scales, and HTTP rendering."""
 from io import BytesIO
 import unittest
 from unittest.mock import patch
@@ -9,16 +9,18 @@ from ax3l.activity.ScoreDistribution import distribution_frames, render_distribu
 
 
 class ScoreDistributionTests(unittest.TestCase):
-    def test_2054_simulations_have_four_complete_blocks_and_all_runs(self):
+    def test_2054_simulations_have_four_cumulative_checkpoints_and_all_runs(self):
         scores = {number: number % 20 for number in range(1, 2055)}
         frames = distribution_frames(scores)
         self.assertEqual(len(frames), 6)
         self.assertEqual(frames[0], ('Before simulation #1', []))
         self.assertEqual(frames[1][0], 'Simulations #1–500')
-        self.assertEqual(frames[2][0], 'Simulations #501–1000')
-        self.assertEqual(frames[-2][0], 'Simulations #1501–2000')
+        self.assertEqual(frames[2][0], 'Simulations #1–1000')
+        self.assertEqual(frames[-2][0], 'Simulations #1–2000')
         self.assertEqual(frames[-1][0], 'All simulations #1–2054')
-        self.assertTrue(all(len(values) == 500 for _, values in frames[1:-1]))
+        self.assertEqual([len(values) for _, values in frames[1:-1]], [500, 1000, 1500, 2000])
+        for index, (_, values) in enumerate(frames[1:-1], 1):
+            self.assertEqual(values, [scores[number] for number in range(1, index * 500 + 1)])
         self.assertEqual(len(frames[-1][1]), 2054)
         gif = Image.open(BytesIO(render_distribution(scores)))
         self.assertEqual(gif.n_frames, 6)
@@ -30,7 +32,7 @@ class ScoreDistributionTests(unittest.TestCase):
             self.assertEqual(gif.disposal_method, 2)
 
     def test_fixed_axes_bar_positions_and_embedded_labels(self):
-        # Block scales match; the final frame uses its own larger Y scale.
+        # Cumulative bars grow while both axes stay fixed through the final frame.
         scores = {number: 0 if number % 2 else 10 for number in range(1, 1001)}
         labels = []
         font_sizes = {}
@@ -41,16 +43,16 @@ class ScoreDistributionTests(unittest.TestCase):
             return original(draw, xy, text, *args, **kwargs)
         with patch.object(ImageDraw.ImageDraw, 'text', record):
             data = render_distribution(scores)
-        self.assertIn('Simulations #501–1000', labels)
+        self.assertIn('Simulations #1–1000', labels)
         self.assertIn('1,000 submitted · 1,000 scored', labels)
         self.assertIn('Number of runs', labels)
         self.assertIn('Run high score', labels)
-        self.assertEqual(font_sizes['Number of runs'], 20)
-        self.assertEqual(font_sizes['Score Distribution'], 22)
-        self.assertEqual(font_sizes['Simulations #501–1000'], 18)
-        self.assertEqual(font_sizes['Run high score'], 18)
-        self.assertEqual(font_sizes['1,000 submitted · 1,000 scored'], 16)
-        self.assertEqual(font_sizes['250'], 14)
+        self.assertEqual(font_sizes['Number of runs'], 15)
+        self.assertEqual(font_sizes['Score Distribution'], 17)
+        self.assertEqual(font_sizes['Simulations #1–1000'], 14)
+        self.assertEqual(font_sizes['Run high score'], 14)
+        self.assertEqual(font_sizes['1,000 submitted · 1,000 scored'], 12)
+        self.assertEqual(font_sizes['200'], 11)
         self.assertIn('500', labels)
         gif = Image.open(BytesIO(data))
         images = []
@@ -60,16 +62,14 @@ class ScoreDistributionTests(unittest.TestCase):
         for image in images[1:]:
             self.assertEqual(image.crop((90, 351, 775, 430)).tobytes(),
                              images[0].crop((90, 351, 775, 430)).tobytes())
-        for image in images[1:-1]:
+        for image in images[1:]:
             self.assertEqual(image.crop((0, 110, 90, 351)).tobytes(),
                              images[0].crop((0, 110, 90, 351)).tobytes())
-        self.assertNotEqual(images[-1].crop((0, 110, 90, 351)).tobytes(),
-                            images[0].crop((0, 110, 90, 351)).tobytes())
         x = int(PLOT[0] + .5 * (PLOT[2] - PLOT[0]) / 11)
         blue = (76, 155, 232)
         self.assertNotEqual(images[0].getpixel((x, 300)), blue)
         self.assertEqual(images[1].getpixel((x, 300)), blue)
-        self.assertEqual(images[1].getpixel((x, 150)), blue)
+        self.assertNotEqual(images[1].getpixel((x, 150)), blue)
         self.assertEqual(images[-1].getpixel((x, 150)), blue)
         self.assertEqual(data, render_distribution(scores))
 
@@ -79,15 +79,15 @@ class ScoreDistributionTests(unittest.TestCase):
         missing = {number: None for number in range(1, 1001) if number != 50}
         frames = distribution_frames(missing)
         self.assertEqual(len(frames), 3)
-        self.assertEqual(frames[1][0], 'Simulations #501–1000')
-        self.assertEqual(len(frames[1][1]), 500)
+        self.assertEqual(frames[1][0], 'Simulations #1–1000')
+        self.assertEqual(len(frames[1][1]), 999)
         for scores in ({}, {1: None}, {1: 0}, missing):
             gif = Image.open(BytesIO(render_distribution(scores)))
             self.assertEqual(gif.n_frames, len(distribution_frames(scores)))
             gif.seek(gif.n_frames - 1)
             self.assertEqual(gif.info['duration'], 5000)
 
-    def test_block_scale_uses_largest_complete_block_and_ignores_partial_block(self):
+    def test_final_y_scale_includes_partial_block_and_is_used_throughout(self):
         scores = {number: number % 50 for number in range(1, 501)}
         scores.update({number: number % 25 for number in range(501, 1001)})
         scores.update({number: 0 for number in range(1001, 1100)})
@@ -101,8 +101,7 @@ class ScoreDistributionTests(unittest.TestCase):
             return original(draw, xy, text, *args, **kwargs)
         with patch.object(ImageDraw.ImageDraw, 'text', record):
             render_distribution(scores)
-        self.assertEqual(ticks[:3], [['0', '4', '8', '12', '16', '20']] * 3)
-        self.assertEqual(ticks[-1], ['0', '26', '52', '78', '104', '130'])
+        self.assertEqual(ticks, [['0', '26', '52', '78', '104', '130']] * 4)
 
     def test_rare_scores_remain_visible_with_large_all_run_counts(self):
         scores = {number: 0 for number in range(1, 1001)}

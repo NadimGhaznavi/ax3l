@@ -9,9 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+This release celebrates the Cree language. Four in Cree is *nēwo*.
+
+- Show 500 simulations per score-distribution frame, with a fixed Y scale based
+  on the blocks and a separate all-simulations Y scale. Reduce GIF font sizes
+  while preserving the size of the Number of runs label.
+
 ## [2.8.0] - 2026-10-12 @ 21:32
 
-This release celebrates Cree language; This is the THREE release: **Nisto**.
+This release celebrates the Cree language; This is the THREE release: **Nisto**.
 
 - Replace the Score Distribution Histogram with a looping blue-bar GIF showing
   separate complete blocks of 200 simulations and a final all-simulations frame.
@@ -20,7 +26,7 @@ This release celebrates Cree language; This is the THREE release: **Nisto**.
 
 ## [2.7.2] - 2026-10-11 @ 16:00
 
-This release celebrates Cree language: This is the **nīso** (2) release.
+This release celebrates the Cree language: This is the **nīso** (2) release.
 
 - Use the site's logo as the favicon.
 

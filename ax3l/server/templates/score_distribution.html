@@ -14,15 +14,16 @@
   </p>
 
   <p>
-    An empty plot is followed by separate blocks of 200 simulations (#1–200, #201–400, …),
+    An empty plot is followed by separate blocks of 500 simulations (#1–500, #501–1000, …),
     for two seconds each. All simulations, including the partial block, appear for five seconds before restarting.
-    Axes stay fixed. Blue bars count the latest high scores; unscored runs are excluded from bars.
+    The X axis stays fixed. Block frames share a fixed Y scale; the final frame uses its own Y scale.
+    Blue bars count the latest high scores; unscored runs are excluded from bars.
     Reload to refresh.
   </p>
   </section>
   <main class="panel">
     <img class="score-distribution" width="800" height="480" src="data:image/gif;base64,{{ animation }}"
-         alt="Score distribution for successive complete blocks of 200 simulation IDs, followed by all {{ total }} simulations ({{ scored }} scored). Fixed axes; each frame includes its range and counts.">
+         alt="Score distribution for successive complete blocks of 500 simulation IDs, followed by all {{ total }} simulations ({{ scored }} scored). Fixed X axis and shared block Y scale; the final frame has its own Y scale. Each frame includes its range and counts.">
     {% if not scored %}
     <p>No scores recorded yet.</p>
     {% endif %}

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-10-17 @ 00:39
+
 This release celebrates the Cree language. This is the **tēpakohposāp** (17) release.
 
 - Add Ax3l-owned reporting tables with automatic initial extraction and incremental

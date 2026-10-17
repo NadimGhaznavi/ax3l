@@ -213,7 +213,9 @@ class AnimationReportTests(unittest.TestCase):
         self.snake = self.enterContext(patch('ax3l.server.ReportingServer.SnakeLab')).return_value
         self.enterContext(patch('ax3l.app.ReportBackground.SnakeLab', return_value=self.snake))
         self.enterContext(patch('ax3l.app.ReportBackground.DbMgr'))
-        self.enterContext(patch('ax3l.app.ReportBackground.EventLogDb', return_value=self.log))
+        self.refresh = self.enterContext(patch('ax3l.app.ReportBackground.ReportingRefresh')).return_value
+        self.refresh.refresh.return_value = dict(
+            games_played=0, moves_made=0, simulations_submitted=0, experiment_cycles=0, all_time_high_score=None)
         self.snake.get_run_summary.return_value = dict(id=123, run_id=self.run_id, high_score=1,
             project_version='2.0.0', completed_at=None, high_score_snapshot=game_frames()[-1])
         self.snake.get_highscore_frames.return_value = game_frames()
@@ -298,14 +300,15 @@ class AnimationReportTests(unittest.TestCase):
                 raise TimeoutError('Test did not release GIF worker')
             return game_frames()
 
-        def totals():
+        def totals(**kwargs):
             totals_started.set()
             if not release.wait(5):
                 raise TimeoutError('Test did not release totals worker')
-            return dict(games_played=2, moves_made=4)
+            return dict(games_played=2, moves_made=4, simulations_submitted=1,
+                        experiment_cycles=1, all_time_high_score=12)
 
         self.snake.get_highscore_frames.side_effect = retrieve
-        self.snake.get_episode_totals.side_effect = totals
+        self.refresh.refresh.side_effect = totals
         try:
             # These requests must complete while both workers are still blocked.
             for path in ('/', f'/simulations/{self.run_id}', '/health', '/'):
@@ -319,7 +322,7 @@ class AnimationReportTests(unittest.TestCase):
             self.assertTrue(gif_started.wait(1))
             self.assertTrue(totals_started.wait(1))
             self.snake.get_highscore_frames.assert_called_once_with(self.run_id)
-            self.snake.get_episode_totals.assert_called_once_with()
+            self.refresh.refresh.assert_called_once_with(initialize=True)
         finally:
             release.set()
 
@@ -327,13 +330,14 @@ class AnimationReportTests(unittest.TestCase):
         started, release = Event(), Event()
         self.addCleanup(release.set)
 
-        def cycles():
+        def cycles(**kwargs):
             started.set()
             if not release.wait(5):
                 raise TimeoutError('Test did not release experiment history')
-            return 100
+            return dict(games_played=2, moves_made=4, simulations_submitted=1,
+                        experiment_cycles=100, all_time_high_score=12)
 
-        self.log.experiment_cycles.side_effect = cycles
+        self.refresh.refresh.side_effect = cycles
         try:
             for path in ('/', '/health', '/'):
                 with urlopen(self.base + path, timeout=1) as response:
@@ -341,7 +345,7 @@ class AnimationReportTests(unittest.TestCase):
                 if path == '/':
                     self.assertIn('Completed Experiments: —', page)
             self.assertTrue(started.wait(1))
-            self.log.experiment_cycles.assert_called_once_with()
+            self.refresh.refresh.assert_called_once_with(initialize=True)
         finally:
             release.set()
 

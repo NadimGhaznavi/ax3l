@@ -73,19 +73,40 @@ class ScoreDistributionTests(unittest.TestCase):
         self.assertEqual(images[-1].getpixel((x, 150)), blue)
         self.assertEqual(data, render_distribution(scores))
 
-    def test_null_zero_and_incomplete_id_blocks(self):
+    def test_null_zero_and_missing_ids_preserve_reached_checkpoints(self):
         scores = {1: 9, 2: 0}
         self.assertEqual(distribution_frames(scores)[-1][1], [9, 0])
         missing = {number: None for number in range(1, 1001) if number != 50}
         frames = distribution_frames(missing)
-        self.assertEqual(len(frames), 3)
-        self.assertEqual(frames[1][0], 'Simulations #1–1000')
-        self.assertEqual(len(frames[1][1]), 999)
+        self.assertEqual(len(frames), 4)
+        self.assertEqual(frames[1][0], 'Simulations #1–500')
+        self.assertEqual(len(frames[1][1]), 499)
+        self.assertEqual(frames[2][0], 'Simulations #1–1000')
+        self.assertEqual(len(frames[2][1]), 999)
         for scores in ({}, {1: None}, {1: 0}, missing):
             gif = Image.open(BytesIO(render_distribution(scores)))
             self.assertEqual(gif.n_frames, len(distribution_frames(scores)))
             gif.seek(gif.n_frames - 1)
             self.assertEqual(gif.info['duration'], 5000)
+
+    def test_second_encoded_frame_shows_first_500_range_despite_missing_id(self):
+        scores = {number: 0 for number in range(2, 1055)}
+        gif = Image.open(BytesIO(render_distribution(scores)))
+        self.assertEqual(gif.n_frames, 4)
+        palette = gif.copy()
+        gif.seek(1)
+        self.assertEqual(gif.info['duration'], 2000)
+        # Compare the decoded frame's range label to independently drawn text.
+        expected = Image.new('RGB', gif.size, '#101720')
+        from PIL import ImageFont
+        from ax3l.activity.ScoreDistribution import FONT
+        ImageDraw.Draw(expected).text((24, 56), 'Simulations #1–500',
+                                      font=ImageFont.truetype(str(FONT), 14), fill='#d5dfeb')
+        expected = expected.quantize(palette=palette, dither=Image.Dither.NONE).convert('RGB')
+        self.assertEqual(gif.convert('RGB').crop((24, 56, 250, 80)).tobytes(),
+                         expected.crop((24, 56, 250, 80)).tobytes())
+        self.assertEqual(distribution_frames({1001: 0})[1:3],
+                         [('Simulations #1–500', []), ('Simulations #1–1000', [])])
 
     def test_final_y_scale_includes_partial_block_and_is_used_throughout(self):
         scores = {number: number % 50 for number in range(1, 501)}

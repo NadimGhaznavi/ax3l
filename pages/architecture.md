@@ -70,8 +70,9 @@ including during digestion.
 
 GIFs loop forever at 75 ms per move by default, holding the final frame for
 1 second before restarting. Each food pickup inserts a stationary sequence at
-50 ms per frame: the snake moves onto the food at its previous length, and a
-darker shade of the food colour travels from head to tail. The captured growth
+50 ms per frame: the snake moves onto the food at its previous length and shows
+the replacement food for one move interval before digestion starts. The new food
+stays visible while a darker shade of the food colour travels from head to tail. The captured growth
 appears on the next captured move: the head advances and the visible tail stays
 in place with its normal body colour. The pickup's full-length board is skipped
 so the previous tail square does not flash after digestion. If the game ends

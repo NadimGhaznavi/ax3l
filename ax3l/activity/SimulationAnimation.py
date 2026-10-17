@@ -8,7 +8,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 
 class SimulationAnimation:
-    VERSION = 6
+    VERSION = 7
     FINAL_FRAME_DURATION_MS = 1000
     FOOD_FRAME_DURATION_MS = 50
     CELL_SIZE = 32
@@ -54,9 +54,12 @@ class SimulationAnimation:
                 digestion_head = None
             if (previous is not None and board["score"] > previous["score"]
                     and board["snake_head"] == previous["food"]):
-                # Move onto the food at the old length, delaying growth and new food.
-                eating = {**board, "snake_body": board["snake_body"][:-1],
-                          "food": None, "score": previous["score"]}
+                # Show replacement food before digestion, delaying only growth.
+                eating = {**board, "snake_body": board["snake_body"][:-1]}
+                image = cls._board(eating)
+                image.info["duration"] = duration_ms
+                image.info["score"] = board["score"]
+                yield image
                 for segment in range(1 + len(eating["snake_body"])):
                     image = cls._board(eating, segment)
                     image.info["duration"] = cls.FOOD_FRAME_DURATION_MS

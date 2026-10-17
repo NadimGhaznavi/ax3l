@@ -150,7 +150,8 @@ class SimulationRunReportTests(unittest.TestCase):
         snake.get_highscore_frames.return_value = None
         self.enterContext(patch('ax3l.app.ReportBackground.SnakeLab', return_value=snake))
         self.enterContext(patch('ax3l.app.ReportBackground.DbMgr'))
-        self.enterContext(patch('ax3l.app.ReportBackground.EventLogDb', return_value=log))
+        self.enterContext(patch('ax3l.app.ReportBackground.ReportingRefresh')).return_value.refresh.return_value = dict(
+            games_played=0, moves_made=0, simulations_submitted=0, experiment_cycles=0, all_time_high_score=None)
         snake.get_high_score.return_value = 0
         snake.get_num_sims.return_value = 1
         snake.get_episode_totals.return_value = {'games_played': 0, 'moves_made': 0}

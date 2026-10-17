@@ -15,18 +15,17 @@ PLOT = (90, 110, 775, 350)
 
 
 def distribution_frames(scores: dict[int, int | None]) -> list[tuple[str, list[int | None]]]:
-    """Accumulate scores through complete ID blocks, retaining unscored submissions."""
+    """Emit reached ID checkpoints even when earlier simulation records have gaps."""
     rows = sorted(scores.items())
-    groups = {}
-    for run_id, score in rows:
-        groups.setdefault((run_id - 1) // BLOCK_SIZE, []).append(score)
     frames = [('Before simulation #1', [])]
     cumulative = []
-    for block, values in sorted(groups.items()):
-        cumulative.extend(values)
-        if len(values) == BLOCK_SIZE:
-            last = (block + 1) * BLOCK_SIZE
-            frames.append((f'Simulations #1–{last}', cumulative.copy()))
+    position = 0
+    maximum_id = rows[-1][0] if rows else 0
+    for last in range(BLOCK_SIZE, maximum_id + 1, BLOCK_SIZE):
+        while position < len(rows) and rows[position][0] <= last:
+            cumulative.append(rows[position][1])
+            position += 1
+        frames.append((f'Simulations #1–{last}', cumulative.copy()))
     label = f'All simulations #{rows[0][0]}–{rows[-1][0]}' if rows else 'All simulations'
     frames.append((label, [score for _, score in rows]))
     return frames

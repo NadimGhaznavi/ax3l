@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+This release celebrates the Cree language. This is the **ayēnānēwosāp** (18) release.
+
+- Show replacement food before the snake's digestion animation starts, keep it
+  visible throughout digestion, and resume movement afterward. Regenerate cached GIFs.
+
 ## [3.0.0] - 2026-10-17 @ 00:39
 
 This release celebrates the Cree language. This is the **tēpakohposāp** (17) release.

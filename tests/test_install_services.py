@@ -176,6 +176,9 @@ exec /usr/bin/systemd-analyze "$@"
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.app / '.venv').stat().st_mode & 0o777, 0o755)
         self.assertTrue((self.app / 'ax3l/app/ReportBackground.py').is_file())
+        self.assertTrue((self.app / 'ax3l/app/ReportingDb.py').is_file())
+        self.assertTrue((self.app / 'ax3l/app/ReportingRefresh.py').is_file())
+        self.assertTrue((self.app / 'ax3l/activity/CompletedRounds.py').is_file())
         self.assertIn('systemctl start qwen-server-dev.service', self.log.read_text())
 
     def test_provisioning_failures_do_not_stop_services(self):

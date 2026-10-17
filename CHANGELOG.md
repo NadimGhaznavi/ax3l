@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+This release celebrates the Cree language. This is the **tēpakohposāp** (17) release.
+
+- Add Ax3l-owned reporting tables with automatic initial extraction and incremental
+  updates. Count games, moves, and all-time high scores from completed runs only;
+  preserve submitted-run and completed-experiment semantics. Keep all source
+  tables and SnakeLab unchanged, and provide a reporting-only rebuild command.
+- Refresh reporting counters independently of SnakeLab control-service status.
+
+- Preserve cumulative score-distribution checkpoints when simulation IDs have
+  gaps, so the #1–500 frame is shown once simulation #500 has been reached.
+
 ## [2.8.2] - 2026-10-12 @ 22:00
 
 This release celebrates th eCree language. The number 5 in Cree is *niyānan*

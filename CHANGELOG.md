@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+The **Webb** release is named for the *James Webb Space Telescope*.
+
 ### Summary
 
 Centralize listener defaults in `CMDB_NETWORK` and preserve production network

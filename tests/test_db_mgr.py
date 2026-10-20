@@ -1,6 +1,6 @@
-"""Integration checks against the disposable ax3l_dev MariaDB database.
+"""Integration checks against the disposable ax3l_test MariaDB database.
 
-Load its DB_* environment variables and set AX3L_TEST_DEV_DB=1 to run.
+Load its DB_* environment variables and set AX3L_TEST_DB=1 to run.
 """
 
 import os
@@ -38,10 +38,10 @@ class EventVersionTests(unittest.TestCase):
         db._connection.rollback.assert_called_once()
 
 
-@unittest.skipUnless(os.environ.get("AX3L_TEST_DEV_DB") == "1", "requires DEV MariaDB")
+@unittest.skipUnless(os.environ.get("AX3L_TEST_DB") == "1", "requires disposable MariaDB test database")
 class DbMgrTests(unittest.TestCase):
     def setUp(self):
-        self.assertEqual(os.environ["DB_NAME"], "ax3l_dev")
+        self.assertEqual(os.environ["DB_NAME"], "ax3l_test")
         from ax3l.app.DbMgr import DbMgr
 
         self.db = DbMgr()

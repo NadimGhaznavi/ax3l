@@ -1,4 +1,4 @@
-"""Verify production configuration creation, validation, and restart semantics."""
+"""Verify local configuration creation, validation, and restart semantics."""
 
 import json
 from pathlib import Path

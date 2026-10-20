@@ -1,4 +1,4 @@
-"""Run with AX3L_TEST_DEV_DB=1 and the disposable DEV DB_* credentials."""
+"""Run with AX3L_TEST_DB=1 and the disposable test DB_* credentials."""
 
 import os
 from pathlib import Path
@@ -12,10 +12,10 @@ from ax3l.app.snakelab.GenerateDefaultConfig import GenerateDefaultConfig
 from ax3l.app.snakelab.SnakeLabDb import CONFIGURATION_COLUMNS, CONFIGURATION_FIELDS, _config_values
 
 
-@unittest.skipUnless(os.environ.get("AX3L_TEST_DEV_DB") == "1", "requires DEV MariaDB")
+@unittest.skipUnless(os.environ.get("AX3L_TEST_DB") == "1", "requires disposable MariaDB test database")
 class SnakeLabDbTests(unittest.TestCase):
     def setUp(self):
-        self.assertEqual(os.environ["DB_NAME"], "ax3l_dev")
+        self.assertEqual(os.environ["DB_NAME"], "ax3l_test")
         initialization = patch.object(
             DbMgr, "_initialize_event_tables",
             side_effect=AssertionError("External connections must not initialize tables"),

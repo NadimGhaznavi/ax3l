@@ -47,7 +47,7 @@ The MCP tool framework is a feature of llama.cpp and is well supported by the Qw
 - Caches reporting totals in memory. Views schedule a background refresh when the cache is older than 60 seconds, using a separate worker from GIF generation and control-service status. Reports show the last successful totals during refreshes and database outages, or an em dash before the first result. Missing captures and transport failures are retried at most once per minute when viewed. Completed background results appear on the next view or browser refresh.
 - Caches control-service status independently, refreshing stale results on views after 60 seconds, so a control-service timeout cannot hold up reporting counters. Direct HTTP database reads do not initialize tables. The event query limits the latest 500 events before joining their details; operations taking at least one second are logged for diagnosis.
 
-With the selected installation's `DB_*` environment loaded, reporting can also
+With the installation's `DB_*` environment loaded, reporting can also
 be populated before serving views:
 
 ```bash
@@ -82,7 +82,7 @@ use 10 ms ticks; cumulative rounding alternates 80 and 70 ms move delays to
 preserve the requested average speed.
 The reporting entry point accepts
 `--gif-dir` (default `/opt/prod/ax3l/games`) and `--gif-duration-ms` (at least
-10 ms). The production service keeps GIFs in
+10 ms). The reporting service keeps GIFs in
 `/opt/prod/ax3l/games`. This directory is writable through systemd's
 `ReadWritePaths` even with `ProtectSystem=strict`. Removing a cached GIF causes
 it to be regenerated on the next view. Old Snake Lab runs are not backfilled.

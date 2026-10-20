@@ -9,13 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Remove retired installation artifacts and environment-specific references from
+  source, tests, and documentation, including obsolete setup examples in this log.
+  MariaDB integration checks now use `AX3L_TEST_DB=1` and require the disposable
+  `ax3l_test` database.
+
 ## [3.1.0] - 2026-10-20 @ 04:57
 
 The **Webb** release is named for the *James Webb Space Telescope*.
 
 ### Summary
 
-Centralize listener defaults in `CMDB_NETWORK` and preserve production network
+Centralize listener defaults in `CMDB_NETWORK` and preserve local network
 overrides in `conf/ax3l.json`, following MyCount's configuration model.
 
 - Rename the Qwen2.5 model option from `qwenv` to `qwen2.5` and its unit to
@@ -32,9 +37,9 @@ overrides in `conf/ax3l.json`, following MyCount's configuration model.
   regenerate listener arguments and internal URLs, and restart services without
   reinstalling dependencies. Share unit rendering with installation.
 
-- Use the existing production configuration for every installation; remove
-  DEV/QA ports, paths, service variants, and the health-only LLM stub.
-- Keep local install, upgrade, uninstall, and service helpers without `-env`;
+- Use one configuration for every installation; remove environment-specific
+  ports, paths, service variants, and the health-only LLM stub.
+- Keep local install, upgrade, uninstall, and service helpers;
   use `/opt/prod/ax3l`, `/etc/ax3l/database.env`, and the `ax3l` accounts/database.
   Deployment between machines belongs to DevOps. Database backup and reset
   utilities use this same configuration.
@@ -162,7 +167,7 @@ The **Philippa** release is dedicated to [Philippa Fawcett](https://en.wikipedia
 
 ### Changed
 
-- Load the Qwen 3.5 4B vision projector in generated production systemd services and require it before service installation.
+- Load the Qwen 3.5 4B vision projector in generated systemd services and require it before service installation.
 - Document Qwen 3.5 4B vision projector conversion, installation, server loading, and capability verification.
 
 ## [2.3.14] - 2026-10-01 @ 17:20
@@ -266,11 +271,11 @@ The **Philippa** release is dedicated to [Philippa Fawcett](https://en.wikipedia
 
 ### Removed
 
-- Remove Ax3l's static HTTP health endpoint and its production, dev, and QA port constants. Ax3l continues to serve tool requests over ZeroMQ; the dev/QA LLM health stub remains available.
+- Remove Ax3l's static HTTP health endpoint and its port constants. Ax3l continues to serve tool requests over ZeroMQ.
 
 ### Added
 
-- Make the watchdog restart inactive or failed Ax3l, reporting, and selected model services, and recover repeated LLM health failures with startup grace and journal logging limited to problems and recovery. Successful watchdog checks and dev/QA LLM stub health requests remain silent.
+- Make the watchdog restart inactive or failed Ax3l, reporting, and selected model services, and recover repeated LLM health failures with startup grace and journal logging limited to problems and recovery. Successful watchdog checks remain silent.
 
 - Add coding guidelines adapted from R3el for Ax3l's architecture and development practices, including changelog updates, and direct repository agents to follow them through `AGENTS.md`.
 
@@ -330,7 +335,7 @@ The **Philippa** release is dedicated to [Philippa Fawcett](https://en.wikipedia
 
 ### HotFix Summary
 
-This release addresses the scenario (reached at simulation number 885 in QA) where all legal choices for a finite parameter space, such as sequence length, have already been tried. Ax3l skips that parameter and advances to the next round-robin step. Exhaustion is checked against the current seed and otherwise identical settings, so a change to either can make choices available again.
+This release addresses the scenario (reached at simulation number 885) where all legal choices for a finite parameter space, such as sequence length, have already been tried. Ax3l skips that parameter and advances to the next round-robin step. Exhaustion is checked against the current seed and otherwise identical settings, so a change to either can make choices available again.
 
 ### Fixed
 
@@ -380,7 +385,7 @@ This release addresses the scenario (reached at simulation number 885 in QA) whe
 
 ### Added
 
-- Add manual local Ax3l database backups using the configured DEV or PROD database name.
+- Add manual local Ax3l database backups using the configured database name.
 
 ### Changed
 
@@ -510,7 +515,7 @@ This release addresses the scenario (reached at simulation number 885 in QA) whe
 
 - Configure Qwen3.5 with `DQwen.CONTEXT_SIZE` (8196 tokens) and a 5-second startup delay, matching the existing QwenV settings. Pass the context size to llama-server on installation and upgrade.
 
-- Reduced number of epochs to 500 to support a fast PROD smoke test.
+- Reduced number of epochs to 500 to support a fast smoke test.
 
 ### Removed
 
@@ -548,7 +553,7 @@ This release addresses the scenario (reached at simulation number 885 in QA) whe
 
 ### Added
 
-- Add `scripts/wipe-db.sh -env dev|qa|prod` to stop Ax3l and SnakeLab and clear both event and simulation data in one transaction. Schemas and accounts remain intact; services remain stopped.
+- Add `scripts/wipe-db.sh` to stop Ax3l and SnakeLab and clear both event and simulation data in one transaction. Schemas and accounts remain intact; services remain stopped.
 
 ## [0.98.10] - 2026-09-12 @ 16:02
 
@@ -574,7 +579,7 @@ This release addresses the scenario (reached at simulation number 885 in QA) whe
 
 - Make the first single-parameter prompt explicitly require one numeric `submit_single_value` tool call, include constraints from the JSON spec, and limit the change to the selected parameter.
 
-- Explicitly enable llama-server’s Jinja tool-calling support for all production models. Unexpected tool responses now report the received function names, finish reason, and captured reply event ID.
+- Explicitly enable llama-server’s Jinja tool-calling support for all models. Unexpected tool responses now report the received function names, finish reason, and captured reply event ID.
 
 ## [0.98.6] - 2026-09-12 @ 15:05
 
@@ -592,7 +597,7 @@ This release addresses the scenario (reached at simulation number 885 in QA) whe
 
 ### Added
 
-- Load external SnakeLab database settings from `snakelab.env` beside Ax3l’s `database.env`. Production upgrades validate the required settings before stopping services; the existing Ax3l credentials file remains unchanged.
+- Load external SnakeLab database settings from `snakelab.env` beside Ax3l’s `database.env`. Upgrades validate the required settings before stopping services; the existing Ax3l credentials file remains unchanged.
 
 ### Changed
 
@@ -618,11 +623,11 @@ This release addresses the scenario (reached at simulation number 885 in QA) whe
 
 - Ax3l logs each decoded MCP tool request as `tool_request_received`, including its sender, target, method, protocol version, and payload, before dispatch or validation. Unknown methods are logged too; logging failure prevents execution.
 
-- Ax3l now runs a shared ZeroMQ listener and handles single-value proposals: JSON-spec legality checks return `InvalidValue`, duplicate golden or historical configurations return `NoDupesSingle`, and legal unique candidates are submitted once. Added `is_config_unique()` to the SnakeLab DAL using full JSON equality across all runs. Deployment assigns separate DEV/QA/PROD endpoints, installs the JSON spec, and runs Ax3l from its provisioned virtual environment.
+- Ax3l now runs a shared ZeroMQ listener and handles single-value proposals: JSON-spec legality checks return `InvalidValue`, duplicate golden or historical configurations return `NoDupesSingle`, and legal unique candidates are submitted once. Added `is_config_unique()` to the SnakeLab DAL using full JSON equality across all runs. Deployment installs the JSON spec and runs Ax3l from its provisioned virtual environment.
 
 - Added the SnakeLab `submit_single_value` MCP tool and shared `ZMQMsg`/`ZMQClient` boundary. The tool forwards the parameter and numeric value to Ax3l and returns its reply without domain validation or automatic retries. The Ax3l handler remains a separate step.
 
-- Added the SnakeLab stdio MCP entry point and generated `mcp.json` registration. Production Qwen, Phi, and QwenV launches pass that config to llama-server; installation provisions the MCP SDK in the application's virtual environment. Domain tools will be registered in the new server module.
+- Added the SnakeLab stdio MCP entry point and generated `mcp.json` registration. Qwen, Phi, and QwenV launches pass that config to llama-server; installation provisions the MCP SDK in the application's virtual environment. Domain tools will be registered in the new server module.
 
 - The active first iteration seeds an empty Snake Lab database, waits for idle, and sends FirstContact, GoldenConfig, LossPlot, and the learning-rate introduction in one request. Each exact message snapshot is logged as a conversation-linked prompt event; the reply ends the iteration.
 
@@ -652,7 +657,7 @@ This release addresses the scenario (reached at simulation number 885 in QA) whe
 
 ### Added
 
-- Installed the system Python ZeroMQ dependency in DEV and PROD. Services using `/usr/bin/python3` require Debian's `python3-zmq` package (`sudo apt-get install python3-zmq`) for the Snake Lab status query; listing `pyzmq` in `requirements.txt` alone does not install it.
+- Installed the system Python ZeroMQ dependency. Services using `/usr/bin/python3` require Debian's `python3-zmq` package (`sudo apt-get install python3-zmq`) for the Snake Lab status query; listing `pyzmq` in `requirements.txt` alone does not install it.
 
 ## [0.8.0] - 2026-09-12 @ 11:10
 
@@ -744,7 +749,7 @@ This release addresses the scenario (reached at simulation number 885 in QA) whe
 
 ### Changed
 
-- Reporting now listens on `0.0.0.0` by default, including under systemd. The production event log is available at `http://neuromancer.osoyalce.com:28870/`. Use `--host 127.0.0.1` for local-only access.
+- Reporting now listens on `0.0.0.0` by default, including under systemd. The event log is available at `http://neuromancer.osoyalce.com:28870/`. Use `--host 127.0.0.1` for local-only access.
 
 ## [0.6.0] - 2026-09-12 @ 09:00
 
@@ -758,17 +763,7 @@ This release addresses the scenario (reached at simulation number 885 in QA) whe
 
 #### Service startup
 
-- Production `ax3l-server` now starts the haiku loop against the local LLM while serving `/health`. Systemd supplies database credentials and a writable capture directory at `/var/lib/ax3l/haiku`. Stopping the service interrupts the loop and records conversation end. DEV/QA retain health-only startup because their model services are inference-free stubs.
-
-Deploy from the updated checkout on PROD:
-
-```bash
-scripts/upgrade.sh -env prod -model qwenv
-```
-
-The loop starts automatically; stop any manually launched loop before upgrading.
-Use `systemctl stop ax3l-server` to stop it. Jinja2 and PyMySQL must be available
-to `/usr/bin/python3`; the upgrade does not install Python dependencies.
+- `ax3l-server` now starts the haiku loop against the local LLM while serving `/health`. Systemd supplies database credentials and a writable capture directory at `/var/lib/ax3l/haiku`. Stopping the service interrupts the loop and records conversation end.
 
 ## [0.5.0] - 2026-09-12 @ 08:52
 
@@ -778,18 +773,6 @@ to `/usr/bin/python3`; the upgrade does not install Python dependencies.
 
 - Added a Jinja2 event-log page at `/` with chronological log lines and a Refresh button, showing the latest 500 events. `/health` remains available. Deployment includes the HTML template; the Python environment needs `Jinja2` from `requirements.txt`.
 
-To run the DEV reporting page from the checkout:
-
-```bash
-set -a
-. prod_etc/ax3l/database.env
-set +a
-python3 -m ax3l.server.ReportingServer --port 28868
-```
-
-Open `http://127.0.0.1:28868/` on that machine. Use `--host 0.0.0.0` to listen
-on the network for access from another machine.
-
 - Integrated `DbMgr.log()` into the haiku loop for linked conversation, prompt, full response, wait, and failure events. Load `DB_*` credentials before running; file capture remains available.
 
 - Added `DbMgr.log()` to atomically store an event envelope and message, returning the event ID with optional process and parent-event links.
@@ -798,7 +781,7 @@ on the network for access from another machine.
 
 ### Added
 
-- Added `DbMgr` with MariaDB connection ownership, generic parameterized SQL methods, and transaction support. Initialization creates shared event envelope, message, list-item, and key/value tables. Verified against the disposable DEV database.
+- Added `DbMgr` with MariaDB connection ownership, generic parameterized SQL methods, and transaction support. Initialization creates shared event envelope, message, list-item, and key/value tables. Verified against a disposable database.
 
 - Added a minimal SnakeLab haiku loop with a shared prompt class and LLM HTTP interface. Saves requests, complete response bodies, headers, and a run log; waits five seconds between requests.
 
@@ -808,7 +791,7 @@ From the project root, run:
 
 ```bash
 set -a
-. /etc/ax3l/database.env  # DEV: use prod_etc/ax3l/database.env instead
+. /etc/ax3l/database.env
 set +a
 python3 -m ax3l.app.snakelab.main-loop --url http://neuromancer.osoyalce.com:27770
 ```
@@ -838,7 +821,7 @@ output root. HTTP or transport errors are logged and stop the loop.
 
 - Added `phi-server` alongside the renamed `qwen-server`, sharing the LLM port with mutually exclusive systemd units. Service control, installation, and upgrade accept `-model qwen|phi` (default Qwen); upgrade removes legacy `llm-server` units.
 
-- Added `scripts/upgrade.sh -env dev|qa|prod` to update application modules and systemd units from the current checkout while preserving the database, credentials, and accounts.
+- Added `scripts/upgrade.sh` to update application modules and systemd units from the current checkout while preserving the database, credentials, and accounts.
 
 ### Changed
 
@@ -862,9 +845,9 @@ output root. HTTP or transport errors are logged and stop the loop.
 
 ### Changed
 
-- Production LLM now binds to `DLlama.HOST` (`0.0.0.0`) to allow connections from the dev machine.
+- LLM now binds to `DLlama.HOST` (`0.0.0.0`) to allow connections from another machine.
 
-- QA now uses the health-only LLM stub alongside dev, without requiring llama.cpp or a model. Production launches the real server using the executable and model paths from `DLlama` and `DQwen`.
+- Model services launch the real server using the executable and model paths from `DLlama` and `DQwen`.
 
 ## [0.1.1] - 2026-09-12 @ 03:15
 
@@ -878,23 +861,21 @@ output root. HTTP or transport errors are logged and stop the loop.
 
 - Added a Scripts reference page, linked from the project home page, covering setup, service control, uninstall, and release commands.
 
-- Added `scripts/services.sh -env dev|qa|prod start|stop`: starts the LLM, waits `DQwen.STARTUP_SECONDS` (7 seconds), then starts reporting, Ax3l, and watchdog. Shutdown uses the reverse order; service installation and uninstall follow the same ordering.
+- Added `scripts/services.sh start|stop`: starts the LLM, waits `DQwen.STARTUP_SECONDS` (7 seconds), then starts reporting, Ax3l, and watchdog. Shutdown uses the reverse order; service installation and uninstall follow the same ordering.
 
-- Added four environment-specific systemd services: LLM, Ax3l, reporting, and watchdog. Dev runs health-only Ax3l/reporting skeletons and an explicitly labeled LLM health stub under `ax3l_dev`; the watchdog reports Ax3l systemd state and LLM health to the journal.
+- Added four systemd services: LLM, Ax3l, reporting, and watchdog. The watchdog reports Ax3l systemd state and LLM health to the journal.
 
-- Added `scripts/install-services.sh -env dev|qa|prod` to render unit templates, copy Python modules, and enable/start the selected environment's services. Uninstall now stops, disables, and removes those units.
+- Added `scripts/install-services.sh` to render unit templates, copy Python modules, and enable/start services. Uninstall now stops, disables, and removes those units.
 
-- Added `scripts/uninstall.sh` with a required `-env dev|qa|prod` flag to remove the selected installation, credentials, MariaDB database/account, and Linux service account/group.
+- Added `scripts/uninstall.sh` to remove the installation, credentials, MariaDB database/account, and Linux service account/group.
 
-- Added `scripts/install.sh` with a required `-env dev|qa|prod` flag to create installation directories, provision local MariaDB databases and accounts (`ax3l_dev`, `ax3l_qa`, or `ax3l`), and generate owner-only credentials. Existing credentials are reused and database login is verified.
+- Added `scripts/install.sh` to create installation directories, provision the local MariaDB database and account, and generate owner-only credentials. Existing credentials are reused and database login is verified.
 
-- Added dev installation support using `ax3l_prod/` and `prod_etc/`, with sudo for Linux account and directory setup and optional sudo for MariaDB provisioning. QA and production installations require root.
-
-- Installation creates a Linux system user and group if absent (`ax3l_dev` for dev, `ax3l` for QA/prod), with no home directory or interactive login, and assigns application-directory ownership to that account and group.
+- Installation creates a Linux system user and group if absent, with no home directory or interactive login, and assigns application-directory ownership to that account and group.
 
 ### Changed
 
-- Excluded disposable dev installation and credentials directories from Git.
+- Excluded local installation artifacts and credentials from Git.
 
 ## [0.0.4] - 2026-09-12 @ 01:11
 

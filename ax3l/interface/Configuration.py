@@ -1,4 +1,4 @@
-"""Create and resolve the production network configuration."""
+"""Create and resolve the local network configuration."""
 
 from ipaddress import IPv4Address
 import json

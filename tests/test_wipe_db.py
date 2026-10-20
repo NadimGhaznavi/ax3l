@@ -57,7 +57,7 @@ class WipeDbTests(unittest.TestCase):
         self.assertNotIn('ALTER TABLE', calls)
         self.assertNotIn('Cleared ', result.stdout)
 
-    def test_environment_selection_does_nothing(self):
-        result, calls, sql = self.run_script('-env', 'prod')
+    def test_unexpected_arguments_do_nothing(self):
+        result, calls, sql = self.run_script('-unknown', 'value')
         self.assertEqual(result.returncode, 2)
         self.assertEqual((calls, sql), ('', ''))

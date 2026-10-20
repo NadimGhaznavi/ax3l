@@ -1,6 +1,6 @@
-"""Reporting backfill, incremental processing, and atomicity on DEV MariaDB.
+"""Reporting backfill, incremental processing, and atomicity on MariaDB.
 
-Use AX3L_TEST_DEV_DB=1 and the disposable ax3l_dev DB_* environment.
+Use AX3L_TEST_DB=1 and the disposable ax3l_test DB_* environment.
 Temporary source/projection tables keep fixtures separate from persistent data.
 """
 
@@ -31,13 +31,13 @@ class CompletedRoundsTests(unittest.TestCase):
             dict(parameter_index=2, first_completion=True)], 3, 1, 1), (2, 0))
 
 
-@unittest.skipUnless(os.environ.get("AX3L_TEST_DEV_DB") == "1", "requires DEV MariaDB")
+@unittest.skipUnless(os.environ.get("AX3L_TEST_DB") == "1", "requires disposable MariaDB test database")
 class ReportingRefreshTests(unittest.TestCase):
     def setUp(self):
-        self.assertEqual(os.environ["DB_NAME"], "ax3l_dev")
+        self.assertEqual(os.environ["DB_NAME"], "ax3l_test")
         self.db = DbMgr()
         self.addCleanup(self.db.close)
-        self.enterContext(patch.object(DSnakeLab, 'DATABASE', 'ax3l_dev'))
+        self.enterContext(patch.object(DSnakeLab, 'DATABASE', 'ax3l_test'))
         self.reports = ReportingDb(self.db)
         self.reports.initialize()
         for table in ('report_runs', 'report_events', 'report_turns', 'report_state'):
@@ -201,10 +201,10 @@ class ReportingRefreshTests(unittest.TestCase):
         self.assertEqual(self.refresh.refresh(), totals)
 
 
-@unittest.skipUnless(os.environ.get("AX3L_TEST_DEV_DB") == "1", "requires DEV MariaDB")
+@unittest.skipUnless(os.environ.get("AX3L_TEST_DB") == "1", "requires disposable MariaDB test database")
 class ReportingSerializationTests(unittest.TestCase):
     def test_state_lock_serializes_connections_and_releases_on_rollback(self):
-        self.assertEqual(os.environ['DB_NAME'], 'ax3l_dev')
+        self.assertEqual(os.environ['DB_NAME'], 'ax3l_test')
         db = DbMgr(initialize_event_tables=False)
         self.addCleanup(db.close)
         ReportingDb(db).initialize()

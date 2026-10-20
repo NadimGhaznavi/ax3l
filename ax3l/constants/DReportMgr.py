@@ -8,4 +8,3 @@ class DReportMgr:
     BACKGROUND_REFRESH_SECONDS: Final[int] = 60
     SIMULATION_BUCKET_SIZE: Final[int] = 20
     REQUEST_TIMEOUT_SECONDS: Final[int] = 30
-    PORT: Final[int] = 28870

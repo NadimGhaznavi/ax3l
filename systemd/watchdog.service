@@ -9,7 +9,7 @@ Group=root
 WorkingDirectory=@APP@
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONDONTWRITEBYTECODE=1
-ExecStart=/usr/bin/python3 -m ax3l.server.Watchdog --ax3l-unit ax3l-server.service --llm-unit @MODEL@-server.service --report-unit reporting-server.service --llm-health-url http://127.0.0.1:@LLM_PORT@/health
+ExecStart=/usr/bin/python3 -m ax3l.server.Watchdog --ax3l-unit ax3l-server.service --llm-unit @MODEL@-server.service --report-unit reporting-server.service --llm-health-url @LLM_URL@/health
 Restart=on-failure
 RestartSec=10
 NoNewPrivileges=true

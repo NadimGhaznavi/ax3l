@@ -14,8 +14,8 @@ class ModelServicesTests(unittest.TestCase):
     def test_vision_command_and_missing_projector(self):
         from ax3l.constants.DQwenV import DQwenV
 
-        installer = (ROOT / 'scripts/install-services.sh').read_text()
-        production = installer.split('llm_paths=', 1)[1].split('\n\n[[ -d $install_dir', 1)[0]
+        installer = (ROOT / 'scripts/service-configuration.sh').read_text()
+        production = installer.split('llm_paths=', 1)[1].split('\n}', 1)[0]
         with tempfile.TemporaryDirectory() as folder:
             directory = Path(folder)
             shutil.copytree(ROOT / 'ax3l/constants', directory / 'ax3l/constants')
@@ -36,7 +36,7 @@ class ModelServicesTests(unittest.TestCase):
                 f'checkout_dir={shlex.quote(folder)}\n'
                 f'config_dir={shlex.quote(folder)}\n'
                 f'install_dir={shlex.quote(folder)}\n'
-                'selected_model=qwenv\nllm_port=27770\nllm_paths='
+                'selected_model=qwenv\nllm_port=27770\nllm_host=0.0.0.0\nllm_paths='
                 + production + '\nprintf "%s\\n" "$qwenv_command"\n'
             )
             result = subprocess.run(['bash', '-c', command], capture_output=True, text=True)
@@ -56,7 +56,8 @@ class ModelServicesTests(unittest.TestCase):
             values = {
                 'USER': 'nobody', 'MODEL': 'qwen',
                 'APP': str(ROOT), 'CONFIG': '/tmp/ax3l-test', 'LLM_PORT': '27770',
-                'REPORT_PORT': '28870',
+                'REPORT_PORT': '28870', 'REPORT_HOST': '0.0.0.0',
+                'LLM_URL': 'http://127.0.0.1:27770',
                 'AX3L_ZMQ_ENDPOINT': 'tcp://127.0.0.1:61970',
                 'AX3L_ARGS': '--llm-url http://127.0.0.1:27770 --output /var/lib/ax3l/snakelab',
                 'QWEN_COMMAND': '/usr/bin/true --model /models/Qwen.gguf',

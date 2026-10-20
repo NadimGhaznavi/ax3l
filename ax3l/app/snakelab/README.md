@@ -66,7 +66,9 @@ over ZeroMQ using the project-wide `ax3l/zmq/ZMQMsg.py` and `ZMQClient.py`:
 }
 ```
 
-The default endpoint is `DAx3l.ZMQ_ENDPOINT` (`tcp://127.0.0.1:61970`).
+The default endpoint comes from the `zmq` network binding in
+`/opt/prod/ax3l/conf/ax3l.json`, falling back to `DAx3l.CMDB_NETWORK`
+(`tcp://127.0.0.1:61970`).
 Override it with `AX3L_ZMQ_ENDPOINT` in the MCP process environment, including through the `env` entry in `mcp.json`.
 Ax3l replies with the same envelope shape and an application result in `payload`;
 the tool returns that payload as JSON text without changing acceptance or rejection.
@@ -78,7 +80,7 @@ the tool.
 Ax3l starts `ZMQServer` and keeps it available
 while the LLM request runs. Domain dispatch lives in `server/ToolHandler.py`;
 SnakeLab validation and submission live in `SubmitSingleValueHandler.py`.
-The listener uses port 61970; Ax3l passes its endpoint to each private MCP session.
+The listener uses the configured `zmq` binding; Ax3l passes its endpoint to each private MCP session.
 `--zmq-endpoint` overrides the listener endpoint for manual runs.
 
 The handler verifies the exact payload fields, finite numeric values, parameter

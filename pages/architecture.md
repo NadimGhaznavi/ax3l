@@ -87,6 +87,12 @@ The reporting entry point accepts
 `ReadWritePaths` even with `ProtectSystem=strict`. Removing a cached GIF causes
 it to be regenerated on the next view. Old Snake Lab runs are not backfilled.
 
+Network bindings are declared in `DAx3l.CMDB_NETWORK` and overridden in
+`/opt/prod/ax3l/conf/ax3l.json`. The configuration interface validates the
+file once per process through `Network`. Installation and the network restart
+helper render all service units from those same values, including the model
+URL passed to Ax3l and the watchdog. See [network configuration](/pages/scripts.html#network-configuration).
+
 ## Watchdog service
 
 - Checks Ax3l, reporting, and the model selected during service installation every 10 seconds; restarts inactive or failed units through systemd.

@@ -19,6 +19,7 @@ There is no environment selector or DEV/QA service variant.
 | `install.sh` | Creates the installation, accounts, database, and credentials, then installs and starts the services. | `sudo scripts/install.sh` |
 | `upgrade.sh` | Updates modules and service units, preserving the database, credentials, and accounts. | `sudo scripts/upgrade.sh` |
 | `install-services.sh` | Copies modules, installs six systemd units, and starts the selected model and application services. | `sudo scripts/install-services.sh` |
+| `restart.sh` | Validates network overrides, regenerates service units, and restarts the selected model and application services. | `sudo scripts/restart.sh` |
 | `services.sh` | Starts or stops services in dependency order. | `sudo scripts/services.sh start` or `sudo scripts/services.sh stop` |
 | `uninstall.sh` | Removes service units, installation, credentials, database/account, and Linux account/group. **Deletes Ax3l data.** | `sudo scripts/uninstall.sh` |
 | `backup-db.sh` | Dumps the configured Ax3l database to a private timestamped file. | `sudo scripts/backup-db.sh` |
@@ -27,8 +28,58 @@ There is no environment selector or DEV/QA service variant.
 MariaDB must already be running for database setup/removal. These operations
 use local root socket authentication.
 
-The listeners use TCP ports **27770** for the model, **28870** for reporting,
-and **61970** on loopback for Ax3l ZeroMQ.
+## Network configuration
+
+`DAx3l.CMDB_NETWORK` is the default inventory for CMDB discovery:
+
+| Use | Interface | TCP port |
+| --- | --- | --- |
+| `llm` | `0.0.0.0` | 27770 |
+| `report` | `0.0.0.0` | 28870 |
+| `zmq` | `127.0.0.1` | 61970 |
+
+Install and upgrade create `/opt/prod/ax3l/conf/ax3l.json` if missing and
+preserve existing files. The generated file contains all three entries;
+CMDB continues to discover the defaults in code. To change only the report
+server port, the file can contain:
+
+```json
+{
+  "network": {
+    "report": {
+      "port": 28871
+    }
+  }
+}
+```
+
+Each entry accepts an IPv4 `interface` and an integer `port` from 1 to 65535.
+Omitted entries and fields use the inventory defaults. A missing file also
+uses defaults. Unknown settings, invalid IPv4 addresses, invalid ports, and
+malformed JSON fail with a field-specific error.
+
+Edit the production file and apply it from the current release checkout:
+
+```sh
+sudoedit /opt/prod/ax3l/conf/ax3l.json
+sudo scripts/restart.sh
+```
+
+The restart helper validates the config and generated units before stopping
+services. It regenerates model, reporting, Ax3l, and watchdog units, reloads
+systemd, and restarts services in dependency order without installing code or
+Python dependencies. Use `sudo scripts/restart.sh -model phi` or
+`-model qwenv` for those models; Qwen is the default, as with upgrade.
+The helper stops all model services before starting the selected one.
+
+Use this helper when changing settings: a plain `systemctl restart` does not
+regenerate listener arguments or the model URLs in installed service units.
+Network values are cached per Python process and reloaded in new processes.
+Internal clients connect to `127.0.0.1` for a wildcard `0.0.0.0` binding.
+Reporting's `--host`/`--port`, Ax3l's `--zmq-endpoint`, and the MCP
+`AX3L_ZMQ_ENDPOINT` variable remain available for individual invocations.
+Database and SnakeLab connections retain their separate outbound settings.
+Uninstall removes the network config with the application directory.
 
 Startup order: **LLM → wait 7 seconds → reporting → Ax3l → watchdog**.
 The delay comes from `DQwen.STARTUP_SECONDS` or `DPhi.STARTUP_SECONDS`.

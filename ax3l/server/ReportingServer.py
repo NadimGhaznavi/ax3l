@@ -29,6 +29,7 @@ from ax3l.activity.SimulationMetrics import metrics
 from ax3l.constants.DReportMgr import DReportMgr
 from ax3l.constants.DLabel import FIELD_TO_LABEL_MAP
 from ax3l.interface.SnakeLab import SnakeLab
+from ax3l.interface.Network import Network
 
 
 def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIRECTORY,
@@ -345,17 +346,24 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
     return ReportServer((host, port), Handler)
 
 
-if __name__ == "__main__":
+def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Show the application event log.")
-    parser.add_argument("--port", type=int, required=True)
-    parser.add_argument("--host", default="0.0.0.0")
+    parser.add_argument("--port", type=int)
+    parser.add_argument("--host")
     parser.add_argument("--gif-dir", type=Path, default=DReportMgr.GIF_DIRECTORY)
     parser.add_argument("--gif-duration-ms", type=int, default=DReportMgr.GIF_DURATION_MS,
                         help="Move duration in milliseconds, at least 10 (rounded to GIF ticks)")
-    args = parser.parse_args()
-    with make_server(args.host, args.port, args.gif_dir, args.gif_duration_ms) as server:
-        print(f"Event log: http://{args.host}:{server.server_port}/", flush=True)
+    args = parser.parse_args(argv)
+    host, port = Network.binding("report")
+    host = args.host if args.host is not None else host
+    port = args.port if args.port is not None else port
+    with make_server(host, port, args.gif_dir, args.gif_duration_ms) as server:
+        print(f"Event log: http://{host}:{server.server_port}/", flush=True)
         try:
             server.serve_forever()
         except KeyboardInterrupt:
             pass
+
+
+if __name__ == "__main__":
+    main()

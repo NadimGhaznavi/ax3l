@@ -4,6 +4,7 @@ Only absolute host paths and EUID checks are redirected in the fixture script.
 Rendering, file copying, chmod, and systemd validation are real.
 Package/browser provisioning, ownership changes, and systemctl are simulated.
 """
+import json
 import os
 from pathlib import Path
 import shutil
@@ -28,11 +29,14 @@ class InstallServicesTests(unittest.TestCase):
         self.log = self.root / 'calls'
         self.bin = self.root / 'test-bin'
         self.bin.mkdir()
-        script = self.root / 'scripts/install-services.sh'
-        script.write_text(script.read_text().replace('$EUID', '$TEST_EUID')
-                          .replace('/opt/prod/ax3l', str(self.root / 'prod/ax3l'))
-                          .replace('config_dir=/etc/ax3l', f'config_dir={self.root}/etc/ax3l')
-                          .replace('/etc/systemd/system', str(self.units)))
+        for name in ('install-services.sh', 'service-configuration.sh', 'restart.sh'):
+            script = self.root / 'scripts' / name
+            script.write_text(script.read_text().replace('$EUID', '$TEST_EUID')
+                              .replace('/opt/prod/ax3l', str(self.root / 'prod/ax3l'))
+                              .replace('config_dir=/etc/ax3l', f'config_dir={self.root}/etc/ax3l')
+                              .replace('/etc/systemd/system', str(self.units)))
+        constants = self.root / 'ax3l/constants/DAx3l.py'
+        constants.write_text(constants.read_text().replace('/opt/prod/ax3l', str(self.root / 'prod/ax3l')))
         helper = self.root / 'scripts/services.sh'
         helper.write_text(helper.read_text().replace('$EUID', '$TEST_EUID'))
         constants = self.root / 'ax3l/constants/DLlama.py'
@@ -112,13 +116,13 @@ exec /usr/bin/systemd-analyze "$@"
                     path.chmod(0o700)
             (self.app / '.venv').chmod(0o700)
 
-    def run_installer(self, *args, fail='', euid=None):
+    def run_installer(self, *args, fail='', euid=None, script='install-services.sh'):
         env = dict(os.environ, PATH=f'{self.bin}:{os.environ["PATH"]}',
                    TEST_ROOT=str(self.root), TEST_LOG=str(self.log), TEST_FAIL=fail,
                    TEST_EUID=str(euid if euid is not None else 0),
                    PYTHONDONTWRITEBYTECODE='1')
         return subprocess.run(['bash', '-c', 'umask 077; exec bash "$@"', 'fixture',
-                               str(self.root / 'scripts/install-services.sh'), *args],
+                               str(self.root / 'scripts' / script), *args],
                               env=env, capture_output=True, text=True, timeout=30)
 
     def test_install_and_upgrade_all_models(self):
@@ -217,3 +221,44 @@ exec /usr/bin/systemd-analyze "$@"
             self.assertIn('first.', result.stderr)
             (self.root / 'models' / name).touch()
         self.assertFalse(self.log.exists())
+
+    def test_restart_applies_all_bindings_without_provisioning_and_preserves_config(self):
+        self.prepare(old=True)
+        path = self.app / 'conf/ax3l.json'
+        path.parent.mkdir()
+        content = json.dumps({'network': {
+            'llm': {'interface': '127.0.0.2', 'port': 27771},
+            'report': {'interface': '127.0.0.3', 'port': 28871},
+            'zmq': {'interface': '0.0.0.0', 'port': 61971},
+        }}, indent=4)
+        path.write_text(content)
+        result = self.run_installer('-model', 'phi', script='restart.sh')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(path.read_text(), content)
+        self.assertIn('--host 127.0.0.2 --port 27771', (self.units / 'phi-server.service').read_text())
+        self.assertIn('--host 127.0.0.3 --port 28871', (self.units / 'reporting-server.service').read_text())
+        application = (self.units / 'ax3l-server.service').read_text()
+        self.assertIn('--llm-url http://127.0.0.2:27771', application)
+        self.assertIn('--zmq-endpoint tcp://0.0.0.0:61971', application)
+        watchdog = (self.units / 'watchdog.service').read_text()
+        self.assertIn('--llm-unit phi-server.service', watchdog)
+        self.assertIn('--llm-health-url http://127.0.0.2:27771/health', watchdog)
+        calls = self.log.read_text()
+        self.assertNotIn('python ', calls)
+        self.assertLess(calls.index('verify'), calls.index('systemctl stop'))
+        self.assertLess(calls.index('systemctl daemon-reload'), calls.index('systemctl start phi-server'))
+
+    def test_invalid_config_leaves_services_and_file_untouched(self):
+        self.prepare(old=True)
+        path = self.app / 'conf/ax3l.json'
+        path.parent.mkdir()
+        path.write_text('{"network": {"llm": {"port": true}}}')
+        content = path.read_bytes()
+        for script in ('install-services.sh', 'restart.sh'):
+            with self.subTest(script=script):
+                result = self.run_installer(script=script)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn('network.llm.port', result.stderr)
+                self.assertFalse(self.log.exists())
+                self.assertEqual(path.read_bytes(), content)
+                self.assertEqual(list(self.units.iterdir()), [])

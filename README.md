@@ -1,6 +1,10 @@
 # ax3l
 Another AI Project
 
+Network defaults live in `DAx3l.CMDB_NETWORK`; production overrides live in
+`/opt/prod/ax3l/conf/ax3l.json`. See [network configuration](pages/scripts.md#network-configuration)
+for editing and restart instructions.
+
 Run `sudo scripts/backup-db.sh` for a manual backup of the local Ax3l database.
 It reads the database name from `/etc/ax3l/database.env` and writes a private,
 timestamped `*-db.dump` SQL file in the current directory. SnakeLab is not included.

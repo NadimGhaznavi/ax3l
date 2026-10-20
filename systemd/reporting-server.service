@@ -10,7 +10,7 @@ WorkingDirectory=@APP@
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONDONTWRITEBYTECODE=1
 EnvironmentFile=@CONFIG@/database.env
-ExecStart=@APP@/.venv/bin/python -m ax3l.server.ReportingServer --port @REPORT_PORT@ --gif-dir @APP@/games
+ExecStart=@APP@/.venv/bin/python -m ax3l.server.ReportingServer --host @REPORT_HOST@ --port @REPORT_PORT@ --gif-dir @APP@/games
 ReadWritePaths=@APP@/games
 NoNewPrivileges=true
 PrivateTmp=true

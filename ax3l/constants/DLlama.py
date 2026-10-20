@@ -6,6 +6,3 @@ class DLlama:
     SERVER: Final[str] = "llama-server"
 
     MODEL_DIR: Final[str] = "/opt/prod/models"
-
-    HOST: Final[str] = "0.0.0.0"
-    PORT: Final[int] = 27770

@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Centralize listener defaults in `CMDB_NETWORK` and preserve production network
+overrides in `conf/ax3l.json`, following MyCount's configuration model.
+
+- Add `llm`, `report`, and `zmq` inventory entries to `DAx3l.CMDB_NETWORK`;
+  remove the separate host, port, and endpoint constants.
+- Create and validate `/opt/prod/ax3l/conf/ax3l.json` during install/upgrade,
+  preserve custom files, and resolve omitted settings from defaults.
+- Resolve reporting and ZeroMQ defaults through the network interface,
+  including local client destinations for wildcard bindings.
+- Add `scripts/restart.sh [-model qwen|phi|qwenv]` to validate network settings,
+  regenerate listener arguments and internal URLs, and restart services without
+  reinstalling dependencies. Share unit rendering with installation.
+
 - Use the existing production configuration for every installation; remove
   DEV/QA ports, paths, service variants, and the health-only LLM stub.
 - Keep local install, upgrade, uninstall, and service helpers without `-env`;

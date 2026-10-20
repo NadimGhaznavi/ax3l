@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+The **Yohkoh** release is named for the Japanese solar observation satellite.
+
+- Declare Ax3l's MariaDB catalog in `DAx3l.CMDB_DATABASES` for CMDB discovery.
+
 - Remove retired installation artifacts and environment-specific references from
   source, tests, and documentation, including obsolete setup examples in this log.
   MariaDB integration checks now use `AX3L_TEST_DB=1` and require the disposable

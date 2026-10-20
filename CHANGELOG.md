@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.1] - 2026-10-20 @ 18:20
+
 The **Yohkoh** release is named for the Japanese solar observation satellite.
 
 - Declare Ax3l's MariaDB catalog in `DAx3l.CMDB_DATABASES` for CMDB discovery.

@@ -183,12 +183,12 @@ For each move, update imports, relevant test references, resource paths, and
 deployment file lists and copying rules. A module that works in the source
 checkout must also be included in the installed application.
 
-Run the tests relevant to the change. Use the real, disposable DEV MariaDB
-database for database development and integration checks. For changes to layer
-boundaries, verify
-contracts such as transaction atomicity, rollback, resource cleanup, error
-translation, and use of shared interfaces. Check entry points and asset
-loading when converting a module into a package.
+Run the tests relevant to the change. Use a real, disposable MariaDB test
+database for database development and integration checks. See the
+[test instructions](../README.md#tests) for credentials and opt-in settings.
+For changes to layer boundaries, verify contracts such as transaction atomicity,
+rollback, resource cleanup, error translation, and use of shared interfaces.
+Check entry points and asset loading when converting a module into a package.
 
 Distinguish new failures from existing failures. Report verification limits
 clearly, including when live database integration has not been tested.

@@ -25,9 +25,9 @@ SNAPSHOT = {"board": {"grid_size": [4, 3], "snake_head": [2, 1],
 
 
 class SimulationRunReportTests(unittest.TestCase):
-    @unittest.skipUnless(os.environ.get('AX3L_TEST_DEV_DB') == '1', 'requires DEV MariaDB')
+    @unittest.skipUnless(os.environ.get('AX3L_TEST_DB') == '1', 'requires disposable MariaDB test database')
     def test_mariadb_event_limit_with_temporary_fixtures(self):
-        self.assertEqual(os.environ['DB_NAME'], 'ax3l_dev')
+        self.assertEqual(os.environ['DB_NAME'], 'ax3l_test')
         db = DbMgr(initialize_event_tables=False)
         self.addCleanup(db.close)
         db.execute('''CREATE TEMPORARY TABLE events (
@@ -52,12 +52,12 @@ class SimulationRunReportTests(unittest.TestCase):
         self.assertEqual([event['event_id'] for event in events], list(range(505, 5, -1)))
         self.assertTrue(all(event['simulation_high_score'] == 38 for event in events))
 
-    @unittest.skipUnless(os.environ.get('AX3L_TEST_DEV_DB') == '1', 'requires DEV MariaDB')
+    @unittest.skipUnless(os.environ.get('AX3L_TEST_DB') == '1', 'requires disposable MariaDB test database')
     def test_mariadb_event_scores_with_different_database_collations(self):
-        self.assertEqual(os.environ['DB_NAME'], 'ax3l_dev')
+        self.assertEqual(os.environ['DB_NAME'], 'ax3l_test')
         db = DbMgr(initialize_event_tables=False)
         self.addCleanup(db.close)
-        # Temporary tables hide the older DEV event schema only for this connection.
+        # Temporary tables hide the existing event schema only for this connection.
         db.execute('''CREATE TEMPORARY TABLE events (
             event_id INTEGER, occurred_at DATETIME, name VARCHAR(100), category VARCHAR(50),
             log_level VARCHAR(10), process_id CHAR(36), source_name VARCHAR(255),
@@ -66,7 +66,7 @@ class SimulationRunReportTests(unittest.TestCase):
         db.execute('''CREATE TEMPORARY TABLE event_messages (event_id INTEGER, content TEXT)
             CHARACTER SET utf8mb4 COLLATE utf8mb4_uca1400_ai_ci''')
         runs = db.query(f'SELECT run_id, high_score FROM `{DSnakeLab.DATABASE}`.simulation_runs LIMIT 5')
-        self.assertTrue(runs, 'DEV SnakeLab needs at least one simulation for this check')
+        self.assertTrue(runs, 'SnakeLab needs at least one simulation for this check')
         for index, run in enumerate(runs):
             db.execute('''INSERT INTO events (event_id, category, name, process_id)
                 VALUES (%s, 'SnakeLab', 'simulation_completed', %s)''', (index, run['run_id']))

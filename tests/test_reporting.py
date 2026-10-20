@@ -1,4 +1,4 @@
-"""HTTP integration check using the disposable DEV event database."""
+"""HTTP integration check using the disposable test event database."""
 
 import os
 import json
@@ -213,10 +213,10 @@ class ExperimentStatusTests(unittest.TestCase):
             server.server_close()
 
 
-@unittest.skipUnless(os.environ.get("AX3L_TEST_DEV_DB") == "1", "requires DEV MariaDB")
+@unittest.skipUnless(os.environ.get("AX3L_TEST_DB") == "1", "requires disposable MariaDB test database")
 class ReportingTests(unittest.TestCase):
     def test_log_page_refresh_and_escaping(self):
-        self.assertEqual(os.environ["DB_NAME"], "ax3l_dev")
+        self.assertEqual(os.environ["DB_NAME"], "ax3l_test")
         from ax3l.app.DbMgr import DbMgr
         from ax3l.server.ReportingServer import make_server
         import zmq

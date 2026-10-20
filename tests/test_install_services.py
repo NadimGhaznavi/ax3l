@@ -32,11 +32,11 @@ class InstallServicesTests(unittest.TestCase):
         for name in ('install-services.sh', 'service-configuration.sh', 'restart.sh'):
             script = self.root / 'scripts' / name
             script.write_text(script.read_text().replace('$EUID', '$TEST_EUID')
-                              .replace('/opt/prod/ax3l', str(self.root / 'prod/ax3l'))
+                              .replace('/opt/prod/ax3l', str(self.root / 'app'))
                               .replace('config_dir=/etc/ax3l', f'config_dir={self.root}/etc/ax3l')
                               .replace('/etc/systemd/system', str(self.units)))
         constants = self.root / 'ax3l/constants/DAx3l.py'
-        constants.write_text(constants.read_text().replace('/opt/prod/ax3l', str(self.root / 'prod/ax3l')))
+        constants.write_text(constants.read_text().replace('/opt/prod/ax3l', str(self.root / 'app')))
         helper = self.root / 'scripts/services.sh'
         helper.write_text(helper.read_text().replace('$EUID', '$TEST_EUID'))
         constants = self.root / 'ax3l/constants/DLlama.py'
@@ -97,7 +97,7 @@ exec /usr/bin/systemd-analyze "$@"
         path.chmod(0o755)
 
     def prepare(self, old=False):
-        self.app = self.root / 'prod/ax3l'
+        self.app = self.root / 'app'
         self.config = self.root / 'etc/ax3l'
         self.app.mkdir(parents=True, exist_ok=True)
         self.config.mkdir(parents=True, exist_ok=True)
@@ -168,7 +168,7 @@ exec /usr/bin/systemd-analyze "$@"
                 self.assertIn('--output /var/lib/ax3l/snakelab', application)
                 selected = (self.units / f'{model}-server.service').read_text()
                 self.assertIn('--port 27770', selected)
-                self.assertNotIn('LLMHealthStub', selected)
+                self.assertIn(f'ExecStart={self.root}/llama.cpp/bin/llama-server ', selected)
                 self.assertIn(f'ReadWritePaths={self.app}/games', reporting)
                 self.assertTrue((self.app / 'games').is_dir())
                 self.assertTrue((self.app / 'ax3l/activity/SimulationAnimation.py').is_file())
@@ -205,8 +205,8 @@ exec /usr/bin/systemd-analyze "$@"
                 self.assertEqual(list(self.units.iterdir()), [])
 
     def test_invalid_arguments_and_wrong_user_do_not_touch_services(self):
-        for args, euid in [((), 1000), (('-env',), 0), (('-env', 'prod'), 0),
-                           (('-env', 'dev'), 0), (('-env', 'qa'), 0),
+        for args, euid in [((), 1000), (('-unknown',), 0), (('-unknown', 'value'), 0),
+                           (('-model',), 0), (('-model', 'qwen', 'extra'), 0),
                            (('-model', 'bad'), 0), (('-model', 'phi'), 1000)]:
             with self.subTest(args=args, euid=euid):
                 result = self.run_installer(*args, euid=euid)

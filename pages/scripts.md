@@ -12,7 +12,6 @@ Run these commands from the project checkout as root. Ax3l uses one
 configuration: `/opt/prod/ax3l`, `/etc/ax3l/database.env`, the `ax3l`
 MariaDB database/account, and the `ax3l` Linux service account. Deployment
 between machines is owned by DevOps; these helpers manage the local installation.
-There is no environment selector or DEV/QA service variant.
 
 | Script | Purpose | Command |
 | --- | --- | --- |
@@ -58,7 +57,7 @@ Omitted entries and fields use the inventory defaults. A missing file also
 uses defaults. Unknown settings, invalid IPv4 addresses, invalid ports, and
 malformed JSON fail with a field-specific error.
 
-Edit the production file and apply it from the current release checkout:
+Edit the configuration file and apply it from the current release checkout:
 
 ```sh
 sudoedit /opt/prod/ax3l/conf/ax3l.json
@@ -106,7 +105,7 @@ Upgrade and network restart also disable and remove the former
 
 Qwen2.5-VL uses `DQwen25.GGUF`, `DQwen25.MMPROJ`, and a 4096-token context.
 Place both GGUF files in `DLlama.MODEL_DIR` (`/opt/prod/models`) before starting
-`qwen2.5-server` in production. It uses the shared executable configured by
+`qwen2.5-server`. It uses the shared executable configured by
 `DLlama`, with `--mmproj`, `-c 4096`, and the existing host, port, and metrics options.
 All models use their bundled chat templates with Jinja enabled. The former
 Qwen2.5-VL tool-template override has been removed; use the default Qwen3.5 for

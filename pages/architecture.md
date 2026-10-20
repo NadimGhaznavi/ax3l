@@ -83,16 +83,21 @@ preserve the requested average speed.
 The reporting entry point accepts
 `--gif-dir` (default `/opt/prod/ax3l/games`) and `--gif-duration-ms` (at least
 10 ms). The production service keeps GIFs in
-`/opt/prod/ax3l/games`; DEV and QA use their own installed application's `games`
-directory. These directories are writable through systemd's
+`/opt/prod/ax3l/games`. This directory is writable through systemd's
 `ReadWritePaths` even with `ProtectSystem=strict`. Removing a cached GIF causes
 it to be regenerated on the next view. Old Snake Lab runs are not backfilled.
+
+Network bindings are declared in `DAx3l.CMDB_NETWORK` and overridden in
+`/opt/prod/ax3l/conf/ax3l.json`. The configuration interface validates the
+file once per process through `Network`. Installation and the network restart
+helper render all service units from those same values, including the model
+URL passed to Ax3l and the watchdog. See [network configuration](/pages/scripts.html#network-configuration).
 
 ## Watchdog service
 
 - Checks Ax3l, reporting, and the model selected during service installation every 10 seconds; restarts inactive or failed units through systemd.
 - Restarts the selected model after three consecutive failed `/health` checks, with a 60-second grace period at watchdog startup and after model restarts.
-- Logs only problems and recovery attempts to the systemd journal; successful polls are silent, including health requests to the dev/QA LLM stub. Runs as root to manage system services.
+- Logs only problems and recovery attempts to the systemd journal; successful polls are silent. Runs as root to manage system services.
 - Does not detect a stalled optimization loop in an otherwise active Ax3l process. Stop the watchdog before intentionally stopping individual services (`services.sh stop` does this automatically).
 - Reinstall services with `-model` when changing the model monitored by the watchdog.
 

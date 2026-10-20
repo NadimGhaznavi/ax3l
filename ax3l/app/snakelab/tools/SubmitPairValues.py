@@ -3,14 +3,14 @@
 import asyncio
 import json
 
-from ax3l.constants.DAx3l import DAx3l
+from ax3l.interface.Network import Network
 from ax3l.zmq.ZMQClient import ZMQClient
 from ax3l.zmq.ZMQMsg import ZMQMsg
 
 
 class SubmitPairValues:
-    def __init__(self, endpoint: str = DAx3l.ZMQ_ENDPOINT):
-        self._client = ZMQClient(endpoint)
+    def __init__(self, endpoint: str | None = None):
+        self._client = ZMQClient(endpoint if endpoint is not None else Network.endpoint(destination=True))
 
     async def submit(self, pair: str, value_1: int | float, value_2: int | float) -> str:
         response = await asyncio.to_thread(

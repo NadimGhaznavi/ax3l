@@ -48,7 +48,7 @@ service units and restart the model service to apply this to an existing install
 
 The installer installs the project requirements in `<app>/.venv`, used by both
 Ax3l and its MCP child processes. Installation needs Python's venv/pip support
-and package-index access for this step. DEV/QA retain their health-only LLM stubs.
+and package-index access for this step.
 
 `scripts/generate-mcp-config.py` remains available for standalone MCP testing;
 do not register its output with the web client's llama-server. Submission
@@ -66,9 +66,10 @@ over ZeroMQ using the project-wide `ax3l/zmq/ZMQMsg.py` and `ZMQClient.py`:
 }
 ```
 
-The default endpoint is `DAx3l.ZMQ_ENDPOINT` (`tcp://127.0.0.1:61970`), separate
-from Ax3l's HTTP health port. Override it with `AX3L_ZMQ_ENDPOINT` in the MCP
-process environment, including through the `env` entry in `mcp.json`.
+The default endpoint comes from the `zmq` network binding in
+`/opt/prod/ax3l/conf/ax3l.json`, falling back to `DAx3l.CMDB_NETWORK`
+(`tcp://127.0.0.1:61970`).
+Override it with `AX3L_ZMQ_ENDPOINT` in the MCP process environment, including through the `env` entry in `mcp.json`.
 Ax3l replies with the same envelope shape and an application result in `payload`;
 the tool returns that payload as JSON text without changing acceptance or rejection.
 `DZMQ.TIMEOUT_SECONDS` bounds send and receive waits. Transport failures propagate
@@ -76,12 +77,11 @@ as tool errors; calls are never retried automatically because a timed-out reques
 may already have been processed. No database or Snake Lab submission occurs in
 the tool.
 
-Ax3l starts `ZMQServer` alongside its HTTP health server and keeps it available
+Ax3l starts `ZMQServer` and keeps it available
 while the LLM request runs. Domain dispatch lives in `server/ToolHandler.py`;
 SnakeLab validation and submission live in `SubmitSingleValueHandler.py`.
-The installer assigns endpoint ports 61968 (DEV), 61969 (QA), and 61970 (PROD)
-to the listener; Ax3l passes its endpoint to each private MCP session. `--zmq-endpoint` overrides
-the listener endpoint for manual runs.
+The listener uses the configured `zmq` binding; Ax3l passes its endpoint to each private MCP session.
+`--zmq-endpoint` overrides the listener endpoint for manual runs.
 
 The handler verifies the exact payload fields, finite numeric values, parameter
 name, and JSON-schema constraints before building a candidate from the golden
@@ -186,17 +186,16 @@ When off, no capture output directory or files are created, including under
 console (the systemd journal for service runs). Existing captures are retained.
 
 From the checkout root, load the installed database credentials into the
-environment, then point the loop at the running model server. For DEV:
+environment, then point the loop at the running model server:
 
 ```sh
 set -a
-. prod_etc/ax3l/database.env
+. /etc/ax3l/database.env
 set +a
 .venv/bin/python -m ax3l.app.snakelab.main-loop --url http://HOST:27770
 ```
 
-On production, source `/etc/ax3l/database.env` instead. The Python environment
-must have the project's PyMySQL dependency installed.
+The Python environment must have the project's PyMySQL dependency installed.
 
 The loop records conversation start/end, prompt snapshots, full reply JSON, and
 LLM failures through `DbMgr.log()`. Events share a process ID printed in

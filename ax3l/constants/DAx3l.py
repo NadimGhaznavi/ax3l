@@ -11,8 +11,10 @@ class DAx3l:
     CMDB_CODENAME: Final[str] = "Ayenanewosap"
 
     BASE_DIR: Final[str] = "/opt/prod/ax3l"
-    BASE_DIR_QA: Final[str] = "/opt/qa/ax3l"
 
-    ZMQ_ENDPOINT: Final[str] = "tcp://127.0.0.1:61970"
-    ZMQ_ENDPOINT_DEV: Final[str] = "tcp://127.0.0.1:61968"
-    ZMQ_ENDPOINT_QA: Final[str] = "tcp://127.0.0.1:61969"
+    CONFIG_FILE: Final[str] = "conf/ax3l.json"
+    CMDB_NETWORK: Final[tuple[tuple[str, str, int], ...]] = (
+        ("llm", "0.0.0.0", 27770),
+        ("report", "0.0.0.0", 28870),
+        ("zmq", "127.0.0.1", 61970),
+    )

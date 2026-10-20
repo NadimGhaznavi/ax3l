@@ -17,6 +17,7 @@ from ax3l.constants.DEventCategory import DEventCategory
 
 from ax3l.constants.DSnakeLab import DSnakeLab
 from ax3l.constants.DAx3l import DAx3l
+from ax3l.interface.Network import Network
 from ax3l.interface.LLM import LLM
 from ax3l.interface.SnakeLab import SnakeLab
 
@@ -74,8 +75,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run the Snake Lab single-parameter optimization loop.")
     parser.add_argument("--url", required=True, help="LLM server base URL, e.g. http://host:27770")
     parser.add_argument("--output", type=Path, default=Path("tmp/snakelab"))
-    parser.add_argument("--zmq-endpoint", default=os.environ.get("AX3L_ZMQ_ENDPOINT", DAx3l.ZMQ_ENDPOINT))
+    parser.add_argument("--zmq-endpoint", default=None)
     args = parser.parse_args(argv)
+    if args.zmq_endpoint is None:
+        args.zmq_endpoint = os.environ.get("AX3L_ZMQ_ENDPOINT")
+    if args.zmq_endpoint is None:
+        args.zmq_endpoint = Network.endpoint(destination=True)
     output = args.output
     with ExitStack() as captures:
         if DAx3l.RAW_LOGS_ENABLED:

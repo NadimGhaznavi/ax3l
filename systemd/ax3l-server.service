@@ -1,5 +1,5 @@
 [Unit]
-Description=Ax3l ax3l-server (@ENV@)
+Description=Ax3l ax3l-server
 After=network.target mariadb.service
 
 [Service]
@@ -10,12 +10,12 @@ WorkingDirectory=@APP@
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONDONTWRITEBYTECODE=1
 Environment=BROWSER_PATH=@APP@/.chrome/browser
-Environment=XDG_CONFIG_HOME=/run/ax3l@SUFFIX@/chrome-config
-Environment=XDG_CACHE_HOME=/run/ax3l@SUFFIX@/chrome-cache
+Environment=XDG_CONFIG_HOME=/run/ax3l/chrome-config
+Environment=XDG_CACHE_HOME=/run/ax3l/chrome-cache
 EnvironmentFile=@CONFIG@/database.env
 ExecStart=@APP@/.venv/bin/python -m ax3l.server.Ax3lServer --zmq-endpoint @AX3L_ZMQ_ENDPOINT@ @AX3L_ARGS@
-StateDirectory=ax3l@SUFFIX@
-RuntimeDirectory=ax3l@SUFFIX@
+StateDirectory=ax3l
+RuntimeDirectory=ax3l
 KillSignal=SIGINT
 SuccessExitStatus=130
 NoNewPrivileges=true

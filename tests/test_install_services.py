@@ -4,6 +4,7 @@ Only absolute host paths and EUID checks are redirected in the fixture script.
 Rendering, file copying, chmod, and systemd validation are real.
 Package/browser provisioning, ownership changes, and systemctl are simulated.
 """
+import json
 import os
 from pathlib import Path
 import shutil
@@ -28,11 +29,14 @@ class InstallServicesTests(unittest.TestCase):
         self.log = self.root / 'calls'
         self.bin = self.root / 'test-bin'
         self.bin.mkdir()
-        script = self.root / 'scripts/install-services.sh'
-        script.write_text(script.read_text().replace('$EUID', '$TEST_EUID')
-                          .replace('/opt/$install_env/ax3l', str(self.root / '$install_env/ax3l'))
-                          .replace('config_dir=/etc/ax3l', f'config_dir={self.root}/etc/ax3l')
-                          .replace('/etc/systemd/system', str(self.units)))
+        for name in ('install-services.sh', 'service-configuration.sh', 'restart.sh'):
+            script = self.root / 'scripts' / name
+            script.write_text(script.read_text().replace('$EUID', '$TEST_EUID')
+                              .replace('/opt/prod/ax3l', str(self.root / 'prod/ax3l'))
+                              .replace('config_dir=/etc/ax3l', f'config_dir={self.root}/etc/ax3l')
+                              .replace('/etc/systemd/system', str(self.units)))
+        constants = self.root / 'ax3l/constants/DAx3l.py'
+        constants.write_text(constants.read_text().replace('/opt/prod/ax3l', str(self.root / 'prod/ax3l')))
         helper = self.root / 'scripts/services.sh'
         helper.write_text(helper.read_text().replace('$EUID', '$TEST_EUID'))
         constants = self.root / 'ax3l/constants/DLlama.py'
@@ -40,14 +44,13 @@ class InstallServicesTests(unittest.TestCase):
         self.executable(self.root / 'llama.cpp/bin/llama-server', '#!/bin/sh\nexit 0\n')
         from ax3l.constants.DQwen import DQwen
         from ax3l.constants.DPhi import DPhi
-        from ax3l.constants.DQwenV import DQwenV
-        self.models = {'qwen': DQwen.GGUF, 'phi': DPhi.GGUF, 'qwenv': DQwenV.GGUF}
-        self.projector = DQwenV.MMPROJ
+        from ax3l.constants.DQwen25 import DQwen25
+        self.models = {'qwen': DQwen.GGUF, 'phi': DPhi.GGUF, 'qwen2.5': DQwen25.GGUF}
+        self.projector = DQwen25.MMPROJ
         self.qwen_projector = DQwen.MMPROJ
         (self.root / 'models').mkdir()
         for name in [*self.models.values(), self.projector, self.qwen_projector]:
             (self.root / 'models' / name).touch()
-        self.executable(self.bin / 'sudo', '#!/bin/sh\nexec "$@"\n')
         self.executable(self.bin / 'sleep', '#!/bin/sh\nexit 0\n')
         self.executable(self.bin / 'systemctl', '''#!/bin/sh
 printf 'systemctl %s\n' "$*" >> "$TEST_LOG"
@@ -93,9 +96,9 @@ exec /usr/bin/systemd-analyze "$@"
         path.write_text(content)
         path.chmod(0o755)
 
-    def prepare(self, environment, old=False):
-        self.app = self.root / ('ax3l_prod' if environment == 'dev' else f'{environment}/ax3l')
-        self.config = self.root / ('prod_etc/ax3l' if environment == 'dev' else 'etc/ax3l')
+    def prepare(self, old=False):
+        self.app = self.root / 'prod/ax3l'
+        self.config = self.root / 'etc/ax3l'
         self.app.mkdir(parents=True, exist_ok=True)
         self.config.mkdir(parents=True, exist_ok=True)
         self.config.chmod(0o700)
@@ -113,89 +116,98 @@ exec /usr/bin/systemd-analyze "$@"
                     path.chmod(0o700)
             (self.app / '.venv').chmod(0o700)
 
-    def run_installer(self, *args, fail='', euid=None):
-        environment = args[1] if len(args) > 1 else 'dev'
+    def run_installer(self, *args, fail='', euid=None, script='install-services.sh'):
         env = dict(os.environ, PATH=f'{self.bin}:{os.environ["PATH"]}',
                    TEST_ROOT=str(self.root), TEST_LOG=str(self.log), TEST_FAIL=fail,
-                   TEST_EUID=str(euid if euid is not None else (1000 if environment == 'dev' else 0)),
+                   TEST_EUID=str(euid if euid is not None else 0),
                    PYTHONDONTWRITEBYTECODE='1')
         return subprocess.run(['bash', '-c', 'umask 077; exec bash "$@"', 'fixture',
-                               str(self.root / 'scripts/install-services.sh'), *args],
+                               str(self.root / 'scripts' / script), *args],
                               env=env, capture_output=True, text=True, timeout=30)
 
-    def test_install_and_upgrade_all_environments_and_models(self):
-        for environment, suffix in [('dev', '-dev'), ('qa', '-qa'), ('prod', '')]:
-            self.prepare(environment, old=True)
-            for model in self.models:
-                with self.subTest(environment=environment, model=model):
-                    self.log.write_text('')
-                    legacy = self.units / f'llm-server{suffix}.service'
-                    legacy.touch()
-                    result = self.run_installer('-env', environment, '-model', model)
-                    self.assertEqual(result.returncode, 0, result.stderr)
-                    self.assertFalse(legacy.exists())
-                    for name in ('qwen-server', 'phi-server', 'qwenv-server', 'ax3l-server', 'reporting-server', 'watchdog'):
-                        unit = self.units / f'{name}{suffix}.service'
-                        self.assertEqual(unit.stat().st_mode & 0o777, 0o644)
-                        self.assertNotIn('@', unit.read_text())
-                    watchdog = (self.units / f'watchdog{suffix}.service').read_text()
-                    self.assertIn(f'--llm-unit {model}-server{suffix}.service', watchdog)
-                    self.assertIn(f'--report-unit reporting-server{suffix}.service', watchdog)
-                    self.assertIn('User=root', watchdog)
-                    self.assertIn('Restart=on-failure', watchdog)
-                    self.assertEqual(self.credentials.stat().st_mode & 0o777, 0o600)
-                    self.assertEqual(self.credentials.read_text(), 'DB_PASSWORD=fixture-secret\n')
-                    self.assertEqual(self.config.stat().st_mode & 0o777, 0o750)
-                    self.assertFalse((self.config / 'mcp.json').exists())
-                    for name in ('qwen-server', 'phi-server', 'qwenv-server'):
-                        command = (self.units / f'{name}{suffix}.service').read_text()
-                        self.assertNotIn('--mcp-servers-config', command)
-                        if name == 'qwen-server' and environment == 'prod':
-                            self.assertIn(f'--mmproj {self.root}/models/{self.qwen_projector}', command)
-                    self.assertEqual((self.app / '.venv/lib/package.py').stat().st_mode & 0o777, 0o640)
-                    self.assertEqual((self.app / '.venv/bin/python').stat().st_mode & 0o777, 0o750)
-                    self.assertTrue((self.app / 'ax3l/app/snakelab/tools/__main__.py').is_file())
-                    reporting = (self.units / f'reporting-server{suffix}.service').read_text()
-                    self.assertIn(f'--gif-dir {self.app}/games', reporting)
-                    self.assertIn(f'ReadWritePaths={self.app}/games', reporting)
-                    self.assertTrue((self.app / 'games').is_dir())
-                    self.assertTrue((self.app / 'ax3l/activity/SimulationAnimation.py').is_file())
-                    self.assertTrue((self.app / 'ax3l/activity/fonts/DejaVuSansMono.ttf').is_file())
-                    self.assertTrue((self.app / 'ax3l/activity/fonts/LICENSE.txt').is_file())
-                    self.assertTrue((self.app / 'ax3l/interface/SimulationGifStore.py').is_file())
-                    self.assertTrue((self.app / 'ax3l/app/ReportBackground.py').is_file())
-                    calls = self.log.read_text()
-                    self.assertLess(calls.index('verify'), calls.index('systemctl stop'))
-                    self.assertIn(f'systemctl start {model}-server{suffix}.service', calls)
-                    self.assertIn(f'systemctl disable --now llm-server{suffix}.service', calls)
-                    self.assertIn('chgrp -R ax3l', calls)
+    def test_install_and_upgrade_all_models(self):
+        self.prepare(old=True)
+        for model in self.models:
+            with self.subTest(model=model):
+                self.log.write_text('')
+                legacy = self.units / 'llm-server.service'
+                legacy.touch()
+                former_qwen25 = self.units / 'qwenv-server.service'
+                former_qwen25.touch()
+                result = self.run_installer('-model', model)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertFalse(legacy.exists())
+                self.assertFalse(former_qwen25.exists())
+                for name in ('qwen-server', 'phi-server', 'qwen2.5-server', 'ax3l-server', 'reporting-server', 'watchdog'):
+                    unit = self.units / f'{name}.service'
+                    self.assertEqual(unit.stat().st_mode & 0o777, 0o644)
+                    self.assertNotIn('@', unit.read_text())
+                watchdog = (self.units / 'watchdog.service').read_text()
+                self.assertIn(f'--llm-unit {model}-server.service', watchdog)
+                self.assertIn('--report-unit reporting-server.service', watchdog)
+                self.assertIn('User=root', watchdog)
+                self.assertIn('Restart=on-failure', watchdog)
+                self.assertEqual(self.credentials.stat().st_mode & 0o777, 0o600)
+                self.assertEqual(self.credentials.read_text(), 'DB_PASSWORD=fixture-secret\n')
+                self.assertEqual(self.config.stat().st_mode & 0o777, 0o750)
+                self.assertFalse((self.config / 'mcp.json').exists())
+                for name in ('qwen-server', 'phi-server', 'qwen2.5-server'):
+                    command = (self.units / f'{name}.service').read_text()
+                    self.assertNotIn('--mcp-servers-config', command)
+                    if name == 'qwen-server':
+                        self.assertIn(f'--mmproj {self.root}/models/{self.qwen_projector}', command)
+                self.assertEqual((self.app / '.venv/lib/package.py').stat().st_mode & 0o777, 0o640)
+                self.assertEqual((self.app / '.venv/bin/python').stat().st_mode & 0o777, 0o750)
+                self.assertTrue((self.app / 'ax3l/app/snakelab/tools/__main__.py').is_file())
+                reporting = (self.units / 'reporting-server.service').read_text()
+                self.assertIn(f'--gif-dir {self.app}/games', reporting)
+                self.assertIn('--port 28870', reporting)
+                application = (self.units / 'ax3l-server.service').read_text()
+                self.assertIn('--zmq-endpoint tcp://127.0.0.1:61970', application)
+                self.assertIn('--llm-url http://127.0.0.1:27770', application)
+                self.assertIn('--output /var/lib/ax3l/snakelab', application)
+                selected = (self.units / f'{model}-server.service').read_text()
+                self.assertIn('--port 27770', selected)
+                self.assertNotIn('LLMHealthStub', selected)
+                self.assertIn(f'ReadWritePaths={self.app}/games', reporting)
+                self.assertTrue((self.app / 'games').is_dir())
+                self.assertTrue((self.app / 'ax3l/activity/SimulationAnimation.py').is_file())
+                self.assertTrue((self.app / 'ax3l/activity/fonts/DejaVuSansMono.ttf').is_file())
+                self.assertTrue((self.app / 'ax3l/activity/fonts/LICENSE.txt').is_file())
+                self.assertTrue((self.app / 'ax3l/interface/SimulationGifStore.py').is_file())
+                self.assertTrue((self.app / 'ax3l/app/ReportBackground.py').is_file())
+                calls = self.log.read_text()
+                self.assertLess(calls.index('verify'), calls.index('systemctl stop'))
+                self.assertIn(f'systemctl start {model}-server.service', calls)
+                self.assertIn('systemctl disable --now llm-server.service', calls)
+                self.assertIn('systemctl disable --now qwenv-server.service', calls)
+                self.assertIn('chgrp -R ax3l', calls)
 
     def test_fresh_install_and_default_model(self):
-        self.prepare('dev')
-        result = self.run_installer('-env', 'dev')
+        self.prepare()
+        result = self.run_installer()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.app / '.venv').stat().st_mode & 0o777, 0o755)
         self.assertTrue((self.app / 'ax3l/app/ReportBackground.py').is_file())
         self.assertTrue((self.app / 'ax3l/app/ReportingDb.py').is_file())
         self.assertTrue((self.app / 'ax3l/app/ReportingRefresh.py').is_file())
         self.assertTrue((self.app / 'ax3l/activity/CompletedRounds.py').is_file())
-        self.assertIn('systemctl start qwen-server-dev.service', self.log.read_text())
+        self.assertIn('systemctl start qwen-server.service', self.log.read_text())
 
     def test_provisioning_failures_do_not_stop_services(self):
-        self.prepare('dev')
+        self.prepare()
         for failure in ('pip', 'chrome', 'verify'):
             with self.subTest(failure=failure):
                 self.log.write_text('')
-                result = self.run_installer('-env', 'dev', fail=failure)
+                result = self.run_installer(fail=failure)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertNotIn('systemctl', self.log.read_text())
                 self.assertEqual(list(self.units.iterdir()), [])
 
     def test_invalid_arguments_and_wrong_user_do_not_touch_services(self):
-        for args, euid in [((), 1000), (('-env',), 1000), (('-env', 'bad'), 1000),
-                           (('-env', 'dev', '-model', 'bad'), 1000),
-                           (('-env', 'dev'), 0), (('-env', 'prod'), 1000),
-                           (('-env', 'qa'), 1000)]:
+        for args, euid in [((), 1000), (('-env',), 0), (('-env', 'prod'), 0),
+                           (('-env', 'dev'), 0), (('-env', 'qa'), 0),
+                           (('-model', 'bad'), 0), (('-model', 'phi'), 1000)]:
             with self.subTest(args=args, euid=euid):
                 result = self.run_installer(*args, euid=euid)
                 self.assertNotEqual(result.returncode, 0)
@@ -203,13 +215,54 @@ exec /usr/bin/systemd-analyze "$@"
                 self.assertFalse(self.log.exists())
 
     def test_missing_prerequisites_do_not_touch_services(self):
-        result = self.run_installer('-env', 'dev')
+        result = self.run_installer()
         self.assertIn('Run install.sh', result.stderr)
-        self.prepare('prod')
-        for name, model in [(self.projector, 'qwenv'), (self.qwen_projector, 'qwen'), (self.models['qwen'], 'qwen')]:
+        self.prepare()
+        for name, model in [(self.projector, 'qwen2.5'), (self.qwen_projector, 'qwen'), (self.models['qwen'], 'qwen')]:
             (self.root / 'models' / name).unlink()
-            result = self.run_installer('-env', 'prod', '-model', model)
+            result = self.run_installer('-model', model)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn('first.', result.stderr)
             (self.root / 'models' / name).touch()
         self.assertFalse(self.log.exists())
+
+    def test_restart_applies_all_bindings_without_provisioning_and_preserves_config(self):
+        self.prepare(old=True)
+        path = self.app / 'conf/ax3l.json'
+        path.parent.mkdir()
+        content = json.dumps({'network': {
+            'llm': {'interface': '127.0.0.2', 'port': 27771},
+            'report': {'interface': '127.0.0.3', 'port': 28871},
+            'zmq': {'interface': '0.0.0.0', 'port': 61971},
+        }}, indent=4)
+        path.write_text(content)
+        result = self.run_installer('-model', 'phi', script='restart.sh')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(path.read_text(), content)
+        self.assertIn('--host 127.0.0.2 --port 27771', (self.units / 'phi-server.service').read_text())
+        self.assertIn('--host 127.0.0.3 --port 28871', (self.units / 'reporting-server.service').read_text())
+        application = (self.units / 'ax3l-server.service').read_text()
+        self.assertIn('--llm-url http://127.0.0.2:27771', application)
+        self.assertIn('--zmq-endpoint tcp://0.0.0.0:61971', application)
+        watchdog = (self.units / 'watchdog.service').read_text()
+        self.assertIn('--llm-unit phi-server.service', watchdog)
+        self.assertIn('--llm-health-url http://127.0.0.2:27771/health', watchdog)
+        calls = self.log.read_text()
+        self.assertNotIn('python ', calls)
+        self.assertLess(calls.index('verify'), calls.index('systemctl stop'))
+        self.assertLess(calls.index('systemctl daemon-reload'), calls.index('systemctl start phi-server'))
+
+    def test_invalid_config_leaves_services_and_file_untouched(self):
+        self.prepare(old=True)
+        path = self.app / 'conf/ax3l.json'
+        path.parent.mkdir()
+        path.write_text('{"network": {"llm": {"port": true}}}')
+        content = path.read_bytes()
+        for script in ('install-services.sh', 'restart.sh'):
+            with self.subTest(script=script):
+                result = self.run_installer(script=script)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn('network.llm.port', result.stderr)
+                self.assertFalse(self.log.exists())
+                self.assertEqual(path.read_bytes(), content)
+                self.assertEqual(list(self.units.iterdir()), [])

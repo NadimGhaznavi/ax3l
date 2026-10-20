@@ -1,5 +1,5 @@
 [Unit]
-Description=Ax3l qwenv-server (@ENV@)
+Description=Ax3l qwen2.5-server
 After=network.target
 
 [Service]
@@ -9,7 +9,7 @@ Group=@USER@
 WorkingDirectory=@APP@
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONDONTWRITEBYTECODE=1
-ExecStart=@QWENV_COMMAND@
+ExecStart=@QWEN25_COMMAND@
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=true

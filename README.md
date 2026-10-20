@@ -2,8 +2,7 @@
 Another AI Project
 
 Run `sudo scripts/backup-db.sh` for a manual backup of the local Ax3l database.
-It reads the database name from `prod_etc/ax3l/database.env` in the checkout
-for DEV, or `/etc/ax3l/database.env` for PROD, and writes a private,
+It reads the database name from `/etc/ax3l/database.env` and writes a private,
 timestamped `*-db.dump` SQL file in the current directory. SnakeLab is not included.
 
 ## Development Style

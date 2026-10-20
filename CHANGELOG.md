@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Use the existing production configuration for every installation; remove
+  DEV/QA ports, paths, service variants, and the health-only LLM stub.
+- Keep local install, upgrade, uninstall, and service helpers without `-env`;
+  use `/opt/prod/ax3l`, `/etc/ax3l/database.env`, and the `ax3l` accounts/database.
+  Deployment between machines belongs to DevOps. Database backup and reset
+  utilities use this same configuration.
+
 ## [3.0.1] - 2026-10-17 @ 00:53
 
 This release celebrates the Cree language. This is the **ayēnānēwosāp** (18) release.

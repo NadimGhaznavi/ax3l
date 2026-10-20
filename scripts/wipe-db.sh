@@ -4,12 +4,12 @@ set -euo pipefail
 
 usage() {
     cat <<'HELP'
-Usage: sudo scripts/wipe-db.sh -env dev|qa|prod
+Usage: sudo scripts/wipe-db.sh
 
 Permanently deletes all Ax3l events and SnakeLab simulations on this machine.
 Includes event details/checkpoints, simulation episodes, and configurations.
-Targets ax3l_dev / ax3l_qa / ax3l according to -env, plus snakelab in every case.
-Stops the selected Ax3l, reporting, and watchdog services and snake-lab.service.
+Targets ax3l and snakelab.
+Stops the Ax3l, reporting, and watchdog services and snake-lab.service.
 Leaves them stopped. The model service is left running.
 Preserves table definitions, credentials, users, grants, and installations.
 Resets auto-increment counters so the next event and simulation IDs start at 1.
@@ -21,22 +21,17 @@ if [[ $# == 1 && ( $1 == -h || $1 == --help ) ]]; then
     usage
     exit 0
 fi
-if [[ $# != 2 || $1 != -env ]]; then
+if [[ $# != 0 ]]; then
     usage >&2
     exit 2
 fi
-case "$2" in
-    dev) database=ax3l_dev; suffix=-dev ;;
-    qa) database=ax3l_qa; suffix=-qa ;;
-    prod) database=ax3l; suffix= ;;
-    *) usage >&2; exit 2 ;;
-esac
+database=ax3l
 [[ $(id -u) == 0 ]] || { printf 'Run as root using sudo.\n' >&2; exit 1; }
 admin=(mariadb --no-defaults --protocol=socket --user=root --batch)
 # Check database access before stopping services. Do not print stored data.
 "${admin[@]}" --execute="SELECT 1 FROM \`$database\`.events LIMIT 0; SELECT 1 FROM snakelab.simulation_runs LIMIT 0;"
 
-for unit in "watchdog$suffix.service" "ax3l-server$suffix.service" "reporting-server$suffix.service" snake-lab.service; do
+for unit in "watchdog.service" "ax3l-server.service" "reporting-server.service" snake-lab.service; do
     if [[ $(systemctl show -p LoadState --value "$unit") != not-found ]]; then
         systemctl stop "$unit"
     fi
@@ -60,4 +55,4 @@ SQL
 "${admin[@]}" --execute="ALTER TABLE \`$database\`.events AUTO_INCREMENT = 1; ALTER TABLE snakelab.simulation_runs AUTO_INCREMENT = 1;"
 printf 'Cleared %s events and snakelab simulations; reset auto-increment counters. Services remain stopped.\n' "$database"
 printf 'Restart SnakeLab first: sudo systemctl start snake-lab.service\n'
-printf 'Then restart Ax3l: sudo systemctl start reporting-server%s.service ax3l-server%s.service watchdog%s.service\n' "$suffix" "$suffix" "$suffix"
+printf 'Then restart Ax3l: sudo systemctl start reporting-server.service ax3l-server.service watchdog.service\n'

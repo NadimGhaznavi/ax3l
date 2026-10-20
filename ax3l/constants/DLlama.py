@@ -9,5 +9,3 @@ class DLlama:
 
     HOST: Final[str] = "0.0.0.0"
     PORT: Final[int] = 27770
-    PORT_DEV: Final[int] = 27768
-    PORT_QA: Final[int] = 27769

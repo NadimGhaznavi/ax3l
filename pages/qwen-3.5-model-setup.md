@@ -116,7 +116,7 @@ Load both files with llama-server:
 ```
 
 For a systemd deployment, include the same `--mmproj` argument in the
-service's `ExecStart` command. Ax3l's `scripts/install-services.sh -env prod`
+service's `ExecStart` command. Ax3l's `sudo scripts/install-services.sh`
 includes this argument for Qwen 3.5 and requires the projector file above
 before installing the service. Stop the existing service before
 running the standalone command above to avoid a port conflict.

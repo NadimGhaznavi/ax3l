@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class WipeDbTests(unittest.TestCase):
-    def run_script(self, environment='prod', *, fail_stop=False, fail_wipe=False):
+    def run_script(self, *arguments, fail_stop=False, fail_wipe=False):
         with tempfile.TemporaryDirectory() as folder:
             directory = Path(folder)
             scripts = {
@@ -24,28 +24,26 @@ class WipeDbTests(unittest.TestCase):
             env = dict(os.environ, PATH=f'{folder}:{os.environ["PATH"]}',
                        CALLS=str(directory / 'calls'), SQL_FILE=str(directory / 'sql'),
                        FAIL_STOP=str(int(fail_stop)), FAIL_WIPE=str(int(fail_wipe)))
-            result = subprocess.run(['bash', str(ROOT / 'scripts/wipe-db.sh'), '-env', environment],
+            result = subprocess.run(['bash', str(ROOT / 'scripts/wipe-db.sh'), *arguments],
                                     env=env, capture_output=True, text=True)
             return result, (directory / 'calls').read_text() if (directory / 'calls').exists() else '', (directory / 'sql').read_text() if (directory / 'sql').exists() else ''
 
     def test_both_databases_cleared_after_services_stop(self):
-        for environment, database, suffix in (('dev', 'ax3l_dev', '-dev'), ('qa', 'ax3l_qa', '-qa'), ('prod', 'ax3l', '')):
-            with self.subTest(environment=environment):
-                result, calls, sql = self.run_script(environment)
-                self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertIn(f'service stop ax3l-server{suffix}.service', calls)
-                self.assertIn('service stop snake-lab.service', calls)
-                self.assertLess(calls.index('service stop snake-lab.service'), calls.rindex('db '))
-                self.assertIn(f'DELETE FROM `{database}`.events;', sql)
-                self.assertIn('DELETE FROM snakelab.simulation_runs;', sql)
-                self.assertTrue(sql.startswith('START TRANSACTION;'))
-                self.assertTrue(sql.endswith('COMMIT;\n'))
-                self.assertIn(f'ALTER TABLE `{database}`.events AUTO_INCREMENT = 1;', calls)
-                self.assertIn('ALTER TABLE snakelab.simulation_runs AUTO_INCREMENT = 1;', calls)
-                self.assertLess(calls.index('wipe committed'), calls.index('ALTER TABLE'))
-                self.assertNotIn('ALTER TABLE', sql)
-                self.assertNotIn('DROP ', sql)
-                self.assertNotIn('service start', calls)
+        result, calls, sql = self.run_script()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('service stop ax3l-server.service', calls)
+        self.assertIn('service stop snake-lab.service', calls)
+        self.assertLess(calls.index('service stop snake-lab.service'), calls.rindex('db '))
+        self.assertIn('DELETE FROM `ax3l`.events;', sql)
+        self.assertIn('DELETE FROM snakelab.simulation_runs;', sql)
+        self.assertTrue(sql.startswith('START TRANSACTION;'))
+        self.assertTrue(sql.endswith('COMMIT;\n'))
+        self.assertIn('ALTER TABLE `ax3l`.events AUTO_INCREMENT = 1;', calls)
+        self.assertIn('ALTER TABLE snakelab.simulation_runs AUTO_INCREMENT = 1;', calls)
+        self.assertLess(calls.index('wipe committed'), calls.index('ALTER TABLE'))
+        self.assertNotIn('ALTER TABLE', sql)
+        self.assertNotIn('DROP ', sql)
+        self.assertNotIn('service start', calls)
 
     def test_failed_stop_prevents_wipe(self):
         result, calls, sql = self.run_script(fail_stop=True)
@@ -59,7 +57,7 @@ class WipeDbTests(unittest.TestCase):
         self.assertNotIn('ALTER TABLE', calls)
         self.assertNotIn('Cleared ', result.stdout)
 
-    def test_invalid_environment_does_nothing(self):
-        result, calls, sql = self.run_script('unknown')
+    def test_environment_selection_does_nothing(self):
+        result, calls, sql = self.run_script('-env', 'prod')
         self.assertEqual(result.returncode, 2)
         self.assertEqual((calls, sql), ('', ''))

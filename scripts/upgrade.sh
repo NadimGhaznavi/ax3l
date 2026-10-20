@@ -4,15 +4,14 @@ set -euo pipefail
 
 usage() {
     cat <<'HELP'
-Usage: scripts/upgrade.sh -env dev|qa|prod [-model qwen|phi|qwenv]
+Usage: sudo scripts/upgrade.sh [-model qwen|phi|qwenv]
 
 Updates application modules and systemd units from the current checkout,
 then starts all four services in dependency order. Services are stopped
 before files are replaced. Existing database, credentials, and accounts
 are preserved; no MariaDB administrative access is needed.
 
-Run dev as the development user (uses sudo); QA/prod require root.
-Run install.sh first if this environment has not been installed.
+Run as root. Run install.sh first if Ax3l has not been installed.
 This does not pull Git changes or update llama.cpp or model files.
 HELP
 }
@@ -21,15 +20,15 @@ if [[ $# == 1 && ( $1 == -h || $1 == --help ) ]]; then
     usage
     exit 0
 fi
-if [[ ( $# != 2 && $# != 4 ) || $1 != -env ]]; then
+if [[ $# != 0 && $# != 2 ]]; then
     usage >&2
     exit 2
 fi
-case "$2" in
-    dev|qa|prod) ;;
-    *) usage >&2; exit 2 ;;
-esac
+if [[ $# == 2 && ( $1 != -model || ( $2 != qwen && $2 != phi && $2 != qwenv ) ) ]]; then
+    usage >&2
+    exit 2
+fi
 
 checkout_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 "$checkout_dir/scripts/install-services.sh" "$@"
-printf 'Upgraded %s from %s.\n' "$2" "$checkout_dir"
+printf 'Upgraded Ax3l from %s.\n' "$checkout_dir"

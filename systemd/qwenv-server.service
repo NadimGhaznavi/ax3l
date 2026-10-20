@@ -1,5 +1,5 @@
 [Unit]
-Description=Ax3l qwenv-server (@ENV@)
+Description=Ax3l qwenv-server
 After=network.target
 
 [Service]

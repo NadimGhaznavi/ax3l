@@ -4,26 +4,14 @@ set -euo pipefail
 
 usage() {
     cat <<'HELP'
-Usage: scripts/install.sh -env dev|qa|prod [-db-admin-sudo]
+Usage: sudo scripts/install.sh
 
-dev:  <checkout>/ax3l_prod and <checkout>/prod_etc/ax3l/database.env
-qa:   /opt/qa/ax3l and /etc/ax3l/database.env (requires root)
-prod: /opt/prod/ax3l and /etc/ax3l/database.env (requires root)
-
-Creates a local database and matching account:
-  dev: ax3l_dev    qa: ax3l_qa    prod: ax3l
-Run prod on the production machine to provision its local MariaDB server.
-Generates a password, creates the installation directory, and writes
-owner-only credentials.
-Creates a Linux system user/group if absent: ax3l_dev for dev, ax3l for QA/prod.
-These accounts have no home directory or interactive login. Each owns its
-installation directory. Dev uses sudo for Linux account and directory setup.
-Existing credentials are reused; existing account passwords are not reset.
-MariaDB must already be running. Its current administrative connection must
-have permission to create databases/users and grant database privileges.
-For dev, -db-admin-sudo additionally uses sudo for the MariaDB administrative client.
-Installs application modules and enables/starts all four systemd services.
-Production requires the llama.cpp binary and model configured in the constants.
+Prepares /opt/prod/ax3l, the ax3l Linux account/group, the local ax3l
+MariaDB database/account, and /etc/ax3l/database.env. Existing credentials
+are reused; existing account passwords are not reset. Requires root and
+MariaDB administrative access through local socket authentication.
+Installs application modules and enables/starts the model and application
+services. Requires the llama.cpp binary and model configured in constants.
 No release publication is performed.
 HELP
 }
@@ -37,45 +25,22 @@ if [[ $# == 1 && ( $1 == -h || $1 == --help ) ]]; then
     usage
     exit 0
 fi
-if [[ ( $# != 2 && $# != 3 ) || ${1:-} != -env ]]; then
+if [[ $# != 0 ]]; then
     usage >&2
     exit 2
 fi
-if [[ $# == 3 && $3 != -db-admin-sudo ]]; then
-    fail "Unknown option '$3'."
-fi
-install_env=$2
-case "$install_env" in
-    dev)
-        [[ $EUID != 0 ]] || fail "Run dev installation as the development user, not root."
-        checkout_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-        install_dir="$checkout_dir/ax3l_prod"
-        config_dir="$checkout_dir/prod_etc/ax3l"
-        ;;
-    qa|prod)
-        [[ $EUID == 0 ]] || fail "Environment '$install_env' requires root."
-        [[ $# == 2 ]] || fail "-db-admin-sudo is only supported for dev."
-        install_dir="/opt/$install_env/ax3l"
-        config_dir=/etc/ax3l
-        ;;
-    *) fail "Invalid environment '$install_env'; expected dev, qa, or prod." ;;
-esac
+[[ $EUID == 0 ]] || fail "Run installation as root."
+install_dir=/opt/prod/ax3l
+config_dir=/etc/ax3l
 
 command -v mariadb >/dev/null || fail "Install the MariaDB client first."
 command -v openssl >/dev/null || fail "Install openssl first."
 admin=(mariadb --protocol=socket)
-if [[ $# == 3 ]]; then
-    admin=(sudo mariadb --protocol=socket --user=root)
-fi
 
 DB_HOST=localhost
 DB_PORT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." &&
     python3 -c 'from ax3l.constants.DDbMgr import DDbMgr; print(DDbMgr.PORT)')
-case "$install_env" in
-    dev) DB_NAME=ax3l_dev ;;
-    qa) DB_NAME=ax3l_qa ;;
-    prod) DB_NAME=ax3l ;;
-esac
+DB_NAME=ax3l
 DB_USER=$DB_NAME
 # Underscores are wildcards in MariaDB database-level grants.
 grant_database=${DB_NAME//_/\\_}
@@ -94,34 +59,28 @@ if [[ -e "$credentials_file" ]]; then
        ${config_lines[2]} == "DB_NAME=$DB_NAME" &&
        ${config_lines[3]} == "DB_USER=$DB_USER" &&
        ${config_lines[4]} =~ ^DB_PASSWORD=([a-f0-9]{64})$ ]] ||
-        fail "Existing credentials do not match the '$install_env' installation contract."
+        fail "Existing credentials do not match the installation contract."
     DB_PASSWORD=${BASH_REMATCH[1]}
 else
     DB_PASSWORD=$(openssl rand -hex 32)
 fi
 
-# All SQL identifiers are fixed by the validated environment; the password is hex.
+# All SQL identifiers are fixed by the installation contract; the password is hex.
 # Check administrative access before creating files or directories.
 "${admin[@]}" --batch --skip-column-names -e 'SELECT 1' >/dev/null ||
-    fail "MariaDB administrative access failed; for dev, configure access or use -db-admin-sudo."
+    fail "MariaDB administrative access failed."
 
 umask 077
 mkdir -p -- "$config_dir"
-if [[ $install_env == dev ]]; then
-    service_account=ax3l_dev
-    system_admin=(sudo)
-else
-    service_account=ax3l
-    system_admin=()
-fi
+service_account=ax3l
 if ! getent group "$service_account" >/dev/null; then
-    "${system_admin[@]}" groupadd --system "$service_account"
+    groupadd --system "$service_account"
 fi
 if ! getent passwd "$service_account" >/dev/null; then
-    "${system_admin[@]}" useradd --system --gid "$service_account" --no-create-home \
+    useradd --system --gid "$service_account" --no-create-home \
         --home-dir /nonexistent --shell /usr/sbin/nologin "$service_account"
 fi
-"${system_admin[@]}" install -d -m 755 -o "$service_account" -g "$service_account" -- "$install_dir"
+install -d -m 755 -o "$service_account" -g "$service_account" -- "$install_dir"
 if [[ ! -e "$credentials_file" ]]; then
     # Keep the generated password if provisioning fails, so a rerun can recover.
     (
@@ -147,4 +106,4 @@ printf 'Installation directory ready: %s\n' "$install_dir"
 printf 'Credentials ready: %s\n' "$credentials_file"
 printf 'Verified local MariaDB account %s on database %s.\n' "$DB_USER" "$DB_NAME"
 
-"$(dirname -- "${BASH_SOURCE[0]}")/install-services.sh" -env "$install_env"
+"$(dirname -- "${BASH_SOURCE[0]}")/install-services.sh"

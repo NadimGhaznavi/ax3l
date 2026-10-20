@@ -8,8 +8,7 @@ usage() {
     cat <<'HELP'
 Usage: sudo scripts/backup-db.sh
 
-Backs up the local Ax3l database named in the checkout's
-prod_etc/ax3l/database.env (DEV), or /etc/ax3l/database.env (PROD).
+Backs up the local Ax3l database named in /etc/ax3l/database.env.
 Writes a private, timestamped SQL dump into the current directory.
 Uses MariaDB root socket authentication. Does not include SnakeLab.
 HELP
@@ -24,11 +23,7 @@ if [[ $# != 0 ]]; then
     exit 2
 fi
 
-checkout_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-config_file="$checkout_dir/prod_etc/ax3l/database.env"
-if [[ ! -f $config_file ]]; then
-    config_file=/etc/ax3l/database.env
-fi
+config_file=/etc/ax3l/database.env
 # Read only the database name; do not execute the credentials file.
 database=$(sed -n 's/^DB_NAME=//p' "$config_file")
 if [[ ! $database =~ ^[a-zA-Z0-9_]+$ ]]; then

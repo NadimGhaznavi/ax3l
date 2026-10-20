@@ -1,5 +1,5 @@
 [Unit]
-Description=Ax3l reporting-server (@ENV@)
+Description=Ax3l reporting-server
 After=network.target mariadb.service
 
 [Service]

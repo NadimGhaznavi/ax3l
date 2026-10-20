@@ -1,6 +1,6 @@
 [Unit]
 Description=Ax3l watchdog
-After=ax3l-server.service qwen-server.service phi-server.service qwenv-server.service
+After=ax3l-server.service qwen-server.service phi-server.service qwen2.5-server.service
 
 [Service]
 Type=simple

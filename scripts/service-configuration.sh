@@ -24,14 +24,14 @@ from pathlib import Path
 from ax3l.constants.DLlama import DLlama
 from ax3l.constants.DQwen import DQwen
 from ax3l.constants.DPhi import DPhi
-from ax3l.constants.DQwenV import DQwenV
+from ax3l.constants.DQwen25 import DQwen25
 
 print(Path(DLlama.BASE_DIR) / DLlama.BIN_DIR / DLlama.SERVER)
 print(Path(DLlama.MODEL_DIR) / DQwen.GGUF)
 print(Path(DLlama.MODEL_DIR) / DPhi.GGUF)
-print(Path(DLlama.MODEL_DIR) / DQwenV.GGUF)
-print(Path(DLlama.MODEL_DIR) / DQwenV.MMPROJ)
-print(DQwenV.CONTEXT_SIZE)
+print(Path(DLlama.MODEL_DIR) / DQwen25.GGUF)
+print(Path(DLlama.MODEL_DIR) / DQwen25.MMPROJ)
+print(DQwen25.CONTEXT_SIZE)
 print(DQwen.CONTEXT_SIZE)
 print(Path(DLlama.MODEL_DIR) / DQwen.MMPROJ)
 PY
@@ -40,19 +40,19 @@ PY
     llm_binary=${paths[0]}
     qwen_model=${paths[1]}
     phi_model=${paths[2]}
-    qwenv_model=${paths[3]}
-    qwenv_mmproj=${paths[4]}
-    qwenv_context=${paths[5]}
+    qwen25_model=${paths[3]}
+    qwen25_mmproj=${paths[4]}
+    qwen25_context=${paths[5]}
     qwen_context=${paths[6]}
     qwen_mmproj=${paths[7]}
     model=$qwen_model
     mmproj=$qwen_mmproj
     if [[ $selected_model == phi ]]; then model=$phi_model; fi
-    if [[ $selected_model == qwenv ]]; then
-        model=$qwenv_model
-        mmproj=$qwenv_mmproj
+    if [[ $selected_model == qwen2.5 ]]; then
+        model=$qwen25_model
+        mmproj=$qwen25_mmproj
     fi
-    if [[ $selected_model == qwen || $selected_model == qwenv ]]; then
+    if [[ $selected_model == qwen || $selected_model == qwen2.5 ]]; then
         [[ -r $mmproj ]] || {
             printf 'Install the vision projector at %s first.\n' "$mmproj" >&2
             exit 1
@@ -64,20 +64,20 @@ PY
     }
     qwen_command="$llm_binary --model $qwen_model --mmproj $qwen_mmproj -c $qwen_context --host $llm_host --port $llm_port --metrics --jinja"
     phi_command="$llm_binary --model $phi_model --host $llm_host --port $llm_port --metrics --jinja"
-    qwenv_command="$llm_binary --model $qwenv_model --mmproj $qwenv_mmproj -c $qwenv_context --host $llm_host --port $llm_port --metrics --jinja"
+    qwen25_command="$llm_binary --model $qwen25_model --mmproj $qwen25_mmproj -c $qwen25_context --host $llm_host --port $llm_port --metrics --jinja"
 }
 
 render_service_units() {
     unit_dir=$(mktemp -d)
     trap 'rm -rf -- "$unit_dir"' EXIT
     units=()
-    for name in qwen-server phi-server qwenv-server ax3l-server reporting-server watchdog; do
+    for name in qwen-server phi-server qwen2.5-server ax3l-server reporting-server watchdog; do
         unit="$name.service"
         units+=("$unit")
         sed -e "s|@USER@|$service_account|g" \
             -e "s|@APP@|$install_dir|g" -e "s|@CONFIG@|$config_dir|g" \
             -e "s|@QWEN_COMMAND@|$qwen_command|g" -e "s|@PHI_COMMAND@|$phi_command|g" \
-            -e "s|@QWENV_COMMAND@|$qwenv_command|g" -e "s|@MODEL@|$selected_model|g" \
+            -e "s|@QWEN25_COMMAND@|$qwen25_command|g" -e "s|@MODEL@|$selected_model|g" \
             -e "s|@REPORT_PORT@|$report_port|g" -e "s|@REPORT_HOST@|$report_host|g" \
             -e "s|@LLM_URL@|$llm_url|g" \
             -e "s|@AX3L_ZMQ_ENDPOINT@|$ax3l_zmq_endpoint|g" \
@@ -89,6 +89,11 @@ render_service_units() {
 }
 
 install_service_units() {
+    # Remove the former Qwen2.5 unit so it cannot start alongside the renamed service.
+    if [[ -f /etc/systemd/system/qwenv-server.service ]]; then
+        systemctl disable --now qwenv-server.service
+        rm -- /etc/systemd/system/qwenv-server.service
+    fi
     for unit in "${units[@]}"; do
         install -m 644 -- "$unit_dir/$unit" "/etc/systemd/system/$unit"
     done

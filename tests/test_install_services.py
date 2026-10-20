@@ -44,9 +44,9 @@ class InstallServicesTests(unittest.TestCase):
         self.executable(self.root / 'llama.cpp/bin/llama-server', '#!/bin/sh\nexit 0\n')
         from ax3l.constants.DQwen import DQwen
         from ax3l.constants.DPhi import DPhi
-        from ax3l.constants.DQwenV import DQwenV
-        self.models = {'qwen': DQwen.GGUF, 'phi': DPhi.GGUF, 'qwenv': DQwenV.GGUF}
-        self.projector = DQwenV.MMPROJ
+        from ax3l.constants.DQwen25 import DQwen25
+        self.models = {'qwen': DQwen.GGUF, 'phi': DPhi.GGUF, 'qwen2.5': DQwen25.GGUF}
+        self.projector = DQwen25.MMPROJ
         self.qwen_projector = DQwen.MMPROJ
         (self.root / 'models').mkdir()
         for name in [*self.models.values(), self.projector, self.qwen_projector]:
@@ -132,10 +132,13 @@ exec /usr/bin/systemd-analyze "$@"
                 self.log.write_text('')
                 legacy = self.units / 'llm-server.service'
                 legacy.touch()
+                former_qwen25 = self.units / 'qwenv-server.service'
+                former_qwen25.touch()
                 result = self.run_installer('-model', model)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertFalse(legacy.exists())
-                for name in ('qwen-server', 'phi-server', 'qwenv-server', 'ax3l-server', 'reporting-server', 'watchdog'):
+                self.assertFalse(former_qwen25.exists())
+                for name in ('qwen-server', 'phi-server', 'qwen2.5-server', 'ax3l-server', 'reporting-server', 'watchdog'):
                     unit = self.units / f'{name}.service'
                     self.assertEqual(unit.stat().st_mode & 0o777, 0o644)
                     self.assertNotIn('@', unit.read_text())
@@ -148,7 +151,7 @@ exec /usr/bin/systemd-analyze "$@"
                 self.assertEqual(self.credentials.read_text(), 'DB_PASSWORD=fixture-secret\n')
                 self.assertEqual(self.config.stat().st_mode & 0o777, 0o750)
                 self.assertFalse((self.config / 'mcp.json').exists())
-                for name in ('qwen-server', 'phi-server', 'qwenv-server'):
+                for name in ('qwen-server', 'phi-server', 'qwen2.5-server'):
                     command = (self.units / f'{name}.service').read_text()
                     self.assertNotIn('--mcp-servers-config', command)
                     if name == 'qwen-server':
@@ -177,6 +180,7 @@ exec /usr/bin/systemd-analyze "$@"
                 self.assertLess(calls.index('verify'), calls.index('systemctl stop'))
                 self.assertIn(f'systemctl start {model}-server.service', calls)
                 self.assertIn('systemctl disable --now llm-server.service', calls)
+                self.assertIn('systemctl disable --now qwenv-server.service', calls)
                 self.assertIn('chgrp -R ax3l', calls)
 
     def test_fresh_install_and_default_model(self):
@@ -214,7 +218,7 @@ exec /usr/bin/systemd-analyze "$@"
         result = self.run_installer()
         self.assertIn('Run install.sh', result.stderr)
         self.prepare()
-        for name, model in [(self.projector, 'qwenv'), (self.qwen_projector, 'qwen'), (self.models['qwen'], 'qwen')]:
+        for name, model in [(self.projector, 'qwen2.5'), (self.qwen_projector, 'qwen'), (self.models['qwen'], 'qwen')]:
             (self.root / 'models' / name).unlink()
             result = self.run_installer('-model', model)
             self.assertNotEqual(result.returncode, 0)

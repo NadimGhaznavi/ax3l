@@ -14,13 +14,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Centralize listener defaults in `CMDB_NETWORK` and preserve production network
 overrides in `conf/ax3l.json`, following MyCount's configuration model.
 
+- Rename the Qwen2.5 model option from `qwenv` to `qwen2.5` and its unit to
+  `qwen2.5-server.service`; rename its constants to `DQwen25`. Upgrade and
+  network restart remove the former unit. Qwen3.5 remains the default `qwen` model.
+
 - Add `llm`, `report`, and `zmq` inventory entries to `DAx3l.CMDB_NETWORK`;
   remove the separate host, port, and endpoint constants.
 - Create and validate `/opt/prod/ax3l/conf/ax3l.json` during install/upgrade,
   preserve custom files, and resolve omitted settings from defaults.
 - Resolve reporting and ZeroMQ defaults through the network interface,
   including local client destinations for wildcard bindings.
-- Add `scripts/restart.sh [-model qwen|phi|qwenv]` to validate network settings,
+- Add `scripts/restart.sh [-model qwen|phi|qwen2.5]` to validate network settings,
   regenerate listener arguments and internal URLs, and restart services without
   reinstalling dependencies. Share unit rendering with installation.
 

@@ -69,7 +69,7 @@ The restart helper validates the config and generated units before stopping
 services. It regenerates model, reporting, Ax3l, and watchdog units, reloads
 systemd, and restarts services in dependency order without installing code or
 Python dependencies. Use `sudo scripts/restart.sh -model phi` or
-`-model qwenv` for those models; Qwen is the default, as with upgrade.
+`-model qwen2.5` for those models; Qwen is the default, as with upgrade.
 The helper stops all model services before starting the selected one.
 
 Use this helper when changing settings: a plain `systemctl restart` does not
@@ -85,13 +85,13 @@ Startup order: **LLM → wait 7 seconds → reporting → Ax3l → watchdog**.
 The delay comes from `DQwen.STARTUP_SECONDS` or `DPhi.STARTUP_SECONDS`.
 Shutdown stops the application services, then all model services.
 
-Qwen3.5 (`qwen`, using `DQwen.GGUF`) is the default for text-only prompts. Select Phi with:
+Qwen3.5 (`qwen`, using `DQwen.GGUF`) is the default model and also supports vision. Select Phi with:
 
 ```sh
 sudo scripts/services.sh start -model phi
 ```
 
-Use `-model qwen`, `-model phi`, or `-model qwenv` to choose the server to
+Use `-model qwen`, `-model phi`, or `-model qwen2.5` to choose the server to
 start. The helper enables and starts that model without checking or stopping
 other models. All three use the same LLM port; an occupied port or insufficient
 GPU memory is left for llama.cpp to report. Stop the running model yourself
@@ -101,10 +101,12 @@ application services.
 All six units are installed and upgraded together. `install-services.sh` and
 `upgrade.sh` accept the same `-model` option to select the model started afterward;
 Qwen remains the default. Upgrade removes the legacy `llm-server` unit.
+Upgrade and network restart also disable and remove the former
+`qwenv-server.service` when installing `qwen2.5-server.service`.
 
-Qwen Vision uses `DQwenV.GGUF`, `DQwenV.MMPROJ`, and a 4096-token context.
+Qwen2.5-VL uses `DQwen25.GGUF`, `DQwen25.MMPROJ`, and a 4096-token context.
 Place both GGUF files in `DLlama.MODEL_DIR` (`/opt/prod/models`) before starting
-`qwenv-server` in production. It uses the shared executable configured by
+`qwen2.5-server` in production. It uses the shared executable configured by
 `DLlama`, with `--mmproj`, `-c 4096`, and the existing host, port, and metrics options.
 All models use their bundled chat templates with Jinja enabled. The former
 Qwen2.5-VL tool-template override has been removed; use the default Qwen3.5 for

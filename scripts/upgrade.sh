@@ -4,7 +4,7 @@ set -euo pipefail
 
 usage() {
     cat <<'HELP'
-Usage: sudo scripts/upgrade.sh [-model qwen|phi|qwenv]
+Usage: sudo scripts/upgrade.sh [-model qwen|phi|qwen2.5]
 
 Updates application modules and systemd units from the current checkout,
 then starts all four services in dependency order. Services are stopped
@@ -24,7 +24,7 @@ if [[ $# != 0 && $# != 2 ]]; then
     usage >&2
     exit 2
 fi
-if [[ $# == 2 && ( $1 != -model || ( $2 != qwen && $2 != phi && $2 != qwenv ) ) ]]; then
+if [[ $# == 2 && ( $1 != -model || ( $2 != qwen && $2 != phi && $2 != qwen2.5 ) ) ]]; then
     usage >&2
     exit 2
 fi

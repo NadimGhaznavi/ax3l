@@ -3,7 +3,7 @@
 set -euo pipefail
 
 usage() {
-    printf 'Usage: sudo scripts/services.sh start|stop [-model qwen|phi|qwenv]\n'
+    printf 'Usage: sudo scripts/services.sh start|stop [-model qwen|phi|qwen2.5]\n'
 }
 
 if [[ $# == 1 && ( $1 == -h || $1 == --help ) ]]; then
@@ -17,7 +17,7 @@ fi
 
 model=qwen
 if [[ $# == 3 ]]; then
-    [[ $2 == -model && ( $3 == qwen || $3 == phi || $3 == qwenv ) ]] || { usage >&2; exit 2; }
+    [[ $2 == -model && ( $3 == qwen || $3 == phi || $3 == qwen2.5 ) ]] || { usage >&2; exit 2; }
     model=$3
 fi
 
@@ -29,8 +29,8 @@ if [[ $1 == start ]]; then
 import sys
 from ax3l.constants.DQwen import DQwen
 from ax3l.constants.DPhi import DPhi
-from ax3l.constants.DQwenV import DQwenV
-print({"qwen": DQwen, "phi": DPhi, "qwenv": DQwenV}[sys.argv[1]].STARTUP_SECONDS)
+from ax3l.constants.DQwen25 import DQwen25
+print({"qwen": DQwen, "phi": DPhi, "qwen2.5": DQwen25}[sys.argv[1]].STARTUP_SECONDS)
 PYMODEL
 )
     systemctl enable "$model-server.service"
@@ -42,7 +42,7 @@ PYMODEL
         systemctl start "$name.service"
     done
 else
-    for name in watchdog ax3l-server reporting-server qwen-server phi-server qwenv-server llm-server; do
+    for name in watchdog ax3l-server reporting-server qwen-server phi-server qwen2.5-server qwenv-server llm-server; do
         printf 'Stopping %s.\n' "$name"
         if [[ $(systemctl show -p LoadState --value "$name.service") != not-found ]]; then
             systemctl stop "$name.service"

@@ -6,12 +6,12 @@ set -euo pipefail
 umask 022
 
 if [[ $# != 0 && $# != 2 ]]; then
-    printf 'Usage: sudo scripts/install-services.sh [-model qwen|phi|qwenv]\n' >&2
+    printf 'Usage: sudo scripts/install-services.sh [-model qwen|phi|qwen2.5]\n' >&2
     exit 2
 fi
 selected_model=qwen
 if [[ $# == 2 ]]; then
-    [[ $1 == -model && ( $2 == qwen || $2 == phi || $2 == qwenv ) ]] || { printf 'Expected -model qwen|phi|qwenv.\n' >&2; exit 2; }
+    [[ $1 == -model && ( $2 == qwen || $2 == phi || $2 == qwen2.5 ) ]] || { printf 'Expected -model qwen|phi|qwen2.5.\n' >&2; exit 2; }
     selected_model=$2
 fi
 [[ $EUID == 0 ]] || { printf 'Run service installation as root.\n' >&2; exit 1; }

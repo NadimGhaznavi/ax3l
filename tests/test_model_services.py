@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class ModelServicesTests(unittest.TestCase):
     def test_vision_command_and_missing_projector(self):
-        from ax3l.constants.DQwenV import DQwenV
+        from ax3l.constants.DQwen25 import DQwen25
 
         installer = (ROOT / 'scripts/service-configuration.sh').read_text()
         production = installer.split('llm_paths=', 1)[1].split('\n}', 1)[0]
@@ -28,22 +28,22 @@ class ModelServicesTests(unittest.TestCase):
             binary = directory / 'bin/llama-server'
             binary.write_text('#!/bin/sh\nexit 0\n')
             binary.chmod(0o755)
-            (directory / DQwenV.GGUF).touch()
-            projector = directory / DQwenV.MMPROJ
+            (directory / DQwen25.GGUF).touch()
+            projector = directory / DQwen25.MMPROJ
             projector.touch()
             command = (
                 'set -euo pipefail\n'
                 f'checkout_dir={shlex.quote(folder)}\n'
                 f'config_dir={shlex.quote(folder)}\n'
                 f'install_dir={shlex.quote(folder)}\n'
-                'selected_model=qwenv\nllm_port=27770\nllm_host=0.0.0.0\nllm_paths='
-                + production + '\nprintf "%s\\n" "$qwenv_command"\n'
+                'selected_model=qwen2.5\nllm_port=27770\nllm_host=0.0.0.0\nllm_paths='
+                + production + '\nprintf "%s\\n" "$qwen25_command"\n'
             )
             result = subprocess.run(['bash', '-c', command], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(shlex.split(result.stdout), [
-                str(binary), '--model', str(directory / DQwenV.GGUF),
-                '--mmproj', str(projector), '-c', str(DQwenV.CONTEXT_SIZE), '--host', '0.0.0.0',
+                str(binary), '--model', str(directory / DQwen25.GGUF),
+                '--mmproj', str(projector), '-c', str(DQwen25.CONTEXT_SIZE), '--host', '0.0.0.0',
                 '--port', '27770', '--metrics', '--jinja',
             ])
             projector.unlink()
@@ -61,7 +61,7 @@ class ModelServicesTests(unittest.TestCase):
                 'AX3L_ZMQ_ENDPOINT': 'tcp://127.0.0.1:61970',
                 'AX3L_ARGS': '--llm-url http://127.0.0.1:27770 --output /var/lib/ax3l/snakelab',
                 'QWEN_COMMAND': '/usr/bin/true --model /models/Qwen.gguf',
-                'QWENV_COMMAND': '/usr/bin/true --model /models/Qwenv.gguf --mmproj /models/projector.gguf -c 4096',
+                'QWEN25_COMMAND': '/usr/bin/true --model /models/Qwen2.5.gguf --mmproj /models/projector.gguf -c 4096',
                 'PHI_COMMAND': '/usr/bin/true --model /models/Phi.gguf',
             }
             units = []
@@ -79,7 +79,7 @@ class ModelServicesTests(unittest.TestCase):
             self.assertIn('RuntimeDirectory=ax3l', app_unit)
             self.assertIn('Environment=XDG_CONFIG_HOME=/run/ax3l/chrome-config', app_unit)
             self.assertIn('Environment=XDG_CACHE_HOME=/run/ax3l/chrome-cache', app_unit)
-            for model in ('qwen', 'phi', 'qwenv'):
+            for model in ('qwen', 'phi', 'qwen2.5'):
                 content = (Path(folder) / f'{model}-server.service').read_text()
                 self.assertNotIn('Conflicts=', content)
                 self.assertIn(f'/models/{model.title()}.gguf', content)
@@ -106,9 +106,9 @@ class ModelServicesTests(unittest.TestCase):
     def test_starting_each_model_leaves_other_models_alone(self):
         from ax3l.constants.DQwen import DQwen
         from ax3l.constants.DPhi import DPhi
-        from ax3l.constants.DQwenV import DQwenV
+        from ax3l.constants.DQwen25 import DQwen25
 
-        for model, constants in (('qwen', DQwen), ('phi', DPhi), ('qwenv', DQwenV)):
+        for model, constants in (('qwen', DQwen), ('phi', DPhi), ('qwen2.5', DQwen25)):
             with self.subTest(model=model):
                 result, calls = self.run_helper('start', '-model', model)
                 self.assertEqual(result.returncode, 0, result.stderr)
@@ -127,9 +127,10 @@ class ModelServicesTests(unittest.TestCase):
     def test_missing_units_do_not_break_stop_or_migration(self):
         result, calls = self.run_helper('stop')
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(len(calls), 7)
+        self.assertEqual(len(calls), 8)
         self.assertTrue(all(call.startswith('show -p LoadState --value ') for call in calls))
         self.assertIn('show -p LoadState --value llm-server.service', calls)
+        self.assertIn('show -p LoadState --value qwenv-server.service', calls)
 
     def test_invalid_selection_does_not_touch_services(self):
         result, calls = self.run_helper('start', '-model', 'invalid')

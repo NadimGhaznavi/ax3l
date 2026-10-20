@@ -39,7 +39,7 @@ if [[ -e "$credentials_file" ]]; then
         fail "Credentials do not match the installation."
 fi
 
-for name in watchdog ax3l-server reporting-server qwen-server phi-server qwenv-server llm-server; do
+for name in watchdog ax3l-server reporting-server qwen-server phi-server qwen2.5-server qwenv-server llm-server; do
     unit="$name.service"
     if [[ -f /etc/systemd/system/$unit ]]; then
         systemctl disable --now "$unit"

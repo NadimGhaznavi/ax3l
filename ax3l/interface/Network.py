@@ -1,4 +1,4 @@
-"""Resolve network defaults and production overrides once per process."""
+"""Resolve network defaults and local overrides once per process."""
 
 from functools import cache
 from pathlib import Path

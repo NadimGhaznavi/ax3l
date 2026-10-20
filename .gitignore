@@ -1,7 +1,5 @@
 # Byte-compiled / optimized / DLL files
-# Disposable development installation and credentials
-/ax3l_prod/
-/prod_etc/
+# Local scratch files and archived projects
 /tmp/
 /legacy/
 

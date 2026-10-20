@@ -143,10 +143,10 @@ class MetricsReportTests(unittest.TestCase):
         self.assertEqual(db.close.call_count, 7)
 
 
-@unittest.skipUnless(os.environ.get('AX3L_TEST_DEV_DB') == '1', 'requires disposable DEV MariaDB')
+@unittest.skipUnless(os.environ.get('AX3L_TEST_DB') == '1', 'requires disposable test MariaDB')
 class MetricsDatabaseTests(unittest.TestCase):
     def test_completed_runs_retries_and_context_messages(self):
-        self.assertEqual(os.environ['DB_NAME'], 'ax3l_dev')
+        self.assertEqual(os.environ['DB_NAME'], 'ax3l_test')
         db = DbMgr()
         self.addCleanup(db.close)
         # Temporary tables keep the fixture separate from stored experiment data.

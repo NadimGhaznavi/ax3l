@@ -1,4 +1,4 @@
-"""Exercise the service entry point with DEV MariaDB and a local LLM fixture."""
+"""Exercise the service entry point with MariaDB and a local LLM fixture."""
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import os
@@ -13,10 +13,10 @@ import time
 import unittest
 
 
-@unittest.skipUnless(os.environ.get("AX3L_TEST_DEV_DB") == "1", "requires DEV MariaDB")
+@unittest.skipUnless(os.environ.get("AX3L_TEST_DB") == "1", "requires disposable MariaDB test database")
 class Ax3lServiceTests(unittest.TestCase):
     def test_graceful_stop_during_first_iteration(self):
-        self.assertEqual(os.environ["DB_NAME"], "ax3l_dev")
+        self.assertEqual(os.environ["DB_NAME"], "ax3l_test")
         from ax3l.app.DbMgr import DbMgr
 
         class LLMHandler(BaseHTTPRequestHandler):

@@ -1,7 +1,7 @@
 # ax3l
 Another AI Project
 
-Network defaults live in `DAx3l.CMDB_NETWORK`; production overrides live in
+Network defaults live in `DAx3l.CMDB_NETWORK`; local overrides live in
 `/opt/prod/ax3l/conf/ax3l.json`. See [network configuration](pages/scripts.md#network-configuration)
 for editing and restart instructions.
 
@@ -26,4 +26,22 @@ full development guidance, including changelog updates.
 - Use explicit contracts and correct types. Validate at interfaces; fail fast and hard with a clear error when a contract or type is wrong, then fix the cause.
 - No fallback parsing, silent defaults, repair prompts, or retries for contract violations.
 - Avoid defensive programming, speculative configuration, and dead code. Add error handling only for observed failures or an explicit requirement.
-- Use the real, disposable DEV MariaDB database for database development and integration checks. Test meaningful behavior appropriate to the change.
+- Use a real, disposable MariaDB test database for database development and integration checks. Test meaningful behavior appropriate to the change.
+
+## Tests
+
+Run the suite from the project checkout:
+
+```sh
+.venv/bin/python -m unittest discover -s tests
+```
+
+MariaDB integration checks are opt-in. Set `DB_HOST`, `DB_PORT`, `DB_USER`,
+`DB_PASSWORD`, and `DB_NAME=ax3l_test` for a disposable test database, then run:
+
+```sh
+AX3L_TEST_DB=1 .venv/bin/python -m unittest discover -s tests
+```
+
+These tests require the database name `ax3l_test` before connecting. Some checks
+also read the configured SnakeLab database and require existing simulation data.

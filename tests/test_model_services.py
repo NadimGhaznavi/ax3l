@@ -15,7 +15,7 @@ class ModelServicesTests(unittest.TestCase):
         from ax3l.constants.DQwen25 import DQwen25
 
         installer = (ROOT / 'scripts/service-configuration.sh').read_text()
-        production = installer.split('llm_paths=', 1)[1].split('\n}', 1)[0]
+        model_configuration = installer.split('llm_paths=', 1)[1].split('\n}', 1)[0]
         with tempfile.TemporaryDirectory() as folder:
             directory = Path(folder)
             shutil.copytree(ROOT / 'ax3l/constants', directory / 'ax3l/constants')
@@ -37,7 +37,7 @@ class ModelServicesTests(unittest.TestCase):
                 f'config_dir={shlex.quote(folder)}\n'
                 f'install_dir={shlex.quote(folder)}\n'
                 'selected_model=qwen2.5\nllm_port=27770\nllm_host=0.0.0.0\nllm_paths='
-                + production + '\nprintf "%s\\n" "$qwen25_command"\n'
+                + model_configuration + '\nprintf "%s\\n" "$qwen25_command"\n'
             )
             result = subprocess.run(['bash', '-c', command], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)

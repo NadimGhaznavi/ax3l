@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Attach the pinned BMForge RCA skill for read-only production evidence collection
+  and local root-cause analysis.
+
 ## [3.1.2] - 2026-10-28 @ 05:00
 
 - Updated README.

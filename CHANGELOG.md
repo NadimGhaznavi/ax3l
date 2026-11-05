@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.1] - 2026-11-05 @ 03:54
+
+- Website correction.
+
 ## [3.2.0] - 2026-11-05 @ 03:50
 
 - Attach the pinned BMForge RCA skill for read-only production evidence collection

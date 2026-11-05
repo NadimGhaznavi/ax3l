@@ -16,13 +16,26 @@ The Ax3l system submits simulation configurations and analyzes the result data. 
 
 ## Live Experiment Data
 
-This is a long-running project expected to operate for well over a month. The current experiment began on **September 15, 2026**. Real-time project status can be viewed:
+This is a long-running experiment that was started on **September 15, 2026**. Ax3l experiment data is exported every 30 minutes and can be viewed on the [SnakeWeb](https://snakeweb.osoyalce.com) website. The published information shows the day's top games as well as a histogram showing simulation high scores over time.
 
-- [Live Site](https://snakeweb.osoyalce.com) with event log
-- [Simulation Scores Distribution Histogram](https://snakeweb.osoyalce.com/reports/score-distribution.html)
-- [Simulation Highscore History](https://snakeweb.osoyalce.com/reports/experiment-highscores.html)
-- [Gallery of the Snake in Action](https://snakeweb.osoyalce.com/reports/top-100.html)
-- [A random sampling of the LLM's Thinking](https://snakeweb.osoyalce.com/reports/ax3l-thinking.html)
+---
+
+## Conclusion
+
+As of November 5, 2026, the experimental evidence support the following conclusions:
+
+- The LLM is proficient at basic neural network tuning.
+- The LLM was not able to improve the performance of the snake AI beyond a basic threshold.
+
+A QA environment ran this same codebase but simulations only ran for 500 epochs, not 1500 as they do in production. The results were very similar, with the exception of the high score being lower. This can be attributed to the lack of opportunity that the configurations had to make those higher scores. Therefore:
+
+---
+
+## Next Steps
+
+Until the hardware is needed for another project, Ax3l will continue to run. The hope is that at some point a configuration will be found that breaks through the current ceiling and results in an overall performance improvement.
+
+A new architecture is being designed to try this experiment again, but with a different framework. Check the [Bear & Moose](https://www.osoyalce.com) or my [blog](https://blog.osoyalce.com) for updates!
 
 ---
 

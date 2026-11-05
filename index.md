@@ -27,7 +27,7 @@ As of November 5, 2026, the experimental evidence support the following conclusi
 - The LLM is proficient at basic neural network tuning.
 - The LLM was not able to improve the performance of the snake AI beyond a basic threshold.
 
-A QA environment ran this same codebase but simulations only ran for 500 epochs, not 1500 as they do in production. The results were very similar, with the exception of the high score being lower. This can be attributed to the lack of opportunity that the configurations had to make those higher scores. Therefore:
+A QA environment ran this same codebase but simulations only ran for 500 epochs, not 1500 as they do in production. The results were very similar, with the exception of the high score being lower. This can be attributed to the lack of opportunity that the configurations had to achieve higher scores.
 
 ---
 

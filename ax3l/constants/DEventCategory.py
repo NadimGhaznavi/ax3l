@@ -19,8 +19,10 @@ class DEventCategory:
 
     class LLM(EventCategory):
         CATEGORY = "LLM"
+        REQUEST_STARTED = "llm_request_started"
         REQUEST_FAILED = "llm_request_failed"
         LABELS = {
+            REQUEST_STARTED: "Request started",
             REQUEST_FAILED: "Request failed",
         }
 
@@ -76,6 +78,8 @@ class DEventCategory:
         SEED_ROTATION_STARTED = "seed_rotation_started"
         GOLDEN_SEED_INCREMENTED = "golden_config_seed_incremented"
         DRAFT_SAVED = "configuration_draft_saved"
+        CHART_STARTED = "choice_chart_started"
+        CHART_FINISHED = "choice_chart_finished"
         LABELS = {
             PROPOSAL_ACCEPTED: "Proposal accepted",
             PROPOSAL_INVALID: "Invalid proposal",
@@ -88,6 +92,8 @@ class DEventCategory:
             SEED_ROTATION_STARTED: "Seed rotation started",
             GOLDEN_SEED_INCREMENTED: "Golden seed incremented",
             DRAFT_SAVED: "Configuration draft saved",
+            CHART_STARTED: "Choice chart started",
+            CHART_FINISHED: "Choice chart finished",
         }
 
     ALL = (Conversation, LLM, Tool, SnakeLab, Configuration)

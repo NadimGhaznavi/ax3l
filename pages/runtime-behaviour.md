@@ -7,30 +7,24 @@ layout: single
 # Complete-configuration experiments
 
 Ax3l chooses every tunable setting before running one 500-episode SnakeLab
-simulation. It uses Qwen's visual interpretation of completed runs, combined
-with exact numeric diagnostics, to inform each parameter conversation.
+simulation. Qwen receives the assigned setting, measured data, and a chart
+when it can inform that choice.
 
 ## Initial startup
 
 With an empty experiment, Ax3l submits the schema defaults once. The baseline
 uses SnakeLab 3.0.1, a four-head Transformer, required EpsilonNice, and 500
 episodes. On completion, it becomes the initial golden configuration and
-receives its first simulation analysis. Interrupted initial seeding resumes
+has its measurements saved before the first choice. Interrupted initial seeding resumes
 its recorded submission.
 
 ## Choosing a complete configuration
 
 A new draft starts from the current golden configuration. It freezes the latest,
 golden, and all-time best reference runs for the entire selection pass. The
-draft is saved in a preparation phase while missing reference analyses are
-generated, so the Experiment Status report can show prerequisites before the
-first choice. A restart completes unfinished analysis using the same frozen
-references before resuming the first unselected parameter. Every reference chart
-has its own prerequisite row and checkmark: three rows per distinct run, up to
-nine for the latest, golden, and all-time best runs. Shared runs show their roles
-together on the same three rows. Image preparation, LLM analysis, completion, and
-failures are recorded as tasks in the shared event log and appear on the report's
-next five-second refresh. Qwen chooses the following settings in order:
+draft is saved while Ax3l records any missing measurements. A restart uses
+the same frozen references and resumes the first unselected parameter. Qwen
+chooses the following settings in order:
 
 | Parameter | Purpose | Allowed values | Tuned with |
 | --- | --- | --- | --- |
@@ -50,79 +44,35 @@ The epsilon settings, distance rewards, and EpsilonNice settings are chosen in
 pairs. The sum of the two distance rewards must be non-positive. Seeds and
 schema-fixed settings remain controlled by Ax3l.
 
-Each choice prompt names the task and score to beat. `data_tool(url)` lets Qwen
-browse the draft and saved reference data in small linked pages, using `latest`,
-`golden`, and `best` rather than run UUIDs. `/draft` marks saved and pending
-values; each reference links to scores, endings, activity, notes, and settings.
-Navigation stays readable; actual values use JSON, including JSON blocks in
-draft and run overviews. Terminal data pages return one JSON object. Numbers
-retain their types and precision, and missing statistics are JSON null.
-Choice rules use English in the submission tool description. Accepted choices are
-saved without starting a simulation. A value can remain unchanged. After all
-eight selection steps, Ax3l checks the full draft for duplicates, submits one
-simulation, and waits for its result.
+Ax3l loads the same short selection skill at the start of each choice. The
+prompt includes current values and same-setting values and scores from the
+latest and golden runs. Qwen receives at most one chart per choice.
 
-## Simulation analysis
+| Choice | Chart | Measured facts alongside it |
+| --- | --- | --- |
+| Learning rate | Training loss | Episodes with recorded loss |
+| Epsilon | Score trend | Mean scores in the first and last 50 episodes and number of random actions |
+| Distance rewards | Score distribution | Median score and counts of zero-score and high-score episodes |
 
-For each completed run, Ax3l runs three separate conversations: score trends,
-score distribution, and training loss. Each receives one PNG, one chart-specific
-question, relevant exact facts, and an invented answer example. Plots include
-titles, labeled axes and units, the high-score objective, seed, episode count,
-and short English labels. Run UUIDs stay outside Qwen's context. Loss is mean
-Smooth L1 loss in its native training scale; missing measurements remain gaps.
+Ax3l uses the latest run's charts when it shares the draft seed. Otherwise it
+uses the current golden run. The learning rate choice uses data alone when
+the run has no recorded loss. Ax3l records the completed simulation's
+measurements directly from episode data.
 
-The score-trends task compares the first 50 episodes with the final 50 episodes
-of that same run. Both exact averages are supplied; Qwen states whether the
-final average is higher, lower, or equal.
+English directions in the prompt lead to relevant `data_tool` pages when
+Qwen needs more detail. The tool menu at `/` links to `draft`, `latest`,
+`golden`, and `best`. Navigation uses English and experiment values use
+JSON. `kb_tool` serves optional background. Choice rules appear in the
+submission tool description. Accepted choices are saved without starting a
+simulation. A value can remain unchanged. After all eight choices, Ax3l
+checks the complete draft for duplicates and submits one simulation.
 
-Ax3l calculates score statistics and termination counts/percentages directly
-from episode data. Termination categories include wall collisions, body
-collisions, move-limit endings, board completion, and unrecorded/other outcomes.
-Percentages use all recorded episodes as their denominator.
-
-Qwen calls `submit_simulation_summary` with 1–2 sentences, at most 40 words,
-about its assigned chart, optionally recommending one concrete value to try
-next. Chart conversations can use `data_tool` at `/run` to inspect the exact
-settings that produced the image, as JSON. `/run/config` returns the complete
-configuration; smaller settings pages and `/run/rules` provide current values
-and allowed tunable domains. This lookup reads the completed simulation
-directly, without waiting for its unfinished analysis. Recommendations require
-reading the relevant current settings and rules and must omit theory and
-causal explanations. They are saved as advice; later configuration choices
-apply and validate changes.
-
-Accepted sections are saved, so a restart skips finished tasks. The final
-submission combines the three labeled observations and optional recommendations
-into one run analysis without another inference call.
-
-The Experiment Status checklist shows all three image jobs for the submitted
-simulation alongside its reference-image prerequisites. Each image label links
-to the latest PNG sent to Qwen when available. Every image and configuration
-row shows elapsed work time and reported input/output tokens; active times
-advance with the report refresh. The final row totals the displayed work,
-counting paired settings' shared conversation once. Tokens from an in-flight
-request appear when its response arrives; missing usage is shown as unavailable.
-
-General background lives in short local knowledge-base pages. `kb_tool(url)`
-reads one page at a time, starting at `/` or the direct guide URL in the prompt.
-Qwen follows relevant links to drill down. These reads continue the conversation;
-only the assigned submission tool finishes it. Full project background is
-omitted from chart prompts; configuration is available through `data_tool`.
-
-Every parameter conversation can browse up to three distinct saved analyses:
-
-| Reference | Role |
-| --- | --- |
-| Latest simulation | Feedback from the most recently completed run, even if it lost. |
-| Current golden | Current-seed baseline and score to beat. |
-| All-time best | Highest completed simulation score across seeds in this experiment. |
-
-A shared run appears once with multiple role labels. Different runs retain
-separate analyses even when their tunable values match. Seeds are explicit;
-results on different seeds are historical context rather than controlled
-comparisons. The all-time reference uses the earliest stored run to resolve
-score ties. Current comparisons are calculated separately from the saved
-interpretation, so role changes do not require another vision call.
+Experiment Status shows the settings to be chosen and the saved selections.
+It lists chart rendering, each Qwen request, each data or guide lookup, and
+each submission under the relevant setting or pair. Each step has its own
+elapsed time. Each returned Qwen request shows its own input and output token
+counts when reported by the server. The chart link opens the prompt with
+the exact image sent to Qwen. The page refreshes every five seconds.
 
 ## Golden configurations and seed rotation
 
@@ -131,13 +81,13 @@ golden score. A tie retains the golden. Each completed configuration comparison
 counts as one experiment cycle.
 
 After nine complete proposals without an improvement, Ax3l increments the seed
-and reruns the golden settings to establish a fresh score baseline. Its analysis
-is generated before parameter selection resumes. The all-time best remains a
+and reruns the golden settings to establish a fresh score baseline. Ax3l
+records its measurements before parameter selection resumes. The all-time best remains a
 separate historical reference and can come from an earlier seed.
 
 ## Restart behavior
 
-Drafts, choices, submission intent, comparisons, and analyses are stored in
+Drafts, choices, submission intent, comparisons, and measurements are stored in
 MariaDB's shared event log. Restarting during selection resumes the first
 unselected parameter. An interrupted submission is reconciled by its full
 configuration; an ambiguous send is never retried automatically. A saved
@@ -147,8 +97,7 @@ Failed or cancelled simulations mark their draft failed and stop the loop.
 A later startup starts a new draft from the retained golden. Transport and
 database failures propagate with their cause.
 
-This workflow is intended for a reset experiment; no migration or backward
-compatibility path is provided. The experiment-reset script clears its event
-snapshots and saved analyses along with the original experiment data.
+The experiment-reset script clears the draft snapshots, setup trace, and
+saved measurements along with the original experiment data.
 
 [Back](/)

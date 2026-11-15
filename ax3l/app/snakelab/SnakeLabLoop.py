@@ -1,20 +1,22 @@
-"""Choose every setting in a durable draft, run once, and analyze the result."""
+"""Choose every setting in a durable draft, run once, and record the result."""
 
 import asyncio
 from copy import deepcopy
 import json
 from uuid import uuid4
 
+from ax3l.activity.RunAnalysis import render_analysis
 from ax3l.app.ConfigurationLog import ConfigurationLog
 from ax3l.app.EventLogDb import EventLogDb
 from ax3l.app.snakelab.ToolConversation import converse
 from ax3l.app.snakelab.SeedRotation import rotate_if_needed
-from ax3l.app.snakelab.AnalyzeRun import analyze_run
+from ax3l.app.snakelab.AnalyzeRun import record_run_metrics
 from ax3l.app.snakelab.ExperimentDb import ExperimentDb
 from ax3l.app.snakelab.prompts.ConfigurationChoice import ConfigurationChoice
-from ax3l.app.snakelab.prompts.ProjectContext import ProjectContext
 from ax3l.constants.DAx3l import DAx3l
+from ax3l.constants.DChoice import CHOICE_CHARTS
 from ax3l.constants.DEventCategory import DEventCategory as Events
+from ax3l.constants.DSimulationAnalysis import DSimulationAnalysis
 from ax3l.constants.DSnakeLab import DSnakeLab
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft
 from ax3l.interface.SnakeLab import SnakeLab, SimulationUnavailable
@@ -24,6 +26,21 @@ from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 
 class SimulationUnsuccessful(RuntimeError):
     """A simulation ended without completed results to compare."""
+
+
+async def prepare_chart(db, draft_id, parameter, section, run, episodes, target):
+    category = Events.Configuration
+    title = DSimulationAnalysis.SECTIONS[section]
+    fields = dict(process_id=draft_id, parameter=parameter)
+    db.log(category.CHART_STARTED, category.CATEGORY, "INFO", title, **fields)
+    try:
+        png = await asyncio.to_thread(render_analysis, run.config, episodes, run.metrics, target, section)
+    except BaseException as error:
+        state = "Stopped" if isinstance(error, (asyncio.CancelledError, KeyboardInterrupt)) else "Failed"
+        db.log(category.CHART_FINISHED, category.CATEGORY, "ERROR", state, **fields)
+        raise
+    db.log(category.CHART_FINISHED, category.CATEGORY, "INFO", "Complete", **fields)
+    return png
 
 
 async def wait_for_run(snake, db, run_id):
@@ -146,16 +163,28 @@ async def optimize(llm, output, db, endpoint):
             if draft.phase == "choosing":
                 draft.phase = "preparing"
                 experiments.save_draft(draft)
-            target = snake.get_run_result(draft.golden_run_id)["high_score"]
-            for run_id in dict.fromkeys(draft.references.values()):
-                await analyze_run(snake, llm, output, db, endpoint, run_id, target)
+            references = {run_id: record_run_metrics(snake, experiments, run_id)
+                          for run_id in dict.fromkeys(draft.references.values())}
+            golden = references[draft.golden_run_id]
+            latest = references[draft.references["latest"]]
+            chart_scope = ("latest" if latest.run_id != golden.run_id and latest.config["seed"] == draft.config["seed"]
+                           else "golden")
+            chart_run = latest if chart_scope == "latest" else golden
+            chart_episodes = None
             draft.phase = "choosing"
             experiments.save_draft(draft)
             while draft.phase == "choosing":
                 parameter = draft.next_parameter
-                prompts = [ProjectContext(), ConfigurationChoice(draft, target)]
+                section = CHOICE_CHARTS.get(parameter)
+                png = None
+                if section and (section != "loss" or chart_run.metrics["episodes_with_loss"]):
+                    if chart_episodes is None:
+                        chart_episodes = snake.get_analysis_episodes(chart_run.run_id)
+                    png = await prepare_chart(db, draft.draft_id, parameter, section, chart_run,
+                                              chart_episodes, golden.metrics["high_score"])
+                prompt = ConfigurationChoice(draft, latest, golden, chart_scope, png)
                 async with SnakeLabTools(endpoint, parameter, draft_id=draft.draft_id) as tools:
-                    await converse(llm, output, db, tools, prompts,
+                    await converse(llm, output, db, tools, [prompt],
                                    parameter=parameter, process_id=draft.draft_id)
                 draft = experiments.draft(draft.draft_id)
         submit_draft(snake, db, experiments, draft)
@@ -165,9 +194,8 @@ async def optimize(llm, output, db, endpoint):
             draft.phase = "failed"
             experiments.save_draft(draft)
             raise
-        golden_id = complete_comparison(snake, db, experiments, draft)
-        target = snake.get_run_result(golden_id)["high_score"]
-        await analyze_run(snake, llm, output, db, endpoint, draft.run_id, target)
+        complete_comparison(snake, db, experiments, draft)
+        record_run_metrics(snake, experiments, draft.run_id)
         draft.phase = "completed"
         experiments.save_draft(draft)
 

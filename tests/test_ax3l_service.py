@@ -61,7 +61,7 @@ class Ax3lServiceTests(unittest.TestCase):
                         "patch('ax3l.interface.SnakeLab.SnakeLab.get_latest_completed_run_id', return_value=golden.run_id).start(); "
                         "patch('ax3l.interface.SnakeLab.SnakeLab.get_all_time_best_run_id', return_value=golden.run_id).start(); "
                         "patch('ax3l.interface.SnakeLab.SnakeLab.get_analysis_episodes', return_value=[]).start(); "
-                        "patch('ax3l.app.snakelab.AnalyzeRun.render_analysis', return_value=b'png').start(); "
+                        "patch('ax3l.app.snakelab.SnakeLabLoop.render_analysis', return_value=b'png').start(); "
                         "patch('ax3l.interface.SnakeLab.SnakeLab.get_num_sims', return_value=1).start(); "
                         "raise SystemExit(main())",
                         "--zmq-endpoint", "tcp://127.0.0.1:*",
@@ -80,7 +80,7 @@ class Ax3lServiceTests(unittest.TestCase):
                             self.assertIsNone(process.poll(), (output / "service.log").read_text())
                             time.sleep(0.05)
                         else:
-                            self.fail("Service did not log its first prompts")
+                            self.fail(f"Service did not log its first prompts\n{(output / 'service.log').read_text()}")
                         self.assertFalse((output / "snakelab").exists())
                         process.send_signal(signal.SIGINT)
                         self.assertEqual(process.wait(timeout=5), 130)

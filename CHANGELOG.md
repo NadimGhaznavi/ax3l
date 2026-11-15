@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Give Qwen relevant charts and measured data during parameter selection, and
+show each setup step in Experiment Status as it happens.
+
+### Changed
+
+- Load a short selection skill for each choice. Include the training loss,
+  score trend, or score distribution chart in the choice that uses it.
+- Provide direct English directions to data pages while keeping values in JSON.
+- Record completed-run metrics directly. Experiment Status shows elapsed time
+  for each chart render, inference request, lookup, and submission, plus separate
+  input and output token counts for each Qwen reply.
+
 ## [4.4.1] - 2026-11-15 @ 13:02
 
 ### Summary

@@ -42,6 +42,13 @@ registration.
 
 - Reads from MariaDB.
 - Summarizes the current system state, e.g., the number of simulations run.
+- Offers an Experiment Status report card with eleven configuration values and
+  read-only checkmarks for accepted LLM choices, including unchanged values.
+  Paired settings advance together, inherited pending values remain visible,
+  and the next selection is highlighted. Simulation and analysis phases are
+  shown separately, with the result compared against the draft's original
+  golden baseline. Current and Last completed views refresh every five seconds;
+  a failed refresh keeps the last successful card and its timestamp visible.
 - Presents a histogram showing score distribution across simulation runs.
 - Simulation details show the saved Qwen analysis and exact termination counts/percentages. Run labels use the first UUID group; navigation retains full UUIDs.
 - Presents a plot of the high score over time, including the dips due to seed rotation events.

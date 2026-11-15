@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Experiment Status · Ax3l</title>
+  {% include "report_styles.html" %}
+  {% include "experiment_status_styles.html" %}
+</head>
+<body class="experiment-status-page">
+  <header>
+    <h1>Experiment Status</h1>
+    <a href="/">Back to event log</a>
+  </header>
+  <nav class="status-toolbar" aria-label="Experiment views">
+    <div class="status-views">
+      <a href="/experiment-status" {% if view == 'current' %}aria-current="page"{% endif %}>Current</a>
+      <a href="/experiment-status?view=completed" {% if view == 'completed' %}aria-current="page"{% endif %}>Last completed</a>
+    </div>
+    <span>Refreshes every 5 seconds · <time id="status-refreshed" aria-label="Last successful refresh in UTC"></time></span>
+  </nav>
+  <p id="status-refresh-error" role="status" hidden></p>
+  <main id="status-card" class="panel">
+    {% if draft %}
+    <div class="status-heading">
+      <div>
+        <p class="status-view-label">{{ 'Current experiment' if view == 'current' else 'Last completed experiment' }}</p>
+        <h2 id="experiment-phase" role="status">{{ phase }}</h2>
+      </div>
+      <div class="status-identifiers">
+        <span>Seed <strong>{{ draft.config.seed }}</strong></span>
+        <span>Experiment <strong>{{ draft.draft_id.split('-')[0] }}</strong></span>
+        <span>Simulation {% if draft.run_id %}<a href="/simulations/{{ draft.run_id }}">{{ draft.run_id.split('-')[0] }}</a>{% else %}<strong>Not submitted</strong>{% endif %}</span>
+      </div>
+    </div>
+    <div class="status-progress">
+      <label for="choice-progress">{{ choices_selected }} / {{ choices_total }} choices saved</label>
+      <progress id="choice-progress" value="{{ choices_selected }}" max="{{ choices_total }}"></progress>
+    </div>
+    <p class="status-detail">{{ detail }}</p>
+    <table class="status-checklist" aria-label="Configuration selection progress">
+      <colgroup><col class="check-column"><col><col class="value-column"></colgroup>
+      <thead><tr><th scope="col">Done</th><th scope="col">Item description</th><th scope="col">Value</th></tr></thead>
+      <tbody>
+        {% for row in rows %}
+        <tr data-parameter="{{ row.path }}" class="{{ 'selected' if row.selected else 'pending' }}{% if row.current %} current-choice{% endif %}"{% if row.current %} aria-current="step"{% endif %}>
+          <td><input type="checkbox" disabled {% if row.selected %}checked{% endif %} aria-label="{{ row.label }} choice saved"></td>
+          <th scope="row"><span class="parameter-label">{{ row.label }}</span><span class="parameter-description">{{ row.description }}</span></th>
+          <td><span class="parameter-value">{{ row.value }}</span>{% if not row.selected %}<span class="pending-label">pending · inherited</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <dl class="status-results" aria-label="Simulation results">
+      <div><dt>High score</dt><dd>{{ '{:,}'.format(high_score) if high_score is not none else '—' }}</dd></div>
+      <div><dt>Golden score to beat</dt><dd><a href="/simulations/{{ draft.golden_run_id }}">{{ '{:,}'.format(target_score) }}</a></dd></div>
+      <div><dt>Difference</dt><dd>{{ '{:+,}'.format(difference) if difference is not none else '—' }}</dd></div>
+      <div><dt>Outcome</dt><dd>{{ outcome }}</dd></div>
+      <div><dt>Analysis</dt><dd>{{ analysis_status }}</dd></div>
+    </dl>
+    {% else %}
+    <p class="empty">{{ 'No completed experiments recorded yet.' if view == 'completed' else 'No configuration selections recorded yet. Ax3l may still be establishing its initial baseline.' }}</p>
+    {% endif %}
+  </main>
+  <script>
+    const refreshed = document.querySelector('#status-refreshed');
+    const errorMessage = document.querySelector('#status-refresh-error');
+    const card = document.querySelector('#status-card');
+    function markRefreshed() {
+      const now = new Date().toISOString();
+      refreshed.dateTime = now;
+      refreshed.textContent = `${now.slice(0, 10)} ${now.slice(11, 19)} UTC`;
+    }
+    markRefreshed();
+
+    async function refreshStatus() {
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), {{ request_timeout_seconds | tojson }} * 1000);
+      try {
+        const response = await fetch(window.location.href, {cache: 'no-store', signal: controller.signal});
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const page = new DOMParser().parseFromString(await response.text(), 'text/html');
+        const nextCard = page.querySelector('#status-card');
+        if (!nextCard) throw new Error('Missing experiment report');
+        card.replaceChildren(...nextCard.childNodes);
+        markRefreshed();
+        errorMessage.hidden = true;
+      } catch (error) {
+        errorMessage.textContent = 'Refresh failed. Showing the last successful report; retrying in 5 seconds.';
+        errorMessage.hidden = false;
+      } finally {
+        window.clearTimeout(timeout);
+        window.setTimeout(refreshStatus, 5000);
+      }
+    }
+    window.setTimeout(refreshStatus, 5000);
+  </script>
+</body>
+</html>

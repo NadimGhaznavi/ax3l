@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Show experiment progress and completed results in a compact report card and
+identify the application version in the server heading.
+
+### Added
+
+- Experiment Status report with eleven read-only configuration checkboxes,
+  accepted values, pending inherited values, and the next selection highlighted.
+- Live simulation and analysis phases, golden-score comparisons, and a Last
+  completed view that remains available when the next experiment starts.
+- Five-second automatic refresh that retains the last successful report if a
+  refresh fails.
+- Application version and codename beneath Last Refresh at the right of the
+  server heading, using release metadata and matching the timestamp style.
+- Smaller text in the new Experiment Status report; existing fonts are unchanged.
+
 ## [4.1.2] - 2026-11-15 @ 08:34
 
 ### Summary

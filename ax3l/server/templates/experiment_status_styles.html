@@ -1,0 +1,45 @@
+<style>
+  body.experiment-status-page { max-width: 1180px; margin: .5rem auto; font-size: 13px; line-height: 1.4; }
+  .experiment-status-page h1 { font-size: 1.25rem; }
+  .experiment-status-page > header { margin-bottom: .6rem; padding: .6rem 1rem; }
+  .status-toolbar, .status-views, .status-identifiers, .status-progress { display: flex; align-items: center; flex-wrap: wrap; gap: .6rem 1rem; }
+  .status-toolbar { justify-content: space-between; margin: .75rem 0; color: var(--muted); font-size: .8rem; }
+  .status-views a { padding: .3rem .65rem; }
+  .status-views [aria-current="page"] { color: var(--text); background: #23364b; border-color: var(--link); }
+  .status-heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .5rem; padding: .75rem 1rem .5rem; }
+  .status-heading h2 { margin: 0; padding: 0; border: 0; background: transparent; color: var(--link); font-size: 1rem; }
+  .status-view-label { margin: 0 0 .2rem; font-size: .8rem; }
+  .status-identifiers { justify-content: flex-end; font-size: .8rem; color: var(--muted); }
+  .status-identifiers a, .status-results a { border: 0; padding: 0; }
+  .status-progress { padding: 0 1rem; color: var(--muted); font-size: .8rem; }
+  .status-progress progress { height: .5rem; width: 10rem; accent-color: var(--link); }
+  .status-detail { margin: .35rem 1rem .7rem; font-size: .8rem; }
+  .status-checklist .check-column { width: 4rem; }
+  .status-checklist .value-column { width: 13rem; }
+  .status-checklist th { width: auto; }
+  .status-checklist th, .status-checklist td { padding: .3rem .7rem; white-space: normal; vertical-align: middle; }
+  .status-checklist thead th { background: #151f2b; color: var(--muted); font-size: .8rem; }
+  .status-checklist td:first-child { text-align: center; }
+  .status-checklist input { margin: 0; width: 1rem; height: 1rem; accent-color: #7fd9a1; opacity: 1; }
+  .status-checklist .parameter-label { color: var(--text); }
+  .parameter-description { color: var(--muted); font-size: .75rem; margin-left: .8rem; }
+  .pending .parameter-value, .pending-label { color: var(--muted); }
+  .pending-label { font-size: .7rem; margin-left: .6rem; white-space: nowrap; }
+  .current-choice { background: #19334c !important; outline: 1px solid var(--link); outline-offset: -1px; }
+  .status-results { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .75rem; margin: 0; padding: .85rem 1rem; }
+  .status-results dt { color: var(--muted); font-size: .75rem; }
+  .status-results dd { margin: .2rem 0 0; font-size: .8rem; }
+  #status-refresh-error { border: 1px solid var(--border); padding: .5rem 1rem; font-size: .8rem; color: #f5c77e; }
+  @media (max-width: 900px) {
+    .parameter-description { display: block; margin-left: 0; }
+    .status-identifiers { justify-content: flex-start; }
+  }
+  @media (max-width: 600px) {
+    .status-toolbar > span { font-size: .7rem; }
+    .status-checklist .check-column { width: 3.2rem; }
+    .status-checklist .value-column { width: 7rem; }
+    .status-checklist th, .status-checklist td { padding: .4rem; }
+    .pending-label { display: block; margin-left: 0; white-space: normal; }
+    .status-results { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+</style>

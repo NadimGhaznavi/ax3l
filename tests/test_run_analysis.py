@@ -2,6 +2,7 @@
 
 from copy import deepcopy
 import json
+import re
 from pathlib import Path
 import unittest
 from unittest.mock import AsyncMock, Mock, call, patch
@@ -122,16 +123,23 @@ class RunAnalysisTests(unittest.TestCase):
                 self.assertIn('submit_simulation_summary', text)
                 self.assertIn('Example format (invented data', text)
                 self.assertIn('/analysis/' + section, text)
+                self.assertIn('data_tool /run', text)
+                self.assertIn('/run/rules', text)
+                self.assertIn('No theory or causal explanations', text)
+                self.assertIn('optionally one concrete value to try next', text)
+                self.assertNotIn('no settings', text)
                 self.assertNotIn('Configuration:', text)
                 self.assertNotIn('termination_reasons', text)
                 self.assertNotIn(self.run_id, text)
-                self.assertLess(len(text.split()), 130)
+                self.assertLess(len(text.split()), 180)
                 self.assertNotIn('{', text)
                 self.assertNotIn(self.run_id.split('-')[0], text)
                 if section == 'loss':
                     self.assertIn('Facts: episodes: 5; episodes with loss: 3', text)
                 else:
                     self.assertNotIn('episodes with loss:', text)
+                path, value = re.search(r'try ([a-z_.]+)=([0-9.]+) next', text).groups()
+                SimulationConfiguration.value(tuple(path.split('.')), float(value))
 
 
 class SummarySubmissionTests(unittest.TestCase):
@@ -173,6 +181,12 @@ class SummarySubmissionTests(unittest.TestCase):
         self.submit(text='Replacement observation.')
         self.assertEqual(self.sections, {'scores': 'Original observation.'})
         self.experiments.save_analysis_sections.assert_called_once()
+
+    def test_concrete_recommendations_are_saved_with_the_chart_observation(self):
+        summary = 'Recorded loss spiked late; try training.learning_rate=0.001 next.'
+        self.assertEqual(self.submit('loss', summary)['status'], 'ok')
+        self.assertEqual(self.sections['loss'], summary)
+        self.snake.submit_simulation.assert_not_called()
 
     def test_invalid_text_ids_and_sections_are_rejected_before_observation_reads(self):
         for text in ('', 'A. B. C.', 'a' * 1001, True, ' '.join(['word'] * 41)):

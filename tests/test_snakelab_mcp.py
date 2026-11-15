@@ -107,7 +107,7 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
         with ZMQServer('tcp://127.0.0.1:*', handle) as server:
             async with SnakeLabTools(server.endpoint, 'simulation_summary', run_id='bound-run', section='loss') as tools:
                 self.assertEqual([definition['function']['name'] for definition in tools.definitions],
-                                 ['submit_simulation_summary', 'kb_tool'])
+                                 ['submit_simulation_summary', 'kb_tool', 'data_tool'])
                 result = await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('Describe loss.')])
         self.assertEqual(result['status'], 'ok')
         self.assertEqual(len(requests), 1)
@@ -169,10 +169,45 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(feedback, ['Choose hidden size.', 'Unknown data page. Read /.'])
         self.assertNotIn('private-draft', json.dumps(payloads))
 
+    async def test_image_analysis_can_read_its_bound_run_settings_and_recommend_a_value(self):
+        requests = []
+        settings = json.dumps(dict(scope='run', seed=1970, training=dict(learning_rate=.002)))
+        rules = json.dumps(dict(parameters={'training.learning_rate': dict(type='number', minimum=.0005, maximum=.005)}))
+        summary = 'Loss spiked late; try training.learning_rate=0.001 next.'
+        def handle(message):
+            requests.append(message)
+            if message.method == 'read_analysis_data':
+                return dict(status='ok', page=settings if message.payload['url'] == '/run/training' else rules)
+            return dict(status='ok', analysis_run_id='private-run')
+        def reply(name, arguments):
+            return 200, '', json.dumps({'choices': [{'message': {
+                'role': 'assistant', 'tool_calls': [{'id': name, 'type': 'function', 'function': {
+                    'name': name, 'arguments': json.dumps(arguments)}}]}}]}).encode()
+        llm = Mock(url='fixture')
+        llm.complete.side_effect = [reply('data_tool', dict(url='/run/training')),
+                                   reply('data_tool', dict(url='/run/rules')),
+                                   reply('submit_simulation_summary', dict(summary=summary))]
+        with ZMQServer('tcp://127.0.0.1:*', handle) as server:
+            async with SnakeLabTools(server.endpoint, 'simulation_summary', run_id='private-run', section='loss') as tools:
+                definition = next(d['function'] for d in tools.definitions if d['function']['name'] == 'data_tool')
+                self.assertEqual(set(definition['parameters']['properties']), {'url'})
+                self.assertIn('settings that produced this chart', definition['description'])
+                result = await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('Analyze this image.')])
+                self.assertTrue((await tools._client.call_tool('submit_single_value', dict(value=.001))).is_error)
+        self.assertEqual(result['status'], 'ok')
+        self.assertEqual([request.method for request in requests], ['read_analysis_data'] * 2 + ['submit_simulation_summary'])
+        self.assertEqual(requests[0].payload, dict(run_id='private-run', url='/run/training'))
+        self.assertEqual(requests[-1].payload, dict(run_id='private-run', section='loss', summary=summary))
+        payload = json.loads(llm.complete.call_args.args[0])
+        self.assertEqual([m['content'] for m in payload['messages'] if m['role'] == 'tool'], [settings, rules])
+        self.assertNotIn('private-run', json.dumps(payload))
+
     async def test_summary_session_without_section_cannot_submit(self):
         async with SnakeLabTools('tcp://127.0.0.1:1', 'simulation_summary', run_id='bound-run') as tools:
             with self.assertRaises(RuntimeError):
                 await tools.submit({'summary': 'Loss fell.'})
+            with self.assertRaises(RuntimeError):
+                await tools.data({'url': '/run/config'})
 
     async def test_conversation_dispatches_the_discovered_tool_and_returns_its_result(self):
         def handle(message):

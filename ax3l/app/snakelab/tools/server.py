@@ -47,7 +47,7 @@ async def submit_pair_values(value_1: StrictInt | StrictFloat,
     return await SubmitPairValues(endpoint).submit(draft_id, parameter, value_1, value_2)
 
 
-@mcp.tool(description="Save this chart's observation: 1–2 sentences, at most 40 words. Supply summary only, then stop.")
+@mcp.tool(description="Save this chart's observation and optional concrete value to try next: 1–2 sentences, at most 40 words, no theory. Supply summary only, then stop.")
 async def submit_simulation_summary(summary: StrictStr) -> str:
     if parameter != "simulation_summary" or not run_id or section not in DSimulationAnalysis.SECTIONS:
         raise ValueError("Ax3l must bind a completed run and chart before analysis submission")
@@ -65,8 +65,21 @@ async def kb_tool(url: StrictStr) -> str:
                            "source_name": "KnowledgeBase", "prompt": {"role": "user", "content": reason}})
 
 
-@mcp.tool(description="Read one small data page. Start at /draft or /. Follow links for runs, scores, notes, or settings. Data payloads are JSON; null means unrecorded.")
+data_description = (
+    "Read the settings that produced this chart. Start at /run; follow links for settings and allowed value rules. "
+    "Read current values and /run/rules before recommending a value. Data payloads are JSON."
+    if parameter == "simulation_summary" else
+    "Read one small data page. Start at /draft or /. Follow links for runs, scores, notes, or settings. "
+    "Data payloads are JSON; null means unrecorded."
+)
+
+
+@mcp.tool(description=data_description)
 async def data_tool(url: StrictStr) -> str:
+    if parameter == "simulation_summary":
+        if not run_id or section not in DSimulationAnalysis.SECTIONS:
+            raise ValueError("Ax3l must bind a completed run and chart before settings lookup")
+        return await ReadSimulationData(os.environ.get("AX3L_ZMQ_ENDPOINT")).read_run(run_id, url)
     if (parameter not in SINGLE_PARAMETERS and parameter not in PAIR_PARAMETERS) or not draft_id:
         raise ValueError("Ax3l must bind a configuration choice before data lookup")
     return await ReadSimulationData(os.environ.get("AX3L_ZMQ_ENDPOINT")).read(draft_id, url)

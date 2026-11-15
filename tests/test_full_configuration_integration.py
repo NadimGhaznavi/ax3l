@@ -80,13 +80,23 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
                 request = json.loads(payload)
                 tool = request['tools'][0]['function']['name']
                 if tool == 'submit_simulation_summary':
-                    self_test.assertEqual(len(request['messages']), 1)
-                    self_test.assertEqual(request['messages'][-1]['content'][1]['type'], 'image_url')
+                    self_test.assertEqual(request['messages'][0]['content'][1]['type'], 'image_url')
                     content = request['messages'][0]['content'][0]['text']
                     label = next(label for label in DSimulationAnalysis.SECTIONS.values()
                                  if f'Task: {label} ' in content)
-                    analysis_tasks.append(label)
-                    arguments = {'summary': f'{label} observation.'}
+                    pages = [message['content'] for message in request['messages'] if message['role'] == 'tool']
+                    paths = ['/run/config', '/run/rules']
+                    if len(pages) < len(paths):
+                        tool, arguments = 'data_tool', dict(url=paths[len(pages)])
+                    else:
+                        run_id = candidate_id if calls else baseline_id
+                        self_test.assertEqual(json.loads(pages[0])['config'], results[run_id]['config'])
+                        rules = json.loads(pages[1])['parameters']
+                        self_test.assertEqual(rules['training.learning_rate']['maximum'], .005)
+                        self_test.assertEqual(rules['epsilon_nice.steps']['maximum'], 50)
+                        self_test.assertNotIn(run_id.split('-')[0], '\n'.join(pages))
+                        analysis_tasks.append(label)
+                        arguments = {'summary': f'{label} observation. Try training.learning_rate=0.001 next.'}
                 else:
                     self_test.assertEqual(calls, [])
                     content = request['messages'][1]['content']
@@ -124,6 +134,7 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
         with patch('ax3l.app.snakelab.SnakeLabLoop.SnakeLab', return_value=snake), \
                 patch('ax3l.app.snakelab.SubmitSingleValueHandler.SnakeLab', return_value=snake), \
                 patch('ax3l.app.snakelab.SubmitSimulationSummaryHandler.SnakeLab', return_value=snake), \
+                patch('ax3l.interface.SimulationData.SnakeLab', return_value=snake), \
                 patch('ax3l.app.snakelab.AnalyzeRun.render_analysis', return_value=b'png'), \
                 patch.object(ExperimentDb, 'save_draft', save_and_stop), \
                 ZMQServer('tcp://127.0.0.1:*', handle_tool) as server:
@@ -132,6 +143,7 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(calls), 1)
         self.assertEqual(analysis_tasks, list(DSimulationAnalysis.SECTIONS.values()) * 2)
         self.assertEqual(calls[0]['model']['hidden_size'], 240)
+        self.assertEqual(calls[0]['training']['learning_rate'], .003)
         self.assertEqual(calls[0]['epsilon_nice'], {'probability': .01, 'steps': 40})
         self.assertEqual(EventLogDb(db).current_golden_config()['process_id'], candidate_id)
         draft = ExperimentDb(db).draft()
@@ -140,6 +152,7 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
         saved = ExperimentDb(db).analysis(candidate_id)
         self.assertEqual(saved.metrics['termination_reasons']['wall'], {'count': 3, 'percent': 30})
         self.assertEqual(saved.metrics['termination_reasons']['snake'], {'count': 7, 'percent': 70})
+        self.assertIn('Try training.learning_rate=0.001 next.', saved.summary)
         rows = db.query("SELECT name, COUNT(*) AS n FROM events WHERE event_id>%s AND name IN ('simulation_analyzed','simulation_analysis_progress','simulation_submitted','configuration_compared') GROUP BY name", (first_event,))
         self.assertEqual({row['name']: row['n'] for row in rows},
                          {'simulation_analyzed': 2, 'simulation_analysis_progress': 4,

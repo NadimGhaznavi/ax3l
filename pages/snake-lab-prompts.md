@@ -16,7 +16,7 @@ analysis before the next configuration choice and reuses saved observations.
 | Prompt | Purpose |
 | --- | --- |
 | `ProjectContext` | States the high-score goal and task boundary; points to short KB guides for background. |
-| `AnalyzeSimulation` | Asks one question about score trends, score distribution, or training loss. Supplies one PNG, relevant facts, an invented example, and the chart's KB URL. Requests 1–2 sentences, at most 40 words, through `submit_simulation_summary`. |
+| `AnalyzeSimulation` | Asks one question about score trends, score distribution, or training loss. Supplies one PNG, relevant facts, an invented example, and links to the chart's guide and original run settings. Requests an observation and optional concrete value to try next in 1–2 sentences, at most 40 words, without theory. |
 | `ConfigurationChoice` | Names one choice and the score to beat; directs Qwen to `data_tool` for the draft and reference runs. Choice rules use English in the submission tool description. |
 | `InvalidValue` | Returns an explicit validation rejection within the current conversation. |
 | `NoDupes` | Rejects a duplicate completed draft and requests different values for its final pair. |
@@ -45,7 +45,17 @@ retain their types and precision; missing statistics are JSON null. Only the
 requested page is returned. Full identifiers stay in storage and transport.
 Chart facts also use compact English labels.
 
-Saved interpretations describe the run's intrinsic behavior. Current roles
+Image-analysis sessions also receive `data_tool`, bound privately to the run
+that produced the chart. `/run` links to the full configuration at `/run/config`,
+the five individual settings sections, and `/run/rules` for current tunable
+constraints. These reads do not require a saved analysis. Before recommending
+a concrete value, Qwen must inspect the current setting and its allowed domain.
+An observation may include one value to try next, without theory or causal
+explanations. Recommendations are saved for later choices; they do not change
+the completed run's configuration.
+
+Saved interpretations describe the run's behavior and may recommend a concrete
+value to try in a later experiment. Current roles
 and score comparisons are added when building selection context. One run can
 serve several roles without repeated context or repeated vision inference.
 Different-seed results remain explicitly identified as historical context.
@@ -54,7 +64,7 @@ the final submission combines all three observations for later parameter choices
 without another LLM call.
 
 Each response requires exactly one call to the assigned submission tool or
-`kb_tool`, or (for choices) `data_tool`. A read continues the conversation; the assigned submission finishes
+`kb_tool`, or `data_tool`. A read continues the conversation; the assigned submission finishes
 it. A missing or unexpected tool call stops the conversation; explicit validation
 rejections receive feedback.
 Prompt events store the exact text/image snapshot supplied to Qwen.

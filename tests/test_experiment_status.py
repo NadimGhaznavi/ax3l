@@ -11,7 +11,7 @@ from urllib.error import HTTPError
 from urllib.request import urlopen
 from uuid import uuid4
 
-from ax3l.activity.ExperimentStatus import experiment_status
+from ax3l.activity.ExperimentStatus import _elapsed, experiment_status
 from ax3l.app.DbMgr import DbMgr
 from ax3l.app.snakelab.ExperimentDb import ExperimentDb
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
@@ -27,6 +27,33 @@ class ExperimentStatusTests(unittest.TestCase):
 
     def report(self, **kwargs):
         return experiment_status(self.draft, golden=self.golden, **kwargs)
+
+    def test_elapsed_uses_minutes_and_seconds_until_one_hour(self):
+        for seconds, expected in [
+            (None, '—'), (0, '00:00'), (0.05, '00:00'), (15, '00:15'),
+            (59.999, '00:59'), (60, '01:00'), (70, '01:10'),
+            (3599.999, '59:59'), (3600, '01:00:00'), (3661, '01:01:01'),
+        ]:
+            with self.subTest(seconds=seconds):
+                self.assertEqual(_elapsed(seconds), expected)
+
+    def test_totals_sum_recorded_steps_and_count_paired_choices_once(self):
+        self.assertEqual(self.report()['totals'], dict(
+            elapsed='00:00', input_tokens=0, output_tokens=0, tokens=0))
+        activity = {
+            'hidden_size': dict(image_event_id=None, steps=[
+                dict(seconds=0.6, input_tokens=0, output_tokens=0),
+                dict(seconds=None, input_tokens=None, output_tokens=None),
+            ]),
+            'epsilon_pair': dict(image_event_id=None, steps=[
+                dict(seconds=0.6, input_tokens=1234, output_tokens=321),
+            ]),
+            'reward_pair': dict(image_event_id=None, steps=[
+                dict(seconds=3600, input_tokens=1350, output_tokens=50),
+            ]),
+        }
+        self.assertEqual(self.report(activity=activity)['totals'], dict(
+            elapsed='01:00:01', input_tokens=2584, output_tokens=371, tokens=2955))
 
     def test_saved_unchanged_values_count_and_paired_rows_advance_together(self):
         self.assertEqual(self.report()['phase'], 'Choosing Hidden Size')
@@ -217,17 +244,38 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         self.assertIn('class="choice-chart" href="/events/4"', page)
         self.assertIn('Render score trends chart', page)
         self.assertIn('Read data /latest/scores', page)
-        self.assertIn('0.050 s', page)
-        self.assertIn('00:01:10', page)
-        self.assertIn('15.000 s', page)
-        self.assertIn('00:05:00', page)
+        self.assertIn('class="item-elapsed">00:00</td>', page)
+        self.assertIn('class="item-elapsed">01:10</td>', page)
+        self.assertIn('class="item-elapsed">00:15</td>', page)
+        self.assertIn('class="item-elapsed">05:00</td>', page)
         self.assertIn('>Running</td>', page)
         self.assertIn('>Input tokens</th>', page)
         self.assertIn('>Output tokens</th>', page)
         for count in ('1,234', '321', '1,350', '50'):
             self.assertEqual(page.count(f'class="item-tokens">{count}</td>'), 1)
-        self.assertNotIn('status-total', page)
+        footer = page.split('<tfoot>')[1].split('</tfoot>')[0]
+        self.assertIn('class="item-elapsed">06:26</td>', footer)
+        self.assertIn('class="item-tokens">2,584</td>', footer)
+        self.assertIn('class="item-tokens">371</td>', footer)
+        self.assertIn('>Total tokens</th>', footer)
+        self.assertIn('class="item-tokens" colspan="2">2,955</td>', footer)
         self.assertEqual(page.count('>Qwen request</th>'), 3)
+        for recorded in self.experiments.choice_events.return_value:
+            recorded['observed_at'] += timedelta(seconds=5)
+        page = self.get()
+        self.assertIn('class="item-elapsed">06:31</td>', page)
+        self.experiments.choice_events.return_value.append(
+            event(12, 'reply_received', 405, parent=3,
+                  detail=json.dumps(dict(prompt_tokens=2000, completion_tokens=400))))
+        page = self.get()
+        footer = page.split('<tfoot>')[1].split('</tfoot>')[0]
+        self.assertIn('class="item-elapsed">06:31</td>', footer)
+        self.assertIn('class="item-tokens">4,584</td>', footer)
+        self.assertIn('class="item-tokens">771</td>', footer)
+        self.assertIn('class="item-tokens" colspan="2">5,355</td>', footer)
+        for recorded in self.experiments.choice_events.return_value:
+            recorded['observed_at'] += timedelta(seconds=5)
+        self.assertIn('class="item-elapsed">06:31</td>', self.get())
 
     def test_image_endpoint_returns_latest_exact_png_and_missing_images_are_unlinked(self):
         run_id = str(uuid4())

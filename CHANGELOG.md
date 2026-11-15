@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Use consistent durations and show running elapsed-time and token totals in
+Experiment Status.
+
+### Changed
+
+- Display setup-step durations as `MM:SS`, switching to `HH:MM:SS` at one hour.
+
+### Added
+
+- Running totals beneath the setup steps for elapsed time, input tokens, and
+  output tokens, followed by a combined token total on the next line.
+
 ## [4.4.2] - 2026-11-15 @ 16:55
 
 ### Summary

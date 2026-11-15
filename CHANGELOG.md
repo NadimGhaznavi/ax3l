@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.3.3] - 2026-11-15 @ 11:57
+
+### Summary
+
+Limit EpsilonNice detour probability to 10% and duration to 50 moves.
+
+### Fixed
+
+- Reject EpsilonNice probabilities above 0.1 and step counts above 50 in
+  configuration choices and complete simulation configurations. Qwen's tool
+  instructions and exploration guide reflect the same limits.
+
 ## [4.3.2] - 2026-11-15 @ 11:45
 
 ### Summary

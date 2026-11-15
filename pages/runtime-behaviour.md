@@ -43,8 +43,8 @@ next five-second refresh. Qwen chooses the following settings in order:
 | Epsilon: decay | Multiplier applied to epsilon after each episode. | Numbers from 0.9 to 0.999. | Epsilon: initial |
 | Food Reward: closer | Reward for moving closer to the food. | 0, 0.1, 0.25, 0.5, 1, 2, 3, 4, 5, 6. | Food Reward: further |
 | Food Reward: further | Penalty for moving farther from the food. | -6, -5, -4, -3, -2, -1, -0.5, -0.25, -0.1, 0. | Food Reward: closer |
-| EpsilonNice: probability | Chance per eligible move of starting a safe detour. | Numbers greater than 0 and at most 1. | EpsilonNice: steps |
-| EpsilonNice: steps | Duration of each detour, reset each episode. | Integers from 1 to 1000. | EpsilonNice: probability |
+| EpsilonNice: probability | Chance per eligible move of starting a safe detour. | Numbers greater than 0 and at most 0.1 (10%). | EpsilonNice: steps |
+| EpsilonNice: steps | Duration of each detour, reset each episode. | Integers from 1 to 50. | EpsilonNice: probability |
 
 The epsilon settings, distance rewards, and EpsilonNice settings are chosen in
 pairs. The sum of the two distance rewards must be non-positive. Seeds and

@@ -40,6 +40,8 @@ class EpsilonNiceComparisonTests(unittest.TestCase):
         instructions = FirstContactEpsilonNicePair().to_md()
         for text in ('probability', 'steps', 'positive', '500-episode', 'next move'):
             self.assertIn(text, instructions)
+        self.assertIn('value_1 = start chance: number; above 0; at most 0.1.', instructions)
+        self.assertIn('value_2 = moves per detour: whole number; at least 1; at most 50.', instructions)
 
     def test_interface_closes_connection_on_success_and_failure(self):
         run = 'f6e72cb3-9bcf-4669-b368-a17c656bad79'

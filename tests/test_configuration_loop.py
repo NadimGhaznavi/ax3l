@@ -7,6 +7,8 @@ import unittest
 from unittest.mock import ANY, AsyncMock, Mock, patch
 from uuid import uuid4
 
+from jsonschema import ValidationError
+
 from ax3l.app.snakelab.SnakeLabLoop import optimize, SimulationUnsuccessful, submit_draft
 from ax3l.app.snakelab.SubmitSingleValueHandler import SubmitSingleValueHandler
 from ax3l.app.snakelab.SubmitPairValuesHandler import SubmitPairValuesHandler
@@ -282,6 +284,19 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.store.saved.config['seed'], self.config['seed'] + 1)
         prompt = self.conversation.await_args.args[4][-1].to_md()
         self.assertIn("beat golden's 30 points", prompt)
+
+    def test_ready_drafts_cannot_submit_epsilon_nice_values_above_either_cap(self):
+        for probability, steps in ((.1, 51), (.11, 50)):
+            with self.subTest(probability=probability, steps=steps):
+                draft = self.draft(8, 'ready')
+                draft.config['epsilon_nice'].update(probability=probability, steps=steps)
+                original = deepcopy(draft)
+                with self.assertRaises(ValidationError):
+                    submit_draft(self.snake, self.db, self.store, draft)
+                self.assertEqual(draft, original)
+                self.assertIsNone(self.store.saved)
+        self.snake.submit_simulation.assert_not_called()
+        self.db.log.assert_not_called()
 
     def test_submission_intent_survives_transport_failure(self):
         draft = self.draft(8, 'ready')

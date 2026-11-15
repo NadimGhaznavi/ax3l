@@ -45,10 +45,29 @@ class SimulationPolicyTests(unittest.TestCase):
             config['game']['rewards'].update(closer_to_food=float(closer), further_from_food=float(further))
             SimulationConfiguration.validate(config)
             upstream.validate(config)
-        for probability, steps in ((.0001, 1), (.01, 40), (1, 1000)):
+        for probability, steps in ((.0001, 1), (.01, 40), (.1, 50)):
             config['epsilon_nice'].update(probability=probability, steps=steps)
             SimulationConfiguration.validate(config)
             upstream.validate(config)
+
+    def test_epsilon_nice_limits_apply_to_field_choices_and_complete_configurations(self):
+        for probability, steps in ((.0001, 1), (.005, 20), (.1, 50)):
+            with self.subTest(probability=probability, steps=steps):
+                self.assertEqual(SimulationConfiguration.value(('epsilon_nice', 'probability'), probability), probability)
+                self.assertEqual(SimulationConfiguration.value(('epsilon_nice', 'steps'), steps), steps)
+                config = SimulationConfiguration.defaults()
+                config['epsilon_nice'].update(probability=probability, steps=steps)
+                SimulationConfiguration.validate(config)
+        for field, values in (('probability', (0, .100001, .11, 1)), ('steps', (0, 51, 60, 1000))):
+            for value in values:
+                with self.subTest(field=field, value=value):
+                    with self.assertRaises(ValidationError):
+                        SimulationConfiguration.value(('epsilon_nice', field), value)
+                    config = SimulationConfiguration.defaults()
+                    config['epsilon_nice'][field] = value
+                    with self.assertRaises(ValidationError) as error:
+                        SimulationConfiguration.validate(config)
+                    self.assertEqual(list(error.exception.absolute_path), ['epsilon_nice', field])
 
     def test_positive_reward_loops_and_nonfinite_proposals_are_rejected(self):
         config = SimulationConfiguration.defaults()

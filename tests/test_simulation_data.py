@@ -146,3 +146,74 @@ class SimulationDataTests(unittest.TestCase):
             'Score trends: "flat".\nTraining loss: missing — path \\loss.')
         self.assertEqual(self.payload('/latest/notes')['summary'], self.analyses[self.latest].summary)
         self.assertIs(self.payload('/best')['same_seed_as_draft'], False)
+
+
+class AnalysisRunDataTests(unittest.TestCase):
+    def setUp(self):
+        self.store = self.enterContext(patch('ax3l.interface.SimulationData.ExperimentDb')).return_value
+        self.snake = self.enterContext(patch('ax3l.interface.SimulationData.SnakeLab')).return_value
+        self.run_id = str(uuid4())
+        self.config = SimulationConfiguration.defaults()
+        self.config['training']['learning_rate'] = .003
+        self.config['epsilon_nice']['steps'] = 40
+        self.snake.get_run_result.return_value = dict(status='completed', config=self.config)
+        self.data = SimulationData(Mock())
+
+    def read(self, url):
+        return self.data.read_run(dict(run_id=self.run_id, url=url))
+
+    def test_chart_settings_are_original_run_values_without_waiting_for_saved_analysis(self):
+        original = deepcopy(self.config)
+        pending, pages = ['/run'], {}
+        while pending:
+            url = pending.pop()
+            if url in pages:
+                continue
+            result = self.read(url)
+            self.assertEqual(result['status'], 'ok', url)
+            page = pages[url] = result['page']
+            self.assertNotIn(self.run_id, page)
+            self.assertLessEqual(len(page.split()), 220, url)
+            pending.extend(re.findall(r'\]\(([^)]+)\)', page))
+        self.assertEqual(len(pages), 8)
+        self.assertEqual(json.loads(pages['/run/config'])['config'], original)
+        self.assertEqual(json.loads(pages['/run/training'])['training']['learning_rate'], .003)
+        self.assertEqual(json.loads(pages['/run/exploration'])['epsilon_nice']['steps'], 40)
+        self.assertEqual(self.read('/')['page'], pages['/run'])
+        for call in self.snake.get_run_result.call_args_list:
+            self.assertEqual(call.args, (self.run_id,))
+        self.store.analysis.assert_not_called()
+        self.store.draft.assert_not_called()
+        self.store.save_draft.assert_not_called()
+        self.store.save_analysis.assert_not_called()
+        self.assertEqual(self.config, original)
+
+    def test_recommendation_rules_use_current_schema_limits_and_only_tunable_fields(self):
+        data = json.loads(self.read('/run/rules')['page'])
+        parameters = data['parameters']
+        self.assertEqual(parameters['training.learning_rate']['maximum'], .005)
+        self.assertEqual(parameters['epsilon_nice.probability']['maximum'], .1)
+        self.assertEqual(parameters['epsilon_nice.steps']['maximum'], 50)
+        self.assertEqual(parameters['model.hidden_size']['multipleOf'], 16)
+        self.assertNotIn('seed', parameters)
+        self.assertNotIn('epochs', parameters)
+        self.assertNotIn('model.heads', parameters)
+        self.assertEqual(data['reward_pair_rule'], 'closer_to_food + further_from_food <= 0')
+
+    def test_invalid_bindings_and_paths_are_rejected_before_run_lookup(self):
+        for url in ('/draft', '/latest/training', '/run/notes', '/run/../config',
+                    '/run/config?run_id=other', 'https://example.com'):
+            with self.subTest(url=url):
+                self.assertEqual(self.read(url)['status'], 'rejected')
+        for payload in (None, {}, dict(run_id='bad-id', url='/run'), dict(run_id=True, url='/run'),
+                        dict(run_id=self.run_id, url=1),
+                        dict(run_id=self.run_id, draft_id='other', url='/run/config')):
+            with self.subTest(payload=payload):
+                self.assertEqual(self.data.read_run(payload)['status'], 'rejected')
+        self.snake.get_run_result.assert_not_called()
+
+    def test_missing_or_unfinished_run_is_a_workflow_error(self):
+        for result in (None, dict(status='running'), dict(status='failed')):
+            self.snake.get_run_result.return_value = result
+            with self.subTest(result=result), self.assertRaisesRegex(RuntimeError, 'completed simulation'):
+                self.read('/run/config')

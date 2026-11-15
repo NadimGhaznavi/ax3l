@@ -37,10 +37,13 @@ conversations, each with one static PNG and one question:
 3. Training loss: does recorded mean Smooth L1 loss rise, fall, or stabilize,
    with spikes or gaps for unrecorded measurements?
 
-Each prompt includes only relevant measured facts and an explicitly invented
-answer example. Qwen submits 1–2 sentences, at most 40 words, about that chart
-and stops. Analysis prompts omit the general project context and full
-configuration. Accepted sections are durable; a restart resumes the first
+Each prompt includes relevant measured facts and an explicitly invented answer
+example. Qwen submits 1–2 sentences and at most 40 words about that chart and
+may recommend one concrete value to try next. It must read the current setting
+and allowed domain first, without explaining theory or diagnosing causes.
+Analysis prompts link to the original run's configuration through `data_tool`;
+they omit the general project context and inline configuration dumps.
+Accepted sections are durable; a restart resumes the first
 unfinished section. The final submission combines the three labeled observations
 into the saved analysis without a fourth LLM conversation. Later parameter
 choices can request all three observations through each run's notes page.
@@ -82,6 +85,14 @@ JSON null, and saved observations are JSON strings. Settings retain their
 configuration keys and numeric types. Selection rules use English in the
 submission tool's description.
 
+For image analysis, `data_tool` is bound to the completed simulation that
+produced the chart. Start at `/run`; `/run/config` returns its full JSON
+configuration, and the five settings pages expose smaller slices. `/run/rules`
+returns the tunable fields' current schema constraints and reward-pair rule.
+These reads use the original simulation record rather than its unfinished
+analysis. Recommendations are saved as advice and remain subject to validation
+when later configuration choices are submitted.
+
 Every parameter conversation can browse saved analyses for:
 
 - The latest completed simulation, including unsuccessful proposals.
@@ -100,7 +111,7 @@ draft and its previously selected settings before choosing.
 
 The stdio entry point is `python -m ax3l.app.snakelab.tools`. Ax3l starts a private
 MCP session for each conversation and sends the assigned submission tool plus
-`kb_tool` to LlamaSrv. Selection sessions also receive `data_tool`. Submission
+`kb_tool` and `data_tool` to LlamaSrv. Submission
 and data functions forward requests over ZeroMQ; Ax3l owns validation,
 persistence, and reads through `ExperimentDb` and the shared `DbMgr`.
 KB reads use only the explicitly addressed local page. Reads never save choices
@@ -113,7 +124,7 @@ JSON data; transport envelopes and full identifiers remain internal.
 | `submit_pair_values` | `value_1`, `value_2` | Draft UUID and assigned pair |
 | `submit_simulation_summary` | `summary` | Completed run UUID and chart section |
 | `kb_tool` | `url` | Allowlisted local reference pages |
-| `data_tool` | `url` | Draft UUID and its frozen reference runs |
+| `data_tool` | `url` | Selection draft and frozen references, or the image's simulation run |
 
 `AX3L_CONVERSATION_PARAMETER` identifies the single, pair, or `simulation_summary`.
 `AX3L_CONFIGURATION_DRAFT` binds selection sessions;

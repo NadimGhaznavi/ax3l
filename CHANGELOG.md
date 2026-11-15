@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.1.2] - 2026-11-15 @ 08:34
+
 ### Summary
 
 Give Qwen an explicit beginning-versus-end score comparison with both averages

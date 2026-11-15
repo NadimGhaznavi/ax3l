@@ -46,7 +46,7 @@ class SimulationConfiguration:
     def validate_reward_pair(closer: int | float, further: int | float) -> None:
         if not SimulationConfiguration.reward_pair_allowed(closer, further):
             raise ValidationError(
-                "closer_to_food + further_from_food must be <= 0 to avoid rewarding loops",
+                "closer reward + farther reward must be at most zero to avoid rewarding loops",
                 path=("game", "rewards"),
             )
 

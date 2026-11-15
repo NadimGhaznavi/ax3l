@@ -27,9 +27,9 @@ async def analyze_run(snake, llm, output, db, endpoint, run_id: str, target_scor
             continue
         experiments.save_analysis_task(AnalysisTask(run_id, section, "preparing"))
         try:
-            png = await asyncio.to_thread(render_analysis, run_id, result["config"], episodes,
+            png = await asyncio.to_thread(render_analysis, result["config"], episodes,
                                           metrics, target_score, section)
-            prompt = AnalyzeSimulation(run_id, result["config"], metrics, png, section)
+            prompt = AnalyzeSimulation(result["config"], metrics, png, section)
             async with SnakeLabTools(endpoint, "simulation_summary", run_id=run_id, section=section) as tools:
                 experiments.save_analysis_task(AnalysisTask(run_id, section, "analyzing"))
                 await converse(llm, output, db, tools, [prompt],

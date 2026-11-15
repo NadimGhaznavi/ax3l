@@ -33,7 +33,7 @@ def measure(episodes: list[dict], high_score: int) -> dict:
     }
 
 
-def render_analysis(run_id: str, config: dict, episodes: list[dict], metrics: dict,
+def render_analysis(config: dict, episodes: list[dict], metrics: dict,
                     target_score: int, section: str) -> bytes:
     figure = go.Figure()
     numbers = [episode["episode"] for episode in episodes]
@@ -72,7 +72,7 @@ def render_analysis(run_id: str, config: dict, episodes: list[dict], metrics: di
     figure.update_xaxes(title_text=x_label)
     figure.update_yaxes(title_text=y_label, rangemode="tozero")
     figure.update_layout(
-        title=dict(text=f"{title} — {run_id.split('-')[0]}<br>"
+        title=dict(text=f"{title}<br>"
                    f"<sup>Goal: improve the simulation high score | Seed {config['seed']} | "
                    f"{metrics['episodes']} episodes | High score {metrics['high_score']} points</sup>"),
         template="plotly_white", width=1100, height=650, font=dict(size=17),

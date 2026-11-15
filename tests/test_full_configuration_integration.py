@@ -16,6 +16,7 @@ from ax3l.app.snakelab.ExperimentDb import ExperimentDb
 from ax3l.app.snakelab.SnakeLabLoop import optimize
 from ax3l.entities.ConfigurationDraft import PARAMETER_ORDER
 from ax3l.constants.DSimulationAnalysis import DSimulationAnalysis
+from ax3l.constants.DChoice import CHOICE_LABELS
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 from ax3l.server.ToolHandler import handle_tool
 from ax3l.zmq.ZMQServer import ZMQServer
@@ -88,14 +89,22 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
                     arguments = {'summary': f'{label} observation.'}
                 else:
                     self_test.assertEqual(calls, [])
-                    content = request['messages'][-1]['content']
-                    for label in DSimulationAnalysis.SECTIONS.values():
-                        self_test.assertIn(f'{label}: {label} observation.', content)
-                    parameter = next(name for name in PARAMETER_ORDER if f'Choose {name}.' in content)
-                    selections.append(parameter)
-                    value = values[parameter]
-                    arguments = ({'value_1': value[0], 'value_2': value[1]} if isinstance(value, tuple)
-                                 else {'value': value})
+                    content = request['messages'][1]['content']
+                    parameter = next(name for name in PARAMETER_ORDER if f'Choose {CHOICE_LABELS[name]}.' in content)
+                    pages = [message['content'] for message in request['messages'] if message['role'] == 'tool']
+                    paths = ['/draft', '/', '/latest/notes']
+                    if len(pages) < len(paths):
+                        tool, arguments = 'data_tool', {'url': paths[len(pages)]}
+                    else:
+                        for label in DSimulationAnalysis.SECTIONS.values():
+                            self_test.assertIn(f'{label}: {label} observation.', pages[-1])
+                        if selections:
+                            self_test.assertIn('hidden size: 240 (chosen)', pages[0])
+                        self_test.assertNotIn(baseline_id.split('-')[0], '\n'.join(pages))
+                        selections.append(parameter)
+                        value = values[parameter]
+                        arguments = ({'value_1': value[0], 'value_2': value[1]} if isinstance(value, tuple)
+                                     else {'value': value})
                 return 200, '', json.dumps({'choices': [{'message': {
                     'role': 'assistant', 'content': None, 'tool_calls': [{
                         'id': str(uuid4()), 'type': 'function', 'function': {

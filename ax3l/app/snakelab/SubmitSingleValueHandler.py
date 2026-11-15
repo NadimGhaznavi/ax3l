@@ -10,6 +10,7 @@ from ax3l.app.snakelab.ExperimentDb import ExperimentDb
 from ax3l.app.snakelab.prompts.InvalidValue import InvalidValue
 from ax3l.app.snakelab.prompts.NoDupes import NoDupes
 from ax3l.constants.DEventCategory import DEventCategory
+from ax3l.constants.DChoice import CHOICE_LABELS
 from ax3l.entities.ConfigurationDraft import PARAMETER_ORDER
 from ax3l.interface.SnakeLab import SnakeLab
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
@@ -46,7 +47,7 @@ class SubmitSingleValueHandler:
         try:
             value = SimulationConfiguration.value(path, value)
         except ValidationError as error:
-            return self._reject(f"{parameter}: {error.message}")
+            return self._reject(f"{CHOICE_LABELS[parameter]}: {error.message}")
 
         return self._stage_changes(payload["draft_id"], parameter, [(path, value)])
 

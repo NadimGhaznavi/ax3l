@@ -146,7 +146,7 @@ class LoopTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(sum(c.args[0] == 'reply_received' for c in logs), 1)
                 self.assertEqual(logs[-1].args[0], 'conversation_ended')
                 self.assertEqual(logs[-1].args[2], 'ERROR')
-                self.assertIn('Expected exactly one submit_single_value or kb_tool tool call', logs[-1].args[3])
+                self.assertIn('Expected exactly one submit_single_value tool call', logs[-1].args[3])
 
     async def test_ambiguous_tool_failure_stops_without_resubmission(self):
         llm, db = Mock(url='fixture'), Mock()

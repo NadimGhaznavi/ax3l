@@ -14,6 +14,7 @@ from ax3l.app.DbMgr import DbMgr
 from ax3l.app.snakelab.ExperimentDb import ExperimentDb
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
+from ax3l.entities.AnalysisTask import AnalysisTask
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 from ax3l.server.ReportingServer import make_server
 
@@ -106,6 +107,47 @@ class ExperimentStatusTests(unittest.TestCase):
                 self.assertEqual(report['difference'], score - target)
                 self.assertEqual(report['outcome'], 'Golden retained')
 
+    def test_preparing_references_groups_shared_runs_and_shows_the_active_image(self):
+        run_id, best_id = self.draft.golden_run_id, str(uuid4())
+        self.draft.phase = 'preparing'
+        self.draft.references = dict(latest=run_id, golden=run_id, all_time_best=best_id)
+        states = {
+            run_id: dict(analysis=None, sections={'scores': 'Saved.'},
+                         task=AnalysisTask(run_id, 'distribution', 'analyzing')),
+            best_id: dict(analysis=SimulationAnalysis(best_id, {}, {}, 'Saved.'), sections={}, task=None),
+        }
+        report = self.report(reference_states=states)
+        self.assertEqual(report['phase'], 'Preparing references')
+        self.assertIn('Analyzing distribution image', report['detail'])
+        self.assertEqual(len(report['prerequisites']), 2)
+        current, best = report['prerequisites']
+        self.assertEqual(current['label'], 'Latest simulation / Current golden')
+        self.assertFalse(current['selected'])
+        self.assertTrue(current['current'])
+        self.assertTrue(best['selected'])
+        self.assertFalse(any(row['current'] for row in report['rows']))
+        for phase in ('preparing', 'failed', 'stopped'):
+            states[run_id]['task'] = AnalysisTask(run_id, 'distribution', phase)
+            report = self.report(reference_states=states)
+            self.assertIn('distribution image', report['prerequisites'][0]['value'])
+            if phase in ('failed', 'stopped'):
+                self.assertEqual(report['phase'], 'Reference analysis ' + phase)
+        states[run_id]['analysis'] = SimulationAnalysis(run_id, {}, {}, 'Saved.')
+        self.draft.phase = 'choosing'
+        report = self.report(reference_states=states)
+        self.assertTrue(all(row['selected'] for row in report['prerequisites']))
+        self.assertTrue(all(row['value'] == 'Complete' for row in report['prerequisites']))
+
+    def test_result_analysis_reports_the_recorded_task_and_failure(self):
+        self.draft.phase, self.draft.run_id = 'submitted', str(uuid4())
+        for phase in ('preparing', 'analyzing', 'failed', 'stopped'):
+            report = self.report(run=dict(status='completed', high_score=25),
+                                 comparison={'current_golden_run_id': self.draft.run_id},
+                                 task=AnalysisTask(self.draft.run_id, 'loss', phase))
+            self.assertIn('training loss image', report['detail'])
+            if phase in ('failed', 'stopped'):
+                self.assertEqual(report['phase'], 'Analysis ' + phase)
+
 
 class ExperimentStatusHttpTests(unittest.TestCase):
     def setUp(self):
@@ -118,6 +160,10 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         self.experiments.comparison.return_value = None
         self.experiments.analysis.return_value = None
         self.experiments.analysis_sections.return_value = {}
+        self.experiments.analysis_states.side_effect = lambda run_ids: {
+            run_id: dict(analysis=self.experiments.analysis(run_id),
+                         sections=self.experiments.analysis_sections(run_id), task=None)
+            for run_id in run_ids}
         self.snake.get_run_result.return_value = dict(status='completed', high_score=0)
         server = make_server('127.0.0.1', 0)
         thread = Thread(target=server.serve_forever, daemon=True)
@@ -178,6 +224,27 @@ class ExperimentStatusHttpTests(unittest.TestCase):
             self.get()
         self.assertEqual(error.exception.code, 500)
         self.db.close.assert_called_once()
+
+    def test_prerequisites_are_in_the_same_table_and_refresh_before_choices(self):
+        run_id = self.draft.golden_run_id
+        self.draft.phase = 'preparing'
+        self.draft.references = dict(latest=run_id, golden=run_id, all_time_best=run_id)
+        state = dict(analysis=None, sections={}, task=AnalysisTask(run_id, 'scores', 'preparing'))
+        self.experiments.analysis_states.side_effect = lambda run_ids: {run_id: state}
+        page = self.get()
+        self.assertEqual(page.count('<table '), 1)
+        self.assertLess(page.index('>Pre-Requisites</th>'), page.index('>Configuration</th>'))
+        self.assertIn('Preparing score trends image', page)
+        self.assertIn('Latest simulation / Current golden / All-time best', page)
+        self.assertEqual(page.count('type="checkbox" disabled'), 12)
+        self.assertEqual(page.count('disabled checked'), 0)
+        state['task'] = AnalysisTask(run_id, 'scores', 'analyzing')
+        self.assertIn('Analyzing score trends image', self.get())
+        state['analysis'] = SimulationAnalysis(run_id, {}, {}, 'Saved.')
+        self.draft.phase = 'choosing'
+        page = self.get()
+        self.assertIn('Choosing: Hidden Size', page)
+        self.assertEqual(page.count('disabled checked'), 1)
 
 
 @unittest.skipUnless(os.environ.get('AX3L_TEST_DB') == '1', 'requires disposable MariaDB test database')

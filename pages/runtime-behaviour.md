@@ -21,7 +21,12 @@ its recorded submission.
 ## Choosing a complete configuration
 
 A new draft starts from the current golden configuration. It freezes the latest,
-golden, and all-time best reference runs for the entire selection pass. Qwen
+golden, and all-time best reference runs for the entire selection pass. The
+draft is saved in a preparation phase while missing reference analyses are
+generated, so the Experiment Status report can show prerequisites before the
+first choice. A restart resumes preparation using the same frozen references.
+Image preparation, LLM analysis, completion, and failures are recorded as tasks
+in the shared event log and appear on the report's next five-second refresh. Qwen
 chooses the following settings in order:
 
 | Parameter | Purpose | Allowed values | Tuned with |

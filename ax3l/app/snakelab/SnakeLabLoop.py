@@ -139,9 +139,14 @@ async def optimize(llm, output, db, endpoint):
                 raise ValueError("The golden simulation must have completed with a high score")
             references = {"latest": snake.get_latest_completed_run_id(), "golden": golden_id,
                           "all_time_best": snake.get_all_time_best_run_id()}
-            for run_id in dict.fromkeys(references.values()):
-                await analyze_run(snake, llm, output, db, endpoint, run_id, baseline["high_score"])
-            draft = ConfigurationDraft(str(uuid4()), golden_id, references, deepcopy(baseline["config"]))
+            draft = ConfigurationDraft(str(uuid4()), golden_id, references,
+                                       deepcopy(baseline["config"]), phase="preparing")
+            experiments.save_draft(draft)
+        if draft.phase == "preparing":
+            target = snake.get_run_result(draft.golden_run_id)["high_score"]
+            for run_id in dict.fromkeys(draft.references.values()):
+                await analyze_run(snake, llm, output, db, endpoint, run_id, target)
+            draft.phase = "choosing"
             experiments.save_draft(draft)
         if draft.phase == "choosing":
             analyses = {run_id: experiments.analysis(run_id) for run_id in set(draft.references.values())}

@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.2.2] - 2026-11-15 @ 10:06
+
+### Summary
+
+Show each reference image job on the report card and complete image analysis
+before selecting configuration elements, including after a restart.
+
+### Changed
+
+- Show one prerequisite row per reference chart, with its own checkmark and
+  preparation, analysis, or failure state. Shared reference runs use three rows;
+  three distinct runs use nine.
+
+### Fixed
+
+- Resume unfinished reference image jobs before the next configuration choice,
+  preserving accepted choices and reusing saved analyses. Feed the completed
+  analyses directly into every element's main text prompt.
+
 ## [4.2.1] - 2026-11-15 @ 09:31
 
 ### Summary

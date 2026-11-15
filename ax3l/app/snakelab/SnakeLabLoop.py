@@ -142,14 +142,16 @@ async def optimize(llm, output, db, endpoint):
             draft = ConfigurationDraft(str(uuid4()), golden_id, references,
                                        deepcopy(baseline["config"]), phase="preparing")
             experiments.save_draft(draft)
-        if draft.phase == "preparing":
+        if draft.phase in ("preparing", "choosing"):
+            if draft.phase == "choosing":
+                draft.phase = "preparing"
+                experiments.save_draft(draft)
             target = snake.get_run_result(draft.golden_run_id)["high_score"]
+            analyses = {}
             for run_id in dict.fromkeys(draft.references.values()):
-                await analyze_run(snake, llm, output, db, endpoint, run_id, target)
+                analyses[run_id] = await analyze_run(snake, llm, output, db, endpoint, run_id, target)
             draft.phase = "choosing"
             experiments.save_draft(draft)
-        if draft.phase == "choosing":
-            analyses = {run_id: experiments.analysis(run_id) for run_id in set(draft.references.values())}
             while draft.phase == "choosing":
                 parameter = draft.next_parameter
                 prompts = [ProjectContext(), ConfigurationChoice(draft, analyses)]

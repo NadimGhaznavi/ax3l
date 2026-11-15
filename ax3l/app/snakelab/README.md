@@ -18,6 +18,13 @@ as exhausted: other settings can change within the same draft.
 
 ## Analysis and reference context
 
+Before any configuration choice, Ax3l completes the image jobs for the frozen
+latest, golden, and all-time best reference runs. This also applies when resuming
+a partially selected draft: saved analyses are reused, unfinished chart tasks
+finish first, and accepted configuration choices are preserved. The resulting
+observations become part of every element's text prompt alongside the exact
+measurements and current draft.
+
 Each completed run receives one saved analysis containing its configuration,
 exact measurements, and three short observations. Ax3l runs three distinct
 conversations, each with one static PNG and one question:

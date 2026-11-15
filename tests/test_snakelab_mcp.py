@@ -61,6 +61,10 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
                                  ('epsilon_nice_pair', (.01, 40))):
                 async with SnakeLabTools(server.endpoint, pair, draft_id='draft') as tools:
                     self.assertEqual(tools.definition['function']['name'], 'submit_pair_values')
+                    if pair == 'epsilon_nice_pair':
+                        description = tools.definition['function']['description']
+                        self.assertIn('start chance: number; above 0; at most 0.1.', description)
+                        self.assertIn('moves per detour: whole number; at least 1; at most 50.', description)
                     arguments = dict(zip(('value_1', 'value_2'), values))
                     self.assertEqual(await tools.submit(arguments), response)
                     self.assertEqual(requests[-1].payload, {'draft_id': 'draft', 'pair': pair, **arguments})

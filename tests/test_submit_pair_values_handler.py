@@ -72,3 +72,22 @@ class SubmitPairValuesHandlerTests(unittest.TestCase):
         self.assertEqual(self.submit('epsilon_nice_pair', .01, 40)['status'], 'ok')
         self.assertEqual(self.draft.phase, 'ready')
         self.snake.submit_simulation.assert_not_called()
+
+    def test_epsilon_nice_caps_reject_the_whole_pair_and_accept_both_upper_bounds(self):
+        self.bind('epsilon_nice_pair')
+        original = deepcopy(self.draft)
+        for probability, steps, label in ((.01, 51, 'moves per detour'),
+                                           (.11, 20, 'start chance'), (.1, 1000, 'moves per detour')):
+            with self.subTest(probability=probability, steps=steps):
+                result = self.submit('epsilon_nice_pair', probability, steps)
+                self.assertEqual(result['code'], 'invalid_value')
+                self.assertIn(label, result['reason'])
+                self.assertEqual(self.draft, original)
+        self.experiments.draft.assert_not_called()
+        self.experiments.save_draft.assert_not_called()
+        self.snake.is_config_unique.assert_not_called()
+        self.snake.submit_simulation.assert_not_called()
+        self.assertEqual(self.submit('epsilon_nice_pair', .1, 50)['status'], 'ok')
+        self.assertEqual(self.draft.config['epsilon_nice'], dict(probability=.1, steps=50))
+        self.assertEqual(self.draft.phase, 'ready')
+        self.experiments.save_draft.assert_called_once_with(self.draft)

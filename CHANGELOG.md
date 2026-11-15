@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.4.2] - 2026-11-15 @ 16:55
+
 ### Summary
 
 Give Qwen charts and measured data during parameter selection, and show each

@@ -35,7 +35,7 @@ cd -- "$checkout_dir"
 while IFS= read -r -d '' source; do
     install -D -m 644 -o "$service_account" -g "$service_account" \
         -- "$source" "$install_dir/$source"
-done < <(find ax3l -type f \( -name '*.py' -o -name '*.schema.json' -o -name '*.jinja' -o -path 'ax3l/server/templates/*.html' -o -path 'ax3l/activity/fonts/*' \) -print0)
+done < <(find ax3l -type f \( -name '*.py' -o -name '*.schema.json' -o -name '*.jinja' -o -path 'ax3l/app/snakelab/knowledge/*.md' -o -path 'ax3l/server/templates/*.html' -o -path 'ax3l/activity/fonts/*' \) -print0)
 
 # install.sh creates this directory under umask 077. Allow service-account
 # traversal; database credentials retain mode 600.

@@ -117,6 +117,7 @@ class ConversationParameterTests(unittest.IsolatedAsyncioTestCase):
         llm.complete.side_effect = [reply({'parameter': 'gamma', 'value': .9}),
                                     reply({'value': 16})]
         tools = Mock(definition={'function': {'name': 'submit_single_value', 'parameters': {'properties': {'value': {}}}}}, submit=AsyncMock(return_value={'status': 'ok', 'run_id': 'next'}))
+        tools.definitions = [tools.definition]
         self.assertEqual(await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('test')]), {'status': 'ok', 'run_id': 'next'})
         tools.submit.assert_awaited_once_with({'value': 16})
         request = json.loads(llm.complete.call_args.args[0])

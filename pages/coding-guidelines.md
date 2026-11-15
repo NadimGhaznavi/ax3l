@@ -195,6 +195,8 @@ clearly, including when live database integration has not been tested.
 
 ## Update the CHANGELOG.md
 
-Update `CHANGELOG.md` when making changes. If there are many low-level changes,
-include a `### Summary` section immediately below `## [Unreleased]` with a short
-summary of the changes.
+Update `CHANGELOG.md` when making changes. Start each release section, including
+`## [Unreleased]`, with a `### Summary` describing the overall change. Group
+entries beneath the summary using the applicable Keep a Changelog headings:
+`### Added`, `### Removed`, `### Changed`, `### Fixed`, `### Deprecated`, and
+`### Security`. Omit empty categories.

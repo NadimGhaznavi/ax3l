@@ -24,7 +24,7 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
                                       cwd=str(ROOT), env={'PYTHONPATH': str(ROOT), 'PYTHONDONTWRITEBYTECODE': '1'})
         async with Client(entry, read_timeout_seconds=10) as client:
             tools = {tool.name: tool for tool in (await client.list_tools()).tools}
-            self.assertEqual(set(tools), {'submit_single_value', 'submit_pair_values', 'submit_simulation_summary'})
+            self.assertEqual(set(tools), {'submit_single_value', 'submit_pair_values', 'submit_simulation_summary', 'kb_tool'})
             for name, arguments in (('submit_single_value', {'value': 240}),
                                     ('submit_pair_values', {'value_1': .91, 'value_2': .95}),
                                     ('submit_simulation_summary', {'summary': 'Scores rose. Loss fell.'})):
@@ -68,21 +68,63 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(len(requests), count)
                     self.assertTrue((await tools._client.call_tool('submit_single_value', {'value': 240})).is_error)
 
-    async def test_summary_session_binds_run_and_accepts_only_text(self):
+    async def test_summary_session_binds_run_and_section_and_accepts_only_text(self):
         requests = []
         def handle(message):
             requests.append(message)
             return {'status': 'ok', 'analysis_run_id': 'bound-run'}
         with ZMQServer('tcp://127.0.0.1:*', handle) as server:
-            async with SnakeLabTools(server.endpoint, 'simulation_summary', run_id='bound-run') as tools:
+            async with SnakeLabTools(server.endpoint, 'simulation_summary', run_id='bound-run', section='loss') as tools:
                 self.assertEqual(set(tools.definition['function']['parameters']['properties']), {'summary'})
                 text = 'Scores rose during training. Most games ended at walls.'
                 self.assertEqual((await tools.submit({'summary': text}))['analysis_run_id'], 'bound-run')
                 self.assertEqual(requests[-1].method, 'submit_simulation_summary')
-                self.assertEqual(requests[-1].payload, {'run_id': 'bound-run', 'summary': text})
+                self.assertEqual(requests[-1].payload, {'run_id': 'bound-run', 'section': 'loss', 'summary': text})
                 with self.assertRaises(RuntimeError):
                     await tools.submit({'summary': 123})
                 self.assertEqual(len(requests), 1)
+
+    async def test_reference_drill_down_returns_pages_without_submitting_and_then_finishes(self):
+        requests = []
+        def handle(message):
+            requests.append(message)
+            return {'status': 'ok', 'analysis_run_id': 'bound-run'}
+        def reply(name, arguments):
+            return 200, '', json.dumps({'choices': [{'message': {
+                'role': 'assistant', 'tool_calls': [{'id': str(len(arguments)) + name,
+                'type': 'function', 'function': {'name': name, 'arguments': json.dumps(arguments)}}]}}]}).encode()
+        llm = Mock(url='fixture')
+        llm.complete.side_effect = [reply('kb_tool', {'url': '/'}),
+                                   reply('kb_tool', {'url': '/analysis/'}),
+                                   reply('kb_tool', {'url': '/analysis/loss'}),
+                                   reply('submit_simulation_summary', {'summary': 'Recorded loss fell.'})]
+        with ZMQServer('tcp://127.0.0.1:*', handle) as server:
+            async with SnakeLabTools(server.endpoint, 'simulation_summary', run_id='bound-run', section='loss') as tools:
+                self.assertEqual([definition['function']['name'] for definition in tools.definitions],
+                                 ['submit_simulation_summary', 'kb_tool'])
+                result = await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('Describe loss.')])
+        self.assertEqual(result['status'], 'ok')
+        self.assertEqual(len(requests), 1)
+        self.assertEqual(requests[0].payload['section'], 'loss')
+        payloads = [json.loads(entry.args[0]) for entry in llm.complete.call_args_list]
+        self.assertEqual(len(payloads), 4)
+        pages = [json.loads(message['content'])['page'] for message in payloads[-1]['messages']
+                 if message['role'] == 'tool']
+        self.assertIn('/analysis/', pages[0])
+        self.assertIn('/analysis/loss', pages[1])
+        self.assertIn('unrecorded, not zero', pages[2])
+
+    async def test_reference_url_errors_allow_a_corrected_lookup_without_submitting(self):
+        async with SnakeLabTools('tcp://127.0.0.1:1', 'hidden_size', draft_id='draft') as tools:
+            for url in ('/../../etc/passwd', 'https://example.com', '/missing'):
+                result = await tools.reference({'url': url})
+                self.assertEqual(result['status'], 'rejected')
+            self.assertEqual((await tools.reference({'url': '/'}))['status'], 'ok')
+
+    async def test_summary_session_without_section_cannot_submit(self):
+        async with SnakeLabTools('tcp://127.0.0.1:1', 'simulation_summary', run_id='bound-run') as tools:
+            with self.assertRaises(RuntimeError):
+                await tools.submit({'summary': 'Loss fell.'})
 
     async def test_conversation_dispatches_the_discovered_tool_and_returns_its_result(self):
         def handle(message):

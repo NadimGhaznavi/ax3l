@@ -10,6 +10,7 @@ from ax3l.app.DbMgr import DbMgr
 from ax3l.app.snakelab.ExperimentDb import ExperimentDb
 from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb
 from ax3l.app.snakelab.SubmitSimulationSummaryHandler import SubmitSimulationSummaryHandler
+from ax3l.constants.DSimulationAnalysis import DSimulationAnalysis
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 
@@ -45,7 +46,7 @@ class ExperimentDatabaseTests(unittest.TestCase):
         restored.config['model']['hidden_size'] = 272
         self.assertEqual(experiments.draft(draft_id).config['model']['hidden_size'], 240)
 
-    def test_summary_persists_computed_facts_once_and_reuses_the_original(self):
+    def test_sections_survive_restart_and_combine_once_with_computed_facts(self):
         run_id = self.process_ids[1]
         config = SimulationConfiguration.defaults()
         with patch('ax3l.app.snakelab.SubmitSimulationSummaryHandler.SnakeLab') as snake:
@@ -54,11 +55,27 @@ class ExperimentDatabaseTests(unittest.TestCase):
                 episode=1, score=9, steps=10, outcome='wall', loss=None, epsilon=.9,
                 epsilon_injections=2, epsilon_nice_injections=0)]
             handler = SubmitSimulationSummaryHandler(self.db)
-            text = 'One episode reached nine points. It ended at a wall with no recorded loss.'
-            self.assertEqual(handler.submit({'run_id': run_id, 'summary': text})['status'], 'ok')
-            self.assertEqual(handler.submit({'run_id': run_id, 'summary': 'Different words. Another sentence.'})['status'], 'ok')
+            summaries = {'scores': 'One episode reached nine points.',
+                         'distribution': 'The only episode scored nine.', 'loss': 'No loss was recorded.'}
+            self.assertEqual(handler.submit({'run_id': run_id, 'section': 'scores',
+                                             'summary': summaries['scores']})['status'], 'ok')
+            self.assertIsNone(ExperimentDb(self.db).analysis(run_id))
+            other = DbMgr(initialize_event_tables=False)
+            try:
+                self.assertEqual(ExperimentDb(other).analysis_sections(run_id), {'scores': summaries['scores']})
+                restarted = SubmitSimulationSummaryHandler(other)
+                self.assertEqual(restarted.submit({'run_id': run_id, 'section': 'scores',
+                                                   'summary': 'Replacement.'})['status'], 'ok')
+                for section in ('distribution', 'loss'):
+                    self.assertEqual(restarted.submit({'run_id': run_id, 'section': section,
+                                                       'summary': summaries[section]})['status'], 'ok')
+            finally:
+                other.close()
+            self.assertEqual(handler.submit({'run_id': run_id, 'section': 'loss',
+                                             'summary': 'Different words.'})['status'], 'ok')
         saved = ExperimentDb(self.db).analysis(run_id)
-        self.assertEqual(saved.summary, text)
+        self.assertEqual(saved.summary, '\n'.join(f'{label}: {summaries[section]}'
+                         for section, label in DSimulationAnalysis.SECTIONS.items()))
         self.assertEqual(saved.metrics['termination_reasons']['wall'], {'count': 1, 'percent': 100})
         self.assertEqual(saved.metrics['episodes_with_loss'], 0)
         self.assertEqual(saved.config, config)
@@ -66,6 +83,7 @@ class ExperimentDatabaseTests(unittest.TestCase):
         self.assertEqual(count, 1)
         self.db.execute('DELETE FROM events WHERE process_id = %s', (run_id,))
         self.assertIsNone(ExperimentDb(self.db).analysis(run_id))
+        self.assertEqual(ExperimentDb(self.db).analysis_sections(run_id), {})
 
     def test_reference_selection_uses_completed_runs_and_stable_ties(self):
         self.db.execute('''CREATE TEMPORARY TABLE simulation_runs (

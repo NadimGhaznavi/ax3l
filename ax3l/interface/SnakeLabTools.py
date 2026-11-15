@@ -15,7 +15,7 @@ from mcp.client.stdio import StdioServerParameters
 
 class SnakeLabTools:
     def __init__(self, endpoint: str, parameter: str, *, draft_id: str | None = None,
-                 run_id: str | None = None):
+                 run_id: str | None = None, section: str | None = None):
         if parameter not in SINGLE_PARAMETERS and parameter not in PAIR_PARAMETERS and parameter != "simulation_summary":
             raise ValueError(f"Unknown conversation parameter: {parameter}")
         self._tool_name = ("submit_simulation_summary" if parameter == "simulation_summary" else
@@ -27,6 +27,8 @@ class SnakeLabTools:
             environment["AX3L_CONFIGURATION_DRAFT"] = draft_id
         if run_id is not None:
             environment["AX3L_ANALYSIS_RUN"] = run_id
+        if section is not None:
+            environment["AX3L_ANALYSIS_SECTION"] = section
         self._client = Client(StdioServerParameters(
             command=sys.executable, args=["-m", "ax3l.app.snakelab.tools"], cwd=str(root),
             env=environment,
@@ -36,11 +38,11 @@ class SnakeLabTools:
         await self._client.__aenter__()
         try:
             tools = await self._client.list_tools()
-            tool = next(tool for tool in tools.tools if tool.name == self._tool_name)
-            schema = deepcopy(tool.input_schema)
-            self.definition = {"type": "function", "function": {
-                "name": tool.name, "description": tool.description, "parameters": schema,
-            }}
+            by_name = {tool.name: tool for tool in tools.tools}
+            self.definitions = [{"type": "function", "function": {
+                "name": tool.name, "description": tool.description, "parameters": deepcopy(tool.input_schema),
+            }} for tool in (by_name[self._tool_name], by_name["kb_tool"])]
+            self.definition = self.definitions[0]
         except BaseException:
             await self._client.__aexit__(*sys.exc_info())
             raise
@@ -50,7 +52,13 @@ class SnakeLabTools:
         return await self._client.__aexit__(*exc)
 
     async def submit(self, arguments: dict) -> dict:
-        result = await self._client.call_tool(self._tool_name, arguments)
+        return await self._call(self._tool_name, arguments)
+
+    async def reference(self, arguments: dict) -> dict:
+        return await self._call("kb_tool", arguments)
+
+    async def _call(self, name: str, arguments: dict) -> dict:
+        result = await self._client.call_tool(name, arguments)
         if result.is_error:
             raise RuntimeError("MCP tool failed; submission may have occurred. Do not automatically retry.")
         return json.loads(result.content[0].text)

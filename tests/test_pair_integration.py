@@ -29,6 +29,7 @@ class PairIntegrationTests(unittest.IsolatedAsyncioTestCase):
                 {'status': 'rejected', 'prompt': {'role': 'user', 'content': 'Duplicate pair'}},
                 {'status': 'ok', 'run_id': 'next'}]))
         db = Mock()
+        tools.definitions = [tools.definition]
         self.assertEqual(await converse(llm, Path('/tmp'), db, tools, [Prompt('pair')],
                                         parameter='epsilon_pair'), {'status': 'ok', 'run_id': 'next'})
         prompt_logs = [call for call in db.log.call_args_list if call.args[0] == 'prompt_sent']

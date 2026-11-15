@@ -39,9 +39,12 @@ class SnakeLabTools:
         try:
             tools = await self._client.list_tools()
             by_name = {tool.name: tool for tool in tools.tools}
+            names = [self._tool_name, "kb_tool"]
+            if self._tool_name != "submit_simulation_summary":
+                names.append("data_tool")
             self.definitions = [{"type": "function", "function": {
                 "name": tool.name, "description": tool.description, "parameters": deepcopy(tool.input_schema),
-            }} for tool in (by_name[self._tool_name], by_name["kb_tool"])]
+            }} for tool in (by_name[name] for name in names)]
             self.definition = self.definitions[0]
         except BaseException:
             await self._client.__aexit__(*sys.exc_info())
@@ -56,6 +59,9 @@ class SnakeLabTools:
 
     async def reference(self, arguments: dict) -> dict:
         return await self._call("kb_tool", arguments)
+
+    async def data(self, arguments: dict) -> dict:
+        return await self._call("data_tool", arguments)
 
     async def _call(self, name: str, arguments: dict) -> dict:
         result = await self._client.call_tool(name, arguments)

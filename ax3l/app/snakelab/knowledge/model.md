@@ -16,8 +16,8 @@ Its 24-value feature vector contains:
 There is no full-board view or food-distance measurement. Sequence length
 controls how many consecutive frames training uses. Hidden size controls
 Transformer width; batch size counts sampled sequences. Learning rate controls
-update size, and gamma discounts future rewards. Valid domains are supplied
-in each selection task.
+update size, and gamma discounts future rewards. Choice rules are in your
+submission tool.
 
 - [Choosing one setting](/selection)
 - [Reference index](/)

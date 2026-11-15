@@ -56,7 +56,7 @@ async def converse(llm, output, db, tools, prompts, *, parameter: str | None = N
             if len(calls) != 1 or calls[0]["function"]["name"] not in definitions:
                 names = [call["function"]["name"] for call in calls]
                 raise ValueError(
-                    f"Expected exactly one {tool_name} or kb_tool tool call; received {names!r}, "
+                    f"Expected exactly one {' or '.join(definitions)} tool call; received {names!r}, "
                     f"finish_reason={choice.get('finish_reason')!r}. See reply event {reply_id}."
                 )
             call = calls[0]
@@ -73,8 +73,12 @@ async def converse(llm, output, db, tools, prompts, *, parameter: str | None = N
                                   f"Call {called_name} with exactly these fields: "
                                   + ", ".join(sorted(argument_names)) + "."}}
                 else:
-                    result = (await tools.reference(arguments) if called_name == "kb_tool"
-                              else await tools.submit(arguments))
+                    if called_name == "kb_tool":
+                        result = await tools.reference(arguments)
+                    elif called_name == "data_tool":
+                        result = await tools.data(arguments)
+                    else:
+                        result = await tools.submit(arguments)
                 if result["status"] not in ("ok", "rejected"):
                     raise RuntimeError(f"Tool submission failed: {result}")
             except Exception as error:
@@ -85,7 +89,7 @@ async def converse(llm, output, db, tools, prompts, *, parameter: str | None = N
                 return result
             # Explicit validation rejections are safe to correct. Transport failures are not retried.
             messages.append({"role": "tool", "tool_call_id": call["id"],
-                             "content": json.dumps(result)})
+                             "content": result["page"] if result["status"] == "ok" else "Rejected."})
             if result["status"] == "rejected":
                 feedback = result["prompt"]
                 messages.append(feedback)

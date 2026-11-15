@@ -63,14 +63,12 @@ class RunAnalysisTests(unittest.TestCase):
                 episodes = [dict(self.episodes[0], episode=index, score=score)
                             for index, score in enumerate(scores, 1)]
                 metrics = measure(episodes, 9)
-                prompt = AnalyzeSimulation(self.run_id, self.config, metrics, b'png', 'scores').to_md()
+                prompt = AnalyzeSimulation(self.config, metrics, b'png', 'scores').to_md()
                 self.assertIn('first 50 and final 50 episodes of this same run', prompt)
                 self.assertIn('higher, lower, or equal', prompt)
-                facts = json.loads(prompt.split('Measured facts: ')[1].split('\n')[0])
-                self.assertEqual(facts, {'episodes': 500, 'mean_first_50_scores': first,
-                                         'mean_last_50_scores': last})
-                self.assertNotEqual(metrics['mean_score'], facts['mean_first_50_scores'])
-                self.assertNotEqual(metrics['mean_score'], facts['mean_last_50_scores'])
+                self.assertIn(f'Facts: episodes: 500; first 50 mean: {first}; last 50 mean: {last}', prompt)
+                self.assertNotEqual(metrics['mean_score'], first)
+                self.assertNotEqual(metrics['mean_score'], last)
 
     def render(self, section, episodes=None):
         figures = []
@@ -79,11 +77,10 @@ class RunAnalysisTests(unittest.TestCase):
             return b'png'
         episodes = self.episodes if episodes is None else episodes
         with patch('plotly.graph_objects.Figure.to_image', capture):
-            self.assertEqual(render_analysis(self.run_id, self.config, episodes,
+            self.assertEqual(render_analysis(self.config, episodes,
                                             measure(episodes, 6), 9, section), b'png')
         figure = figures[0]
-        self.assertIn(self.run_id.split('-')[0], figure.layout.title.text)
-        self.assertNotIn(self.run_id, figure.layout.title.text)
+        self.assertNotIn(self.run_id.split('-')[0], figure.layout.title.text)
         self.assertIn('Goal:', figure.layout.title.text)
         self.assertNotIn('xaxis2', figure.layout.to_plotly_json())
         return figure
@@ -116,7 +113,7 @@ class RunAnalysisTests(unittest.TestCase):
     def test_each_prompt_has_one_image_one_question_and_an_explicit_example(self):
         for section in DSimulationAnalysis.SECTIONS:
             with self.subTest(section=section):
-                prompt = AnalyzeSimulation(self.run_id, self.config, self.metrics, b'png', section)
+                prompt = AnalyzeSimulation(self.config, self.metrics, b'png', section)
                 message = json.loads(prompt.to_json())
                 self.assertEqual([part['type'] for part in message['content']], ['text', 'image_url'])
                 self.assertEqual(message['content'][1]['image_url']['url'], 'data:image/png;base64,cG5n')
@@ -128,12 +125,13 @@ class RunAnalysisTests(unittest.TestCase):
                 self.assertNotIn('Configuration:', text)
                 self.assertNotIn('termination_reasons', text)
                 self.assertNotIn(self.run_id, text)
-                self.assertLess(len(text.split()), 190)
-                facts = json.loads(text.split('Measured facts: ')[1].split('\n')[0])
+                self.assertLess(len(text.split()), 130)
+                self.assertNotIn('{', text)
+                self.assertNotIn(self.run_id.split('-')[0], text)
                 if section == 'loss':
-                    self.assertEqual(facts, {'episodes': 5, 'episodes_with_loss': 3})
+                    self.assertIn('Facts: episodes: 5; episodes with loss: 3', text)
                 else:
-                    self.assertNotIn('episodes_with_loss', facts)
+                    self.assertNotIn('episodes with loss:', text)
 
 
 class SummarySubmissionTests(unittest.TestCase):

@@ -4,6 +4,7 @@ from jsonschema import ValidationError
 
 from ax3l.app.snakelab.PairParameters import PAIR_PARAMETERS
 from ax3l.app.snakelab.SubmitSingleValueHandler import SubmitSingleValueHandler
+from ax3l.constants.DChoice import PAIR_LABELS
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 
 
@@ -22,7 +23,7 @@ class SubmitPairValuesHandler(SubmitSingleValueHandler):
             try:
                 value = SimulationConfiguration.value(path, value)
             except ValidationError as error:
-                return self._reject(f"{name} ({'.'.join(path)}): {error.message}")
+                return self._reject(f"{name} ({PAIR_LABELS[pair][index - 1]}): {error.message}")
             changes.append((path, value))
 
         if pair == "reward_pair":

@@ -22,9 +22,10 @@ Each completed run receives one saved analysis containing its configuration,
 exact measurements, and three short observations. Ax3l runs three distinct
 conversations, each with one static PNG and one question:
 
-1. Score trends: do scores improve, decline, or stay flat? The image includes
-   episode scores, a trailing mean of up to 20 episodes, the target at analysis
-   time, and an ordinary-epsilon-end marker when observed.
+1. Score trends: is the final 50-episode mean higher, lower, or equal to the
+   first 50-episode mean of the same run? Both exact averages are supplied.
+   The image includes episode scores, a trailing mean of up to 20 episodes,
+   the target at analysis time, and an ordinary-epsilon-end marker when observed.
 2. Score distribution: are high scores common or rare within this run?
 3. Training loss: does recorded mean Smooth L1 loss rise, fall, or stabilize,
    with spikes or gaps for unrecorded measurements?

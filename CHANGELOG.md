@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Give Qwen an explicit beginning-versus-end score comparison with both averages
+supplied.
+
+### Fixed
+
+- Compare the first and final 50-episode mean scores within the same run;
+  supply both exact averages and align the prompt, example, and reference guide.
+
 ## [4.1.1] - 2026-11-15 @ 07:44
 
 ### Summary

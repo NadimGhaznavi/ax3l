@@ -36,6 +36,8 @@ class RunAnalysisTests(unittest.TestCase):
         self.assertEqual(self.metrics['high_score'], 6)
         self.assertEqual(self.metrics['mean_score'], 3)
         self.assertEqual(self.metrics['median_score'], 3)
+        self.assertEqual(self.metrics['mean_first_50_scores'], 3)
+        self.assertEqual(self.metrics['mean_last_50_scores'], 3)
         self.assertEqual(self.metrics['zero_score_episodes'], 1)
         self.assertEqual(self.metrics['high_score_episodes'], 1)
         self.assertEqual(self.metrics['episodes_with_loss'], 3)
@@ -50,7 +52,25 @@ class RunAnalysisTests(unittest.TestCase):
         metrics = measure([], 0)
         self.assertIsNone(metrics['mean_score'])
         self.assertIsNone(metrics['median_score'])
+        self.assertIsNone(metrics['mean_first_50_scores'])
+        self.assertIsNone(metrics['mean_last_50_scores'])
         self.assertEqual(metrics['termination_reasons']['wall']['percent'], 0)
+
+    def test_score_comparison_supplies_both_window_means_without_using_the_run_average(self):
+        for first, last in ((1, 3), (3, 1), (2, 2)):
+            with self.subTest(first=first, last=last):
+                scores = [first] * 50 + [9] * 400 + [last] * 50
+                episodes = [dict(self.episodes[0], episode=index, score=score)
+                            for index, score in enumerate(scores, 1)]
+                metrics = measure(episodes, 9)
+                prompt = AnalyzeSimulation(self.run_id, self.config, metrics, b'png', 'scores').to_md()
+                self.assertIn('first 50 and final 50 episodes of this same run', prompt)
+                self.assertIn('higher, lower, or equal', prompt)
+                facts = json.loads(prompt.split('Measured facts: ')[1].split('\n')[0])
+                self.assertEqual(facts, {'episodes': 500, 'mean_first_50_scores': first,
+                                         'mean_last_50_scores': last})
+                self.assertNotEqual(metrics['mean_score'], facts['mean_first_50_scores'])
+                self.assertNotEqual(metrics['mean_score'], facts['mean_last_50_scores'])
 
     def render(self, section, episodes=None):
         figures = []

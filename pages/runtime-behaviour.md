@@ -57,6 +57,10 @@ titles, labeled axes and units, the high-score objective, seed, episode count,
 and the first eight characters of the run UUID. Loss is mean Smooth L1 loss in
 its native training scale; missing measurements remain gaps.
 
+The score-trends task compares the first 50 episodes with the final 50 episodes
+of that same run. Both exact averages are supplied; Qwen states whether the
+final average is higher, lower, or equal.
+
 Ax3l calculates score statistics and termination counts/percentages directly
 from episode data. Termination categories include wall collisions, body
 collisions, move-limit endings, board completion, and unrecorded/other outcomes.

@@ -1,6 +1,8 @@
 """Configuration checklist semantics, lifecycle states, and report navigation."""
 
 from copy import deepcopy
+from datetime import datetime
+import json
 import os
 from threading import Thread
 import unittest
@@ -185,6 +187,38 @@ class ExperimentStatusTests(unittest.TestCase):
             if phase in ('failed', 'stopped'):
                 self.assertEqual(report['phase'], 'Analysis ' + phase)
 
+    def test_current_images_and_all_configuration_rows_share_work_without_double_counting_totals(self):
+        self.draft.run_id = str(uuid4())
+        self.draft.phase = 'submitted'
+        self.draft.references = dict(latest=self.draft.golden_run_id, golden=self.draft.golden_run_id)
+        activity = {
+            (self.draft.golden_run_id, 'scores'): dict(seconds=30, tokens=100, image_event_id=10),
+            (self.draft.run_id, 'scores'): dict(seconds=65, tokens=200, image_event_id=20),
+            (self.draft.draft_id, 'epsilon_pair'): dict(seconds=3661, tokens=300, image_event_id=None),
+        }
+        report = self.report(
+            run=dict(status='completed', high_score=2), activity=activity,
+            reference_states={self.draft.golden_run_id: dict(analysis=None, sections={}, task=None)},
+            task=AnalysisTask(self.draft.run_id, 'scores', 'analyzing'))
+        self.assertEqual(len(report['prerequisites']), 6)
+        current = report['prerequisites'][3:]
+        self.assertEqual([row['section'] for row in current], list(DSimulationAnalysis.SECTIONS))
+        self.assertTrue(all(row['roles'] == 'Current simulation' for row in current))
+        self.assertEqual(current[0]['image_url'], f'/analysis-images/{self.draft.run_id}/scores.png')
+        self.assertEqual(current[0]['elapsed'], '00:01:05')
+        self.assertEqual(current[0]['tokens'], 200)
+        self.assertTrue(current[0]['current'])
+        self.assertIsNone(current[1]['image_url'])
+        for row in report['rows'][5:7]:
+            self.assertEqual(row['elapsed'], '01:01:01')
+            self.assertEqual(row['tokens'], 300)
+        self.assertEqual(report['totals'], dict(elapsed='01:02:36', tokens=600))
+        self.assertEqual(report['rows'][0]['elapsed'], '—')
+        self.assertIsNone(report['rows'][0]['tokens'])
+        activity[self.draft.run_id, 'scores']['tokens'] = None
+        self.assertIsNone(self.report(activity=activity, reference_states={
+            self.draft.golden_run_id: dict(analysis=None, sections={}, task=None)})['totals']['tokens'])
+
 
 class ExperimentStatusHttpTests(unittest.TestCase):
     def setUp(self):
@@ -197,6 +231,7 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         self.experiments.comparison.return_value = None
         self.experiments.analysis.return_value = None
         self.experiments.analysis_sections.return_value = {}
+        self.experiments.activity_events.return_value = []
         self.experiments.analysis_states.side_effect = lambda run_ids: {
             run_id: dict(analysis=self.experiments.analysis(run_id),
                          sections=self.experiments.analysis_sections(run_id), task=None)
@@ -239,7 +274,7 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         page = self.get('/experiment-status?view=completed')
         self.assertIn('aria-current="page">Last completed</a>', page)
         self.assertIn('id="experiment-phase" role="status">Complete</h2>', page)
-        self.assertEqual(page.count('disabled checked'), 11)
+        self.assertEqual(page.count('disabled checked'), 14)
         self.assertNotIn('pending · inherited', page)
         self.assertIn('<dt>High score</dt><dd>0</dd>', page)
         self.assertIn('<dt>Difference</dt><dd>+0</dd>', page)
@@ -301,6 +336,53 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         for section in DSimulationAnalysis.SECTIONS:
             self.assertEqual(page.count(f'data-analysis="{section}"'), 3)
         self.assertLess(page.rindex('data-analysis='), page.index('>Configuration</th>'))
+
+    def test_current_image_links_time_tokens_and_total_cover_every_item(self):
+        self.draft.phase, self.draft.run_id = 'submitted', str(uuid4())
+        activity = {
+            (self.draft.run_id, 'scores'): dict(seconds=60, tokens=1000, image_event_id=10),
+            (self.draft.draft_id, 'epsilon_pair'): dict(seconds=30, tokens=250, image_event_id=None),
+        }
+        with patch('ax3l.server.ReportingServer.item_activity', return_value=activity):
+            page = self.get()
+        self.assertEqual(page.count('data-analysis='), 3)
+        self.assertIn(f'href="/analysis-images/{self.draft.run_id}/scores.png"', page)
+        self.assertIn('>Score trends image</a>', page)
+        self.assertIn('Score distribution image</span>', page)
+        self.assertNotIn(f'href="/analysis-images/{self.draft.run_id}/distribution.png"', page)
+        self.assertEqual(page.count('class="item-elapsed"'), 15)
+        self.assertEqual(page.count('class="item-tokens"'), 15)
+        self.assertIn('<th scope="col">Elapsed time</th><th scope="col">Tokens</th>', page)
+        self.assertIn('class="item-tokens">1,000</td>', page)
+        self.assertIn('colspan="3">Total</th><td class="item-elapsed">00:01:30</td>', page)
+        self.assertIn('class="item-tokens">1,250</td>', page)
+        self.assertGreater(page.index('class="status-total"'), page.rindex('data-parameter='))
+
+    def test_image_endpoint_returns_latest_exact_png_and_missing_images_are_unlinked(self):
+        run_id = str(uuid4())
+        stamp = datetime(2026, 11, 15, 12)
+        self.experiments.activity_events.return_value = [
+            dict(event_id=1, process_id=run_id, name='simulation_analysis_task',
+                 occurred_at=stamp, observed_at=stamp, parent_event_id=None,
+                 task=dict(section='scores', phase='preparing')),
+            dict(event_id=2, process_id=run_id, name='conversation_started',
+                 occurred_at=stamp, parent_event_id=None),
+            dict(event_id=3, process_id=run_id, name='prompt_sent', parameter='simulation_summary',
+                 occurred_at=stamp, parent_event_id=2, source_name='AnalyzeSimulation'),
+        ]
+        event_log = self.enterContext(patch('ax3l.server.ReportingServer.EventLogDb')).return_value
+        event_log.get.return_value = dict(content=json.dumps(dict(content=[
+            dict(type='image_url', image_url=dict(url='data:image/png;base64,cG5n'))])))
+        with urlopen(f'{self.base}/analysis-images/{run_id}/scores.png') as response:
+            self.assertEqual(response.headers['Content-Type'], 'image/png')
+            self.assertEqual(response.headers['Cache-Control'], 'no-store')
+            self.assertEqual(response.read(), b'png')
+        event_log.get.assert_called_once_with(3)
+        for path in (f'/analysis-images/{run_id}/loss.png',
+                     f'/analysis-images/{run_id}/other.png', '/analysis-images/invalid/scores.png'):
+            with self.subTest(path=path), self.assertRaises(HTTPError) as error:
+                self.get(path)
+            self.assertEqual(error.exception.code, 404)
 
 
 @unittest.skipUnless(os.environ.get('AX3L_TEST_DB') == '1', 'requires disposable MariaDB test database')

@@ -104,6 +104,7 @@ class LoopTests(unittest.IsolatedAsyncioTestCase):
         llm.complete.side_effect = [reply(.002), reply(.003)]
         db = Mock()
         tools = Mock(definition={'function': {'name': 'submit_single_value', 'parameters': {'properties': {'value': {}}}}})
+        tools.definitions = [tools.definition]
         tools.submit = AsyncMock(side_effect=[{'status': 'rejected', 'source_name': 'NoDupes', 'prompt': {'role': 'user', 'content': 'Duplicate value'}}, {'status': 'ok', 'run_id': 'next'}])
         self.assertEqual(await converse(llm, Path('/tmp'), db, tools, [Prompt('initial')], parameter='learning_rate'), {'status': 'ok', 'run_id': 'next'})
         first, second = [json.loads(call.args[0]) for call in llm.complete.call_args_list]
@@ -130,6 +131,7 @@ class LoopTests(unittest.IsolatedAsyncioTestCase):
                 llm.complete.return_value = (200, '', json.dumps({'choices': [
                     {'message': prose, 'finish_reason': 'stop'}]}).encode())
                 tools = Mock(definition={'function': {'name': 'submit_single_value', 'parameters': {'properties': {'value': {}}}}})
+                tools.definitions = [tools.definition]
                 tools.submit = AsyncMock()
                 with self.assertRaisesRegex(ValueError, r"received \[\], finish_reason='stop'. See reply event"):
                     await converse(llm, Path('/tmp'), db, tools, [Prompt('initial')])
@@ -144,12 +146,13 @@ class LoopTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(sum(c.args[0] == 'reply_received' for c in logs), 1)
                 self.assertEqual(logs[-1].args[0], 'conversation_ended')
                 self.assertEqual(logs[-1].args[2], 'ERROR')
-                self.assertIn('Expected exactly one submit_single_value tool call', logs[-1].args[3])
+                self.assertIn('Expected exactly one submit_single_value or kb_tool tool call', logs[-1].args[3])
 
     async def test_ambiguous_tool_failure_stops_without_resubmission(self):
         llm, db = Mock(url='fixture'), Mock()
         llm.complete.return_value = reply(.003)
         tools = Mock(definition={'function': {'name': 'submit_single_value', 'parameters': {'properties': {'value': {}}}}})
+        tools.definitions = [tools.definition]
         tools.submit = AsyncMock(side_effect=TimeoutError('timeout'))
         with self.assertRaises(TimeoutError):
             await converse(llm, Path('/tmp'), db, tools, [Prompt('initial')])

@@ -144,6 +144,12 @@ exec /usr/bin/systemd-analyze "$@"
                                'app/snakelab/prompts/ConfigurationChoice.py',
                                'app/snakelab/SubmitSimulationSummaryHandler.py',
                                'app/snakelab/tools/SubmitSimulationSummary.py',
+                               'interface/KnowledgeBase.py', 'constants/DSimulationAnalysis.py',
+                               'app/snakelab/knowledge/index.md',
+                               'app/snakelab/knowledge/analysis/index.md',
+                               'app/snakelab/knowledge/analysis/scores.md',
+                               'app/snakelab/knowledge/analysis/distribution.md',
+                               'app/snakelab/knowledge/analysis/loss.md',
                                'app/snakelab/prompts/FirstContactEpsilonNicePair.py',
                                'app/snakelab/prompts/ComparisonEpsilonNicePair.py', 'app/ReportBackground.py'):
                     self.assertTrue((self.app / 'ax3l' / module).is_file(), module)

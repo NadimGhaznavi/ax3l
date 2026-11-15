@@ -50,8 +50,9 @@ simulation, and waits for its result.
 
 ## Simulation analysis
 
-For each completed run, Ax3l generates a PNG containing episode scores during
-training, the distribution of episode scores, and training loss. Plots include
+For each completed run, Ax3l runs three separate conversations: score trends,
+score distribution, and training loss. Each receives one PNG, one chart-specific
+question, relevant exact facts, and an invented answer example. Plots include
 titles, labeled axes and units, the high-score objective, seed, episode count,
 and the first eight characters of the run UUID. Loss is mean Smooth L1 loss in
 its native training scale; missing measurements remain gaps.
@@ -61,10 +62,17 @@ from episode data. Termination categories include wall collisions, body
 collisions, move-limit endings, board completion, and unrecorded/other outcomes.
 Percentages use all recorded episodes as their denominator.
 
-Qwen receives the image and measured facts and calls
-`submit_simulation_summary` with 2–3 sentences, at most 80 words. This
-interpretation is saved once per run. It describes observed behavior without
-assuming that an individual parameter caused it.
+Qwen calls `submit_simulation_summary` with 1–2 sentences, at most 40 words,
+about its assigned chart. Accepted sections are saved, so a restart skips
+finished tasks. The final submission combines the three labeled observations
+into one run analysis, without another inference call. Observations describe
+behavior without assuming that an individual parameter caused it.
+
+General background lives in short local knowledge-base pages. `kb_tool(url)`
+reads one page at a time, starting at `/` or the direct guide URL in the prompt.
+Qwen follows relevant links to drill down. These reads continue the conversation;
+only the assigned submission tool finishes it. Full project background and
+configuration are omitted from chart prompts.
 
 Every parameter conversation receives up to three distinct saved analyses:
 

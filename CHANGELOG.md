@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Keep Qwen's simulation analysis focused by interpreting one chart per
+conversation and loading reference guidance on demand.
+
+### Added
+
+- Local `kb_tool` navigation through short reference pages, installed with Ax3l.
+- Durable analysis progress to resume unfinished chart sections after restart.
+
+### Removed
+
+- Full configuration dumps and general background from chart-analysis prompts.
+
+### Changed
+
+- Split run interpretation into three focused conversations, each with one
+  chart, relevant facts, an example answer, and a 40-word observation limit.
+- Combine all three chart observations for later parameter choices without
+  another LLM conversation.
+
 ## [4.1.0] - 2026-11-15 @ 07:03
 
 ### Summary

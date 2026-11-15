@@ -24,7 +24,8 @@ async def converse(llm, output, db, tools, prompts, *, parameter: str | None = N
     outcome, level = "Tool result accepted.", "INFO"
     try:
         tool_name = tools.definition["function"]["name"]
-        argument_names = set(tools.definition["function"]["parameters"]["properties"])
+        definitions = {definition["function"]["name"]: definition["function"]
+                       for definition in tools.definitions}
         messages = [json.loads(prompt.to_json()) for prompt in prompts]
         for prompt, message in zip(prompts, messages):
             log(Events.Conversation, Events.Conversation.PROMPT, json.dumps(message, ensure_ascii=False),
@@ -32,7 +33,7 @@ async def converse(llm, output, db, tools, prompts, *, parameter: str | None = N
         turn = 0
         while True:
             turn += 1
-            payload = json.dumps({"messages": messages, "tools": [tools.definition],
+            payload = json.dumps({"messages": messages, "tools": tools.definitions,
                                   "tool_choice": "required", "parallel_tool_calls": False,
                                   "stream": False}, ensure_ascii=False).encode()
             prefix = output / f"{process_id}-{conversation_id}-{turn:04d}"
@@ -52,13 +53,15 @@ async def converse(llm, output, db, tools, prompts, *, parameter: str | None = N
             choice = json.loads(body)["choices"][0]
             reply = choice["message"]
             calls = reply.get("tool_calls", [])
-            if len(calls) != 1 or calls[0]["function"]["name"] != tool_name:
+            if len(calls) != 1 or calls[0]["function"]["name"] not in definitions:
                 names = [call["function"]["name"] for call in calls]
                 raise ValueError(
-                    f"Expected exactly one {tool_name} tool call; received {names!r}, "
+                    f"Expected exactly one {tool_name} or kb_tool tool call; received {names!r}, "
                     f"finish_reason={choice.get('finish_reason')!r}. See reply event {reply_id}."
                 )
             call = calls[0]
+            called_name = call["function"]["name"]
+            argument_names = set(definitions[called_name]["parameters"]["properties"])
             arguments = json.loads(call["function"]["arguments"])
             messages.append(reply)
             log(Events.Tool, Events.Tool.STARTED, json.dumps(call))
@@ -67,25 +70,27 @@ async def converse(llm, output, db, tools, prompts, *, parameter: str | None = N
                     result = {"status": "rejected", "code": "invalid_arguments",
                               "source_name": "ToolConversation",
                               "prompt": {"role": "user", "content":
-                                  f"Call {tool_name} with exactly these fields: "
+                                  f"Call {called_name} with exactly these fields: "
                                   + ", ".join(sorted(argument_names)) + "."}}
                 else:
-                    result = await tools.submit(arguments)
+                    result = (await tools.reference(arguments) if called_name == "kb_tool"
+                              else await tools.submit(arguments))
                 if result["status"] not in ("ok", "rejected"):
                     raise RuntimeError(f"Tool submission failed: {result}")
             except Exception as error:
                 log(Events.Tool, Events.Tool.FAILED, str(error), "ERROR")
                 raise
             log(Events.Tool, Events.Tool.COMPLETED, json.dumps(result))
-            if result["status"] == "ok":
+            if result["status"] == "ok" and called_name == tool_name:
                 return result
             # Explicit validation rejections are safe to correct. Transport failures are not retried.
             messages.append({"role": "tool", "tool_call_id": call["id"],
                              "content": json.dumps(result)})
-            feedback = result["prompt"]
-            messages.append(feedback)
-            log(Events.Conversation, Events.Conversation.PROMPT, json.dumps(feedback, ensure_ascii=False),
-                source_name=result.get("source_name", "ToolConversation"))
+            if result["status"] == "rejected":
+                feedback = result["prompt"]
+                messages.append(feedback)
+                log(Events.Conversation, Events.Conversation.PROMPT, json.dumps(feedback, ensure_ascii=False),
+                    source_name=result.get("source_name", "ToolConversation"))
     except (KeyboardInterrupt, asyncio.CancelledError):
         outcome = "Stopped by user."
         raise

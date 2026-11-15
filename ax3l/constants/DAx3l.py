@@ -3,7 +3,7 @@ from typing import Final
 
 class DAx3l:
     RAW_LOGS_ENABLED: Final[bool] = False
-    HTTP_TIMEOUT_SECONDS: Final[int] = 300
+    HTTP_TIMEOUT_SECONDS: Final[int] = 600
 
     VERSION: Final[str] = "4.4.3"
     CMDB_SUBTYPE: Final[str] = "Lab Experiment"

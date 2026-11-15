@@ -32,7 +32,8 @@ class SubmitSimulationSummaryHandler:
             UUID(run_id)
         except ValueError:
             return reject("run_id must be a UUID.")
-        instruction = "Submit 1–2 sentences using at most 40 words about the assigned chart only."
+        instruction = ("Submit 1–2 sentences using at most 40 words: an observation about the assigned chart "
+                       "and optionally a concrete value to try next. No theory.")
         if not isinstance(summary, str) or not summary.strip() or len(summary) > 1000:
             return reject(instruction)
         summary = summary.strip()

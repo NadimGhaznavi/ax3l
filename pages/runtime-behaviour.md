@@ -81,10 +81,19 @@ collisions, move-limit endings, board completion, and unrecorded/other outcomes.
 Percentages use all recorded episodes as their denominator.
 
 Qwen calls `submit_simulation_summary` with 1–2 sentences, at most 40 words,
-about its assigned chart. Accepted sections are saved, so a restart skips
-finished tasks. The final submission combines the three labeled observations
-into one run analysis, without another inference call. Observations describe
-behavior without assuming that an individual parameter caused it.
+about its assigned chart, optionally recommending one concrete value to try
+next. Chart conversations can use `data_tool` at `/run` to inspect the exact
+settings that produced the image, as JSON. `/run/config` returns the complete
+configuration; smaller settings pages and `/run/rules` provide current values
+and allowed tunable domains. This lookup reads the completed simulation
+directly, without waiting for its unfinished analysis. Recommendations require
+reading the relevant current settings and rules and must omit theory and
+causal explanations. They are saved as advice; later configuration choices
+apply and validate changes.
+
+Accepted sections are saved, so a restart skips finished tasks. The final
+submission combines the three labeled observations and optional recommendations
+into one run analysis without another inference call.
 
 The Experiment Status checklist shows all three image jobs for the submitted
 simulation alongside its reference-image prerequisites. Each image label links
@@ -97,8 +106,8 @@ request appear when its response arrives; missing usage is shown as unavailable.
 General background lives in short local knowledge-base pages. `kb_tool(url)`
 reads one page at a time, starting at `/` or the direct guide URL in the prompt.
 Qwen follows relevant links to drill down. These reads continue the conversation;
-only the assigned submission tool finishes it. Full project background and
-configuration are omitted from chart prompts.
+only the assigned submission tool finishes it. Full project background is
+omitted from chart prompts; configuration is available through `data_tool`.
 
 Every parameter conversation can browse up to three distinct saved analyses:
 

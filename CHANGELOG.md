@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.4.1] - 2026-11-15 @ 13:02
+
+### Summary
+
+Let image analysis inspect the settings behind each chart and recommend a
+concrete value to try next without explaining theory.
+
+### Added
+
+- `data_tool` access during chart conversations, bound to the exact simulation
+  that produced the image, with JSON configuration pages and current tunable
+  limits. Settings are available before the run's analysis has been saved.
+
+### Changed
+
+- Allow an optional value recommendation in each saved chart observation while
+  retaining the 1–2 sentence, 40-word limit. Prompts and chart guides require
+  checking current settings and allowed values and exclude theory and causal
+  explanations. Configuration choices still apply and validate changes later.
+
 ## [4.4.0] - 2026-11-15 @ 12:17
 
 ### Summary

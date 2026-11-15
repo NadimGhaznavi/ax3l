@@ -7,6 +7,7 @@ from ax3l.app.snakelab.SingleParameters import SINGLE_PARAMETERS
 from ax3l.constants.DChoice import REFERENCE_LABELS
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
+from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 
 
 CONFIG_SECTIONS = {
@@ -33,6 +34,24 @@ def data_json(scope: str, seed: int, data: dict) -> str:
 
 def links(scope: str, pages: tuple[str, ...]) -> str:
     return "\n".join(f"[{page}](/{scope}/{page})" for page in pages)
+
+
+def analysis_index_page() -> str:
+    return ("Settings used to produce this chart. Read current values and allowed rules before recommending a value.\n"
+            + links("run", ("config", *CONFIG_PAGES, "rules")))
+
+
+def analysis_rules_page(config: dict) -> str:
+    constraints = ("type", "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf", "enum")
+    parameters = {}
+    for parameter in PARAMETER_ORDER:
+        paths = ((SINGLE_PARAMETERS[parameter][0],) if parameter in SINGLE_PARAMETERS
+                 else PAIR_PARAMETERS[parameter])
+        for path in paths:
+            field = SimulationConfiguration.field(path)
+            parameters[".".join(path)] = {key: field[key] for key in constraints if key in field}
+    return data_json("run", config["seed"], dict(
+        parameters=parameters, reward_pair_rule="closer_to_food + further_from_food <= 0"))
 
 
 def index_page(draft: ConfigurationDraft) -> str:

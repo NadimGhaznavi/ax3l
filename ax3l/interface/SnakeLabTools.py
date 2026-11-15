@@ -39,9 +39,7 @@ class SnakeLabTools:
         try:
             tools = await self._client.list_tools()
             by_name = {tool.name: tool for tool in tools.tools}
-            names = [self._tool_name, "kb_tool"]
-            if self._tool_name != "submit_simulation_summary":
-                names.append("data_tool")
+            names = [self._tool_name, "kb_tool", "data_tool"]
             self.definitions = [{"type": "function", "function": {
                 "name": tool.name, "description": tool.description, "parameters": deepcopy(tool.input_schema),
             }} for tool in (by_name[name] for name in names)]

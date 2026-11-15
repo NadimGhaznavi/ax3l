@@ -22,6 +22,8 @@ def handle_tool(request: ZMQMsg) -> dict:
                     "submit_simulation_summary": SubmitSimulationSummaryHandler}
         if request.target == "snakelab" and request.method == "read_simulation_data":
             return SimulationData(db).read(request.payload)
+        if request.target == "snakelab" and request.method == "read_analysis_data":
+            return SimulationData(db).read_run(request.payload)
         if request.target != "snakelab" or request.method not in handlers:
             return {"status": "error", "error": {"code": "unknown_method", "message": "Unknown domain or method"}}
         return handlers[request.method](db).submit(request.payload)

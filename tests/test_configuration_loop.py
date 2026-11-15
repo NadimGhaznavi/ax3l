@@ -2,6 +2,7 @@
 
 import asyncio
 from copy import deepcopy
+import json
 from pathlib import Path
 import unittest
 from unittest.mock import ANY, AsyncMock, Mock, patch
@@ -10,6 +11,7 @@ from uuid import uuid4
 from ax3l.app.snakelab.SnakeLabLoop import optimize, SimulationUnsuccessful, submit_draft
 from ax3l.app.snakelab.SubmitSingleValueHandler import SubmitSingleValueHandler
 from ax3l.app.snakelab.SubmitPairValuesHandler import SubmitPairValuesHandler
+from ax3l.constants.DSimulationAnalysis import DSimulationAnalysis
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
@@ -31,7 +33,7 @@ class MemoryExperiments:
             raise asyncio.CancelledError()
 
     def analysis(self, run_id):
-        return self.analyses[run_id]
+        return self.analyses.get(run_id)
 
     def comparison(self, run_id):
         return self.comparisons.get(run_id)
@@ -70,6 +72,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.rotation = self.enterContext(patch(module + 'rotate_if_needed', new_callable=AsyncMock))
         self.wait = self.enterContext(patch(module + 'wait_for_run', new_callable=AsyncMock))
         self.analysis = self.enterContext(patch(module + 'analyze_run', new_callable=AsyncMock))
+        self.analysis.side_effect = lambda *args: self.store.analysis(args[5])
         self.tools = self.enterContext(patch(module + 'SnakeLabTools', return_value=AsyncMock()))
         self.conversation = self.enterContext(patch(module + 'converse', new_callable=AsyncMock))
         shared = 'ax3l.app.snakelab.SubmitSingleValueHandler.'
@@ -135,6 +138,54 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.snake.submit_simulation.call_args.args[0]['model']['hidden_size'], 272)
         self.assertEqual(self.rotation.await_count, 1)  # Resume pending rotation only.
 
+    async def check_image_analysis_before_choices(self, completed_choices=0):
+        if completed_choices:
+            self.store.saved = self.draft(completed_choices)
+            self.store.saved.config['model']['hidden_size'] = 272
+        references = [self.latest, self.gold, self.best]
+        completed = deepcopy(self.store.analyses)
+        self.store.analyses.clear()
+        analyzed = []
+        for index, analysis in enumerate(completed.values(), 1):
+            completed[analysis.run_id] = SimulationAnalysis(
+                analysis.run_id, analysis.config, analysis.metrics,
+                '\n'.join(f'{label}: Reference {index} observation.'
+                          for label in DSimulationAnalysis.SECTIONS.values()))
+
+        async def analyze(*args):
+            run_id = args[5]
+            if run_id in references:
+                self.assertEqual(self.store.saved.phase, 'preparing')
+                self.assertEqual(self.prompts, [])
+                analyzed.append(run_id)
+                self.store.analyses[run_id] = completed[run_id]
+            return self.store.analysis(run_id)
+
+        self.analysis.side_effect = analyze
+        select = self.conversation.side_effect
+
+        async def choose(*args, **kwargs):
+            self.assertEqual(analyzed, references)
+            prompt = args[4][-1].to_md()
+            reference_text = prompt.split('Reference simulation analyses:\n')[1].split('\n')[0]
+            supplied = json.loads(reference_text)
+            self.assertEqual({row['run']: row['interpretation'] for row in supplied},
+                             {run_id.split('-')[0]: completed[run_id].summary for run_id in references})
+            return await select(*args, **kwargs)
+
+        self.conversation.side_effect = choose
+        await self.cycle()
+        self.assertEqual([call.kwargs['parameter'] for call in self.conversation.await_args_list],
+                         PARAMETER_ORDER[completed_choices:])
+        if completed_choices:
+            self.assertEqual(self.snake.submit_simulation.call_args.args[0]['model']['hidden_size'], 272)
+
+    async def test_image_observations_are_ready_and_included_in_every_config_prompt(self):
+        await self.check_image_analysis_before_choices()
+
+    async def test_restart_finishes_image_jobs_before_the_next_config_prompt(self):
+        await self.check_image_analysis_before_choices(completed_choices=3)
+
     async def test_reference_preparation_is_durable_and_resumes_before_choices(self):
         self.store.saved = self.draft(phase='preparing')
         original = deepcopy(self.store.saved)
@@ -146,6 +197,17 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.conversation.assert_not_awaited()
         self.snake.submit_simulation.assert_not_called()
         self.snake.get_latest_completed_run_id.assert_not_called()
+
+    async def test_interrupted_reference_analysis_preserves_resumed_choices(self):
+        self.store.saved = self.draft(3)
+        self.store.saved.config['model']['hidden_size'] = 272
+        original = deepcopy(self.store.saved)
+        original.phase = 'preparing'
+        self.analysis.side_effect = asyncio.CancelledError()
+        await self.cycle()
+        self.assertEqual(self.store.saved, original)
+        self.conversation.assert_not_awaited()
+        self.snake.submit_simulation.assert_not_called()
 
     async def test_restart_after_final_choice_does_not_repeat_any_conversation(self):
         self.store.saved = self.draft(8, 'ready')

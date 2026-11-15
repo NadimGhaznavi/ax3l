@@ -12,6 +12,7 @@ from uuid import uuid4
 from ax3l.activity.ExperimentStatus import experiment_status
 from ax3l.app.DbMgr import DbMgr
 from ax3l.app.snakelab.ExperimentDb import ExperimentDb
+from ax3l.constants.DSimulationAnalysis import DSimulationAnalysis
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
 from ax3l.entities.AnalysisTask import AnalysisTask
@@ -119,17 +120,25 @@ class ExperimentStatusTests(unittest.TestCase):
         report = self.report(reference_states=states)
         self.assertEqual(report['phase'], 'Preparing references')
         self.assertIn('Analyzing distribution image', report['detail'])
-        self.assertEqual(len(report['prerequisites']), 2)
-        current, best = report['prerequisites']
-        self.assertEqual(current['label'], 'Latest simulation / Current golden')
+        self.assertEqual(len(report['prerequisites']), 6)
+        scores, current, loss, *best = report['prerequisites']
+        self.assertEqual(current['roles'], 'Latest simulation / Current golden')
+        self.assertEqual(current['label'], 'Score distribution')
+        self.assertTrue(scores['selected'])
+        self.assertEqual(scores['value'], 'Complete')
+        self.assertFalse(scores['current'])
         self.assertFalse(current['selected'])
         self.assertTrue(current['current'])
-        self.assertTrue(best['selected'])
+        self.assertFalse(loss['selected'])
+        self.assertFalse(loss['current'])
+        self.assertEqual(loss['value'], 'Pending')
+        self.assertTrue(all(row['selected'] for row in best))
+        self.assertEqual([row['section'] for row in best], list(DSimulationAnalysis.SECTIONS))
         self.assertFalse(any(row['current'] for row in report['rows']))
         for phase in ('preparing', 'failed', 'stopped'):
             states[run_id]['task'] = AnalysisTask(run_id, 'distribution', phase)
             report = self.report(reference_states=states)
-            self.assertIn('distribution image', report['prerequisites'][0]['value'])
+            self.assertIn('distribution image', report['prerequisites'][1]['value'])
             if phase in ('failed', 'stopped'):
                 self.assertEqual(report['phase'], 'Reference analysis ' + phase)
         states[run_id]['analysis'] = SimulationAnalysis(run_id, {}, {}, 'Saved.')
@@ -137,6 +146,34 @@ class ExperimentStatusTests(unittest.TestCase):
         report = self.report(reference_states=states)
         self.assertTrue(all(row['selected'] for row in report['prerequisites']))
         self.assertTrue(all(row['value'] == 'Complete' for row in report['prerequisites']))
+
+    def test_each_distinct_reference_has_three_image_rows(self):
+        run_ids = [str(uuid4()) for _ in range(3)]
+        for count in (1, 2, 3):
+            with self.subTest(distinct_runs=count):
+                self.draft.phase = 'preparing'
+                self.draft.references = dict(zip(('latest', 'golden', 'all_time_best'),
+                                                (run_ids[index % count] for index in range(3))))
+                states = {run_id: dict(analysis=None, sections={}, task=None) for run_id in run_ids[:count]}
+                rows = self.report(reference_states=states)['prerequisites']
+                self.assertEqual(len(rows), count * 3)
+                self.assertEqual([(row['run_id'], row['section']) for row in rows],
+                                 [(run_id, section) for run_id in run_ids[:count]
+                                  for section in DSimulationAnalysis.SECTIONS])
+                self.assertTrue(all(row['value'] == 'Pending' and not row['selected'] for row in rows))
+
+    def test_saved_image_is_complete_even_when_its_last_task_is_stale(self):
+        run_id = self.draft.golden_run_id
+        self.draft.phase = 'preparing'
+        self.draft.references = {'golden': run_id}
+        for phase in ('preparing', 'analyzing', 'saved', 'failed', 'stopped'):
+            with self.subTest(phase=phase):
+                state = dict(analysis=None, sections={'scores': 'Saved.'},
+                             task=AnalysisTask(run_id, 'scores', phase))
+                rows = self.report(reference_states={run_id: state})['prerequisites']
+                self.assertTrue(rows[0]['selected'])
+                self.assertEqual(rows[0]['value'], 'Complete')
+                self.assertTrue(all(not row['current'] and row['phase'] is None for row in rows))
 
     def test_result_analysis_reports_the_recorded_task_and_failure(self):
         self.draft.phase, self.draft.run_id = 'submitted', str(uuid4())
@@ -236,15 +273,34 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         self.assertLess(page.index('>Pre-Requisites</th>'), page.index('>Configuration</th>'))
         self.assertIn('Preparing score trends image', page)
         self.assertIn('Latest simulation / Current golden / All-time best', page)
-        self.assertEqual(page.count('type="checkbox" disabled'), 12)
+        self.assertEqual(page.count('type="checkbox" disabled'), 14)
         self.assertEqual(page.count('disabled checked'), 0)
+        self.assertEqual(page.count('data-analysis='), 3)
+        for section in DSimulationAnalysis.SECTIONS:
+            self.assertIn(f'data-analysis="{section}"', page)
         state['task'] = AnalysisTask(run_id, 'scores', 'analyzing')
         self.assertIn('Analyzing score trends image', self.get())
+        state['sections'] = {'scores': 'Saved.'}
+        state['task'] = AnalysisTask(run_id, 'distribution', 'analyzing')
+        page = self.get()
+        self.assertEqual(page.count('disabled checked'), 1)
+        self.assertIn('Analyzing distribution image', page)
         state['analysis'] = SimulationAnalysis(run_id, {}, {}, 'Saved.')
         self.draft.phase = 'choosing'
         page = self.get()
         self.assertIn('Choosing: Hidden Size', page)
-        self.assertEqual(page.count('disabled checked'), 1)
+        self.assertEqual(page.count('disabled checked'), 3)
+
+    def test_three_distinct_reference_runs_render_nine_image_items_above_configuration(self):
+        self.draft.phase = 'preparing'
+        self.draft.references = dict(zip(('latest', 'golden', 'all_time_best'),
+                                        (str(uuid4()) for _ in range(3))))
+        page = self.get()
+        self.assertEqual(page.count('data-analysis='), 9)
+        self.assertEqual(page.count('type="checkbox" disabled'), 20)
+        for section in DSimulationAnalysis.SECTIONS:
+            self.assertEqual(page.count(f'data-analysis="{section}"'), 3)
+        self.assertLess(page.rindex('data-analysis='), page.index('>Configuration</th>'))
 
 
 @unittest.skipUnless(os.environ.get('AX3L_TEST_DB') == '1', 'requires disposable MariaDB test database')

@@ -6,9 +6,12 @@ layout: single
 
 # Snake Lab Prompts
 
-The optimizer chooses all tunable settings in a draft before executing one
-simulation. Parameter conversations use text; three separate conversations per
-completed run interpret one chart each and produce reusable observations.
+The optimizer first completes the reference runs' image-analysis jobs, then
+includes their saved observations in the main text prompt for every configuration
+element. It chooses all tunable settings in a draft before executing one simulation.
+Three separate conversations per completed run interpret one chart each and
+produce reusable observations. Resuming a draft completes unfinished reference
+analysis before the next configuration choice and reuses saved observations.
 
 | Prompt | Purpose |
 | --- | --- |

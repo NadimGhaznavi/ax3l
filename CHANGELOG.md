@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Summary
 
 Give Qwen charts and measured data during parameter selection, and show each
-setup step as it happens in Experiment Status.
+setup step as it happens in Experiment Status. Improved reporting.
 
 ### Changed
 

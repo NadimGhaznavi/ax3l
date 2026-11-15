@@ -187,13 +187,16 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
             ):
                 try:
                     run_id = self.path.split("/")[2]
-                    run = SnakeLab().get_run_summary(run_id)
+                    snake = SnakeLab()
+                    run = snake.get_run_summary(run_id)
                     if run is None:
                         self.send_error(404, "Simulation not found")
                         return
                     body = templates.get_template("simulation_run.html").render(
                         run=run, board_gif_url=animation_url(run_id, run["id"]),
-                        board_svg=board_svg(run.get("high_score_snapshot"))
+                        board_svg=board_svg(run.get("high_score_snapshot")),
+                        config=snake.get_config(run_id),
+                        diagnostics=snake.get_episode_diagnostics(run_id),
                     ).encode("utf-8")
                     content_type = "text/html; charset=utf-8"
                 except Exception:

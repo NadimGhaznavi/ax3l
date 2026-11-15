@@ -1,4 +1,4 @@
-"""Run from the checkout: python3 -m ax3l.app.snakelab.main-loop --url URL."""
+"""Run from the checkout: python3 -m ax3l.app.snakelab.main-loop."""
 
 import argparse
 import os
@@ -18,6 +18,7 @@ from ax3l.constants.DEventCategory import DEventCategory
 from ax3l.constants.DSnakeLab import DSnakeLab
 from ax3l.constants.DAx3l import DAx3l
 from ax3l.interface.Network import Network
+from ax3l.interface.Configuration import Configuration
 from ax3l.interface.LLM import LLM
 from ax3l.interface.SnakeLab import SnakeLab
 
@@ -73,10 +74,12 @@ def initialize_simulation(db: DbMgr) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run the Snake Lab single-parameter optimization loop.")
-    parser.add_argument("--url", required=True, help="LLM server base URL, e.g. http://host:27770")
+    parser.add_argument("--url", type=Configuration.validate_llamasrv_url,
+                        help="Override the configured LlamaSrv base URL")
     parser.add_argument("--output", type=Path, default=Path("tmp/snakelab"))
     parser.add_argument("--zmq-endpoint", default=None)
     args = parser.parse_args(argv)
+    url = args.url if args.url is not None else Network.llamasrv_url()
     if args.zmq_endpoint is None:
         args.zmq_endpoint = os.environ.get("AX3L_ZMQ_ENDPOINT")
     if args.zmq_endpoint is None:
@@ -94,7 +97,7 @@ def main(argv: list[str] | None = None) -> int:
             db = DbMgr()
             try:
                 initialize_simulation(db)
-                run_optimization(LLM(args.url), output, db, args.zmq_endpoint)
+                run_optimization(LLM(url), output, db, args.zmq_endpoint)
             finally:
                 db.close()
         except KeyboardInterrupt:

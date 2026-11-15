@@ -198,6 +198,22 @@ class SnakeLab:
         finally:
             db.close()
 
+    def get_epsilon_nice_report(self, golden_run_id: str) -> list[dict]:
+        UUID(golden_run_id)
+        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
+        try:
+            return SnakeLabDb(db).get_epsilon_nice_report(golden_run_id)
+        finally:
+            db.close()
+
+    def get_episode_diagnostics(self, run_id: str) -> dict:
+        UUID(run_id)
+        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
+        try:
+            return SnakeLabDb(db).get_episode_diagnostics(run_id)
+        finally:
+            db.close()
+
     def get_learning_rate_report(self, golden_run_id: str) -> list[dict]:
         UUID(golden_run_id)
         db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)

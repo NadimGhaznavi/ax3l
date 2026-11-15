@@ -1,11 +1,10 @@
 """Validate a joint proposal and submit a candidate using the shared workflow."""
 
-import math
-
-from jsonschema import Draft202012Validator, ValidationError
+from jsonschema import ValidationError
 
 from ax3l.app.snakelab.PairParameters import PAIR_PARAMETERS
 from ax3l.app.snakelab.SubmitSingleValueHandler import SubmitSingleValueHandler
+from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 
 
 class SubmitPairValuesHandler(SubmitSingleValueHandler):
@@ -14,25 +13,23 @@ class SubmitPairValuesHandler(SubmitSingleValueHandler):
             return self._reject("Supply exactly pair, value_1, and value_2.")
         pair = payload["pair"]
         if not isinstance(pair, str) or pair not in PAIR_PARAMETERS:
-            return self._reject("pair must be epsilon_pair or reward_pair.")
+            return self._reject(f"pair must be one of {', '.join(PAIR_PARAMETERS)}.")
 
         changes = []
         descriptions = []
         for index, path in enumerate(PAIR_PARAMETERS[pair], start=1):
             name = f"value_{index}"
             value = payload[name]
-            if type(value) not in (int, float) or (isinstance(value, float) and not math.isfinite(value)):
-                return self._reject(f"{name} must be a finite JSON number.")
-            definition = self._schema
-            for key in path:
-                definition = definition["properties"][key]
             try:
-                Draft202012Validator(definition).validate(value)
+                value = SimulationConfiguration.value(path, value)
             except ValidationError as error:
                 return self._reject(f"{name} ({'.'.join(path)}): {error.message}")
-            if definition["type"] == "integer":
-                value = int(value)
             changes.append((path, value))
             descriptions.append(f"{'.'.join(path)}: {value}")
 
+        if pair == "reward_pair":
+            try:
+                SimulationConfiguration.validate_reward_pair(*(value for _, value in changes))
+            except ValidationError as error:
+                return self._reject(error.message)
         return self._submit_changes(changes, f"{pair}: " + ", ".join(descriptions))

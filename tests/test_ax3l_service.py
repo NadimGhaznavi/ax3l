@@ -50,12 +50,15 @@ class Ax3lServiceTests(unittest.TestCase):
                         "from importlib import import_module; "
                         "from ax3l.server.Ax3lServer import main; "
                         "from ax3l.app.Prompt import Prompt; "
+                        "from ax3l.app.snakelab.GenerateDefaultConfig import GenerateDefaultConfig; "
                         "golden = Prompt('Golden configuration'); "
                         "golden.run_id = 'f6e72cb3-9bcf-4669-b368-a17c656bad79'; "
                         "patch.object(import_module('ax3l.app.snakelab.SnakeLabLoop'), 'GoldenConfig', return_value=golden).start(); "
                         "patch('ax3l.interface.SnakeLab.SnakeLab.is_simulation_running', return_value=False).start(); "
                         "patch('ax3l.app.EventLogDb.EventLogDb.latest_snakelab_proposal', return_value=None).start(); "
-                        "patch('ax3l.interface.SnakeLab.SnakeLab.get_run_result', return_value={'status': 'completed', 'high_score': 10}).start(); "
+                        "patch('ax3l.app.EventLogDb.EventLogDb.current_golden_config', return_value={'process_id': golden.run_id}).start(); "
+                        "patch('ax3l.interface.SnakeLab.SnakeLab.get_run_result', return_value={'status': 'completed', 'high_score': 10, 'config': GenerateDefaultConfig().run()}).start(); "
+                        "patch('ax3l.interface.SnakeLab.SnakeLab.get_parameter_report', return_value=[]).start(); "
                         "patch('ax3l.interface.SnakeLab.SnakeLab.get_num_sims', return_value=1).start(); "
                         "raise SystemExit(main())",
                         "--zmq-endpoint", "tcp://127.0.0.1:*",

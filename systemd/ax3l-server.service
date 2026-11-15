@@ -13,7 +13,7 @@ Environment=BROWSER_PATH=@APP@/.chrome/browser
 Environment=XDG_CONFIG_HOME=/run/ax3l/chrome-config
 Environment=XDG_CACHE_HOME=/run/ax3l/chrome-cache
 EnvironmentFile=@CONFIG@/database.env
-ExecStart=@APP@/.venv/bin/python -m ax3l.server.Ax3lServer --zmq-endpoint @AX3L_ZMQ_ENDPOINT@ @AX3L_ARGS@
+ExecStart=@APP@/.venv/bin/python -m ax3l.server.Ax3lServer --zmq-endpoint @AX3L_ZMQ_ENDPOINT@ --output /var/lib/ax3l/snakelab
 StateDirectory=ax3l
 RuntimeDirectory=ax3l
 KillSignal=SIGINT

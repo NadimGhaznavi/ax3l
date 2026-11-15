@@ -2,18 +2,21 @@
 
 import json
 
-from ax3l.app.snakelab.SingleParameters import SCHEMA
+from ax3l.interface.SimulationConfiguration import SCHEMA
 
 
 PAIR_PARAMETERS = {
     "epsilon_pair": (("epsilon", "initial"), ("epsilon", "decay")),
     "reward_pair": (("game", "rewards", "closer_to_food"),
                     ("game", "rewards", "further_from_food")),
+    "epsilon_nice_pair": (("epsilon_nice", "probability"), ("epsilon_nice", "steps")),
 }
 
 
 def pair_instructions(pair: str) -> str:
     lines = [f"Submit two values together for the Ax3l-assigned {pair}."]
+    if pair == "reward_pair":
+        lines.append("closer_to_food + further_from_food must be <= 0; positive-sum pairs reward loops.")
     for index, path in enumerate(PAIR_PARAMETERS[pair], start=1):
         field = SCHEMA
         for key in path:

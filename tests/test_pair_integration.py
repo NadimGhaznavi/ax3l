@@ -9,6 +9,7 @@ from ax3l.app.snakelab.RoundRobinState import ROUND_ROBIN_ORDER
 from ax3l.app.snakelab.SnakeLabLoop import optimize
 from ax3l.app.snakelab.ToolConversation import converse
 from ax3l.app.snakelab.prompts.FirstContactEpsilonPair import FirstContactEpsilonPair
+from ax3l.app.snakelab.prompts.FirstContactEpsilonNicePair import FirstContactEpsilonNicePair
 from ax3l.app.snakelab.prompts.FirstContactRewardPair import FirstContactRewardPair
 
 
@@ -23,9 +24,9 @@ class PairIntegrationTests(unittest.IsolatedAsyncioTestCase):
         events = Mock()
         events.latest_snakelab_proposal.return_value = None
         events.latest_seed_baseline.return_value = None
-        with patch(module + 'SnakeLab', return_value=snake), patch(module + 'GoldenConfig', return_value=golden), patch(module + 'EventLogDb', return_value=events), patch(module + 'rotate_if_needed', new_callable=AsyncMock, return_value=None), patch(module + 'RoundRobinState') as selector, patch(module + 'SnakeLabTools', return_value=AsyncMock()) as tools, patch(module + 'converse', new_callable=AsyncMock) as conversation, patch(module + 'wait_for_run', new_callable=AsyncMock) as wait, patch(module + 'compare', return_value='gold'), patch(module + 'Comparison', return_value=Prompt('single')), patch(module + 'ComparisonEpsilonPair', return_value=Prompt('epsilon report')) as epsilon, patch(module + 'ComparisonRewardPair', return_value=Prompt('reward grid')) as reward:
+        with patch(module + 'SnakeLab', return_value=snake), patch(module + 'GoldenConfig', return_value=golden), patch(module + 'EventLogDb', return_value=events), patch(module + 'rotate_if_needed', new_callable=AsyncMock, return_value=None), patch(module + 'RoundRobinState') as selector, patch(module + 'SnakeLabTools', return_value=AsyncMock()) as tools, patch(module + 'converse', new_callable=AsyncMock) as conversation, patch(module + 'wait_for_run', new_callable=AsyncMock) as wait, patch(module + 'compare', return_value='gold'), patch(module + 'Comparison', return_value=Prompt('single')), patch(module + 'ComparisonEpsilonPair', return_value=Prompt('epsilon report')) as epsilon, patch(module + 'ComparisonRewardPair', return_value=Prompt('reward grid')) as reward, patch(module + 'ComparisonEpsilonNicePair', return_value=Prompt('nice report')) as nice:
             selector.return_value.begin.side_effect = ROUND_ROBIN_ORDER + ROUND_ROBIN_ORDER[:1]
-            conversation.side_effect = [f'run-{i}' for i in range(7)] + [asyncio.CancelledError()]
+            conversation.side_effect = [f'run-{i}' for i in range(len(ROUND_ROBIN_ORDER))] + [asyncio.CancelledError()]
             with self.assertRaises(asyncio.CancelledError):
                 await optimize(Mock(), Path('/tmp'), Mock(), 'endpoint')
             self.assertEqual([call.args[1] for call in tools.call_args_list], ROUND_ROBIN_ORDER + ROUND_ROBIN_ORDER[:1])
@@ -33,13 +34,17 @@ class PairIntegrationTests(unittest.IsolatedAsyncioTestCase):
                              ROUND_ROBIN_ORDER + ROUND_ROBIN_ORDER[:1])
             epsilon.assert_called_once_with('gold')
             reward.assert_called_once_with('gold')
+            nice.assert_called_once_with('gold')
             epsilon_prompts = conversation.call_args_list[5].args[4]
             reward_prompts = conversation.call_args_list[6].args[4]
             self.assertEqual(epsilon_prompts[1].to_md(), 'epsilon report')
             self.assertIsInstance(epsilon_prompts[2], FirstContactEpsilonPair)
             self.assertEqual(reward_prompts[1].to_md(), 'reward grid')
             self.assertIsInstance(reward_prompts[2], FirstContactRewardPair)
-            self.assertEqual(wait.await_count, 7)
+            nice_prompts = conversation.call_args_list[7].args[4]
+            self.assertEqual(nice_prompts[1].to_md(), 'nice report')
+            self.assertIsInstance(nice_prompts[2], FirstContactEpsilonNicePair)
+            self.assertEqual(wait.await_count, len(ROUND_ROBIN_ORDER))
 
     async def test_pair_arguments_cannot_override_assignment_and_rejections_retry(self):
         def reply(arguments):

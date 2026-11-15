@@ -129,6 +129,8 @@ class SnakeLabDbTests(unittest.TestCase):
                   "pages/snake-lab/database-v3.sql").read_text()
         schema = schema[schema.index("CREATE TABLE"):schema.index(",\n\n    CONSTRAINT")]
         db.execute(schema.replace("CREATE TABLE IF NOT EXISTS", "CREATE TEMPORARY TABLE") + ")")
+        additions = (Path(__file__).resolve().parents[1] / 'pages/snake-lab/database-v6.sql').read_text()
+        db.execute(additions.split('ALTER TABLE simulation_episodes')[0])
         return db
 
     def insert_config(self, db, config, status="completed", score=3):
@@ -161,7 +163,7 @@ class SnakeLabDbTests(unittest.TestCase):
                     target = changed
                     for part in path[:-1]:
                         target = target[part]
-                    target[path[-1]] += 1
+                    target[path[-1]] = 'rnn' if isinstance(target[path[-1]], str) else target[path[-1]] + 1
                     self.assertTrue(dal.is_config_unique(changed), path)
                 latest = self.insert_config(db, candidate, state)
                 self.assertEqual(dal.find_config_run(candidate), latest)
@@ -182,7 +184,7 @@ class SnakeLabDbTests(unittest.TestCase):
         self.assertEqual(dal.get_run_result(ids[0])['config']['training']['learning_rate'], .01)
         self.assertIsNone(dal.get_run_result(str(uuid4())))
         self.assertEqual(dal.get_config(ids[-1]), config)
-        self.assertIsInstance(dal.get_config(ids[-1])['game']['rewards']['food'], int)
+        self.assertIsInstance(dal.get_config(ids[-1])['game']['rewards']['food'], float)
         self.assertIsNone(dal.get_config(str(uuid4())))
 
     def test_score_history_omits_seeds_and_preserves_sorted_repeated_scores(self):
@@ -217,5 +219,46 @@ class SnakeLabDbTests(unittest.TestCase):
             {'initial': config['epsilon']['initial'], 'pairs': [
                 {'decay': config['epsilon']['decay'], 'scores': [0, 4]}]}])
         rewards = dal.get_reward_report(golden_id)
-        self.assertEqual(rewards['2']['-2'], [0, 4])
+        self.assertEqual(rewards['1']['-1'], [0, 4])
         self.assertEqual(sum(len(scores) for pairs in rewards.values() for scores in pairs.values()), 2)
+
+    def test_nice_history_matches_the_complete_configuration(self):
+        from copy import deepcopy
+        from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb
+        db = self.configuration_db()
+        baseline = GenerateDefaultConfig().run()
+        golden = self.insert_config(db, baseline, score=4)
+        trial = deepcopy(baseline)
+        trial['epsilon_nice'].update(probability=.01, steps=40)
+        self.insert_config(db, trial, score=7)
+        trial['seed'] += 1
+        self.insert_config(db, trial, score=6)
+        for section, key, value in (('model', 'type', 'rnn'), ('model', 'heads', 8),
+                                    ('epsilon', 'decay', .99)):
+            other = deepcopy(trial)
+            other[section][key] = value
+            self.insert_config(db, other, score=99)
+        self.assertEqual(SnakeLabDb(db).get_epsilon_nice_report(golden), [
+            {'probability': .005, 'pairs': [{'steps': 20, 'scores': [4]}, {'steps': 40, 'scores': []}]},
+            {'probability': .01, 'pairs': [{'steps': 20, 'scores': []}, {'steps': 40, 'scores': [6, 7]}]},
+        ])
+        self.assertEqual(SnakeLabDb(db).get_config(golden), baseline)
+
+    def test_episode_diagnostics_are_scoped_and_preserve_zero_counts(self):
+        from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb
+        db = DbMgr(initialize_event_tables=False)
+        self.addCleanup(db.close)
+        db.execute("""CREATE TEMPORARY TABLE simulation_episodes (
+            run_id CHAR(36), epsilon DOUBLE, epsilon_injections INT,
+            epsilon_nice_injections INT, reward DOUBLE, outcome VARCHAR(16))""")
+        for row in (('run', .01, 4, 0, 1.5, 'wall'), ('run', 0, 0, 3, -.25, 'max_moves'),
+                    ('other', 0, 100, 100, 100, 'snake')):
+            db.execute('INSERT INTO simulation_episodes VALUES (%s,%s,%s,%s,%s,%s)', row)
+        dal = SnakeLabDb(db)
+        self.assertEqual(dal.get_episode_diagnostics('run'), dict(episodes=2, post_epsilon_episodes=1,
+            epsilon_injections=4, epsilon_nice_injections=3, total_reward=1.25,
+            wall=1, snake=0, max_moves=1, board_filled=0))
+        empty = dal.get_episode_diagnostics('absent')
+        self.assertEqual(empty['episodes'], 0)
+        self.assertEqual(empty['epsilon_nice_injections'], 0)
+        self.assertIsNone(empty['total_reward'])

@@ -29,7 +29,7 @@ class InstallServicesTests(unittest.TestCase):
         self.log = self.root / 'calls'
         self.bin = self.root / 'test-bin'
         self.bin.mkdir()
-        for name in ('install-services.sh', 'service-configuration.sh', 'restart.sh'):
+        for name in ('install-services.sh', 'service-configuration.sh', 'restart.sh', 'uninstall.sh'):
             script = self.root / 'scripts' / name
             script.write_text(script.read_text().replace('$EUID', '$TEST_EUID')
                               .replace('/opt/prod/ax3l', str(self.root / 'app'))
@@ -39,19 +39,6 @@ class InstallServicesTests(unittest.TestCase):
         constants.write_text(constants.read_text().replace('/opt/prod/ax3l', str(self.root / 'app')))
         helper = self.root / 'scripts/services.sh'
         helper.write_text(helper.read_text().replace('$EUID', '$TEST_EUID'))
-        constants = self.root / 'ax3l/constants/DLlama.py'
-        constants.write_text(constants.read_text().replace('/opt/prod/', str(self.root) + '/'))
-        self.executable(self.root / 'llama.cpp/bin/llama-server', '#!/bin/sh\nexit 0\n')
-        from ax3l.constants.DQwen import DQwen
-        from ax3l.constants.DPhi import DPhi
-        from ax3l.constants.DQwen25 import DQwen25
-        self.models = {'qwen': DQwen.GGUF, 'phi': DPhi.GGUF, 'qwen2.5': DQwen25.GGUF}
-        self.projector = DQwen25.MMPROJ
-        self.qwen_projector = DQwen.MMPROJ
-        (self.root / 'models').mkdir()
-        for name in [*self.models.values(), self.projector, self.qwen_projector]:
-            (self.root / 'models' / name).touch()
-        self.executable(self.bin / 'sleep', '#!/bin/sh\nexit 0\n')
         self.executable(self.bin / 'systemctl', '''#!/bin/sh
 printf 'systemctl %s\n' "$*" >> "$TEST_LOG"
 if [ "$1" = show ]; then echo loaded; fi
@@ -125,74 +112,67 @@ exec /usr/bin/systemd-analyze "$@"
                                str(self.root / 'scripts' / script), *args],
                               env=env, capture_output=True, text=True, timeout=30)
 
-    def test_install_and_upgrade_all_models(self):
+    def test_install_and_upgrade_manage_only_ax3l_services(self):
         self.prepare(old=True)
-        for model in self.models:
-            with self.subTest(model=model):
+        shared = self.units / 'llamasrv-llm.service'
+        shared.write_text('# independently managed inference\n')
+        for iteration in range(2):
+            with self.subTest(iteration=iteration):
                 self.log.write_text('')
-                legacy = self.units / 'llm-server.service'
-                legacy.touch()
-                former_qwen25 = self.units / 'qwenv-server.service'
-                former_qwen25.touch()
-                result = self.run_installer('-model', model)
+                result = self.run_installer()
                 self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertFalse(legacy.exists())
-                self.assertFalse(former_qwen25.exists())
-                for name in ('qwen-server', 'phi-server', 'qwen2.5-server', 'ax3l-server', 'reporting-server', 'watchdog'):
+                self.assertEqual({path.name for path in self.units.iterdir()}, {
+                    'ax3l-server.service', 'reporting-server.service',
+                    'watchdog.service', 'llamasrv-llm.service',
+                })
+                self.assertEqual(shared.read_text(), '# independently managed inference\n')
+                for name in ('ax3l-server', 'reporting-server', 'watchdog'):
                     unit = self.units / f'{name}.service'
                     self.assertEqual(unit.stat().st_mode & 0o777, 0o644)
                     self.assertNotIn('@', unit.read_text())
-                watchdog = (self.units / 'watchdog.service').read_text()
-                self.assertIn(f'--llm-unit {model}-server.service', watchdog)
-                self.assertIn('--report-unit reporting-server.service', watchdog)
-                self.assertIn('User=root', watchdog)
-                self.assertIn('Restart=on-failure', watchdog)
                 self.assertEqual(self.credentials.stat().st_mode & 0o777, 0o600)
                 self.assertEqual(self.credentials.read_text(), 'DB_PASSWORD=fixture-secret\n')
                 self.assertEqual(self.config.stat().st_mode & 0o777, 0o750)
-                self.assertFalse((self.config / 'mcp.json').exists())
-                for name in ('qwen-server', 'phi-server', 'qwen2.5-server'):
-                    command = (self.units / f'{name}.service').read_text()
-                    self.assertNotIn('--mcp-servers-config', command)
-                    if name == 'qwen-server':
-                        self.assertIn(f'--mmproj {self.root}/models/{self.qwen_projector}', command)
                 self.assertEqual((self.app / '.venv/lib/package.py').stat().st_mode & 0o777, 0o640)
                 self.assertEqual((self.app / '.venv/bin/python').stat().st_mode & 0o777, 0o750)
-                self.assertTrue((self.app / 'ax3l/app/snakelab/tools/__main__.py').is_file())
+                for module in ('app/snakelab/tools/__main__.py', 'activity/SimulationAnimation.py',
+                               'activity/fonts/DejaVuSansMono.ttf', 'activity/fonts/LICENSE.txt',
+                               'interface/SimulationGifStore.py', 'interface/SimulationConfiguration.py',
+                               'app/snakelab/prompts/FirstContactEpsilonNicePair.py',
+                               'app/snakelab/prompts/ComparisonEpsilonNicePair.py', 'app/ReportBackground.py'):
+                    self.assertTrue((self.app / 'ax3l' / module).is_file(), module)
                 reporting = (self.units / 'reporting-server.service').read_text()
                 self.assertIn(f'--gif-dir {self.app}/games', reporting)
                 self.assertIn('--port 28870', reporting)
-                application = (self.units / 'ax3l-server.service').read_text()
-                self.assertIn('--zmq-endpoint tcp://127.0.0.1:61970', application)
-                self.assertIn('--llm-url http://127.0.0.1:27770', application)
-                self.assertIn('--output /var/lib/ax3l/snakelab', application)
-                selected = (self.units / f'{model}-server.service').read_text()
-                self.assertIn('--port 27770', selected)
-                self.assertIn(f'ExecStart={self.root}/llama.cpp/bin/llama-server ', selected)
                 self.assertIn(f'ReadWritePaths={self.app}/games', reporting)
                 self.assertTrue((self.app / 'games').is_dir())
-                self.assertTrue((self.app / 'ax3l/activity/SimulationAnimation.py').is_file())
-                self.assertTrue((self.app / 'ax3l/activity/fonts/DejaVuSansMono.ttf').is_file())
-                self.assertTrue((self.app / 'ax3l/activity/fonts/LICENSE.txt').is_file())
-                self.assertTrue((self.app / 'ax3l/interface/SimulationGifStore.py').is_file())
-                self.assertTrue((self.app / 'ax3l/app/ReportBackground.py').is_file())
+                application = (self.units / 'ax3l-server.service').read_text()
+                self.assertIn('--zmq-endpoint tcp://127.0.0.1:61970', application)
+                self.assertIn('--output /var/lib/ax3l/snakelab', application)
+                self.assertIn('RuntimeDirectory=ax3l', application)
+                self.assertIn('Environment=XDG_CONFIG_HOME=/run/ax3l/chrome-config', application)
+                self.assertIn('Environment=XDG_CACHE_HOME=/run/ax3l/chrome-cache', application)
                 calls = self.log.read_text()
                 self.assertLess(calls.index('verify'), calls.index('systemctl stop'))
-                self.assertIn(f'systemctl start {model}-server.service', calls)
-                self.assertIn('systemctl disable --now llm-server.service', calls)
-                self.assertIn('systemctl disable --now qwenv-server.service', calls)
+                self.assertNotIn('llamasrv', calls)
+                self.assertNotIn('sleep', calls)
                 self.assertIn('chgrp -R ax3l', calls)
+                starts = [line for line in calls.splitlines() if line.startswith('systemctl start')]
+                self.assertEqual(starts, ['systemctl start reporting-server.service',
+                                          'systemctl start ax3l-server.service',
+                                          'systemctl start watchdog.service'])
 
-    def test_fresh_install_and_default_model(self):
+    def test_fresh_install_needs_no_model_binary_or_files(self):
         self.prepare()
         result = self.run_installer()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.app / '.venv').stat().st_mode & 0o777, 0o755)
-        self.assertTrue((self.app / 'ax3l/app/ReportBackground.py').is_file())
-        self.assertTrue((self.app / 'ax3l/app/ReportingDb.py').is_file())
-        self.assertTrue((self.app / 'ax3l/app/ReportingRefresh.py').is_file())
-        self.assertTrue((self.app / 'ax3l/activity/CompletedRounds.py').is_file())
-        self.assertIn('systemctl start qwen-server.service', self.log.read_text())
+        for module in ('app/ReportBackground.py', 'app/ReportingDb.py', 'app/ReportingRefresh.py',
+                       'activity/CompletedRounds.py'):
+            self.assertTrue((self.app / 'ax3l' / module).is_file(), module)
+        config = json.loads((self.app / 'conf/ax3l.json').read_text())
+        self.assertEqual(config['llamasrv_url'], 'http://127.0.0.1:51001')
+        self.assertEqual(set(config['network']), {'report', 'zmq'})
 
     def test_provisioning_failures_do_not_stop_services(self):
         self.prepare()
@@ -214,16 +194,9 @@ exec /usr/bin/systemd-analyze "$@"
                 self.assertNotIn('unbound variable', result.stderr)
                 self.assertFalse(self.log.exists())
 
-    def test_missing_prerequisites_do_not_touch_services(self):
+    def test_missing_installation_does_not_touch_services(self):
         result = self.run_installer()
         self.assertIn('Run install.sh', result.stderr)
-        self.prepare()
-        for name, model in [(self.projector, 'qwen2.5'), (self.qwen_projector, 'qwen'), (self.models['qwen'], 'qwen')]:
-            (self.root / 'models' / name).unlink()
-            result = self.run_installer('-model', model)
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn('first.', result.stderr)
-            (self.root / 'models' / name).touch()
         self.assertFalse(self.log.exists())
 
     def test_restart_applies_all_bindings_without_provisioning_and_preserves_config(self):
@@ -231,38 +204,58 @@ exec /usr/bin/systemd-analyze "$@"
         path = self.app / 'conf/ax3l.json'
         path.parent.mkdir()
         content = json.dumps({'network': {
-            'llm': {'interface': '127.0.0.2', 'port': 27771},
             'report': {'interface': '127.0.0.3', 'port': 28871},
             'zmq': {'interface': '0.0.0.0', 'port': 61971},
-        }}, indent=4)
+        }, 'llamasrv_url': 'http://wintermute:51001'}, indent=4)
         path.write_text(content)
-        result = self.run_installer('-model', 'phi', script='restart.sh')
+        result = self.run_installer(script='restart.sh')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(path.read_text(), content)
-        self.assertIn('--host 127.0.0.2 --port 27771', (self.units / 'phi-server.service').read_text())
         self.assertIn('--host 127.0.0.3 --port 28871', (self.units / 'reporting-server.service').read_text())
         application = (self.units / 'ax3l-server.service').read_text()
-        self.assertIn('--llm-url http://127.0.0.2:27771', application)
+        self.assertNotIn('--llm-url', application)
         self.assertIn('--zmq-endpoint tcp://0.0.0.0:61971', application)
         watchdog = (self.units / 'watchdog.service').read_text()
-        self.assertIn('--llm-unit phi-server.service', watchdog)
-        self.assertIn('--llm-health-url http://127.0.0.2:27771/health', watchdog)
+        self.assertNotIn('--llm', watchdog)
         calls = self.log.read_text()
         self.assertNotIn('python ', calls)
+        self.assertNotIn('llamasrv', calls)
         self.assertLess(calls.index('verify'), calls.index('systemctl stop'))
-        self.assertLess(calls.index('systemctl daemon-reload'), calls.index('systemctl start phi-server'))
+        self.assertLess(calls.index('systemctl daemon-reload'), calls.index('systemctl start reporting-server'))
 
     def test_invalid_config_leaves_services_and_file_untouched(self):
         self.prepare(old=True)
         path = self.app / 'conf/ax3l.json'
         path.parent.mkdir()
-        path.write_text('{"network": {"llm": {"port": true}}}')
+        path.write_text('{"llamasrv_url": "http://wintermute/v1"}')
         content = path.read_bytes()
         for script in ('install-services.sh', 'restart.sh'):
             with self.subTest(script=script):
                 result = self.run_installer(script=script)
                 self.assertNotEqual(result.returncode, 0)
-                self.assertIn('network.llm.port', result.stderr)
+                self.assertIn('llamasrv_url', result.stderr)
                 self.assertFalse(self.log.exists())
                 self.assertEqual(path.read_bytes(), content)
                 self.assertEqual(list(self.units.iterdir()), [])
+
+    def test_retired_model_option_is_rejected_before_any_host_actions(self):
+        for script in ('install-services.sh', 'restart.sh', 'upgrade.sh'):
+            with self.subTest(script=script):
+                result = self.run_installer('-model', 'qwen', script=script)
+                self.assertEqual(result.returncode, 2)
+                self.assertFalse(self.log.exists())
+
+    def test_uninstall_preserves_shared_inference(self):
+        self.prepare()
+        self.credentials.write_text('DB_NAME=ax3l\n')
+        for name in ('watchdog', 'ax3l-server', 'reporting-server', 'llamasrv-llm', 'llamasrv-http'):
+            (self.units / f'{name}.service').write_text('# fixture\n')
+        self.executable(self.bin / 'mariadb', '#!/bin/sh\ncat >/dev/null\n')
+        self.executable(self.bin / 'getent', '#!/bin/sh\nexit 2\n')
+        result = self.run_installer(script='uninstall.sh')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(self.app.exists())
+        self.assertFalse(self.credentials.exists())
+        self.assertEqual({path.name for path in self.units.iterdir()},
+                         {'llamasrv-llm.service', 'llamasrv-http.service'})
+        self.assertNotIn('llamasrv', self.log.read_text())

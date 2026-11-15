@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.3.3] - 2026-11-15 @ 11:57
+
 ### Summary
 
 Limit EpsilonNice detour probability to 10% and duration to 50 moves.

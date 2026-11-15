@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.2.2] - 2026-11-15 @ 10:06
+
 ### Summary
 
 Show each reference image job on the report card and complete image analysis

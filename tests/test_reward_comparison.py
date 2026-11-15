@@ -17,6 +17,7 @@ class RewardComparisonTests(unittest.TestCase):
                 (3, -3, "completed", 39), (3, -3, "completed", 41),
                 (3.0, -3.0, "completed", 37), (3, -3, "completed", 37),
                 (0, -6, "completed", 0), (6, 0, "completed", 12),
+                (.1, -.1, "completed", 13),
                 (2, -2, "failed", 99), (2, -2, "running", 99),
                 (2, -2, "completed", None),
                 (7, -2, "completed", 99), (2, -7, "completed", 99),
@@ -24,12 +25,14 @@ class RewardComparisonTests(unittest.TestCase):
             ]
         ]
         report = SnakeLabDb(db).get_reward_report("gold")
-        self.assertEqual(list(report), ["0", "1", "2", "3", "4", "5", "6"])
-        for pairs in report.values():
-            self.assertEqual(list(pairs), ["-6", "-5", "-4", "-3", "-2", "-1", "0"])
+        self.assertEqual(list(report), ["0", "0.1", "0.25", "0.5", "1", "2", "3", "4", "5", "6"])
+        for first, pairs in report.items():
+            self.assertEqual(list(map(float, pairs)), sorted(map(float, pairs)))
+            self.assertTrue(all(float(first) + float(second) <= 0 for second in pairs))
         self.assertEqual(report["3"]["-3"], [37, 37, 39, 41])
         self.assertEqual(report["0"]["-6"], [0])
-        self.assertEqual(report["6"]["0"], [12])
+        self.assertNotIn("0", report["6"])
+        self.assertEqual(report["0.1"]["-0.1"], [13])
         self.assertEqual(sum(bool(scores) for pairs in report.values() for scores in pairs.values()), 3)
         sql, args = db.query.call_args.args
         self.assertNotIn("c.seed = g.seed", sql)
@@ -38,14 +41,14 @@ class RewardComparisonTests(unittest.TestCase):
         self.assertIn("c.epochs = g.epochs", sql)
         self.assertEqual(args, ("gold",))
 
-    def test_no_runs_still_produces_49_independent_empty_cells(self):
+    def test_no_runs_still_produces_55_independent_empty_cells(self):
         db = Mock()
         db.query.return_value = []
         report = SnakeLabDb(db).get_reward_report("gold")
         cells = [scores for pairs in report.values() for scores in pairs.values()]
-        self.assertEqual(len(cells), 49)
+        self.assertEqual(len(cells), 55)
         self.assertTrue(all(scores == [] for scores in cells))
-        self.assertEqual(len({id(scores) for scores in cells}), 49)
+        self.assertEqual(len({id(scores) for scores in cells}), 55)
 
     def test_prompt_json_contains_gold_and_grid_and_refreshes(self):
         with patch("ax3l.app.snakelab.prompts.ComparisonRewardPair.SnakeLab") as snake:

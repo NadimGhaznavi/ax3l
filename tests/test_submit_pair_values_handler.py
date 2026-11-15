@@ -30,8 +30,10 @@ class SubmitPairValuesHandlerTests(unittest.TestCase):
             proposals += [{**valid, field: value} for value in (True, '0.95', None, float('nan'), float('inf'), -.1, 1)]
         proposals += [
             {'pair': 'reward_pair', 'value_1': first, 'value_2': second}
-            for first, second in ((-1, -2), (7, -2), (2, -7), (2, 1), (2.5, -2), (2, -2.5))
+            for first, second in ((-1, -2), (7, -2), (2, -7), (2, 1), (2.5, -2), (2, -2.5), (6, 0), (1, -.5))
         ]
+        proposals += [{'pair': 'epsilon_nice_pair', 'value_1': p, 'value_2': n}
+                      for p, n in ((0, 20), (-.01, 20), (1.1, 20), (.005, 0), (.005, 1001), (.005, 2.5))]
         for proposal in proposals:
             with self.subTest(proposal=proposal):
                 result = self.handler.submit(proposal)
@@ -43,7 +45,8 @@ class SubmitPairValuesHandlerTests(unittest.TestCase):
     def test_joint_changes_preserve_baseline_and_log_one_submission(self):
         for pair, section, values in (
             ('epsilon_pair', ('epsilon',), {'initial': .85, 'decay': .999}),
-            ('reward_pair', ('game', 'rewards'), {'closer_to_food': 6.0, 'further_from_food': -6.0}),
+            ('reward_pair', ('game', 'rewards'), {'closer_to_food': .25, 'further_from_food': -.5}),
+            ('epsilon_nice_pair', ('epsilon_nice',), {'probability': .01, 'steps': 40}),
         ):
             with self.subTest(pair=pair):
                 self.db.reset_mock()
@@ -66,8 +69,8 @@ class SubmitPairValuesHandlerTests(unittest.TestCase):
                 self.assertIn(pair, self.db.log.call_args_list[0].args[3])
                 if pair == 'reward_pair':
                     rewards = self.snake.submit_simulation.call_args.args[0]['game']['rewards']
-                    self.assertIs(type(rewards['closer_to_food']), int)
-                    self.assertIs(type(rewards['further_from_food']), int)
+                    self.assertIs(type(rewards['closer_to_food']), float)
+                    self.assertIs(type(rewards['further_from_food']), float)
 
     def test_unchanged_and_historical_pairs_are_duplicates(self):
         epsilon = self.baseline['epsilon']

@@ -1,4 +1,4 @@
-"""Run the SnakeLab MCP server over stdio for llama-server."""
+"""Run Ax3l's private SnakeLab MCP server over stdio."""
 
 from ax3l.app.snakelab.tools.server import mcp
 

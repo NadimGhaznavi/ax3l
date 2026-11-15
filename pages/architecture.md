@@ -4,17 +4,20 @@ author_profile: true
 layout: single
 ---
 
-![Ax3l Architecture]({{ '/pages/images/ax3l-architecture.png' | relative_url }})
-
 The project runs on [Debian Linux](https://debian.org) and uses [systemd](https://systemd.io/) to run the components as services.
 
 ## Ax3l Server
 
 The **Ax3l Server** is the heart of the system. It is implemented as a *systemd service*. See the [runtime behaviour page](/pages/runtime-behaviour) for more information. Key events are logged and reported on by the **Reporting Server**.
 
-## llama-server
+## Shared LlamaSrv inference
 
-The **llama-server** is part of [llama.cpp](https://llama-cpp.com/). The Ax3l project uses a *systemd service* to run the llama-server. The llama-server hosts the **Qwen 3.5 4B** model.
+The standalone [LlamaSrv](https://llamasrv.osoyalce.com/) application manages
+the shared **llama-server** and its loaded **Qwen 3.5 4B** model. Ax3l sends
+OpenAI-compatible chat requests to the configured `llamasrv_url`, which
+defaults to `http://127.0.0.1:51001`. Model provisioning, inference settings,
+and service lifecycle belong to LlamaSrv. Its production server supports four
+concurrent slots against the same loaded model.
 
 ### Qwen 3.5 4B LLM
 
@@ -22,7 +25,10 @@ The LLM used by the project is [Qwen 3.5 - 4B](https://huggingface.co/Qwen/Qwen3
 
 ## MCP servers and tools
 
-The MCP tool framework is a feature of llama.cpp and is well supported by the Qwen 3.5 4B model.
+Ax3l starts a private stdio MCP session for each optimization conversation and
+sends its discovered tool definitions with inference requests. Ax3l executes
+the returned tool calls; the shared inference service has no global Ax3l tool
+registration.
 
 - The MCP tools provide a way for the LLM to communicate its parameter choices to the Ax3l server.
 - The tools use the [ZeroMQ](http://zeromq.org) messaging framework to deliver the results to the Ax3l server.
@@ -87,19 +93,19 @@ The reporting entry point accepts
 `ReadWritePaths` even with `ProtectSystem=strict`. Removing a cached GIF causes
 it to be regenerated on the next view. Old Snake Lab runs are not backfilled.
 
-Network bindings are declared in `DAx3l.CMDB_NETWORK` and overridden in
+Ax3l's reporting and ZeroMQ bindings are declared in `DAx3l.CMDB_NETWORK` and overridden in
 `/opt/prod/ax3l/conf/ax3l.json`. The configuration interface validates the
 file once per process through `Network`. Installation and the network restart
-helper render all service units from those same values, including the model
-URL passed to Ax3l and the watchdog. See [network configuration](/pages/scripts.html#network-configuration).
+helper render Ax3l's service units from those same values. The outbound
+`llamasrv_url` is configured separately in the same file and read by the
+optimization process at startup. See [network configuration](/pages/scripts.html#network-configuration).
 
 ## Watchdog service
 
-- Checks Ax3l, reporting, and the model selected during service installation every 10 seconds; restarts inactive or failed units through systemd.
-- Restarts the selected model after three consecutive failed `/health` checks, with a 60-second grace period at watchdog startup and after model restarts.
+- Checks Ax3l and reporting every 10 seconds; restarts inactive or failed units through systemd.
+- Shared LlamaSrv inference is managed independently; the watchdog does not control its services.
 - Logs only problems and recovery attempts to the systemd journal; successful polls are silent. Runs as root to manage system services.
 - Does not detect a stalled optimization loop in an otherwise active Ax3l process. Stop the watchdog before intentionally stopping individual services (`services.sh stop` does this automatically).
-- Reinstall services with `-model` when changing the model monitored by the watchdog.
 
 ---
 

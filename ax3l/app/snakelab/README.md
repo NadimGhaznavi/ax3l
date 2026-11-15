@@ -1,8 +1,9 @@
 # Round-robin optimization
 
 The optimizer visits hidden size, sequence length, batch size, learning rate,
-and gamma in schema order, followed by `epsilon_pair` and `reward_pair`, then
-wraps to hidden size. Each conversation may change only its assigned single or pair. Before asking the LLM, Ax3l stores the parameter
+and gamma in schema order, followed by `epsilon_pair`, `reward_pair`, and
+`epsilon_nice_pair`, then wraps to hidden size. Each conversation may change only
+its assigned single or pair. Before asking the LLM, Ax3l stores the parameter
 order and current index as a `round_robin_checkpoint` event in its database.
 Restarting during thinking or validation retries resumes that parameter. An
 accepted proposal advances the next turn once, even if the MCP reply was lost;
@@ -12,19 +13,38 @@ requires resetting experiment events before resuming. There is no upgrade path
 for old five-entry checkpoints. A fresh experiment starts at hidden size.
 
 Before opening an LLM conversation, Ax3l checks finite schema domains (currently
-hidden size, sequence length, batch size, and the 49 reward pairs). If every legal
-choice already has a run with the current seed and all other settings unchanged,
+hidden size, sequence length, batch size, and the 55 legal reward pairs, including
+fractional choices). If every legal choice already has a run with the current
+seed and all other settings unchanged,
 it records `parameter_space_exhausted` and advances to the next step. Runs in any
 status count as existing choices, matching duplicate-proposal validation. Earlier
 seeds and different settings do not exhaust the current domain. Skips survive
 restarts and count as completed steps; continuous domains are not skipped.
 
 Seed rotation occurs after `DSnakeLab.SEED_STAGNANT_ROUNDS` (9) complete
-round-robin cycles without a new high score. Each cycle includes all seven
+round-robin cycles without a new high score. Each cycle includes all eight
 entries and counts only once each step has been compared or skipped as exhausted.
 A new golden configuration resets the count; a cycle containing an improvement
 does not count as stagnant. Rotation increments the seed and reruns the golden
 configuration to establish a fresh score baseline. The count survives restarts.
+
+## Simulation policy
+
+`SimulationConfiguration` owns the bundled Ax3l schema, default generation, field
+validation, and reward-pair rule. Ax3l fixes the model to Transformer with four
+heads and each run to 500 episodes. Nice probability must be positive; its
+probability and duration are tunable together. Defaults use probability 0.005 and
+20 steps, with ordinary epsilon 0.96/0/0.97. The full epsilon decay range remains
+0.9–0.999.
+
+Distance reward choices add 0.1, 0.25, and 0.5 to the existing integer magnitudes
+0–6. Only pairs with a non-positive sum are legal; defaults are +1/-1 and (0,0)
+remains the no-shaping control. The same 55 legal pairs drive validation,
+exhaustion, and comparison grids.
+
+The run report displays architecture, Nice settings and override counts, ordinary
+epsilon injections, total training reward, and episode termination outcomes from
+database schema v7. High score remains the promotion metric.
 
 ## MCP tools
 
@@ -40,20 +60,17 @@ and comparable history. MCP rejects strings and booleans as numeric values.
 Parameter existence, permitted ranges, duplicates, and submission decisions
 belong to Ax3l, not the MCP tool.
 
-`scripts/install-services.sh` keeps SnakeLab tools out of llama-server's global
-MCP registration, so the web chat client cannot discover or call them. The
-optimization loop configures its own bound MCP sessions automatically and
-supplies the appropriate tool definition with each LLM request. Reinstall the
-service units and restart the model service to apply this to an existing install.
+LlamaSrv provides shared inference. The optimization loop configures its own
+bound MCP sessions and supplies the appropriate tool definition with each
+request. Ax3l executes the returned tool calls; its tools are never registered
+globally with the shared inference service.
 
 The installer installs the project requirements in `<app>/.venv`, used by both
 Ax3l and its MCP child processes. Installation needs Python's venv/pip support
 and package-index access for this step.
 
-`scripts/generate-mcp-config.py` remains available for standalone MCP testing;
-do not register its output with the web client's llama-server. Submission
-requires an Ax3l-assigned `AX3L_CONVERSATION_PARAMETER` in the MCP process
-environment. The tool forwards requests
+Submission requires an Ax3l-assigned `AX3L_CONVERSATION_PARAMETER` in the MCP
+process environment. The tool forwards requests
 over ZeroMQ using the project-wide `ax3l/zmq/ZMQMsg.py` and `ZMQClient.py`:
 
 ```json
@@ -101,7 +118,7 @@ serially; external writers to SnakeLab are outside that serialization boundary.
 
 The single-parameter search space is `hidden_size`, `sequence_length`, `batch_size`,
 `learning_rate`, and `gamma`. Each conversation chooses a value for its assigned parameter.
-Reward distance values and epsilon initial/decay are tuned in their own pair
+Reward distance values, epsilon initial/decay, and Nice probability/steps are tuned in their own pair
 entries. Seed and schema-fixed settings cannot be proposed. Comparison histories hold all other settings equal
 to the current golden configuration for each parameter.
 
@@ -110,17 +127,17 @@ to the current golden configuration for each parameter.
 ### Pair MCP tool
 
 `submit_pair_values(value_1, value_2)` forwards a joint proposal to Ax3l.
-Bind `AX3L_CONVERSATION_PARAMETER` to `epsilon_pair` or `reward_pair`:
+Bind `AX3L_CONVERSATION_PARAMETER` to `epsilon_pair`, `reward_pair`, or `epsilon_nice_pair`:
 
 | Assignment | value_1 | value_2 |
 | --- | --- | --- |
 | epsilon_pair | epsilon.initial | epsilon.decay |
 | reward_pair | game.rewards.closer_to_food | game.rewards.further_from_food |
+| epsilon_nice_pair | epsilon_nice.probability | epsilon_nice.steps |
 
 The bound tool description includes these mappings and their schema rules.
 The LLM supplies only the two numeric values; the MCP server supplies the pair
-identity. Strings and booleans are rejected. Range, integer constraints for
-rewards, duplicate checks, and simulation submission belong to Ax3l.
+identity. Strings and booleans are rejected. Range, integer constraints for duration, legal reward-pair constraints, duplicate checks, and simulation submission belong to Ax3l.
 The forwarded ZMQ method is `submit_pair_values`, with payload
 `{"pair": "epsilon_pair", "value_1": 0.96, "value_2": 0.97}`.
 Replies pass through unchanged and transport errors are not retried.
@@ -133,19 +150,18 @@ in a copy, validates the full candidate, and rejects unchanged or previously
 stored configurations. Either value may remain unchanged if the other changes.
 Accepted candidates are submitted once and logged through the shared single/pair
 submission workflow. Backend failures propagate without automatic retries.
-Both pair entries are active in the round robin. The conversation dispatcher
+All three pair entries are active in the round robin. The conversation dispatcher
 uses the discovered tool name and argument fields for the assigned entry.
 
 ### Active optimization flow
 
 The optimization flow sends text-only prompts. Every conversation starts with
-`ProjectContext`, identifying Patrick Loeber's "Train an AI to Play Snake" tutorial
-and the LLM's responsibility for choosing parameters. The initial conversation then uses
+`ProjectContext`, describing the 24-feature vector, Transformer training, and required EpsilonNice in Snake Lab 3.0.1. The initial conversation then uses
 `FirstContact`, `Comparison`, and `FirstContactSingle()`.
 Subsequent conversations use `Comparison` and `ComparisonSingle` to choose the
 next single-parameter change from high-score history. Epsilon turns use
 `ComparisonEpsilonPair` and `FirstContactEpsilonPair`; reward turns use
-`ComparisonRewardPair` and `FirstContactRewardPair`. Each pair turn includes its
+`ComparisonRewardPair` and `FirstContactRewardPair`. Nice turns use `ComparisonEpsilonNicePair` and `FirstContactEpsilonNicePair`. Each pair turn includes its
 report and pair instructions. After seed rotation, the next entry uses the new
 golden baseline. `LossPlot` and `ComparisonPlot` are no
 longer included, so this flow does not require PNG rendering or a vision model.
@@ -186,14 +202,18 @@ When off, no capture output directory or files are created, including under
 console (the systemd journal for service runs). Existing captures are retained.
 
 From the checkout root, load the installed database credentials into the
-environment, then point the loop at the running model server:
+environment, then run the loop against the configured LlamaSrv endpoint:
 
 ```sh
 set -a
 . /etc/ax3l/database.env
 set +a
-.venv/bin/python -m ax3l.app.snakelab.main-loop --url http://HOST:27770
+.venv/bin/python -m ax3l.app.snakelab.main-loop
 ```
+
+The loop uses `llamasrv_url` from `/opt/prod/ax3l/conf/ax3l.json`, defaulting
+to `http://127.0.0.1:51001`. Use `--url http://HOST:51001` for an individual
+invocation.
 
 The Python environment must have the project's PyMySQL dependency installed.
 

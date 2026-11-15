@@ -9,6 +9,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-11-14 @ 20:19
+
+### Summary
+
+Use Snake Lab 3.0.1 for fresh experiments with a required Transformer, tunable
+EpsilonNice, and 500-episode runs.
+
+Use the standalone LlamaSrv service for shared inference and manage only
+Ax3l's own application services.
+
+- Replace the owned inference listener with a configurable `llamasrv_url`,
+  defaulting to `http://127.0.0.1:51001`; exclude it from CMDB listener inventory.
+- Remove model units, model constants and file checks, startup delays,
+  `-model` options, and legacy inference migrations. Limit the watchdog to
+  Ax3l and reporting; it never restarts the shared inference service.
+- Remove the unused global MCP registration generator, obsolete inference
+  setup guides, and the architecture image showing embedded inference.
+  Remove the unused direct `httpx` dependency; keep per-conversation MCP
+  sessions private to Ax3l.
+- Reject the retired `network.llm` configuration; there is no compatibility
+  migration. Both optimization entry points use LlamaSrv by default.
+- Fix the model to Transformer with four attention heads; retain the existing
+  five single-parameter turns and add a joint Nice probability/duration turn.
+  Keep the full ordinary epsilon decay range and defaults that make Nice
+  eligible at episode 227.
+- Centralize simulation defaults and validation behind `SimulationConfiguration`;
+  include every new setting in configuration reads, uniqueness checks, and
+  comparable histories, preserving the string model type.
+- Add fractional distance-reward choices and reject positive-sum pairs; keep
+  validation, finite-space exhaustion, and the 55-cell report consistent.
+- Explain the 24-feature vector and exploration behavior in prompts; report
+  model settings, exploration counts, training rewards, and termination outcomes.
+- Update bundled contract snapshots, documentation, and fresh-install tests;
+  remove the unused incomplete v3 configuration schema.
+
 ## [3.2.1] - 2026-11-05 @ 03:54
 
 - Website correction.

@@ -19,7 +19,8 @@ class ConfigurationTests(unittest.TestCase):
         base = patch.object(DAx3l, 'BASE_DIR', str(self.root))
         base.start()
         self.addCleanup(base.stop)
-        self.addCleanup(Network._bindings.cache_clear)
+        Network._configuration.cache_clear()
+        self.addCleanup(Network._configuration.cache_clear)
         self.path = self.root / DAx3l.CONFIG_FILE
         self.path.parent.mkdir()
 
@@ -27,13 +28,15 @@ class ConfigurationTests(unittest.TestCase):
         self.path.write_text(json.dumps(values))
 
     def read(self):
-        return Configuration.read(self.path, DAx3l.CMDB_NETWORK)
+        return Configuration(self.path).network
 
     def test_install_creates_defaults_and_readable_permissions(self):
         self.path.parent.rmdir()
         Configuration.install()
         self.assertEqual(self.read(), {use: (interface, port) for use, interface, port in DAx3l.CMDB_NETWORK})
-        self.assertEqual(set(json.loads(self.path.read_text())['network']), {'llm', 'report', 'zmq'})
+        values = json.loads(self.path.read_text())
+        self.assertEqual(set(values['network']), {'report', 'zmq'})
+        self.assertEqual(values['llamasrv_url'], 'http://127.0.0.1:51001')
         self.assertEqual(self.path.stat().st_mode & 0o777, 0o644)
         self.assertEqual(self.path.parent.stat().st_mode & 0o777, 0o755)
 
@@ -61,19 +64,20 @@ class ConfigurationTests(unittest.TestCase):
         self.assertEqual(Network.destination('zmq'), ('127.0.0.1', 61970))
         self.assertEqual(Network.endpoint(), 'tcp://0.0.0.0:61970')
         self.assertEqual(Network.endpoint(destination=True), 'tcp://127.0.0.1:61970')
-        self.assertEqual(Network.destination('llm'), ('127.0.0.1', 27770))
+        self.assertEqual(Network.llamasrv_url(), 'http://127.0.0.1:51001')
 
     def test_changes_are_loaded_on_process_restart(self):
         self.write({'network': {'report': {'port': 62000}}})
         self.assertEqual(Network.binding('report')[1], 62000)
         self.write({'network': {'report': {'port': 62001}}})
         self.assertEqual(Network.binding('report')[1], 62000)
-        Network._bindings.cache_clear()  # A new service process starts with an empty cache.
+        Network._configuration.cache_clear()  # A new service process starts with an empty cache.
         self.assertEqual(Network.binding('report')[1], 62001)
 
     def test_invalid_configurations_identify_field(self):
-        cases = [([], 'network settings'), ({'netwrok': {}}, 'network settings'),
+        cases = [([], 'expected an object'), ({'netwrok': {}}, 'expected an object'),
                  ({'network': []}, 'network must be an object'),
+                 ({'network': {'llm': {'port': 27770}}}, 'network.llm'),
                  ({'network': {'typo': {}}}, 'network.typo'),
                  ({'network': {'report': []}}, 'network.report'),
                  ({'network': {'report': {'host': '127.0.0.1'}}}, 'network.report')]
@@ -92,6 +96,32 @@ class ConfigurationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'invalid JSON'):
             Configuration.install()
         self.assertEqual(self.path.read_text(), '{bad json')
+
+    def test_llamasrv_url_is_an_outbound_dependency_and_survives_reinstall(self):
+        self.write({'llamasrv_url': 'http://wintermute:51001/'})
+        original = self.path.read_bytes()
+        Configuration.install()
+        self.assertEqual(self.path.read_bytes(), original)
+        self.assertEqual(Network.llamasrv_url(), 'http://wintermute:51001')
+        self.assertEqual(set(self.read()), {'report', 'zmq'})
+        self.write({'llamasrv_url': 'https://inference.example:51443'})
+        self.assertEqual(Network.llamasrv_url(), 'http://wintermute:51001')
+        Network._configuration.cache_clear()
+        self.assertEqual(Network.llamasrv_url(), 'https://inference.example:51443')
+
+    def test_invalid_llamasrv_url_identifies_field(self):
+        for value in (None, True, 51001, '', 'wintermute:51001', 'ftp://wintermute',
+                      'http://', 'http://wintermute:bad', 'http://wintermute:0',
+                      'http://wintermute:65536', 'http://[invalid]', 'http://0.0.0.0:51001',
+                      'http://user:password@wintermute:51001', 'http://wintermute/v1',
+                      'http://wintermute?setting=1', 'http://wintermute#fragment',
+                      'http://wintermute\n', 'http://winter mute'):
+            with self.subTest(value=value):
+                self.write({'llamasrv_url': value})
+                original = self.path.read_bytes()
+                with self.assertRaisesRegex(ValueError, 'llamasrv_url'):
+                    Configuration.install()
+                self.assertEqual(self.path.read_bytes(), original)
 
     def test_report_entry_point_reads_bindings_and_allows_cli_overrides(self):
         from ax3l.server.ReportingServer import main
@@ -126,3 +156,16 @@ class ConfigurationTests(unittest.TestCase):
                 client.reset_mock()
                 submitter('tcp://127.0.0.2:12345')
                 client.assert_called_once_with('tcp://127.0.0.2:12345')
+
+    def test_ax3l_uses_configured_llamasrv_by_default(self):
+        from ax3l.server.Ax3lServer import main
+
+        self.write({'llamasrv_url': 'http://wintermute:51001'})
+        loop = MagicMock()
+        loop.main.return_value = 0
+        with patch.dict('os.environ', {}, clear=True), patch('sys.argv', ['ax3l']), \
+                patch('ax3l.server.Ax3lServer.ZMQServer') as server, \
+                patch('ax3l.server.Ax3lServer.import_module', return_value=loop):
+            server.return_value.__enter__.return_value.endpoint = 'tcp://127.0.0.1:61970'
+            self.assertEqual(main(), 0)
+            self.assertEqual(loop.main.call_args.args[0][:2], ['--url', 'http://wintermute:51001'])

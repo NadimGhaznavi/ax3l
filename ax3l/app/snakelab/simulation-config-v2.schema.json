@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://snake-lab.local/schemas/simulation-config-v2.schema.json",
   "title": "Snake Lab simulation configuration",
-  "description": "Configuration for one serial Snake Lab simulation run.",
+  "description": "Ax3l experiment policy for Snake Lab 3.0.1: Transformer, required EpsilonNice, and 500 episodes.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -10,9 +10,10 @@
       "title": "Number of epochs",
       "description": "Number of complete Snake episodes to execute.",
       "type": "integer",
-      "const": 1500,
-      "default": 1500,
-      "x-snakelab-unit": "episodes"
+      "default": 500,
+      "minimum": 1,
+      "x-snakelab-unit": "episodes",
+      "const": 500
     },
     "seed": {
       "title": "Simulation seed",
@@ -58,50 +59,77 @@
           "additionalProperties": false,
           "properties": {
             "food": {
-              "type": "integer",
-              "const": 10,
+              "type": "number",
+              "minimum": 0,
               "default": 10,
-              "description": "Reward for eating food."
+              "description": "Reward for eating food.",
+              "const": 10
             },
             "wall": {
-              "type": "integer",
-              "const": -10,
+              "type": "number",
+              "maximum": 0,
               "default": -10,
-              "description": "Penalty for colliding with a wall."
+              "description": "Penalty for colliding with a wall.",
+              "const": -10
             },
             "snake": {
-              "type": "integer",
-              "const": -10,
+              "type": "number",
+              "maximum": 0,
               "default": -10,
-              "description": "Penalty for colliding with the snake."
+              "description": "Penalty for colliding with the snake.",
+              "const": -10
             },
             "max_moves": {
-              "type": "integer",
-              "const": -10,
+              "type": "number",
+              "maximum": 0,
               "default": -10,
-              "description": "Penalty when the maximum move limit is reached."
+              "description": "Penalty when the maximum move limit is reached.",
+              "const": -10
             },
             "empty": {
-              "type": "integer",
-              "const": 0,
+              "type": "number",
+              "maximum": 0,
               "default": 0,
-              "description": "Reward for a normal move that does not eat food."
+              "description": "Reward for a normal move that does not eat food.",
+              "const": 0
             },
             "closer_to_food": {
-              "type": "integer",
-              "default": 2,
+              "type": "number",
+              "default": 1,
               "minimum": 0,
               "maximum": 6,
-              "multipleOf": 1,
-              "description": "Reward for moving closer to the food."
+              "description": "Reward for moving closer to the food.",
+              "enum": [
+                0,
+                0.1,
+                0.25,
+                0.5,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
             },
             "further_from_food": {
-              "type": "integer",
-              "default": -2,
+              "type": "number",
+              "default": -1,
               "minimum": -6,
               "maximum": 0,
-              "multipleOf": 1,
-              "description": "Penalty for moving farther from the food."
+              "description": "Penalty for moving farther from the food.",
+              "enum": [
+                -6,
+                -5,
+                -4,
+                -3,
+                -2,
+                -1,
+                -0.5,
+                -0.25,
+                -0.1,
+                0
+              ]
             }
           },
           "required": [
@@ -124,10 +152,22 @@
       ]
     },
     "model": {
-      "title": "Recurrent model",
+      "title": "Sequence model",
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "type": {
+          "type": "string",
+          "default": "transformer",
+          "description": "Sequence-model architecture used for action values.",
+          "const": "transformer"
+        },
+        "heads": {
+          "type": "integer",
+          "default": 4,
+          "description": "Attention heads per Transformer layer.",
+          "const": 4
+        },
         "hidden_size": {
           "type": "integer",
           "default": 224,
@@ -135,23 +175,25 @@
           "maximum": 384,
           "multipleOf": 16,
           "x-snakelab-unit": "neurons",
-          "description": "Number of neurons in each recurrent hidden layer."
+          "description": "Hidden width of the Transformer."
         },
         "layers": {
           "type": "integer",
           "const": 4,
           "default": 4,
-          "description": "Number of recurrent model layers."
+          "description": "Number of Transformer encoder layers."
         },
         "dropout": {
           "type": "number",
           "const": 0.1,
           "default": 0.1,
           "x-snakelab-unit": "probability",
-          "description": "Dropout probability between recurrent layers."
+          "description": "Dropout probability in the selected sequence model."
         }
       },
       "required": [
+        "type",
+        "heads",
         "hidden_size",
         "layers",
         "dropout"
@@ -191,7 +233,7 @@
           "default": 0.0021,
           "minimum": 0.0005,
           "maximum": 0.005,
-          "description": "Control the size of gradient updates."
+          "description": "Optimizer learning rate; controls the size of gradient updates."
         },
         "gamma": {
           "type": "number",
@@ -221,6 +263,32 @@
         "gamma",
         "tau",
         "max_gradient_norm"
+      ]
+    },
+    "epsilon_nice": {
+      "title": "Safe exploration bursts",
+      "description": "Safe alternative moves after ordinary epsilon has expired.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "probability": {
+          "type": "number",
+          "default": 0.005,
+          "maximum": 1,
+          "description": "Probability per eligible move of starting a safe detour on the next move. Must remain enabled in Ax3l.",
+          "exclusiveMinimum": 0
+        },
+        "steps": {
+          "type": "integer",
+          "default": 20,
+          "minimum": 1,
+          "maximum": 1000,
+          "description": "Number of moves in a detour; detours reset at episode boundaries."
+        }
+      },
+      "required": [
+        "probability",
+        "steps"
       ]
     },
     "epsilon": {
@@ -266,6 +334,7 @@
     "game",
     "model",
     "training",
-    "epsilon"
+    "epsilon",
+    "epsilon_nice"
   ]
 }

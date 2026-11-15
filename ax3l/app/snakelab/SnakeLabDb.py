@@ -1,6 +1,8 @@
 """Read Snake Lab simulation data through AX3L's database manager."""
 
-from ax3l.app.snakelab.SingleParameters import SCHEMA, SINGLE_PARAMETERS
+from ax3l.app.snakelab.SingleParameters import SINGLE_PARAMETERS
+from ax3l.app.snakelab.PairParameters import PAIR_PARAMETERS
+from ax3l.interface.SimulationConfiguration import SCHEMA
 from ax3l.app.DbMgr import DbMgr
 from ax3l.app.snakelab.ParameterSpace import finite_choices, parameter_paths
 from fractions import Fraction
@@ -25,7 +27,7 @@ def _config_from_row(row):
         target = config
         for part in path[:-1]:
             target = target.setdefault(part, {})
-        target[path[-1]] = int(row[column]) if kind == "integer" else float(row[column])
+        target[path[-1]] = {"integer": int, "number": float, "string": str}[kind](row[column])
     return config
 
 
@@ -148,43 +150,45 @@ class SnakeLabDb:
         return self.get_parameter_report(golden_run_id, "learning_rate")
 
     def get_epsilon_report(self, golden_run_id: str) -> list[dict]:
-        """Group comparable epsilon pairs, including gaps in observed values."""
-        conditions = _comparable({"seed", "epsilon_initial", "epsilon_decay"})
+        return self._pair_report(golden_run_id, "epsilon_pair")
+
+    def get_epsilon_nice_report(self, golden_run_id: str) -> list[dict]:
+        return self._pair_report(golden_run_id, "epsilon_nice_pair")
+
+    def _pair_report(self, golden_run_id: str, pair: str) -> list[dict]:
+        first_path, second_path = PAIR_PARAMETERS[pair]
+        first, second = first_path[-1], second_path[-1]
+        first_column, second_column = "_".join(first_path), "_".join(second_path)
+        conditions = _comparable({"seed", first_column, second_column})
         rows = self._db.query(f"""
             SELECT r.status, r.high_score,
-                   c.epsilon_initial AS initial, c.epsilon_decay AS decay
+                   c.{first_column} AS {first}, c.{second_column} AS {second}
             FROM simulation_runs r JOIN configurations c ON c.run_id = r.run_id
             JOIN configurations g ON g.run_id = %s
             WHERE {conditions}
-            ORDER BY c.epsilon_initial, c.epsilon_decay, r.id
+            ORDER BY c.{first_column}, c.{second_column}, r.id
         """, (golden_run_id,))
         grouped = {}
-        decays = set()
+        second_values = set()
         for row in rows:
-            initial = row["initial"]
-            decay = row["decay"]
-            decays.add(decay)
-            scores = grouped.setdefault(initial, {}).setdefault(decay, [])
+            second_values.add(row[second])
+            scores = grouped.setdefault(row[first], {}).setdefault(row[second], [])
             if row["status"] == "completed" and row["high_score"] is not None:
                 scores.append(row["high_score"])
         return [
-            {"initial": initial, "pairs": [
-                {"decay": decay, "scores": sorted(grouped[initial].get(decay, []))}
-                for decay in sorted(decays)
+            {first: value, "pairs": [
+                {second: other, "scores": sorted(grouped[value].get(other, []))}
+                for other in sorted(second_values)
             ]}
-            for initial in sorted(grouped)
+            for value in sorted(grouped)
         ]
 
     def get_reward_report(self, golden_run_id: str) -> dict:
         """Return the full legal distance-reward grid across comparable seeds."""
-        fields = SCHEMA["properties"]["game"]["properties"]["rewards"]["properties"]
-        closer = fields["closer_to_food"]
-        further = fields["further_from_food"]
-        grid = {
-            str(first): {str(second): []
-                         for second in range(further["minimum"], further["maximum"] + 1)}
-            for first in range(closer["minimum"], closer["maximum"] + 1)
-        }
+        choices = finite_choices("reward_pair")
+        grid = {}
+        for first, second in sorted(choices):
+            grid.setdefault(format(float(first), "g"), {})[format(float(second), "g")] = []
         conditions = _comparable({"seed", "game_rewards_closer_to_food", "game_rewards_further_from_food"})
         rows = self._db.query(f"""
             SELECT r.status, r.high_score,
@@ -196,17 +200,32 @@ class SnakeLabDb:
             ORDER BY r.id
         """, (golden_run_id,))
         for row in rows:
-            first = row["closer_to_food"]
-            second = row["further_from_food"]
-            # Historical configurations outside today's legal grid have no cell.
-            if first not in range(closer["minimum"], closer["maximum"] + 1) or second not in range(further["minimum"], further["maximum"] + 1):
+            first = Fraction(str(row["closer_to_food"]))
+            second = Fraction(str(row["further_from_food"]))
+            if (first, second) not in choices:
                 continue
             if row["status"] == "completed" and row["high_score"] is not None:
-                grid[str(int(first))][str(int(second))].append(row["high_score"])
+                grid[format(float(first), "g")][format(float(second), "g")].append(row["high_score"])
         for pairs in grid.values():
             for scores in pairs.values():
                 scores.sort()
         return grid
+
+    def get_episode_diagnostics(self, run_id: str) -> dict:
+        row = self._db.query("""
+            SELECT COUNT(*) AS episodes,
+                   COALESCE(SUM(epsilon_injections), 0) AS epsilon_injections,
+                   COALESCE(SUM(epsilon_nice_injections), 0) AS epsilon_nice_injections,
+                   COALESCE(SUM(epsilon = 0), 0) AS post_epsilon_episodes,
+                   SUM(reward) AS total_reward,
+                   COALESCE(SUM(outcome = 'wall'), 0) AS wall,
+                   COALESCE(SUM(outcome = 'snake'), 0) AS snake,
+                   COALESCE(SUM(outcome = 'max_moves'), 0) AS max_moves,
+                   COALESCE(SUM(outcome = 'board_filled'), 0) AS board_filled
+            FROM simulation_episodes WHERE run_id = %s
+        """, (run_id,))[0]
+        return {key: (None if value is None else float(value)) if key == "total_reward"
+                else int(value) for key, value in row.items()}
 
     def get_parameter_report(self, golden_run_id: str, parameter: str) -> list[dict]:
         path, _ = SINGLE_PARAMETERS[parameter]

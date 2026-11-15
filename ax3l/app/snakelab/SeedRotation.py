@@ -2,10 +2,9 @@
 
 from copy import deepcopy
 import json
-from pathlib import Path
 from uuid import uuid4
 
-from jsonschema import Draft202012Validator
+from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 
 from ax3l.app.ConfigurationLog import ConfigurationLog
 from ax3l.app.EventLogDb import EventLogDb
@@ -26,8 +25,7 @@ async def rotate_if_needed(snake, db, wait_for_run, *, resume_only=False) -> str
         golden_id = events.current_golden_config()["process_id"]
         config = deepcopy(snake.get_config(golden_id))
         config["seed"] += 1
-        schema = json.loads((Path(__file__).parent / "simulation-config-v2.schema.json").read_text())
-        Draft202012Validator(schema).validate(config)
+        SimulationConfiguration.validate(config)
         intent_id = db.log(Events.Configuration.SEED_ROTATION_STARTED, Events.Configuration.CATEGORY,
                            "INFO", json.dumps({"config": config, "golden_run_id": golden_id}),
                            process_id=str(uuid4()), ax3l_version=DAx3l.VERSION)

@@ -1,18 +1,13 @@
 #!/usr/bin/env bash
-# Install the model and application services after install.sh has provisioned the account/DB.
+# Install Ax3l services after install.sh has provisioned the account/DB.
 set -euo pipefail
 
 # install.sh uses 077 for database credentials; service files must be readable.
 umask 022
 
-if [[ $# != 0 && $# != 2 ]]; then
-    printf 'Usage: sudo scripts/install-services.sh [-model qwen|phi|qwen2.5]\n' >&2
+if [[ $# != 0 ]]; then
+    printf 'Usage: sudo scripts/install-services.sh\n' >&2
     exit 2
-fi
-selected_model=qwen
-if [[ $# == 2 ]]; then
-    [[ $1 == -model && ( $2 == qwen || $2 == phi || $2 == qwen2.5 ) ]] || { printf 'Expected -model qwen|phi|qwen2.5.\n' >&2; exit 2; }
-    selected_model=$2
 fi
 [[ $EUID == 0 ]] || { printf 'Run service installation as root.\n' >&2; exit 1; }
 checkout_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
@@ -36,12 +31,6 @@ install -d -m 755 "$install_dir/games"
 render_service_units
 "$checkout_dir/scripts/services.sh" stop
 
-legacy_unit="llm-server.service"
-if [[ -f /etc/systemd/system/$legacy_unit ]]; then
-    systemctl disable --now "$legacy_unit"
-    rm -- "/etc/systemd/system/$legacy_unit"
-fi
-
 cd -- "$checkout_dir"
 while IFS= read -r -d '' source; do
     install -D -m 644 -o "$service_account" -g "$service_account" \
@@ -54,5 +43,5 @@ chgrp "$service_account" "$config_dir"
 chmod 750 "$config_dir"
 
 install_service_units
-"$checkout_dir/scripts/services.sh" start -model "$selected_model"
+"$checkout_dir/scripts/services.sh" start
 printf 'Installed: %s\n' "${units[*]}"

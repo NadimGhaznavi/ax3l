@@ -4,8 +4,10 @@ from fractions import Fraction
 from itertools import product
 from math import ceil, floor
 
-from ax3l.app.snakelab.SingleParameters import SCHEMA, SINGLE_PARAMETERS
+from ax3l.app.snakelab.SingleParameters import SINGLE_PARAMETERS
+from ax3l.interface.SimulationConfiguration import SCHEMA
 from ax3l.app.snakelab.PairParameters import PAIR_PARAMETERS
+from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 
 
 def finite_values(field):
@@ -47,4 +49,7 @@ def finite_choices(parameter):
         if values is None:
             return None
         domains.append(values)
-    return set(product(*domains))
+    choices = set(product(*domains))
+    if parameter == 'reward_pair':
+        choices = {pair for pair in choices if SimulationConfiguration.reward_pair_allowed(*pair)}
+    return choices

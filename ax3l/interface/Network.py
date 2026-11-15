@@ -1,17 +1,18 @@
-"""Resolve network defaults and local overrides once per process."""
+"""Expose configured listeners and the outbound LlamaSrv URL."""
 
 from functools import cache
-from pathlib import Path
 
-from ax3l.constants.DAx3l import DAx3l
 from ax3l.interface.Configuration import Configuration
 
 
 class Network:
     @staticmethod
     def binding(use: str) -> tuple[str, int]:
-        path = Path(DAx3l.BASE_DIR) / DAx3l.CONFIG_FILE
-        return Network._bindings(path, DAx3l.CMDB_NETWORK)[use]
+        return Network._configuration().network[use]
+
+    @staticmethod
+    def llamasrv_url() -> str:
+        return Network._configuration().llamasrv_url
 
     @staticmethod
     def destination(use: str) -> tuple[str, int]:
@@ -25,5 +26,5 @@ class Network:
 
     @staticmethod
     @cache
-    def _bindings(path: Path, defaults: tuple[tuple[str, str, int], ...]) -> dict[str, tuple[str, int]]:
-        return Configuration.read(path, defaults)
+    def _configuration() -> Configuration:
+        return Configuration()

@@ -17,6 +17,9 @@ class DLabel:
     REWARD_PAIR: Final[str] = "Food Reward: closer, further"
     CLOSER_TO_FOOD: Final[str] = "Food Reward: closer"
     FURTHER_FROM_FOOD: Final[str] = "Food Reward: further"
+    EPSILON_NICE_PAIR: Final[str] = "EpsilonNice: probability, steps"
+    EPSILON_NICE_PROBABILITY: Final[str] = "EpsilonNice: probability"
+    EPSILON_NICE_STEPS: Final[str] = "EpsilonNice: steps"
 
 
 FIELD_TO_LABEL_MAP: Final[dict[str, str]] = {
@@ -38,4 +41,9 @@ FIELD_TO_LABEL_MAP: Final[dict[str, str]] = {
     "game.rewards.closer_to_food": DLabel.CLOSER_TO_FOOD,
     "further_from_food": DLabel.FURTHER_FROM_FOOD,
     "game.rewards.further_from_food": DLabel.FURTHER_FROM_FOOD,
+    "epsilon_nice_pair": DLabel.EPSILON_NICE_PAIR,
+    "epsilon_nice.probability": DLabel.EPSILON_NICE_PROBABILITY,
+    "epsilon_nice.steps": DLabel.EPSILON_NICE_STEPS,
+    "model.type": "Model",
+    "model.heads": "Attention Heads",
 }

@@ -218,6 +218,7 @@ class ReportingTests(unittest.TestCase):
     def test_log_page_refresh_and_escaping(self):
         self.assertEqual(os.environ["DB_NAME"], "ax3l_test")
         from ax3l.app.DbMgr import DbMgr
+        from ax3l.app.ReportBackground import ReportBackground
         from ax3l.server.ReportingServer import make_server
         import zmq
 
@@ -234,6 +235,27 @@ class ReportingTests(unittest.TestCase):
         self.enterContext(patch(
             "ax3l.server.ReportingServer.SnakeLab.get_episode_totals",
             return_value={"games_played": 170, "moves_made": 1700},
+        ))
+        self.enterContext(patch(
+            "ax3l.app.ReportBackground.ReportBackground.episode_totals",
+            return_value={"games_played": 170, "moves_made": 1700},
+        ))
+        self.enterContext(patch(
+            "ax3l.app.ReportBackground.ReportBackground.status",
+            side_effect=lambda: dict(ReportBackground._load_status(),
+                simulations_submitted=17, experiment_cycles=0,
+                all_time_high_score=high_score.return_value),
+        ))
+        self.enterContext(patch(
+            "ax3l.app.ReportBackground.ReportBackground.animation_ready", return_value=False,
+        ))
+        self.enterContext(patch(
+            "ax3l.app.EventLogDb.EventLogDb.current_golden_config",
+            return_value={"process_id": str(uuid4())},
+        ))
+        self.enterContext(patch(
+            "ax3l.server.ReportingServer.SnakeLab.get_run_summary",
+            side_effect=lambda _: {"id": 1, "high_score": high_score.return_value},
         ))
 
         db = DbMgr()
@@ -258,8 +280,8 @@ class ReportingTests(unittest.TestCase):
                 self.assertIn("Snake Lab Server: Idle", page)
                 self.assertIn("Current Highscore: 55", page)
                 self.assertLess(page.index('id="snake-lab-status"'), page.index('id="experiment-status"'))
-                self.assertLess(page.index('id="experiment-status"'), page.index('<h1>Ax3l Event Log'))
-                self.assertLess(page.index('class="server-bar"'), page.index('<h1>Ax3l Event Log'))
+                self.assertLess(page.index('id="experiment-status"'), page.index('id="event-log-title"'))
+                self.assertLess(page.index('class="server-bar"'), page.index('id="event-log-title"'))
             second = f"{process_id} refreshed event"
             simulation.return_value = True
             high_score.return_value = 60

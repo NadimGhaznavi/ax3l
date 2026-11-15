@@ -12,6 +12,17 @@ MAIN = runpy.run_path(str(Path(__file__).resolve().parents[1] / "ax3l/app/snakel
 
 
 class MainLoopTests(unittest.TestCase):
+    def test_default_uses_configured_llamasrv(self):
+        db, llm, optimize = Mock(), Mock(), Mock()
+        factory = Mock(return_value=llm)
+        with patch.dict(MAIN.__globals__, {'DbMgr': lambda: db, 'LLM': factory,
+                                          'initialize_simulation': Mock(), 'run_optimization': optimize}), \
+                patch('ax3l.interface.Network.Network.llamasrv_url', return_value='http://wintermute:51001'):
+            self.assertEqual(MAIN(['--zmq-endpoint', 'tcp://127.0.0.1:61970']), 0)
+        factory.assert_called_once_with('http://wintermute:51001')
+        self.assertIs(optimize.call_args.args[0], llm)
+        db.close.assert_called_once()
+
     def test_raw_log_switch_controls_all_capture_files(self):
         main = MAIN
         for enabled in (False, True):

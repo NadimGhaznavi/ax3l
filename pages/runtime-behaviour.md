@@ -50,8 +50,11 @@ The epsilon settings, distance rewards, and EpsilonNice settings are chosen in
 pairs. The sum of the two distance rewards must be non-positive. Seeds and
 schema-fixed settings remain controlled by Ax3l.
 
-Each conversation receives the project goal, the reference analyses and their
-configurations, the current draft, and previous choices. Accepted choices are
+Each choice prompt names the task and score to beat. `data_tool(url)` lets Qwen
+browse the draft and saved reference data in small English pages, using `latest`,
+`golden`, and `best` rather than run UUIDs. `/draft` marks saved and pending
+values; each reference links to scores, endings, activity, notes, and settings.
+Choice rules use English in the submission tool description. Accepted choices are
 saved without starting a simulation. A value can remain unchanged. After all
 eight selection steps, Ax3l checks the full draft for duplicates, submits one
 simulation, and waits for its result.
@@ -62,8 +65,8 @@ For each completed run, Ax3l runs three separate conversations: score trends,
 score distribution, and training loss. Each receives one PNG, one chart-specific
 question, relevant exact facts, and an invented answer example. Plots include
 titles, labeled axes and units, the high-score objective, seed, episode count,
-and the first eight characters of the run UUID. Loss is mean Smooth L1 loss in
-its native training scale; missing measurements remain gaps.
+and short English labels. Run UUIDs stay outside Qwen's context. Loss is mean
+Smooth L1 loss in its native training scale; missing measurements remain gaps.
 
 The score-trends task compares the first 50 episodes with the final 50 episodes
 of that same run. Both exact averages are supplied; Qwen states whether the
@@ -86,7 +89,7 @@ Qwen follows relevant links to drill down. These reads continue the conversation
 only the assigned submission tool finishes it. Full project background and
 configuration are omitted from chart prompts.
 
-Every parameter conversation receives up to three distinct saved analyses:
+Every parameter conversation can browse up to three distinct saved analyses:
 
 | Reference | Role |
 | --- | --- |

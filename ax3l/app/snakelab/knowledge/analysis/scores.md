@@ -1,7 +1,7 @@
 # Score trends
 
-Compare the two supplied averages from this same run: mean_first_50_scores
-and mean_last_50_scores. State whether the final average is higher, lower,
+Compare the first 50 mean and last 50 mean from this same run.
+State whether the final average is higher, lower,
 or equal, and include both numbers. These compare the beginning and end;
 they do not establish a steady trend throughout training.
 

@@ -121,7 +121,8 @@ class ConversationParameterTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('test')]), {'status': 'ok', 'run_id': 'next'})
         tools.submit.assert_awaited_once_with({'value': 16})
         request = json.loads(llm.complete.call_args.args[0])
-        self.assertEqual(json.loads(request['messages'][2]['content'])['status'], 'rejected')
+        self.assertEqual(request['messages'][2]['content'], 'Rejected.')
+        self.assertIn('exactly these fields: value', request['messages'][3]['content'])
         self.assertEqual(request['messages'][2]['tool_call_id'], 'call-1')
 
 

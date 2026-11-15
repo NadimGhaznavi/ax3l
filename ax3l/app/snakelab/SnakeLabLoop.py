@@ -147,14 +147,13 @@ async def optimize(llm, output, db, endpoint):
                 draft.phase = "preparing"
                 experiments.save_draft(draft)
             target = snake.get_run_result(draft.golden_run_id)["high_score"]
-            analyses = {}
             for run_id in dict.fromkeys(draft.references.values()):
-                analyses[run_id] = await analyze_run(snake, llm, output, db, endpoint, run_id, target)
+                await analyze_run(snake, llm, output, db, endpoint, run_id, target)
             draft.phase = "choosing"
             experiments.save_draft(draft)
             while draft.phase == "choosing":
                 parameter = draft.next_parameter
-                prompts = [ProjectContext(), ConfigurationChoice(draft, analyses)]
+                prompts = [ProjectContext(), ConfigurationChoice(draft, target)]
                 async with SnakeLabTools(endpoint, parameter, draft_id=draft.draft_id) as tools:
                     await converse(llm, output, db, tools, prompts,
                                    parameter=parameter, process_id=draft.draft_id)

@@ -24,12 +24,14 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
                                       cwd=str(ROOT), env={'PYTHONPATH': str(ROOT), 'PYTHONDONTWRITEBYTECODE': '1'})
         async with Client(entry, read_timeout_seconds=10) as client:
             tools = {tool.name: tool for tool in (await client.list_tools()).tools}
-            self.assertEqual(set(tools), {'submit_single_value', 'submit_pair_values', 'submit_simulation_summary', 'kb_tool'})
+            self.assertEqual(set(tools), {'submit_single_value', 'submit_pair_values', 'submit_simulation_summary', 'kb_tool', 'data_tool'})
             for name, arguments in (('submit_single_value', {'value': 240}),
                                     ('submit_pair_values', {'value_1': .91, 'value_2': .95}),
                                     ('submit_simulation_summary', {'summary': 'Scores rose. Loss fell.'})):
                 self.assertEqual(set(tools[name].input_schema['properties']), set(arguments))
                 self.assertTrue((await client.call_tool(name, arguments)).is_error)
+            self.assertEqual(set(tools['data_tool'].input_schema['properties']), {'url'})
+            self.assertTrue((await client.call_tool('data_tool', {'url': '/'})).is_error)
 
     async def test_single_choices_bind_the_draft_and_parameter_outside_model_arguments(self):
         requests = []
@@ -108,7 +110,7 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(requests[0].payload['section'], 'loss')
         payloads = [json.loads(entry.args[0]) for entry in llm.complete.call_args_list]
         self.assertEqual(len(payloads), 4)
-        pages = [json.loads(message['content'])['page'] for message in payloads[-1]['messages']
+        pages = [message['content'] for message in payloads[-1]['messages']
                  if message['role'] == 'tool']
         self.assertIn('/analysis/', pages[0])
         self.assertIn('/analysis/loss', pages[1])
@@ -120,6 +122,44 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
                 result = await tools.reference({'url': url})
                 self.assertEqual(result['status'], 'rejected')
             self.assertEqual((await tools.reference({'url': '/'}))['status'], 'ok')
+
+    async def test_data_drill_down_binds_the_draft_and_only_submission_finishes(self):
+        requests = []
+        def handle(message):
+            requests.append(message)
+            if message.method == 'read_simulation_data':
+                if message.payload['url'] == '/missing':
+                    return {'status': 'rejected', 'reason': 'Unknown data page.', 'source_name': 'SimulationData',
+                            'prompt': {'role': 'user', 'content': 'Unknown data page. Read /.'}}
+                return {'status': 'ok', 'page': f"Page {message.payload['url']}"}
+            return {'status': 'ok', 'draft_id': 'private-draft'}
+        def reply(name, arguments):
+            return 200, '', json.dumps({'choices': [{'message': {
+                'role': 'assistant', 'tool_calls': [{'id': name + str(len(arguments)),
+                'type': 'function', 'function': {'name': name, 'arguments': json.dumps(arguments)}}]}}]}).encode()
+        llm = Mock(url='fixture')
+        llm.complete.side_effect = [reply('data_tool', {'url': '/missing'}),
+                                   reply('data_tool', {'url': '/draft'}),
+                                   reply('data_tool', {'url': '/latest/model'}),
+                                   reply('submit_single_value', {'value': 240})]
+        with ZMQServer('tcp://127.0.0.1:*', handle) as server:
+            async with SnakeLabTools(server.endpoint, 'hidden_size', draft_id='private-draft') as tools:
+                definition = next(d for d in tools.definitions if d['function']['name'] == 'data_tool')
+                self.assertEqual(set(definition['function']['parameters']['properties']), {'url'})
+                result = await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('Choose hidden size.')])
+                before = len(requests)
+                with self.assertRaises(RuntimeError):
+                    await tools.data({'url': 123})
+                self.assertEqual(len(requests), before)
+        self.assertEqual(result['status'], 'ok')
+        self.assertEqual([r.method for r in requests], ['read_simulation_data'] * 3 + ['submit_single_value'])
+        self.assertEqual(requests[1].payload, {'draft_id': 'private-draft', 'url': '/draft'})
+        payloads = [json.loads(call.args[0]) for call in llm.complete.call_args_list]
+        self.assertEqual([m['content'] for m in payloads[-1]['messages'] if m['role'] == 'tool'],
+                         ['Rejected.', 'Page /draft', 'Page /latest/model'])
+        feedback = [m['content'] for m in payloads[-1]['messages'] if m['role'] == 'user']
+        self.assertEqual(feedback, ['Choose hidden size.', 'Unknown data page. Read /.'])
+        self.assertNotIn('private-draft', json.dumps(payloads))
 
     async def test_summary_session_without_section_cannot_submit(self):
         async with SnakeLabTools('tcp://127.0.0.1:1', 'simulation_summary', run_id='bound-run') as tools:

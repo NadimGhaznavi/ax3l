@@ -1,6 +1,7 @@
 """Schema-backed search space for single-parameter proposals."""
 
-import json
+from ax3l.activity.ParameterRules import parameter_rules
+from ax3l.constants.DChoice import CHOICE_LABELS
 from ax3l.interface.SimulationConfiguration import SCHEMA
 
 EXCLUDED = {"seed", "closer_to_food", "further_from_food", "initial", "decay", "probability", "steps"}
@@ -22,19 +23,5 @@ def parameter_instructions(parameter=None):
     lines = []
     for name in names:
         _, field = SINGLE_PARAMETERS[name]
-        rules = {
-            key: value
-            for key, value in field.items()
-            if key
-            in (
-                "type",
-                "minimum",
-                "maximum",
-                "exclusiveMinimum",
-                "exclusiveMaximum",
-                "multipleOf",
-                "enum",
-            )
-        }
-        lines.append(f"{name}: JSON Schema rules: {json.dumps(rules)}")
+        lines.append(f"{CHOICE_LABELS[name]}: {parameter_rules(field)}")
     return "\n".join(lines)

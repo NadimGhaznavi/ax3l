@@ -2,7 +2,6 @@
 
 import asyncio
 from copy import deepcopy
-import json
 from pathlib import Path
 import unittest
 from unittest.mock import ANY, AsyncMock, Mock, patch
@@ -12,6 +11,7 @@ from ax3l.app.snakelab.SnakeLabLoop import optimize, SimulationUnsuccessful, sub
 from ax3l.app.snakelab.SubmitSingleValueHandler import SubmitSingleValueHandler
 from ax3l.app.snakelab.SubmitPairValuesHandler import SubmitPairValuesHandler
 from ax3l.constants.DSimulationAnalysis import DSimulationAnalysis
+from ax3l.constants.DChoice import CHOICE_LABELS
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
@@ -124,11 +124,13 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.snake.submit_simulation.assert_called_once()
         self.wait.assert_awaited_once_with(self.snake, self.db, self.run)
         self.assertEqual(self.store.saved.phase, 'completed')
-        self.assertIn('"hidden_size": 240', self.prompts[1])
-        self.assertIn('"latest"', self.prompts[0])
-        self.assertIn('"all_time_best"', self.prompts[0])
-        self.assertNotIn(self.gold, self.prompts[0])
-        self.assertIn(self.gold.split('-')[0], self.prompts[0])
+        for parameter, prompt in zip(PARAMETER_ORDER, self.prompts):
+            self.assertIn(f'Choose {CHOICE_LABELS[parameter]}.', prompt)
+            self.assertIn('data_tool', prompt)
+            self.assertIn('/draft', prompt)
+            self.assertLess(len(prompt.split()), 75)
+            for run_id in (self.gold, self.latest, self.best):
+                self.assertNotIn(run_id.split('-')[0], prompt)
 
     async def test_restart_resumes_at_the_first_unselected_parameter(self):
         self.store.saved = self.draft(3)
@@ -166,11 +168,10 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
 
         async def choose(*args, **kwargs):
             self.assertEqual(analyzed, references)
-            prompt = args[4][-1].to_md()
-            reference_text = prompt.split('Reference simulation analyses:\n')[1].split('\n')[0]
-            supplied = json.loads(reference_text)
-            self.assertEqual({row['run']: row['interpretation'] for row in supplied},
-                             {run_id.split('-')[0]: completed[run_id].summary for run_id in references})
+            for run_id in references:
+                self.assertEqual(self.store.analysis(run_id), completed[run_id])
+            self.assertIn('data_tool', args[4][-1].to_md())
+            self.assertNotIn('Reference 1 observation.', args[4][-1].to_md())
             return await select(*args, **kwargs)
 
         self.conversation.side_effect = choose
@@ -180,7 +181,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         if completed_choices:
             self.assertEqual(self.snake.submit_simulation.call_args.args[0]['model']['hidden_size'], 272)
 
-    async def test_image_observations_are_ready_and_included_in_every_config_prompt(self):
+    async def test_image_observations_are_ready_to_browse_before_every_choice(self):
         await self.check_image_analysis_before_choices()
 
     async def test_restart_finishes_image_jobs_before_the_next_config_prompt(self):
@@ -254,7 +255,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.snake.get_all_time_best_run_id.return_value = self.gold
         await self.cycle()
         self.assertEqual([call.args[5] for call in self.analysis.await_args_list], [self.gold, self.run])
-        self.assertIn('"roles": ["latest", "golden", "all_time_best"]', self.prompts[0])
+        self.assertEqual(len(self.prompts), len(PARAMETER_ORDER))
 
     async def test_recorded_comparison_resumes_analysis_without_comparing_again(self):
         self.store.saved = self.draft(8, 'submitted')
@@ -280,7 +281,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.store.saved.golden_run_id, self.best)
         self.assertEqual(self.store.saved.config['seed'], self.config['seed'] + 1)
         prompt = self.conversation.await_args.args[4][-1].to_md()
-        self.assertIn('high score of 30 points', prompt)
+        self.assertIn("beat golden's 30 points", prompt)
 
     def test_submission_intent_survives_transport_failure(self):
         draft = self.draft(8, 'ready')

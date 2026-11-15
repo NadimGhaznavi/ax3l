@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Let Qwen browse small English pages of experiment data instead of receiving
+full run and draft JSON dumps.
+
+### Added
+
+- Draft-bound `data_tool(url)` navigation for current choices and the frozen
+  latest, golden, and best runs, with separate scores, endings, activity,
+  notes, and configuration pages.
+
+### Changed
+
+- Use short readable labels in choice prompts, tool descriptions, chart facts,
+  and data pages. Keep UUIDs in storage and transport, outside Qwen's text.
+- Return plain page text to Qwen and avoid repeating rejection metadata.
+- Preserve reference-analysis prerequisites and resume accepted draft choices;
+  retrieve saved observations only when Qwen requests them.
+
 ## [4.2.2] - 2026-11-15 @ 10:06
 
 ### Summary

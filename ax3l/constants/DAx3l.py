@@ -5,10 +5,10 @@ class DAx3l:
     RAW_LOGS_ENABLED: Final[bool] = False
     HTTP_TIMEOUT_SECONDS: Final[int] = 300
 
-    VERSION: Final[str] = "4.4.2"
+    VERSION: Final[str] = "4.4.3"
     CMDB_SUBTYPE: Final[str] = "Lab Experiment"
     CMDB_SUPPLIER: Final[str] = "Nadim-Daniel"
-    CMDB_CODENAME: Final[str] = "Filly"
+    CMDB_CODENAME: Final[str] = "Guam"
     CMDB_DATABASES: Final[tuple[tuple[str, str], ...]] = (("Ax3l", "ax3l"),)
 
     BASE_DIR: Final[str] = "/opt/prod/ax3l"

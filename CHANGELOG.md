@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.4.3] - 2026-11-15 @ 17:28
+
 ### Summary
 
 Use consistent durations and show running elapsed-time and token totals in

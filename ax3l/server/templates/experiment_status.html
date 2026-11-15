@@ -38,10 +38,23 @@
       <progress id="choice-progress" value="{{ choices_selected }}" max="{{ choices_total }}"></progress>
     </div>
     <p class="status-detail">{{ detail }}</p>
-    <table class="status-checklist" aria-label="Configuration selection progress">
+    <table class="status-checklist" aria-label="Experiment prerequisites and configuration progress">
       <colgroup><col class="check-column"><col><col class="value-column"></colgroup>
       <thead><tr><th scope="col">Done</th><th scope="col">Item description</th><th scope="col">Value</th></tr></thead>
-      <tbody>
+      <tbody class="status-prerequisites">
+        <tr class="status-section-heading"><th scope="rowgroup" colspan="3">Pre-Requisites</th></tr>
+        {% for row in prerequisites %}
+        <tr class="{{ 'selected' if row.selected else 'pending' }}{% if row.current %} current-choice{% endif %}"{% if row.current %} aria-current="step"{% endif %}>
+          <td><input type="checkbox" disabled {% if row.selected %}checked{% endif %} aria-label="{{ row.label }} analysis saved"></td>
+          <th scope="row"><span class="parameter-label">{{ row.label }}</span><span class="parameter-description">Image analysis · <a href="/simulations/{{ row.run_id }}">{{ row.run_id.split('-')[0] }}</a></span></th>
+          <td class="prerequisite-value">{{ row.value }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3">No reference analyses recorded.</td></tr>
+        {% endfor %}
+      </tbody>
+      <tbody class="status-configuration">
+        <tr class="status-section-heading"><th scope="rowgroup" colspan="3">Configuration</th></tr>
         {% for row in rows %}
         <tr data-parameter="{{ row.path }}" class="{{ 'selected' if row.selected else 'pending' }}{% if row.current %} current-choice{% endif %}"{% if row.current %} aria-current="step"{% endif %}>
           <td><input type="checkbox" disabled {% if row.selected %}checked{% endif %} aria-label="{{ row.label }} choice saved"></td>

@@ -12,6 +12,8 @@ from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb
 from ax3l.app.snakelab.SubmitSimulationSummaryHandler import SubmitSimulationSummaryHandler
 from ax3l.constants.DSimulationAnalysis import DSimulationAnalysis
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft
+from ax3l.entities.AnalysisTask import AnalysisTask
+from ax3l.entities.SimulationAnalysis import SimulationAnalysis
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 
 
@@ -45,6 +47,29 @@ class ExperimentDatabaseTests(unittest.TestCase):
         self.assertEqual(restored.next_parameter, 'sequence_length')
         restored.config['model']['hidden_size'] = 272
         self.assertEqual(experiments.draft(draft_id).config['model']['hidden_size'], 240)
+
+    def test_report_states_use_latest_tasks_per_run_and_survive_new_connections(self):
+        first, second = self.process_ids
+        experiments = ExperimentDb(self.db)
+        self.assertEqual(experiments.analysis_states([]), {})
+        self.assertEqual(experiments.analysis_states([first])[first], dict(analysis=None, sections={}, task=None))
+        experiments.save_analysis_task(AnalysisTask(first, 'scores', 'preparing'))
+        experiments.save_analysis_task(AnalysisTask(first, 'scores', 'analyzing'))
+        experiments.save_analysis_sections(first, {'scores': 'Saved.'})
+        experiments.save_analysis_task(AnalysisTask(first, 'distribution', 'failed'))
+        saved = SimulationAnalysis(second, SimulationConfiguration.defaults(), {}, 'Saved all images.')
+        experiments.save_analysis(saved)
+        self.db.log('simulation_analysis_task', 'Other', 'INFO', 'unrelated', process_id=first)
+        other = DbMgr(initialize_event_tables=False)
+        try:
+            states = ExperimentDb(other).analysis_states([first, second])
+        finally:
+            other.close()
+        self.assertEqual(states[first]['task'], AnalysisTask(first, 'distribution', 'failed'))
+        self.assertEqual(states[first]['sections'], {'scores': 'Saved.'})
+        self.assertIsNone(states[first]['analysis'])
+        self.assertEqual(states[second]['analysis'], saved)
+        self.assertIsNone(states[second]['task'])
 
     def test_sections_survive_restart_and_combine_once_with_computed_facts(self):
         run_id = self.process_ids[1]

@@ -4,7 +4,7 @@ import asyncio
 from copy import deepcopy
 from pathlib import Path
 import unittest
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import ANY, AsyncMock, Mock, patch
 from uuid import uuid4
 
 from ax3l.app.snakelab.SnakeLabLoop import optimize, SimulationUnsuccessful, submit_draft
@@ -134,6 +134,18 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([call.kwargs['parameter'] for call in self.conversation.await_args_list], PARAMETER_ORDER[3:])
         self.assertEqual(self.snake.submit_simulation.call_args.args[0]['model']['hidden_size'], 272)
         self.assertEqual(self.rotation.await_count, 1)  # Resume pending rotation only.
+
+    async def test_reference_preparation_is_durable_and_resumes_before_choices(self):
+        self.store.saved = self.draft(phase='preparing')
+        original = deepcopy(self.store.saved)
+        self.analysis.side_effect = asyncio.CancelledError()
+        await self.cycle()
+        self.assertEqual(self.store.saved, original)
+        self.analysis.assert_awaited_once_with(self.snake, ANY, ANY,
+                                               self.db, 'endpoint', self.latest, 20)
+        self.conversation.assert_not_awaited()
+        self.snake.submit_simulation.assert_not_called()
+        self.snake.get_latest_completed_run_id.assert_not_called()
 
     async def test_restart_after_final_choice_does_not_repeat_any_conversation(self):
         self.store.saved = self.draft(8, 'ready')

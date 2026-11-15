@@ -49,6 +49,9 @@ registration.
   shown separately, with the result compared against the draft's original
   golden baseline. Current and Last completed views refresh every five seconds;
   a failed refresh keeps the last successful card and its timestamp visible.
+  Pre-Requisites share the same checklist and show reference image preparation,
+  the LLM's current image-analysis task, and saved completion. Shared reference
+  runs appear once with combined role labels.
 - Presents a histogram showing score distribution across simulation runs.
 - Simulation details show the saved Qwen analysis and exact termination counts/percentages. Run labels use the first UUID group; navigation retains full UUIDs.
 - Presents a plot of the high score over time, including the dips due to seed rotation events.

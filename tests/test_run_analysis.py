@@ -223,6 +223,7 @@ class AnalyzeRunTests(unittest.IsolatedAsyncioTestCase):
             snake.get_run_result.assert_not_called()
             render.assert_not_called()
             llm.complete.assert_not_called()
+            experiments.return_value.save_analysis_task.assert_not_called()
 
     async def check_sections(self, completed):
         module = 'ax3l.app.snakelab.AnalyzeRun.'
@@ -244,6 +245,9 @@ class AnalyzeRunTests(unittest.IsolatedAsyncioTestCase):
                                                        section=section) for section in pending])
             self.assertEqual(render.call_count, len(pending))
             self.assertEqual(conversation.await_count, len(pending))
+            recorded = [entry.args[0] for entry in experiments.return_value.save_analysis_task.call_args_list]
+            self.assertEqual([(task.section, task.phase) for task in recorded],
+                             [(section, phase) for section in pending for phase in ('preparing', 'analyzing', 'saved')])
             images = []
             for entry in conversation.await_args_list:
                 prompts = entry.args[4]
@@ -258,3 +262,23 @@ class AnalyzeRunTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_restart_resumes_after_the_last_saved_section(self):
         await self.check_sections({'scores': 'Scores stayed flat.'})
+
+    async def test_image_failure_and_cancellation_are_recorded_and_propagate(self):
+        import asyncio
+
+        module = 'ax3l.app.snakelab.AnalyzeRun.'
+        for error, phase in [(RuntimeError('inference unavailable'), 'failed'),
+                              (asyncio.CancelledError(), 'stopped')]:
+            with self.subTest(phase=phase), patch(module + 'ExperimentDb') as experiments, \
+                    patch(module + 'render_analysis', return_value=b'png'), \
+                    patch(module + 'SnakeLabTools', return_value=AsyncMock()), \
+                    patch(module + 'converse', side_effect=error):
+                experiments.return_value.analysis.return_value = None
+                experiments.return_value.analysis_sections.return_value = {}
+                snake = Mock()
+                snake.get_run_result.return_value = dict(status='completed', high_score=6,
+                                                         config=SimulationConfiguration.defaults())
+                snake.get_analysis_episodes.return_value = observations()
+                with self.assertRaises(type(error)):
+                    await analyze_run(snake, Mock(), Path('/tmp'), Mock(), 'endpoint', 'run', 10)
+                self.assertEqual(experiments.return_value.save_analysis_task.call_args.args[0].phase, phase)

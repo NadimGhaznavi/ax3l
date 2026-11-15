@@ -6,6 +6,7 @@ import json
 from ax3l.app.DbMgr import DbMgr
 from ax3l.constants.DEventCategory import DEventCategory as Events
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft
+from ax3l.entities.AnalysisTask import AnalysisTask
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
 
 
@@ -54,6 +55,37 @@ class ExperimentDb:
     def save_analysis_sections(self, run_id: str, sections: dict[str, str]) -> None:
         self._db.log(Events.SnakeLab.ANALYSIS_PROGRESS, Events.SnakeLab.CATEGORY, "INFO",
                      json.dumps(sections, allow_nan=False), process_id=run_id)
+
+    def save_analysis_task(self, task: AnalysisTask) -> None:
+        self._db.log(Events.SnakeLab.ANALYSIS_TASK, Events.SnakeLab.CATEGORY, "INFO",
+                     json.dumps(asdict(task), allow_nan=False), process_id=task.run_id)
+
+    def analysis_states(self, run_ids: list[str]) -> dict[str, dict]:
+        """Read each run's saved analysis, sections, and task in one snapshot."""
+        states = {run_id: dict(analysis=None, sections={}, task=None) for run_id in run_ids}
+        if not run_ids:
+            return states
+        placeholders = ", ".join("%s" for _ in run_ids)
+        category = Events.SnakeLab
+        rows = self._db.query(f"""
+            SELECT latest.process_id, latest.name, m.content FROM (
+                SELECT process_id, name, MAX(event_id) AS event_id FROM events
+                WHERE category = %s AND name IN (%s, %s, %s)
+                  AND process_id IN ({placeholders})
+                GROUP BY process_id, name
+            ) latest JOIN event_messages m USING (event_id)
+        """, (category.CATEGORY, category.ANALYZED, category.ANALYSIS_PROGRESS,
+              category.ANALYSIS_TASK, *run_ids))
+        for row in rows:
+            state = states[row["process_id"]]
+            data = json.loads(row["content"])
+            if row["name"] == category.ANALYZED:
+                state["analysis"] = SimulationAnalysis(**data)
+            elif row["name"] == category.ANALYSIS_TASK:
+                state["task"] = AnalysisTask(**data)
+            else:
+                state["sections"] = data
+        return states
 
     def comparison(self, run_id: str) -> dict | None:
         rows = self._db.query("""

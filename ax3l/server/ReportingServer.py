@@ -147,15 +147,19 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
                         experiments = ExperimentDb(db)
                         draft = experiments.draft() if view == "current" else experiments.last_completed_draft()
                         comparison = experiments.comparison(draft.run_id) if draft and draft.run_id else None
-                        analysis = experiments.analysis(draft.run_id) if draft and draft.run_id else None
-                        sections = experiments.analysis_sections(draft.run_id) if draft and draft.run_id else {}
+                        run_ids = list(dict.fromkeys(draft.references.values())) if draft else []
+                        if draft and draft.run_id and draft.run_id not in run_ids:
+                            run_ids.append(draft.run_id)
+                        states = experiments.analysis_states(run_ids)
                     finally:
                         db.close()
                     snake = SnakeLab()
                     run = snake.get_run_result(draft.run_id) if draft and draft.run_id else None
                     golden = snake.get_run_result(draft.golden_run_id) if draft else None
+                    state = states[draft.run_id] if draft and draft.run_id else dict(analysis=None, sections={}, task=None)
                     body = templates.get_template("experiment_status.html").render(
-                        view=view, **experiment_status(draft, run, golden, comparison, analysis, sections)
+                        view=view, **experiment_status(
+                            draft, run, golden, comparison, state["analysis"], state["sections"], states, state["task"])
                     ).encode("utf-8")
                     content_type = "text/html; charset=utf-8"
                 except Exception:

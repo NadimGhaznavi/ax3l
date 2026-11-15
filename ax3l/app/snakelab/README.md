@@ -60,20 +60,17 @@ and comparable history. MCP rejects strings and booleans as numeric values.
 Parameter existence, permitted ranges, duplicates, and submission decisions
 belong to Ax3l, not the MCP tool.
 
-`scripts/install-services.sh` keeps SnakeLab tools out of llama-server's global
-MCP registration, so the web chat client cannot discover or call them. The
-optimization loop configures its own bound MCP sessions automatically and
-supplies the appropriate tool definition with each LLM request. Reinstall the
-service units and restart the model service to apply this to an existing install.
+LlamaSrv provides shared inference. The optimization loop configures its own
+bound MCP sessions and supplies the appropriate tool definition with each
+request. Ax3l executes the returned tool calls; its tools are never registered
+globally with the shared inference service.
 
 The installer installs the project requirements in `<app>/.venv`, used by both
 Ax3l and its MCP child processes. Installation needs Python's venv/pip support
 and package-index access for this step.
 
-`scripts/generate-mcp-config.py` remains available for standalone MCP testing;
-do not register its output with the web client's llama-server. Submission
-requires an Ax3l-assigned `AX3L_CONVERSATION_PARAMETER` in the MCP process
-environment. The tool forwards requests
+Submission requires an Ax3l-assigned `AX3L_CONVERSATION_PARAMETER` in the MCP
+process environment. The tool forwards requests
 over ZeroMQ using the project-wide `ax3l/zmq/ZMQMsg.py` and `ZMQClient.py`:
 
 ```json
@@ -205,14 +202,18 @@ When off, no capture output directory or files are created, including under
 console (the systemd journal for service runs). Existing captures are retained.
 
 From the checkout root, load the installed database credentials into the
-environment, then point the loop at the running model server:
+environment, then run the loop against the configured LlamaSrv endpoint:
 
 ```sh
 set -a
 . /etc/ax3l/database.env
 set +a
-.venv/bin/python -m ax3l.app.snakelab.main-loop --url http://HOST:27770
+.venv/bin/python -m ax3l.app.snakelab.main-loop
 ```
+
+The loop uses `llamasrv_url` from `/opt/prod/ax3l/conf/ax3l.json`, defaulting
+to `http://127.0.0.1:51001`. Use `--url http://HOST:51001` for an individual
+invocation.
 
 The Python environment must have the project's PyMySQL dependency installed.
 

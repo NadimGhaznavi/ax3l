@@ -10,7 +10,7 @@ Permanently deletes all Ax3l events and SnakeLab simulations on this machine.
 Includes event details/checkpoints, simulation episodes, and configurations.
 Targets ax3l and snakelab.
 Stops the Ax3l, reporting, and watchdog services and snake-lab.service.
-Leaves them stopped. The model service is left running.
+Leaves them stopped. Shared LlamaSrv inference is left running.
 Preserves table definitions, credentials, users, grants, and installations.
 Resets auto-increment counters so the next event and simulation IDs start at 1.
 Uses local MariaDB root socket authentication.

@@ -8,42 +8,51 @@ layout: single
 
 # Project Scripts
 
-Run these commands from the project checkout as root. Ax3l uses one
-configuration: `/opt/prod/ax3l`, `/etc/ax3l/database.env`, the `ax3l`
-MariaDB database/account, and the `ax3l` Linux service account. Deployment
-between machines is owned by DevOps; these helpers manage the local installation.
+Run these commands from the project checkout as root. Ax3l uses
+`/opt/prod/ax3l`, `/etc/ax3l/database.env`, the `ax3l` MariaDB database/account,
+and the `ax3l` Linux service account. Deployment between machines is owned by
+DevOps; these helpers manage the local Ax3l installation.
+
+Inference is provided by the independently managed [LlamaSrv](https://llamasrv.osoyalce.com/)
+service. Ax3l's helpers manage only `ax3l-server.service`,
+`reporting-server.service`, and `watchdog.service`.
 
 | Script | Purpose | Command |
 | --- | --- | --- |
-| `install.sh` | Creates the installation, accounts, database, and credentials, then installs and starts the services. | `sudo scripts/install.sh` |
+| `install.sh` | Creates the installation, accounts, database, and credentials, then installs and starts Ax3l services. | `sudo scripts/install.sh` |
 | `upgrade.sh` | Updates modules and service units, preserving the database, credentials, and accounts. | `sudo scripts/upgrade.sh` |
-| `install-services.sh` | Copies modules, installs six systemd units, and starts the selected model and application services. | `sudo scripts/install-services.sh` |
-| `restart.sh` | Validates network overrides, regenerates service units, and restarts the selected model and application services. | `sudo scripts/restart.sh` |
-| `services.sh` | Starts or stops services in dependency order. | `sudo scripts/services.sh start` or `sudo scripts/services.sh stop` |
-| `uninstall.sh` | Removes service units, installation, credentials, database/account, and Linux account/group. **Deletes Ax3l data.** | `sudo scripts/uninstall.sh` |
+| `install-services.sh` | Copies modules, installs three systemd units, and starts Ax3l services. | `sudo scripts/install-services.sh` |
+| `restart.sh` | Validates configuration, regenerates service units, and restarts Ax3l services. | `sudo scripts/restart.sh` |
+| `services.sh` | Starts or stops Ax3l services in dependency order. | `sudo scripts/services.sh start` or `sudo scripts/services.sh stop` |
+| `uninstall.sh` | Removes Ax3l service units, installation, credentials, database/account, and Linux account/group. **Deletes Ax3l data.** | `sudo scripts/uninstall.sh` |
 | `backup-db.sh` | Dumps the configured Ax3l database to a private timestamped file. | `sudo scripts/backup-db.sh` |
 | `wipe-db.sh` | Deletes Ax3l events and SnakeLab simulations, preserves schemas, and leaves services stopped. | `sudo scripts/wipe-db.sh` |
 
 MariaDB must already be running for database setup/removal. These operations
-use local root socket authentication.
+use local root socket authentication. Installation requires Python's venv/pip
+support and package-index access. Model binaries, weights, GPU drivers, and
+inference settings belong to LlamaSrv.
 
 ## Network configuration
 
-`DAx3l.CMDB_NETWORK` is the default inventory for CMDB discovery:
+`DAx3l.CMDB_NETWORK` declares only listeners owned by Ax3l:
 
 | Use | Interface | TCP port |
 | --- | --- | --- |
-| `llm` | `0.0.0.0` | 27770 |
 | `report` | `0.0.0.0` | 28870 |
 | `zmq` | `127.0.0.1` | 61970 |
 
 Install and upgrade create `/opt/prod/ax3l/conf/ax3l.json` if missing and
-preserve existing files. The generated file contains all three entries;
-CMDB continues to discover the defaults in code. To change only the report
-server port, the file can contain:
+preserve valid existing files. The generated file contains both listener
+entries and the outbound `llamasrv_url`, whose default is
+`http://127.0.0.1:51001`. CMDB discovers the listener defaults in code;
+LlamaSrv's ports belong to LlamaSrv's inventory.
+
+For example, use a shared LlamaSrv on Wintermute and override the report port:
 
 ```json
 {
+  "llamasrv_url": "http://wintermute:51001",
   "network": {
     "report": {
       "port": 28871
@@ -52,71 +61,67 @@ server port, the file can contain:
 }
 ```
 
-Each entry accepts an IPv4 `interface` and an integer `port` from 1 to 65535.
-Omitted entries and fields use the inventory defaults. A missing file also
-uses defaults. Unknown settings, invalid IPv4 addresses, invalid ports, and
-malformed JSON fail with a field-specific error.
+Listener entries accept an IPv4 `interface` and an integer `port` from 1 to
+65535. Omitted entries and fields use defaults. A missing file also uses
+defaults. `llamasrv_url` accepts an HTTP(S) base URL without credentials,
+path, query, or fragment; Ax3l appends `/v1/chat/completions`. Unknown settings,
+invalid addresses or ports, malformed URLs, and malformed JSON fail with a
+field-specific error.
 
-Edit the configuration file and apply it from the current release checkout:
+Edit the configuration and apply it from the current release checkout:
 
 ```sh
 sudoedit /opt/prod/ax3l/conf/ax3l.json
 sudo scripts/restart.sh
 ```
 
-The restart helper validates the config and generated units before stopping
-services. It regenerates model, reporting, Ax3l, and watchdog units, reloads
-systemd, and restarts services in dependency order without installing code or
-Python dependencies. Use `sudo scripts/restart.sh -model phi` or
-`-model qwen2.5` for those models; Qwen is the default, as with upgrade.
-The helper stops all model services before starting the selected one.
+The restart helper validates configuration and generated units before stopping
+Ax3l services. It regenerates reporting, Ax3l, and watchdog units, reloads
+systemd, and restarts them without installing code or Python dependencies.
+Use it when changing listener settings, because a plain `systemctl restart`
+does not regenerate listener arguments. Network values are cached per Python
+process and reloaded in new processes. The Ax3l process reads the LlamaSrv URL
+from configuration when it starts.
 
-Use this helper when changing settings: a plain `systemctl restart` does not
-regenerate listener arguments or the model URLs in installed service units.
-Network values are cached per Python process and reloaded in new processes.
-Internal clients connect to `127.0.0.1` for a wildcard `0.0.0.0` binding.
+Internal ZeroMQ clients use `127.0.0.1` for a wildcard `0.0.0.0` binding.
 Reporting's `--host`/`--port`, Ax3l's `--zmq-endpoint`, and the MCP
 `AX3L_ZMQ_ENDPOINT` variable remain available for individual invocations.
 Database and SnakeLab connections retain their separate outbound settings.
-Uninstall removes the network config with the application directory.
+Uninstall removes the application configuration with the application directory.
 
-Startup order: **LLM → wait 7 seconds → reporting → Ax3l → watchdog**.
-The delay comes from `DQwen.STARTUP_SECONDS` or `DPhi.STARTUP_SECONDS`.
-Shutdown stops the application services, then all model services.
+## Shared inference and service lifecycle
 
-Qwen3.5 (`qwen`, using `DQwen.GGUF`) is the default model and also supports vision. Select Phi with:
+Provision LlamaSrv separately and make sure its selected model supports the
+vision inputs and tool calls used by Ax3l. The production model is Qwen3.5-4B
+with its vision projector. Applications share the loaded model; Ax3l supplies
+its tool definitions per request and executes tools through private MCP
+sessions. No Ax3l tools are registered globally with the inference service.
+
+Check the shared endpoint without sending an inference request:
 
 ```sh
-sudo scripts/services.sh start -model phi
+curl -fsS http://wintermute:51001/health
+curl -fsS http://wintermute:51001/props
 ```
 
-Use `-model qwen`, `-model phi`, or `-model qwen2.5` to choose the server to
-start. The helper enables and starts that model without checking or stopping
-other models. All three use the same LLM port; an occupied port or insufficient
-GPU memory is left for llama.cpp to report. Stop the running model yourself
-before starting another. `services.sh stop` stops all model and
-application services.
+Both optimization entry points use the configured endpoint by default:
 
-All six units are installed and upgraded together. `install-services.sh` and
-`upgrade.sh` accept the same `-model` option to select the model started afterward;
-Qwen remains the default. Upgrade removes the legacy `llm-server` unit.
-Upgrade and network restart also disable and remove the former
-`qwenv-server.service` when installing `qwen2.5-server.service`.
+```sh
+.venv/bin/python -m ax3l.server.Ax3lServer
+.venv/bin/python -m ax3l.app.snakelab.main-loop
+```
 
-Qwen2.5-VL uses `DQwen25.GGUF`, `DQwen25.MMPROJ`, and a 4096-token context.
-Place both GGUF files in `DLlama.MODEL_DIR` (`/opt/prod/models`) before starting
-`qwen2.5-server`. It uses the shared executable configured by
-`DLlama`, with `--mmproj`, `-c 4096`, and the existing host, port, and metrics options.
-All models use their bundled chat templates with Jinja enabled. The former
-Qwen2.5-VL tool-template override has been removed; use the default Qwen3.5 for
-Snake Lab tool submissions.
+For an individual invocation, `Ax3lServer --llm-url http://HOST:51001` or
+`main-loop --url http://HOST:51001` overrides the configured URL.
+
+Startup order is **reporting → Ax3l → watchdog**; shutdown uses the reverse
+order. The watchdog recovers only Ax3l and reporting. LlamaSrv's configuration,
+model selection, health recovery, and lifecycle are managed independently, so
+stopping, upgrading, or uninstalling Ax3l leaves shared inference running.
 
 To update the local installation, run `sudo scripts/upgrade.sh` from the
 desired release checkout. Upgrade requires an existing installation and needs
-no MariaDB administrative access. It does not pull Git changes or update
-llama.cpp or model files. The real llama.cpp binary and selected model must
-be installed before starting services; see the
-[architecture]({{ '/pages/architecture' | relative_url }}).
+no MariaDB administrative access. It does not pull Git changes.
 
 ## Releases
 

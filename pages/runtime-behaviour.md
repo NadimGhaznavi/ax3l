@@ -59,7 +59,7 @@ A new golden configuration resets the stagnation count.
 
 The **Ax3l Server** executes the following steps 8 times for one complete experiment cycle:
 
-1. Communicate with the `llama-server` that houses the LLM.
+1. Communicate with the shared LlamaSrv inference endpoint that houses the LLM.
   1(a). Present the LLM with simulation run data.
   1(b). Ask the LLM to tune one or two parameters.
 2. Validate the LLM's new parameter choice(s).

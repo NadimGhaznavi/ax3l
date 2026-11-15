@@ -4,7 +4,6 @@ import json
 import zmq
 import zmq.asyncio
 from pathlib import Path
-import subprocess
 import sys
 import unittest
 
@@ -15,26 +14,16 @@ from mcp.client.stdio import StdioServerParameters
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def configuration(app: Path) -> dict:
-    result = subprocess.run(
-        [sys.executable, str(ROOT / "scripts/generate-mcp-config.py"), "--app", str(app)],
-        capture_output=True, text=True, check=True,
+def stdio_server() -> StdioServerParameters:
+    return StdioServerParameters(
+        command=sys.executable, args=['-m', 'ax3l.app.snakelab.tools'], cwd=str(ROOT),
+        env={'PYTHONPATH': str(ROOT), 'PYTHONDONTWRITEBYTECODE': '1'},
     )
-    return json.loads(result.stdout)
 
 
 class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
-    def test_config_uses_installation_paths(self):
-        app = Path("/tmp/ax3l installation")
-        entry = configuration(app)["mcpServers"]["snakelab"]
-        self.assertEqual(entry["command"], str(app / ".venv/bin/python"))
-        self.assertEqual(entry["cwd"], str(app))
-        self.assertEqual(entry["args"], ["-m", "ax3l.app.snakelab.tools"])
-        self.assertEqual(entry["env"]["PYTHONPATH"], str(app))
-
-    async def test_registered_stdio_server_initializes_and_lists_tools(self):
-        entry = configuration(ROOT)["mcpServers"]["snakelab"]
-        async with Client(StdioServerParameters(**entry), read_timeout_seconds=10) as client:
+    async def test_stdio_server_initializes_and_lists_tools(self):
+        async with Client(stdio_server(), read_timeout_seconds=10) as client:
             result = await client.list_tools()
             tools = {tool.name: tool for tool in result.tools}
             self.assertEqual(set(tools), {"submit_single_value", "submit_pair_values"})
@@ -91,14 +80,14 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
                     self.assertTrue(result.is_error)
 
     async def test_mcp_forwards_proposals_and_returns_ax3l_replies(self):
-        entry = configuration(ROOT)["mcpServers"]["snakelab"]
+        entry = stdio_server()
         with zmq.asyncio.Context() as context:
             with context.socket(zmq.REP) as server:
                 server.setsockopt(zmq.LINGER, 0)
                 port = server.bind_to_random_port("tcp://127.0.0.1")
-                entry["env"]["AX3L_ZMQ_ENDPOINT"] = f"tcp://127.0.0.1:{port}"
-                entry["env"]["AX3L_CONVERSATION_PARAMETER"] = "learning_rate"
-                async with Client(StdioServerParameters(**entry), read_timeout_seconds=10) as client:
+                entry.env["AX3L_ZMQ_ENDPOINT"] = f"tcp://127.0.0.1:{port}"
+                entry.env["AX3L_CONVERSATION_PARAMETER"] = "learning_rate"
+                async with Client(entry, read_timeout_seconds=10) as client:
                     cases = [
                         ({"parameter": "learning_rate", "value": 0.003}, {"status": "ok", "run_id": "accepted-run"}),
                         ({"parameter": "learning_rate", "value": -4}, {"status": "rejected", "reason": "Invalid value"}),
@@ -137,10 +126,10 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
             snake.return_value.is_config_unique.side_effect = [False, True, False]
             snake.return_value.submit_simulation.return_value = 'submitted-run'
             with ZMQServer('tcp://127.0.0.1:*', handle_tool) as server:
-                entry = configuration(ROOT)['mcpServers']['snakelab']
-                entry['env']['AX3L_ZMQ_ENDPOINT'] = server.endpoint
-                entry['env']['AX3L_CONVERSATION_PARAMETER'] = 'learning_rate'
-                async with Client(StdioServerParameters(**entry), read_timeout_seconds=10) as client:
+                entry = stdio_server()
+                entry.env['AX3L_ZMQ_ENDPOINT'] = server.endpoint
+                entry.env['AX3L_CONVERSATION_PARAMETER'] = 'learning_rate'
+                async with Client(entry, read_timeout_seconds=10) as client:
                     for value, expected in [(0.2, 'invalid_value'),
                                             (baseline['training']['learning_rate'], 'duplicate_config'),
                                             (0.004, 'duplicate_config'), (0.003, 'ok'), (0.003, 'duplicate_config')]:

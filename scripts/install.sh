@@ -10,8 +10,8 @@ Prepares /opt/prod/ax3l, the ax3l Linux account/group, the local ax3l
 MariaDB database/account, and /etc/ax3l/database.env. Existing credentials
 are reused; existing account passwords are not reset. Requires root and
 MariaDB administrative access through local socket authentication.
-Installs application modules and enables/starts the model and application
-services. Requires the llama.cpp binary and model configured in constants.
+Installs application modules and enables/starts Ax3l's three services.
+Inference uses the separately managed LlamaSrv endpoint in conf/ax3l.json.
 No release publication is performed.
 HELP
 }

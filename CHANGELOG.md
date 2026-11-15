@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.2.1] - 2026-11-15 @ 09:31
+
+### Summary
+
+Show reference-analysis prerequisites and the LLM's current image task in the
+Experiment Status report card.
+
+### Added
+
+- Pre-Requisites rows above configuration items in the same checklist, with
+  saved-analysis checkmarks and live image preparation, analysis, and failure states.
+- Durable preparation progress before configuration selection, including restart
+  recovery and shared reference runs displayed once with their combined roles.
+
 ## [4.2.0] - 2026-11-15 @ 09:15
 
 ### Summary

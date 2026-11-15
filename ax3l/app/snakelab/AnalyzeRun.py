@@ -7,6 +7,7 @@ from ax3l.app.snakelab.ExperimentDb import ExperimentDb
 from ax3l.app.snakelab.ToolConversation import converse
 from ax3l.app.snakelab.prompts.AnalyzeSimulation import AnalyzeSimulation
 from ax3l.constants.DSimulationAnalysis import DSimulationAnalysis
+from ax3l.entities.AnalysisTask import AnalysisTask
 from ax3l.interface.SnakeLabTools import SnakeLabTools
 
 
@@ -24,10 +25,20 @@ async def analyze_run(snake, llm, output, db, endpoint, run_id: str, target_scor
     for section in DSimulationAnalysis.SECTIONS:
         if section in sections:
             continue
-        png = await asyncio.to_thread(render_analysis, run_id, result["config"], episodes,
-                                      metrics, target_score, section)
-        prompt = AnalyzeSimulation(run_id, result["config"], metrics, png, section)
-        async with SnakeLabTools(endpoint, "simulation_summary", run_id=run_id, section=section) as tools:
-            await converse(llm, output, db, tools, [prompt],
-                           parameter="simulation_summary", process_id=run_id)
+        experiments.save_analysis_task(AnalysisTask(run_id, section, "preparing"))
+        try:
+            png = await asyncio.to_thread(render_analysis, run_id, result["config"], episodes,
+                                          metrics, target_score, section)
+            prompt = AnalyzeSimulation(run_id, result["config"], metrics, png, section)
+            async with SnakeLabTools(endpoint, "simulation_summary", run_id=run_id, section=section) as tools:
+                experiments.save_analysis_task(AnalysisTask(run_id, section, "analyzing"))
+                await converse(llm, output, db, tools, [prompt],
+                               parameter="simulation_summary", process_id=run_id)
+        except (KeyboardInterrupt, asyncio.CancelledError):
+            experiments.save_analysis_task(AnalysisTask(run_id, section, "stopped"))
+            raise
+        except Exception:
+            experiments.save_analysis_task(AnalysisTask(run_id, section, "failed"))
+            raise
+        experiments.save_analysis_task(AnalysisTask(run_id, section, "saved"))
     return experiments.analysis(run_id)

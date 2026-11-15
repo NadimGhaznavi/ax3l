@@ -21,6 +21,7 @@ def measure(episodes: list[dict], high_score: int) -> dict:
         "episodes": count, "high_score": high_score,
         "mean_score": mean(scores) if scores else None,
         "median_score": median(scores) if scores else None,
+        "mean_first_50_scores": mean(scores[:50]) if scores else None,
         "mean_last_50_scores": mean(scores[-50:]) if scores else None,
         "zero_score_episodes": scores.count(0),
         "high_score_episodes": scores.count(high_score),

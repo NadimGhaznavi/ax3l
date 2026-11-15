@@ -11,10 +11,11 @@ class AnalyzeSimulation(Prompt):
     def __init__(self, run_id: str, config: dict, metrics: dict, png: bytes, section: str):
         question, fields, example = {
             "scores": (
-                "Describe whether episode scores improve, decline, or stay flat during this run.",
-                ("high_score", "mean_score", "mean_last_50_scores"),
-                "Scores stayed low throughout training, with occasional one-point spikes. "
-                "The final 50 episodes averaged 0.1 points."),
+                "Compare the supplied mean scores for the first 50 and final 50 episodes of this same run. "
+                "Is the final mean higher, lower, or equal?",
+                ("mean_first_50_scores", "mean_last_50_scores"),
+                "The first 50 episodes averaged 0.2 points and the final 50 averaged 0.1 points, "
+                "so the final average was lower."),
             "distribution": (
                 "Describe whether high scores are common or rare within this run.",
                 ("high_score", "mean_score", "median_score", "zero_score_episodes", "high_score_episodes"),

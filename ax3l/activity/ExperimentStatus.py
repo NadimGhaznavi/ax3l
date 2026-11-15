@@ -38,10 +38,27 @@ def _analysis_value(analysis: SimulationAnalysis | None, sections: dict[str, str
     return f"{len(sections)}/{len(DSimulationAnalysis.SECTIONS)} images analyzed"
 
 
-def _prerequisites(draft: ConfigurationDraft, states: dict[str, dict]) -> list[dict]:
+def _elapsed(seconds: float | None) -> str:
+    if seconds is None:
+        return "—"
+    hours, remainder = divmod(int(seconds), 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{hours:02}:{minutes:02}:{seconds:02}"
+
+
+def _work_values(key: tuple[str, str], activity: dict[tuple[str, str], dict]) -> dict:
+    work = activity.get(key)
+    return dict(work_key=key, elapsed=_elapsed(work["seconds"] if work else None),
+                tokens=work["tokens"] if work else None)
+
+
+def _prerequisites(draft: ConfigurationDraft, states: dict[str, dict],
+                   activity: dict[tuple[str, str], dict]) -> list[dict]:
     roles = {}
     for role, run_id in draft.references.items():
         roles.setdefault(run_id, []).append(REFERENCE_LABELS[role])
+    if draft.run_id:
+        roles.setdefault(draft.run_id, []).append("Current simulation")
     rows = []
     for run_id, labels in roles.items():
         state = states[run_id]
@@ -55,11 +72,14 @@ def _prerequisites(draft: ConfigurationDraft, states: dict[str, dict]) -> list[d
             rows.append(dict(
                 run_id=run_id, section=section, label=label, roles=" / ".join(labels),
                 selected=selected, value=value, current=phase in ("preparing", "analyzing"), phase=phase,
+                image_url=(f"/analysis-images/{run_id}/{section}.png"
+                           if activity.get((run_id, section), {}).get("image_event_id") is not None else None),
+                **_work_values((run_id, section), activity),
             ))
     return rows
 
 
-def _rows(draft: ConfigurationDraft) -> list[dict]:
+def _rows(draft: ConfigurationDraft, activity: dict[tuple[str, str], dict]) -> list[dict]:
     rows = []
     for parameter in PARAMETER_ORDER:
         paths = ((SINGLE_PARAMETERS[parameter][0],) if parameter in SINGLE_PARAMETERS
@@ -73,6 +93,7 @@ def _rows(draft: ConfigurationDraft) -> list[dict]:
                 path=name, label=FIELD_TO_LABEL_MAP[name], description=schema["description"],
                 value=str(value), selected=parameter in draft.selections,
                 current=parameter == draft.next_parameter,
+                **_work_values((draft.draft_id, parameter), activity),
             ))
     return rows
 
@@ -114,12 +135,23 @@ def experiment_status(draft: ConfigurationDraft | None, run: dict | None = None,
                       analysis: SimulationAnalysis | None = None,
                       sections: dict[str, str] | None = None,
                       reference_states: dict[str, dict] | None = None,
-                      task: AnalysisTask | None = None) -> dict:
+                      task: AnalysisTask | None = None,
+                      activity: dict[tuple[str, str], dict] | None = None) -> dict:
     """Use accepted selections, rather than value differences, for checkmarks."""
     if draft is None:
         return {"draft": None}
     sections = sections if sections is not None else {}
-    prerequisites = _prerequisites(draft, reference_states if reference_states is not None else {})
+    activity = activity if activity is not None else {}
+    states = dict(reference_states) if reference_states is not None else {}
+    if draft.run_id:
+        states[draft.run_id] = dict(analysis=analysis, sections=sections, task=task)
+    prerequisites = _prerequisites(draft, states, activity)
+    rows = _rows(draft, activity)
+    work_keys = {row["work_key"] for row in prerequisites + rows}
+    work = [activity[key] for key in work_keys if key in activity]
+    totals = dict(elapsed=_elapsed(sum(item["seconds"] for item in work)),
+                  tokens=(sum(item["tokens"] for item in work)
+                          if all(item["tokens"] is not None for item in work) else None))
     phase, detail = _phase(draft, run, comparison, analysis, sections, prerequisites, task)
     completed = run is not None and run["status"] == "completed"
     score = run["high_score"] if completed else None
@@ -131,7 +163,7 @@ def experiment_status(draft: ConfigurationDraft | None, run: dict | None = None,
     elif run is not None and run["status"] in ("failed", "cancelled"):
         outcome = "No completed result"
     return dict(
-        draft=draft, rows=_rows(draft), prerequisites=prerequisites, phase=phase, detail=detail,
+        draft=draft, rows=rows, prerequisites=prerequisites, totals=totals, phase=phase, detail=detail,
         choices_selected=len(draft.selections), choices_total=len(PARAMETER_ORDER),
         high_score=score, target_score=target,
         difference=score - target if score is not None else None, outcome=outcome,

@@ -1,12 +1,15 @@
 """Draft recovery and analysis queries against disposable MariaDB fixtures."""
 
 from copy import deepcopy
+from datetime import timedelta
+import json
 import os
 import unittest
 from unittest.mock import patch
 from uuid import uuid4
 
 from ax3l.app.DbMgr import DbMgr
+from ax3l.activity.ExperimentActivity import item_activity
 from ax3l.app.snakelab.ExperimentDb import ExperimentDb
 from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb
 from ax3l.app.snakelab.SubmitSimulationSummaryHandler import SubmitSimulationSummaryHandler
@@ -109,6 +112,59 @@ class ExperimentDatabaseTests(unittest.TestCase):
         self.db.execute('DELETE FROM events WHERE process_id = %s', (run_id,))
         self.assertIsNone(ExperimentDb(self.db).analysis(run_id))
         self.assertEqual(ExperimentDb(self.db).analysis_sections(run_id), {})
+
+    def test_checklist_activity_uses_database_time_and_omits_image_payloads(self):
+        run_id, draft_id = self.process_ids
+        started = self.db.query('SELECT CURRENT_TIMESTAMP(6) AS stamp')[0]['stamp'] - timedelta(minutes=5)
+
+        def event(name, content, seconds, *, process=run_id, parent=None, parameter=None, source=None):
+            category = 'SnakeLab' if name == 'simulation_analysis_task' else 'Conversation'
+            event_id = self.db.log(name, category, 'INFO', content, process_id=process,
+                                   parent_event_id=parent, parameter=parameter, source_name=source)
+            self.db.execute('UPDATE events SET occurred_at=%s WHERE event_id=%s',
+                            (started + timedelta(seconds=seconds), event_id))
+            return event_id
+
+        event('simulation_analysis_task', json.dumps(dict(section='scores', phase='preparing')), 0)
+        conversation = event('conversation_started', 'Started', 5)
+        image = event('prompt_sent', json.dumps(dict(content=[
+            dict(type='text', text='Scores'),
+            dict(type='image_url', image_url=dict(url='data:image/png;base64,cG5n'))])), 6,
+            parent=conversation, parameter='simulation_summary', source='AnalyzeSimulation')
+        event('reply_received', json.dumps(dict(usage=dict(total_tokens=100))), 10, parent=conversation)
+        event('reply_received', json.dumps(dict(usage=dict(total_tokens=150))), 20, parent=conversation)
+        event('conversation_ended', 'Done', 22, parent=conversation)
+        event('simulation_analysis_task', json.dumps(dict(section='scores', phase='saved')), 25)
+        event('simulation_analysis_task', json.dumps(dict(section='loss', phase='preparing')), 30)
+        conversation = event('conversation_started', 'Started', 35, process=draft_id)
+        event('prompt_sent', json.dumps(dict(content='Choose')), 36, process=draft_id,
+              parent=conversation, parameter='epsilon_pair', source='ConfigurationChoice')
+        event('reply_received', json.dumps(dict(usage=dict(total_tokens=300))), 40,
+              process=draft_id, parent=conversation)
+        event('conversation_ended', 'Done', 45, process=draft_id, parent=conversation)
+        self.db.log('reply_received', 'Other', 'INFO', 'Not JSON', process_id=run_id)
+        other = DbMgr(initialize_event_tables=False)
+        try:
+            events = ExperimentDb(other).activity_events([run_id, draft_id])
+        finally:
+            other.close()
+        self.assertEqual(ExperimentDb(self.db).activity_events([]), [])
+        self.assertNotIn('cG5n', json.dumps(events, default=str))
+        work = item_activity(events)
+        self.assertEqual(work[run_id, 'scores'], dict(seconds=25, tokens=250, image_event_id=image))
+        self.assertEqual(work[draft_id, 'epsilon_pair'], dict(seconds=10, tokens=300, image_event_id=None))
+        self.assertGreaterEqual(work[run_id, 'loss']['seconds'], 270)
+        self.assertLess(work[run_id, 'loss']['seconds'], 280)
+
+    def test_checklist_activity_preserves_unreported_tokens(self):
+        run_id = self.process_ids[0]
+        conversation = self.db.log('conversation_started', 'Conversation', 'INFO', 'Started', process_id=run_id)
+        self.db.log('prompt_sent', 'Conversation', 'INFO', '{"content":"Choose"}',
+                    process_id=run_id, parent_event_id=conversation, parameter='hidden_size')
+        self.db.log('reply_received', 'Conversation', 'INFO', '{"choices":[]}',
+                    process_id=run_id, parent_event_id=conversation)
+        work = item_activity(ExperimentDb(self.db).activity_events([run_id]))
+        self.assertIsNone(work[run_id, 'hidden_size']['tokens'])
 
     def test_reference_selection_uses_completed_runs_and_stable_ties(self):
         self.db.execute('''CREATE TEMPORARY TABLE simulation_runs (

@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.3.2] - 2026-11-15 @ 11:45
+
+### Summary
+
+Show current simulation images and resource usage throughout the experiment
+checklist.
+
+### Added
+
+- Three prerequisite rows for the submitted simulation's score trends, score
+  distribution, and training loss images, alongside the reference analyses.
+- Links to each chart's latest available image, using the exact PNG sent to Qwen.
+- Elapsed time and input/output token usage for every analysis and configuration
+  row, with live elapsed times and a final total counting paired choices once.
+
+### Changed
+
+- Render saved checklist items with green checkmarks across browsers.
+
 ## [4.3.0] - 2026-11-15 @ 11:14
 
 ### Summary

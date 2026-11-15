@@ -39,31 +39,39 @@
     </div>
     <p class="status-detail">{{ detail }}</p>
     <table class="status-checklist" aria-label="Experiment prerequisites and configuration progress">
-      <colgroup><col class="check-column"><col><col class="value-column"></colgroup>
-      <thead><tr><th scope="col">Done</th><th scope="col">Item description</th><th scope="col">Value</th></tr></thead>
+      <colgroup><col class="check-column"><col><col class="value-column"><col class="time-column"><col class="token-column"></colgroup>
+      <thead><tr><th scope="col">Done</th><th scope="col">Item description</th><th scope="col">Value</th><th scope="col">Elapsed time</th><th scope="col">Tokens</th></tr></thead>
       <tbody class="status-prerequisites">
-        <tr class="status-section-heading"><th scope="rowgroup" colspan="3">Pre-Requisites</th></tr>
+        <tr class="status-section-heading"><th scope="rowgroup" colspan="5">Pre-Requisites</th></tr>
         {% for row in prerequisites %}
         <tr data-analysis="{{ row.section }}" data-run="{{ row.run_id }}" class="{{ 'selected' if row.selected else 'pending' }}{% if row.current %} current-choice{% endif %}"{% if row.current %} aria-current="step"{% endif %}>
           <td><input type="checkbox" disabled {% if row.selected %}checked{% endif %} aria-label="{{ row.roles }} {{ row.label }} analysis saved"></td>
-          <th scope="row"><span class="parameter-label">{{ row.label }}</span><span class="parameter-description">{{ row.roles }} · <a href="/simulations/{{ row.run_id }}">{{ row.run_id.split('-')[0] }}</a></span></th>
+          <th scope="row"><span class="parameter-label">{% if row.image_url %}<a href="{{ row.image_url }}" target="_blank" rel="noopener">{{ row.label }} image</a>{% else %}{{ row.label }} image{% endif %}</span><span class="parameter-description">{{ row.roles }} · <a href="/simulations/{{ row.run_id }}">{{ row.run_id.split('-')[0] }}</a></span></th>
           <td class="prerequisite-value">{{ row.value }}</td>
+          <td class="item-elapsed">{{ row.elapsed }}</td>
+          <td class="item-tokens">{{ '{:,}'.format(row.tokens) if row.tokens is not none else '—' }}</td>
         </tr>
         {% else %}
-        <tr><td colspan="3">No reference analyses recorded.</td></tr>
+        <tr><td colspan="5">No image analyses recorded.</td></tr>
         {% endfor %}
       </tbody>
       <tbody class="status-configuration">
-        <tr class="status-section-heading"><th scope="rowgroup" colspan="3">Configuration</th></tr>
+        <tr class="status-section-heading"><th scope="rowgroup" colspan="5">Configuration</th></tr>
         {% for row in rows %}
         <tr data-parameter="{{ row.path }}" class="{{ 'selected' if row.selected else 'pending' }}{% if row.current %} current-choice{% endif %}"{% if row.current %} aria-current="step"{% endif %}>
           <td><input type="checkbox" disabled {% if row.selected %}checked{% endif %} aria-label="{{ row.label }} choice saved"></td>
           <th scope="row"><span class="parameter-label">{{ row.label }}</span><span class="parameter-description">{{ row.description }}</span></th>
           <td><span class="parameter-value">{{ row.value }}</span>{% if not row.selected %}<span class="pending-label">pending · inherited</span>{% endif %}</td>
+          <td class="item-elapsed">{{ row.elapsed }}</td>
+          <td class="item-tokens">{{ '{:,}'.format(row.tokens) if row.tokens is not none else '—' }}</td>
         </tr>
         {% endfor %}
       </tbody>
+      <tfoot>
+        <tr class="status-total"><th scope="row" colspan="3">Total</th><td class="item-elapsed">{{ totals.elapsed }}</td><td class="item-tokens">{{ '{:,}'.format(totals.tokens) if totals.tokens is not none else '—' }}</td></tr>
+      </tfoot>
     </table>
+    <p class="status-usage-note">Time includes preparation and conversations. Tokens include input and output from returned requests. Paired settings share time and tokens; totals count them once. — means unavailable or not started.</p>
     <dl class="status-results" aria-label="Simulation results">
       <div><dt>High score</dt><dd>{{ '{:,}'.format(high_score) if high_score is not none else '—' }}</dd></div>
       <div><dt>Golden score to beat</dt><dd><a href="/simulations/{{ draft.golden_run_id }}">{{ '{:,}'.format(target_score) }}</a></dd></div>

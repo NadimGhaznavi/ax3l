@@ -1,17 +1,13 @@
 """Bounded chart tasks, exact observations, and resumable result handoff."""
 
 from copy import deepcopy
-import json
-import re
-from pathlib import Path
 import unittest
-from unittest.mock import AsyncMock, Mock, call, patch
+from unittest.mock import Mock, patch
 from uuid import uuid4
 
 from ax3l.activity.RunAnalysis import measure, render_analysis
-from ax3l.app.snakelab.AnalyzeRun import analyze_run
+from ax3l.app.snakelab.AnalyzeRun import record_run_metrics
 from ax3l.app.snakelab.SubmitSimulationSummaryHandler import SubmitSimulationSummaryHandler
-from ax3l.app.snakelab.prompts.AnalyzeSimulation import AnalyzeSimulation
 from ax3l.constants.DSimulationAnalysis import DSimulationAnalysis
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
@@ -64,10 +60,8 @@ class RunAnalysisTests(unittest.TestCase):
                 episodes = [dict(self.episodes[0], episode=index, score=score)
                             for index, score in enumerate(scores, 1)]
                 metrics = measure(episodes, 9)
-                prompt = AnalyzeSimulation(self.config, metrics, b'png', 'scores').to_md()
-                self.assertIn('first 50 and final 50 episodes of this same run', prompt)
-                self.assertIn('higher, lower, or equal', prompt)
-                self.assertIn(f'Facts: episodes: 500; first 50 mean: {first}; last 50 mean: {last}', prompt)
+                self.assertEqual(metrics['mean_first_50_scores'], first)
+                self.assertEqual(metrics['mean_last_50_scores'], last)
                 self.assertNotEqual(metrics['mean_score'], first)
                 self.assertNotEqual(metrics['mean_score'], last)
 
@@ -110,36 +104,6 @@ class RunAnalysisTests(unittest.TestCase):
         figure = self.render('loss', episodes)
         self.assertEqual(list(figure.data[0].y), [None] * 5)
         self.assertEqual(figure.layout.annotations[0].text, 'No training losses recorded')
-
-    def test_each_prompt_has_one_image_one_question_and_an_explicit_example(self):
-        for section in DSimulationAnalysis.SECTIONS:
-            with self.subTest(section=section):
-                prompt = AnalyzeSimulation(self.config, self.metrics, b'png', section)
-                message = json.loads(prompt.to_json())
-                self.assertEqual([part['type'] for part in message['content']], ['text', 'image_url'])
-                self.assertEqual(message['content'][1]['image_url']['url'], 'data:image/png;base64,cG5n')
-                text = message['content'][0]['text']
-                self.assertIn('at most 40 words', text)
-                self.assertIn('submit_simulation_summary', text)
-                self.assertIn('Example format (invented data', text)
-                self.assertIn('/analysis/' + section, text)
-                self.assertIn('data_tool /run', text)
-                self.assertIn('/run/rules', text)
-                self.assertIn('No theory or causal explanations', text)
-                self.assertIn('optionally one concrete value to try next', text)
-                self.assertNotIn('no settings', text)
-                self.assertNotIn('Configuration:', text)
-                self.assertNotIn('termination_reasons', text)
-                self.assertNotIn(self.run_id, text)
-                self.assertLess(len(text.split()), 180)
-                self.assertNotIn('{', text)
-                self.assertNotIn(self.run_id.split('-')[0], text)
-                if section == 'loss':
-                    self.assertIn('Facts: episodes: 5; episodes with loss: 3', text)
-                else:
-                    self.assertNotIn('episodes with loss:', text)
-                path, value = re.search(r'try ([a-z_.]+)=([0-9.]+) next', text).groups()
-                SimulationConfiguration.value(tuple(path.split('.')), float(value))
 
 
 class SummarySubmissionTests(unittest.TestCase):
@@ -224,73 +188,22 @@ class SummarySubmissionTests(unittest.TestCase):
         self.assertIn('Training loss: Loss fell.', self.experiments.save_analysis.call_args.args[0].summary)
 
 
-class AnalyzeRunTests(unittest.IsolatedAsyncioTestCase):
-    async def test_cached_analysis_does_not_render_or_call_the_llm_again(self):
-        module = 'ax3l.app.snakelab.AnalyzeRun.'
-        saved = SimulationAnalysis('run', {}, {}, 'Saved.')
-        with patch(module + 'ExperimentDb') as experiments, patch(module + 'render_analysis') as render:
-            experiments.return_value.analysis.return_value = saved
-            snake, llm = Mock(), Mock()
-            self.assertIs(await analyze_run(snake, llm, Path('/tmp'), Mock(), 'endpoint', 'run', 10), saved)
-            snake.get_run_result.assert_not_called()
-            render.assert_not_called()
-            llm.complete.assert_not_called()
-            experiments.return_value.save_analysis_task.assert_not_called()
+class RecordRunMetricsTests(unittest.TestCase):
+    def test_saved_metrics_are_reused_after_restart(self):
+        experiments, snake = Mock(), Mock()
+        saved = SimulationAnalysis('run', {}, {}, 'Previously saved note.')
+        experiments.analysis.return_value = saved
+        self.assertIs(record_run_metrics(snake, experiments, 'run'), saved)
+        snake.get_run_result.assert_not_called()
+        experiments.save_analysis.assert_not_called()
 
-    async def check_sections(self, completed):
-        module = 'ax3l.app.snakelab.AnalyzeRun.'
-        run_id = str(uuid4())
-        saved = SimulationAnalysis(run_id, {}, {}, 'Saved.')
-        snake = Mock()
-        snake.get_run_result.return_value = dict(status='completed', high_score=6,
-                                                 config=SimulationConfiguration.defaults())
+    def test_recording_measures_the_completed_run(self):
+        experiments, snake = Mock(), Mock()
+        experiments.analysis.return_value = None
+        config = SimulationConfiguration.defaults()
+        snake.get_run_result.return_value = dict(status='completed', config=config, high_score=6)
         snake.get_analysis_episodes.return_value = observations()
-        with patch(module + 'ExperimentDb') as experiments, \
-                patch(module + 'render_analysis', side_effect=lambda *args: args[-1].encode()) as render, \
-                patch(module + 'SnakeLabTools', return_value=AsyncMock()) as tools, \
-                patch(module + 'converse', new_callable=AsyncMock) as conversation:
-            experiments.return_value.analysis.side_effect = [None, saved]
-            experiments.return_value.analysis_sections.return_value = completed
-            self.assertIs(await analyze_run(snake, Mock(), Path('/tmp'), Mock(), 'endpoint', run_id, 10), saved)
-            pending = [section for section in DSimulationAnalysis.SECTIONS if section not in completed]
-            self.assertEqual(tools.call_args_list, [call('endpoint', 'simulation_summary', run_id=run_id,
-                                                       section=section) for section in pending])
-            self.assertEqual(render.call_count, len(pending))
-            self.assertEqual(conversation.await_count, len(pending))
-            recorded = [entry.args[0] for entry in experiments.return_value.save_analysis_task.call_args_list]
-            self.assertEqual([(task.section, task.phase) for task in recorded],
-                             [(section, phase) for section in pending for phase in ('preparing', 'analyzing', 'saved')])
-            images = []
-            for entry in conversation.await_args_list:
-                prompts = entry.args[4]
-                self.assertEqual(len(prompts), 1)
-                message = json.loads(prompts[0].to_json())
-                images.append(message['content'][1]['image_url']['url'])
-                self.assertEqual(entry.kwargs['process_id'], run_id)
-            self.assertEqual(len(set(images)), len(pending))
-
-    async def test_three_fresh_conversations_each_get_only_their_own_chart(self):
-        await self.check_sections({})
-
-    async def test_restart_resumes_after_the_last_saved_section(self):
-        await self.check_sections({'scores': 'Scores stayed flat.'})
-
-    async def test_image_failure_and_cancellation_are_recorded_and_propagate(self):
-        import asyncio
-
-        module = 'ax3l.app.snakelab.AnalyzeRun.'
-        for error, phase in [(RuntimeError('inference unavailable'), 'failed'),
-                              (asyncio.CancelledError(), 'stopped')]:
-            with self.subTest(phase=phase), patch(module + 'ExperimentDb') as experiments, \
-                    patch(module + 'render_analysis', return_value=b'png'), \
-                    patch(module + 'SnakeLabTools', return_value=AsyncMock()), \
-                    patch(module + 'converse', side_effect=error):
-                experiments.return_value.analysis.return_value = None
-                experiments.return_value.analysis_sections.return_value = {}
-                snake = Mock()
-                snake.get_run_result.return_value = dict(status='completed', high_score=6,
-                                                         config=SimulationConfiguration.defaults())
-                snake.get_analysis_episodes.return_value = observations()
-                with self.assertRaises(type(error)):
-                    await analyze_run(snake, Mock(), Path('/tmp'), Mock(), 'endpoint', 'run', 10)
-                self.assertEqual(experiments.return_value.save_analysis_task.call_args.args[0].phase, phase)
+        analysis = record_run_metrics(snake, experiments, 'run')
+        experiments.save_analysis.assert_called_once_with(analysis)
+        self.assertEqual(analysis.metrics, measure(observations(), 6))
+        self.assertIsNone(analysis.summary)

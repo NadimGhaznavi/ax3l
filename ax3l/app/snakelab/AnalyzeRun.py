@@ -1,44 +1,19 @@
-"""Generate and save a completed run's interpretation once."""
+"""Record exact metrics for a completed simulation."""
 
-import asyncio
-
-from ax3l.activity.RunAnalysis import measure, render_analysis
+from ax3l.activity.RunAnalysis import measure
 from ax3l.app.snakelab.ExperimentDb import ExperimentDb
-from ax3l.app.snakelab.ToolConversation import converse
-from ax3l.app.snakelab.prompts.AnalyzeSimulation import AnalyzeSimulation
-from ax3l.constants.DSimulationAnalysis import DSimulationAnalysis
-from ax3l.entities.AnalysisTask import AnalysisTask
-from ax3l.interface.SnakeLabTools import SnakeLabTools
+from ax3l.entities.SimulationAnalysis import SimulationAnalysis
+from ax3l.interface.SnakeLab import SnakeLab
 
 
-async def analyze_run(snake, llm, output, db, endpoint, run_id: str, target_score: int):
-    experiments = ExperimentDb(db)
+def record_run_metrics(snake: SnakeLab, experiments: ExperimentDb, run_id: str) -> SimulationAnalysis:
     saved = experiments.analysis(run_id)
     if saved is not None:
         return saved
     result = snake.get_run_result(run_id)
     if result is None or result["status"] != "completed" or result["high_score"] is None:
-        raise ValueError("Analysis requires a completed simulation with a recorded high score")
-    episodes = snake.get_analysis_episodes(run_id)
-    metrics = measure(episodes, result["high_score"])
-    sections = experiments.analysis_sections(run_id)
-    for section in DSimulationAnalysis.SECTIONS:
-        if section in sections:
-            continue
-        experiments.save_analysis_task(AnalysisTask(run_id, section, "preparing"))
-        try:
-            png = await asyncio.to_thread(render_analysis, result["config"], episodes,
-                                          metrics, target_score, section)
-            prompt = AnalyzeSimulation(result["config"], metrics, png, section)
-            async with SnakeLabTools(endpoint, "simulation_summary", run_id=run_id, section=section) as tools:
-                experiments.save_analysis_task(AnalysisTask(run_id, section, "analyzing"))
-                await converse(llm, output, db, tools, [prompt],
-                               parameter="simulation_summary", process_id=run_id)
-        except (KeyboardInterrupt, asyncio.CancelledError):
-            experiments.save_analysis_task(AnalysisTask(run_id, section, "stopped"))
-            raise
-        except Exception:
-            experiments.save_analysis_task(AnalysisTask(run_id, section, "failed"))
-            raise
-        experiments.save_analysis_task(AnalysisTask(run_id, section, "saved"))
-    return experiments.analysis(run_id)
+        raise ValueError("Metrics require a completed simulation with a recorded high score")
+    metrics = measure(snake.get_analysis_episodes(run_id), result["high_score"])
+    analysis = SimulationAnalysis(run_id, result["config"], metrics, None)
+    experiments.save_analysis(analysis)
+    return analysis

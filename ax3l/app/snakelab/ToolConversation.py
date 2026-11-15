@@ -39,6 +39,7 @@ async def converse(llm, output, db, tools, prompts, *, parameter: str | None = N
             prefix = output / f"{process_id}-{conversation_id}-{turn:04d}"
             if DAx3l.RAW_LOGS_ENABLED:
                 prefix.with_suffix(".request.json").write_bytes(payload)
+            log(Events.LLM, Events.LLM.REQUEST_STARTED, f"Inference request {turn}.")
             try:
                 status, headers, body = await asyncio.to_thread(llm.complete, payload)
                 if DAx3l.RAW_LOGS_ENABLED:

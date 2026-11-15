@@ -24,7 +24,7 @@ from ax3l.activity.PromptReport import parts, summary
 from ax3l.activity.ScoreDistribution import distribution
 from ax3l.activity.ExperimentHighscores import highscores
 from ax3l.activity.ExperimentStatus import experiment_status
-from ax3l.activity.ExperimentActivity import item_activity
+from ax3l.activity.ExperimentActivity import choice_activity, item_activity
 from ax3l.activity.GoldenConfigurations import parameter_change
 from ax3l.activity.SimulationBoard import board_svg
 from ax3l.activity.SimulationAnimation import SimulationAnimation
@@ -173,22 +173,15 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
                         experiments = ExperimentDb(db)
                         draft = experiments.draft() if view == "current" else experiments.last_completed_draft()
                         comparison = experiments.comparison(draft.run_id) if draft and draft.run_id else None
-                        run_ids = list(dict.fromkeys(draft.references.values())) if draft else []
-                        if draft and draft.run_id and draft.run_id not in run_ids:
-                            run_ids.append(draft.run_id)
-                        states = experiments.analysis_states(run_ids)
-                        activity = item_activity(
-                            experiments.activity_events(([draft.draft_id] if draft else []) + run_ids))
+                        analysis = experiments.analysis(draft.run_id) if draft and draft.run_id else None
+                        activity = choice_activity(experiments.choice_events(draft.draft_id)) if draft else {}
                     finally:
                         db.close()
                     snake = SnakeLab()
                     run = snake.get_run_result(draft.run_id) if draft and draft.run_id else None
                     golden = snake.get_run_result(draft.golden_run_id) if draft else None
-                    state = states[draft.run_id] if draft and draft.run_id else dict(analysis=None, sections={}, task=None)
                     body = templates.get_template("experiment_status.html").render(
-                        view=view, **experiment_status(
-                            draft, run, golden, comparison, state["analysis"], state["sections"], states,
-                            state["task"], activity)
+                        view=view, **experiment_status(draft, run, golden, comparison, analysis, activity)
                     ).encode("utf-8")
                     content_type = "text/html; charset=utf-8"
                 except Exception:

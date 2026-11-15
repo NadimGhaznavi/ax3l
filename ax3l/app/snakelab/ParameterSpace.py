@@ -39,6 +39,10 @@ def parameter_paths(parameter):
     return PAIR_PARAMETERS[parameter]
 
 
+def parameter_values(config: dict, parameter: str) -> dict[str, int | float]:
+    return {path[-1]: SimulationConfiguration.value_at(config, path) for path in parameter_paths(parameter)}
+
+
 def finite_choices(parameter):
     domains = []
     for path in parameter_paths(parameter):

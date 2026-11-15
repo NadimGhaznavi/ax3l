@@ -2,9 +2,10 @@
 
 import asyncio
 from copy import deepcopy
+import json
 from pathlib import Path
 import unittest
-from unittest.mock import ANY, AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 from uuid import uuid4
 
 from jsonschema import ValidationError
@@ -12,8 +13,7 @@ from jsonschema import ValidationError
 from ax3l.app.snakelab.SnakeLabLoop import optimize, SimulationUnsuccessful, submit_draft
 from ax3l.app.snakelab.SubmitSingleValueHandler import SubmitSingleValueHandler
 from ax3l.app.snakelab.SubmitPairValuesHandler import SubmitPairValuesHandler
-from ax3l.constants.DSimulationAnalysis import DSimulationAnalysis
-from ax3l.constants.DChoice import CHOICE_LABELS
+from ax3l.constants.DChoice import CHOICE_CHARTS, CHOICE_LABELS
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
@@ -53,8 +53,10 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
             config = deepcopy(self.config)
             if run_id == self.best:
                 config['seed'] += 1
-            self.store.analyses[run_id] = SimulationAnalysis(run_id, config, {'high_score': score},
-                                                           'Scores rose during training. Loss fluctuated.')
+            metrics = dict(high_score=score, episodes=500, episodes_with_loss=480,
+                           mean_first_50_scores=.1, mean_last_50_scores=.2, epsilon_random_actions=95,
+                           median_score=0, zero_score_episodes=463, high_score_episodes=1)
+            self.store.analyses[run_id] = SimulationAnalysis(run_id, config, metrics, 'Previous notes.')
         self.snake = Mock()
         self.snake.is_simulation_running.return_value = False
         self.snake.is_config_unique.return_value = True
@@ -73,8 +75,9 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.enterContext(patch(module + 'EventLogDb', return_value=self.events))
         self.rotation = self.enterContext(patch(module + 'rotate_if_needed', new_callable=AsyncMock))
         self.wait = self.enterContext(patch(module + 'wait_for_run', new_callable=AsyncMock))
-        self.analysis = self.enterContext(patch(module + 'analyze_run', new_callable=AsyncMock))
-        self.analysis.side_effect = lambda *args: self.store.analysis(args[5])
+        self.analysis = self.enterContext(patch(module + 'record_run_metrics'))
+        self.analysis.side_effect = lambda snake, experiments, run_id: experiments.analysis(run_id)
+        self.chart = self.enterContext(patch(module + 'render_analysis', return_value=b'png'))
         self.tools = self.enterContext(patch(module + 'SnakeLabTools', return_value=AsyncMock()))
         self.conversation = self.enterContext(patch(module + 'converse', new_callable=AsyncMock))
         shared = 'ax3l.app.snakelab.SubmitSingleValueHandler.'
@@ -130,7 +133,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn(f'Choose {CHOICE_LABELS[parameter]}.', prompt)
             self.assertIn('data_tool', prompt)
             self.assertIn('/draft', prompt)
-            self.assertLess(len(prompt.split()), 75)
+            self.assertLess(len(prompt.split()), 135)
             for run_id in (self.gold, self.latest, self.best):
                 self.assertNotIn(run_id.split('-')[0], prompt)
 
@@ -142,52 +145,34 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.snake.submit_simulation.call_args.args[0]['model']['hidden_size'], 272)
         self.assertEqual(self.rotation.await_count, 1)  # Resume pending rotation only.
 
-    async def check_image_analysis_before_choices(self, completed_choices=0):
-        if completed_choices:
-            self.store.saved = self.draft(completed_choices)
-            self.store.saved.config['model']['hidden_size'] = 272
-        references = [self.latest, self.gold, self.best]
-        completed = deepcopy(self.store.analyses)
-        self.store.analyses.clear()
-        analyzed = []
-        for index, analysis in enumerate(completed.values(), 1):
-            completed[analysis.run_id] = SimulationAnalysis(
-                analysis.run_id, analysis.config, analysis.metrics,
-                '\n'.join(f'{label}: Reference {index} observation.'
-                          for label in DSimulationAnalysis.SECTIONS.values()))
-
-        async def analyze(*args):
-            run_id = args[5]
-            if run_id in references:
-                self.assertEqual(self.store.saved.phase, 'preparing')
-                self.assertEqual(self.prompts, [])
-                analyzed.append(run_id)
-                self.store.analyses[run_id] = completed[run_id]
-            return self.store.analysis(run_id)
-
-        self.analysis.side_effect = analyze
-        select = self.conversation.side_effect
-
-        async def choose(*args, **kwargs):
-            self.assertEqual(analyzed, references)
-            for run_id in references:
-                self.assertEqual(self.store.analysis(run_id), completed[run_id])
-            self.assertIn('data_tool', args[4][-1].to_md())
-            self.assertNotIn('Reference 1 observation.', args[4][-1].to_md())
-            return await select(*args, **kwargs)
-
-        self.conversation.side_effect = choose
+    async def test_only_relevant_choices_get_a_chart_and_matching_json(self):
         await self.cycle()
-        self.assertEqual([call.kwargs['parameter'] for call in self.conversation.await_args_list],
-                         PARAMETER_ORDER[completed_choices:])
-        if completed_choices:
-            self.assertEqual(self.snake.submit_simulation.call_args.args[0]['model']['hidden_size'], 272)
+        messages = {call.kwargs['parameter']: json.loads(call.args[4][0].to_json())['content']
+                    for call in self.conversation.await_args_list}
+        for parameter, content in messages.items():
+            if parameter in CHOICE_CHARTS:
+                self.assertEqual([part['type'] for part in content], ['text', 'image_url'])
+                self.assertIn('The chart shows the latest run.', content[0]['text'])
+            else:
+                self.assertIsInstance(content, str)
+        self.assertEqual([call.args[-1] for call in self.chart.call_args_list], list(CHOICE_CHARTS.values()))
+        data = json.loads(messages['epsilon_pair'][0]['text'].split('```json\n')[1].split('\n```')[0])
+        self.assertEqual(data['reference_runs']['golden']['high_score'], 20)
+        self.assertEqual(data['reference_runs']['latest']['mean_last_50_scores'], .2)
+        self.assertEqual(data['current'], {key: self.config['epsilon'][key] for key in ('initial', 'decay')})
+        self.assertNotIn('Previous notes.', messages['epsilon_pair'][0]['text'])
 
-    async def test_image_observations_are_ready_to_browse_before_every_choice(self):
-        await self.check_image_analysis_before_choices()
-
-    async def test_restart_finishes_image_jobs_before_the_next_config_prompt(self):
-        await self.check_image_analysis_before_choices(completed_choices=3)
+    async def test_golden_supplies_chart_after_seed_change_and_missing_loss_skips_chart(self):
+        self.store.analyses[self.latest].config['seed'] += 1
+        self.store.analyses[self.gold].metrics['episodes_with_loss'] = 0
+        await self.cycle()
+        messages = {call.kwargs['parameter']: json.loads(call.args[4][0].to_json())['content']
+                    for call in self.conversation.await_args_list}
+        self.assertIsInstance(messages['learning_rate'], str)
+        self.assertIn('/golden/activity', messages['learning_rate'])
+        self.assertIn('The chart shows the golden run.', messages['epsilon_pair'][0]['text'])
+        self.assertEqual([call.args[-1] for call in self.chart.call_args_list], ['scores', 'distribution'])
+        self.snake.get_analysis_episodes.assert_called_once_with(self.gold)
 
     async def test_reference_preparation_is_durable_and_resumes_before_choices(self):
         self.store.saved = self.draft(phase='preparing')
@@ -195,8 +180,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.analysis.side_effect = asyncio.CancelledError()
         await self.cycle()
         self.assertEqual(self.store.saved, original)
-        self.analysis.assert_awaited_once_with(self.snake, ANY, ANY,
-                                               self.db, 'endpoint', self.latest, 20)
+        self.analysis.assert_called_once_with(self.snake, self.store, self.latest)
         self.conversation.assert_not_awaited()
         self.snake.submit_simulation.assert_not_called()
         self.snake.get_latest_completed_run_id.assert_not_called()
@@ -249,14 +233,14 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(SimulationUnsuccessful):
             await optimize(Mock(), Path('/tmp'), self.db, 'endpoint')
         self.assertEqual(self.store.saved.phase, 'failed')
-        self.analysis.assert_not_awaited()
+        self.analysis.assert_not_called()
         self.assertNotIn('configuration_compared', [call.args[0] for call in self.db.log.call_args_list])
 
     async def test_one_reference_analysis_when_a_run_fills_all_three_roles(self):
         self.snake.get_latest_completed_run_id.return_value = self.gold
         self.snake.get_all_time_best_run_id.return_value = self.gold
         await self.cycle()
-        self.assertEqual([call.args[5] for call in self.analysis.await_args_list], [self.gold, self.run])
+        self.assertEqual([call.args[2] for call in self.analysis.call_args_list], [self.gold, self.run])
         self.assertEqual(len(self.prompts), len(PARAMETER_ORDER))
 
     async def test_recorded_comparison_resumes_analysis_without_comparing_again(self):
@@ -267,7 +251,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.events.current_golden_config.return_value = {'process_id': self.run}
         await self.cycle()
         self.assertNotIn('configuration_compared', [call.args[0] for call in self.db.log.call_args_list])
-        self.analysis.assert_awaited_once()
+        self.analysis.assert_called_once()
 
     async def test_new_draft_uses_the_rotated_baseline_before_parameter_selection(self):
         rotated = self.store.analyses[self.best]
@@ -283,7 +267,8 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.store.saved.golden_run_id, self.best)
         self.assertEqual(self.store.saved.config['seed'], self.config['seed'] + 1)
         prompt = self.conversation.await_args.args[4][-1].to_md()
-        self.assertIn("beat golden's 30 points", prompt)
+        self.assertIn('"golden": {"seed":', prompt)
+        self.assertIn('"high_score": 30', prompt)
 
     def test_ready_drafts_cannot_submit_epsilon_nice_values_above_either_cap(self):
         for probability, steps in ((.1, 51), (.11, 50)):

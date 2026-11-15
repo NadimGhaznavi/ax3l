@@ -15,3 +15,9 @@ PAIR_LABELS = {
 }
 
 REFERENCE_LABELS = {"latest": "latest", "golden": "golden", "all_time_best": "best"}
+
+CHOICE_CHARTS = {
+    "learning_rate": "loss",
+    "epsilon_pair": "scores",
+    "reward_pair": "distribution",
+}

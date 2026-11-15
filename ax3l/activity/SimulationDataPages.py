@@ -2,8 +2,7 @@
 
 import json
 
-from ax3l.app.snakelab.PairParameters import PAIR_PARAMETERS
-from ax3l.app.snakelab.SingleParameters import SINGLE_PARAMETERS
+from ax3l.app.snakelab.ParameterSpace import parameter_paths, parameter_values
 from ax3l.constants.DChoice import REFERENCE_LABELS
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
@@ -22,10 +21,12 @@ CONFIG_PAGES = (*CONFIG_SECTIONS, "exploration")
 RUN_PAGES = ("scores", "endings", "activity", "notes", *CONFIG_PAGES)
 
 
-def value_at(config: dict, path: tuple[str, ...]):
-    for key in path:
-        config = config[key]
-    return config
+PAGE_LABELS = {
+    "scores": "Score statistics", "endings": "How episodes ended",
+    "activity": "Moves, exploration and loss counts", "notes": "Saved notes",
+    "model": "Model settings", "training": "Training settings", "exploration": "Exploration settings",
+    "rewards": "Reward settings", "game": "Board settings", "config": "All settings", "rules": "Allowed values",
+}
 
 
 def data_json(scope: str, seed: int, data: dict) -> str:
@@ -33,7 +34,7 @@ def data_json(scope: str, seed: int, data: dict) -> str:
 
 
 def links(scope: str, pages: tuple[str, ...]) -> str:
-    return "\n".join(f"[{page}](/{scope}/{page})" for page in pages)
+    return "\n".join(f"[{PAGE_LABELS[page]}](/{scope}/{page})" for page in pages)
 
 
 def analysis_index_page() -> str:
@@ -45,9 +46,7 @@ def analysis_rules_page(config: dict) -> str:
     constraints = ("type", "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf", "enum")
     parameters = {}
     for parameter in PARAMETER_ORDER:
-        paths = ((SINGLE_PARAMETERS[parameter][0],) if parameter in SINGLE_PARAMETERS
-                 else PAIR_PARAMETERS[parameter])
-        for path in paths:
+        for path in parameter_paths(parameter):
             field = SimulationConfiguration.field(path)
             parameters[".".join(path)] = {key: field[key] for key in constraints if key in field}
     return data_json("run", config["seed"], dict(
@@ -59,20 +58,18 @@ def index_page(draft: ConfigurationDraft) -> str:
     for role, run_id in draft.references.items():
         roles.setdefault(run_id, []).append(REFERENCE_LABELS[role])
     runs = "\n".join(f"[{', '.join(labels)}](/{labels[0]})" for labels in roles.values())
-    return (f"[draft](/draft): current choices\n{runs}\n"
-            "Latest: feedback. Golden: baseline. Best: historical best.\n"
-            "Shared labels mean the same run. Different seeds are not controlled comparisons.")
+    return (f"[Current draft](/draft)\n{runs}\n"
+            "Latest is the most recent run. Golden is the score to beat. Best is the all-time high score.\n"
+            "Runs on other seeds are historical context.")
 
 
 def draft_page(draft: ConfigurationDraft) -> str:
     choices = {}
     for parameter in PARAMETER_ORDER:
-        paths = ((SINGLE_PARAMETERS[parameter][0],) if parameter in SINGLE_PARAMETERS
-                 else PAIR_PARAMETERS[parameter])
         choices[parameter] = dict(state="chosen" if parameter in draft.selections else "pending",
-                                  values={path[-1]: value_at(draft.config, path) for path in paths})
+                                  values=parameter_values(draft.config, parameter))
     data = data_json("draft", draft.config["seed"], dict(choices=choices))
-    return (f"Draft choices. Chosen = saved; pending = inherited.\n```json\n{data}\n```\n"
+    return (f"The draft shows saved and inherited values.\n```json\n{data}\n```\n"
             + links("draft", CONFIG_PAGES))
 
 
@@ -81,7 +78,7 @@ def config_page(scope: str, page: str, config: dict) -> str:
         data = dict(epsilon=config["epsilon"], epsilon_nice=config["epsilon_nice"])
     else:
         path, fields = CONFIG_SECTIONS[page]
-        values = value_at(config, path)
+        values = SimulationConfiguration.value_at(config, path)
         data = {page: {key: values[key] for key in fields}}
         if page == "game":
             data["epochs"] = config["epochs"]
@@ -98,7 +95,7 @@ def run_overview(scope: str, draft: ConfigurationDraft, analysis: SimulationAnal
     return "\n".join((f"{scope} run\n```json\n{data}\n```",
                       "Same seed as draft." if analysis.config["seed"] == draft.config["seed"] else
                       "Different seed: historical context, not a controlled comparison.",
-                      links(scope, RUN_PAGES)))
+                      links(scope, tuple(page for page in RUN_PAGES if page != "notes" or analysis.summary))))
 
 
 def run_page(scope: str, page: str, analysis: SimulationAnalysis) -> str:

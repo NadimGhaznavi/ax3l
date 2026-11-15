@@ -13,6 +13,12 @@ _VALIDATOR = Draft202012Validator(SCHEMA)
 
 class SimulationConfiguration:
     @staticmethod
+    def value_at(config: dict, path: tuple[str, ...]):
+        for key in path:
+            config = config[key]
+        return config
+
+    @staticmethod
     def field(path: tuple[str, ...]) -> dict:
         field = SCHEMA
         for key in path:

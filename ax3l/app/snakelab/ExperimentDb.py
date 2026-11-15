@@ -130,3 +130,29 @@ class ExperimentDb:
         """, (run_id, Events.Configuration.CATEGORY, Events.Configuration.PROPOSAL_ACCEPTED,
                Events.SnakeLab.CATEGORY, Events.SnakeLab.SUBMITTED))
         return {row["name"]: row["event_id"] for row in rows}
+
+    def choice_events(self, draft_id: str) -> list[dict]:
+        """Read the setup trace without loading image snapshots or model output."""
+        config, chat, llm, tool = Events.Configuration, Events.Conversation, Events.LLM, Events.Tool
+        return self._db.query("""
+            SELECT e.event_id, e.occurred_at, CURRENT_TIMESTAMP(6) AS observed_at,
+                   e.parent_event_id, e.name, e.parameter,
+                   CASE WHEN e.name = %s AND e.source_name = 'ConfigurationChoice'
+                        THEN JSON_TYPE(JSON_EXTRACT(m.content, '$.content')) = 'ARRAY' END AS has_image,
+                   CASE WHEN e.name IN (%s, %s, %s) THEN m.content
+                        WHEN e.name = %s THEN JSON_EXTRACT(m.content, '$.usage')
+                        WHEN e.name = %s THEN JSON_UNQUOTE(JSON_EXTRACT(m.content, '$.status'))
+                   END AS detail
+            FROM events e JOIN event_messages m USING (event_id)
+            WHERE e.process_id = %s AND (
+                (e.category = %s AND e.name IN (%s, %s)) OR
+                (e.category = %s AND e.name IN (%s, %s, %s)) OR
+                (e.category = %s AND e.name IN (%s, %s)) OR
+                (e.category = %s AND e.name IN (%s, %s, %s)))
+            ORDER BY e.event_id
+        """, (chat.PROMPT, config.CHART_STARTED, config.CHART_FINISHED, tool.STARTED,
+              chat.RESPONSE, tool.COMPLETED, draft_id,
+              config.CATEGORY, config.CHART_STARTED, config.CHART_FINISHED,
+              chat.CATEGORY, chat.PROMPT, chat.RESPONSE, chat.ENDED,
+              llm.CATEGORY, llm.REQUEST_STARTED, llm.REQUEST_FAILED,
+              tool.CATEGORY, tool.STARTED, tool.COMPLETED, tool.FAILED))

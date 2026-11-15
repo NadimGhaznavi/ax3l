@@ -1,13 +1,10 @@
-"""Turn a saved configuration draft and its run into a readable report card."""
+"""Turn a saved configuration draft and its setup steps into a status report."""
 
-from ax3l.app.snakelab.PairParameters import PAIR_PARAMETERS
-from ax3l.app.snakelab.SingleParameters import SINGLE_PARAMETERS
+from ax3l.app.snakelab.ParameterSpace import parameter_paths
 from ax3l.constants.DLabel import FIELD_TO_LABEL_MAP
-from ax3l.constants.DSimulationAnalysis import DSimulationAnalysis
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
-from ax3l.entities.AnalysisTask import AnalysisTask
-from ax3l.interface.SimulationConfiguration import SCHEMA
+from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 
 
 RUN_PHASES = {
@@ -15,144 +12,71 @@ RUN_PHASES = {
     "running": ("Simulation running", "All configuration choices are saved. Snake Lab is running the simulation."),
     "paused": ("Simulation paused", "Snake Lab has paused the simulation."),
     "cancelling": ("Simulation cancelling", "Snake Lab is stopping the simulation."),
-    "cancelled": ("Simulation cancelled", "The simulation was cancelled; no completed result is available."),
-    "failed": ("Simulation failed", "The simulation failed; no completed result is available."),
+    "cancelled": ("Simulation cancelled", "The simulation was cancelled."),
+    "failed": ("Simulation failed", "Snake Lab reported a failed simulation."),
 }
-
-REFERENCE_LABELS = {"latest": "Latest simulation", "golden": "Current golden", "all_time_best": "All-time best"}
-IMAGE_LABELS = {"scores": "score trends", "distribution": "distribution", "loss": "training loss"}
-
-
-def _analysis_value(analysis: SimulationAnalysis | None, sections: dict[str, str],
-                    task: AnalysisTask | None) -> str:
-    if analysis is not None:
-        return "Complete"
-    if task is not None and task.section not in sections:
-        label = IMAGE_LABELS[task.section]
-        if task.phase == "preparing":
-            return f"Preparing {label} image"
-        if task.phase == "analyzing":
-            return f"Analyzing {label} image"
-        if task.phase in ("failed", "stopped"):
-            return f"{task.phase.capitalize()}: {label} image"
-    return f"{len(sections)}/{len(DSimulationAnalysis.SECTIONS)} images analyzed"
 
 
 def _elapsed(seconds: float | None) -> str:
     if seconds is None:
         return "—"
+    if seconds < 60:
+        return f"{seconds:.3f} s"
     hours, remainder = divmod(int(seconds), 3600)
     minutes, seconds = divmod(remainder, 60)
     return f"{hours:02}:{minutes:02}:{seconds:02}"
 
 
-def _work_values(key: tuple[str, str], activity: dict[tuple[str, str], dict]) -> dict:
-    work = activity.get(key)
-    return dict(work_key=key, elapsed=_elapsed(work["seconds"] if work else None),
-                tokens=work["tokens"] if work else None)
-
-
-def _prerequisites(draft: ConfigurationDraft, states: dict[str, dict],
-                   activity: dict[tuple[str, str], dict]) -> list[dict]:
-    roles = {}
-    for role, run_id in draft.references.items():
-        roles.setdefault(run_id, []).append(REFERENCE_LABELS[role])
-    if draft.run_id:
-        roles.setdefault(draft.run_id, []).append("Current simulation")
-    rows = []
-    for run_id, labels in roles.items():
-        state = states[run_id]
-        analysis, sections, task = state["analysis"], state["sections"], state["task"]
-        for section, label in DSimulationAnalysis.SECTIONS.items():
-            selected = analysis is not None or section in sections
-            phase = task.phase if task is not None and task.section == section and not selected else None
-            value = "Complete" if selected else "Pending"
-            if phase in ("preparing", "analyzing", "failed", "stopped"):
-                value = _analysis_value(analysis, sections, task)
-            rows.append(dict(
-                run_id=run_id, section=section, label=label, roles=" / ".join(labels),
-                selected=selected, value=value, current=phase in ("preparing", "analyzing"), phase=phase,
-                image_url=(f"/analysis-images/{run_id}/{section}.png"
-                           if activity.get((run_id, section), {}).get("image_event_id") is not None else None),
-                **_work_values((run_id, section), activity),
-            ))
-    return rows
-
-
-def _rows(draft: ConfigurationDraft, activity: dict[tuple[str, str], dict]) -> list[dict]:
+def _rows(draft: ConfigurationDraft, activity: dict[str, dict]) -> list[dict]:
     rows = []
     for parameter in PARAMETER_ORDER:
-        paths = ((SINGLE_PARAMETERS[parameter][0],) if parameter in SINGLE_PARAMETERS
-                 else PAIR_PARAMETERS[parameter])
+        paths = parameter_paths(parameter)
         for path in paths:
-            value, schema = draft.config, SCHEMA
-            for key in path:
-                value, schema = value[key], schema["properties"][key]
             name = ".".join(path)
             rows.append(dict(
-                path=name, label=FIELD_TO_LABEL_MAP[name], description=schema["description"],
-                value=str(value), selected=parameter in draft.selections,
-                current=parameter == draft.next_parameter,
-                **_work_values((draft.draft_id, parameter), activity),
+                path=name, label=FIELD_TO_LABEL_MAP[name],
+                description=SimulationConfiguration.field(path)["description"],
+                value=str(SimulationConfiguration.value_at(draft.config, path)),
+                selected=parameter in draft.selections, current=parameter == draft.next_parameter,
+                steps=[], image_url=None,
             ))
+        work = activity.get(parameter)
+        if work:
+            rows[-1]["steps"] = [dict(step, elapsed=_elapsed(step["seconds"])) for step in work["steps"]]
+            image = work["image_event_id"]
+            rows[-len(paths)]["image_url"] = f"/events/{image}" if image is not None else None
     return rows
 
 
 def _phase(draft: ConfigurationDraft, run: dict | None, comparison: dict | None,
-           analysis: SimulationAnalysis | None, sections: dict[str, str],
-           prerequisites: list[dict], task: AnalysisTask | None) -> tuple[str, str]:
+           analysis: SimulationAnalysis | None) -> tuple[str, str]:
     if draft.phase == "preparing":
-        for row in prerequisites:
-            if row["phase"] in ("failed", "stopped"):
-                return f"Reference analysis {row['phase']}", f"{row['value']} for {row['roles']}."
-            if row["current"]:
-                return "Preparing references", f"{row['value']} for {row['roles']}."
-        return "Preparing references", "Reference image analyses must be saved before configuration selection begins."
+        return "Preparing references", "Loading measured data for the reference runs."
     if draft.phase == "choosing":
-        return (f"Choosing: {FIELD_TO_LABEL_MAP[draft.next_parameter]}",
-                "Highlighted items are awaiting selection. Checkmarks mean the LLM's choice was accepted and saved.")
+        return (f"Choosing {FIELD_TO_LABEL_MAP[draft.next_parameter]}",
+                "A checkmark indicates that Ax3l accepted and saved the choice.")
     if draft.phase == "ready":
-        return "Ready to submit", "All configuration choices are saved. The simulation has not been submitted yet."
+        return "Ready to submit", "All configuration choices are saved."
     if draft.phase == "submitting":
-        return ("Submission pending", "Awaiting submission confirmation. An unresolved submission is not retried automatically.")
+        return "Submission pending", "Waiting for Snake Lab to confirm the simulation."
     if run is None:
         return "Simulation unavailable", "The submitted simulation has no stored run record."
     if run["status"] != "completed":
         return RUN_PHASES[run["status"]]
     if comparison is None:
-        return "Comparing results", "Simulation complete. Awaiting the saved comparison with the golden configuration."
+        return "Comparing results", "Comparing the high score with the golden configuration."
     if analysis is None:
-        if task is not None and task.phase in ("preparing", "analyzing", "failed", "stopped"):
-            phase = f"Analysis {task.phase}" if task.phase in ("failed", "stopped") else "Analyzing simulation"
-            return phase, f"Simulation complete. {_analysis_value(analysis, sections, task)}."
-        next_section = next(label for key, label in DSimulationAnalysis.SECTIONS.items() if key not in sections)
-        return "Analyzing simulation", f"Simulation complete. Awaiting analysis: {next_section}."
-    return "Complete", "Simulation, golden comparison, and analysis are complete."
+        return "Recording results", "Saving the measured results."
+    return "Complete", "The simulation results and golden comparison are saved."
 
 
 def experiment_status(draft: ConfigurationDraft | None, run: dict | None = None,
                       golden: dict | None = None, comparison: dict | None = None,
                       analysis: SimulationAnalysis | None = None,
-                      sections: dict[str, str] | None = None,
-                      reference_states: dict[str, dict] | None = None,
-                      task: AnalysisTask | None = None,
-                      activity: dict[tuple[str, str], dict] | None = None) -> dict:
-    """Use accepted selections, rather than value differences, for checkmarks."""
+                      activity: dict[str, dict] | None = None) -> dict:
     if draft is None:
         return {"draft": None}
-    sections = sections if sections is not None else {}
-    activity = activity if activity is not None else {}
-    states = dict(reference_states) if reference_states is not None else {}
-    if draft.run_id:
-        states[draft.run_id] = dict(analysis=analysis, sections=sections, task=task)
-    prerequisites = _prerequisites(draft, states, activity)
-    rows = _rows(draft, activity)
-    work_keys = {row["work_key"] for row in prerequisites + rows}
-    work = [activity[key] for key in work_keys if key in activity]
-    totals = dict(elapsed=_elapsed(sum(item["seconds"] for item in work)),
-                  tokens=(sum(item["tokens"] for item in work)
-                          if all(item["tokens"] is not None for item in work) else None))
-    phase, detail = _phase(draft, run, comparison, analysis, sections, prerequisites, task)
+    phase, detail = _phase(draft, run, comparison, analysis)
     completed = run is not None and run["status"] == "completed"
     score = run["high_score"] if completed else None
     target = golden["high_score"]
@@ -163,11 +87,9 @@ def experiment_status(draft: ConfigurationDraft | None, run: dict | None = None,
     elif run is not None and run["status"] in ("failed", "cancelled"):
         outcome = "No completed result"
     return dict(
-        draft=draft, rows=rows, prerequisites=prerequisites, totals=totals, phase=phase, detail=detail,
+        draft=draft, rows=_rows(draft, activity or {}), phase=phase, detail=detail,
         choices_selected=len(draft.selections), choices_total=len(PARAMETER_ORDER),
         high_score=score, target_score=target,
         difference=score - target if score is not None else None, outcome=outcome,
-        analysis_status=("Complete" if analysis is not None else
-                         task.phase.capitalize() if task is not None and task.phase in ("failed", "stopped") else
-                         f"In progress ({len(sections)}/{len(DSimulationAnalysis.SECTIONS)})" if completed else "Pending"),
+        analysis_status=("Saved" if analysis is not None else "Recording" if completed else "Pending"),
     )

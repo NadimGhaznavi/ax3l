@@ -9,8 +9,5 @@ counts food eaten; training reward and training loss are separate diagnostics.
 Changing rewards can change the scale of Smooth L1 loss without improving
 episode scores.
 
-Example: closer=0.25 and farther=-0.5 passes the sum rule. Closer=1 and
-farther=-0.5 fails it. These illustrate validation, not recommended settings.
-
 - [Choosing one setting](/selection)
 - [Reference index](/)

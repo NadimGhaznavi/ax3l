@@ -46,12 +46,12 @@ class SimulationData:
         else:
             analysis = self._experiments.analysis(draft.references[scopes[scope]])
             if analysis is None:
-                raise RuntimeError("Reference analysis must finish before data lookup.")
+                raise RuntimeError("Reference metrics must finish before data lookup.")
             if not page:
                 golden = (analysis if analysis.run_id == draft.golden_run_id else
                           self._experiments.analysis(draft.golden_run_id))
                 if golden is None:
-                    raise RuntimeError("Golden analysis must finish before data lookup.")
+                    raise RuntimeError("Golden metrics must finish before data lookup.")
                 text = run_overview(scope, draft, analysis, golden.metrics["high_score"])
             else:
                 text = run_page(scope, page, analysis)

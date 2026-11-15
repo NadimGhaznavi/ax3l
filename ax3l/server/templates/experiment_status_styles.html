@@ -26,12 +26,12 @@
   .status-checklist input { appearance: none; display: block; margin: auto; width: 1rem; height: 1rem; border: 1px solid var(--muted); border-radius: .12rem; background: transparent; opacity: 1; }
   .status-checklist input:checked { border-color: #7fd9a1; }
   .status-checklist input:checked::after { content: ""; display: block; width: .28rem; height: .52rem; margin: .04rem auto; border: solid #7fd9a1; border-width: 0 2px 2px 0; transform: rotate(45deg); }
-  .status-checklist .status-section-heading th { background: #151f2b; color: var(--text); font-weight: bold; font-size: .8rem; }
-  .prerequisite-value { font-size: .75rem; }
-  .status-prerequisites a { border: 0; padding: 0; }
   .status-checklist .parameter-label { color: var(--text); }
   .status-checklist .item-elapsed, .status-checklist .item-tokens { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-  .status-checklist .status-total { border-top: 2px solid var(--border); font-weight: bold; }
+  .setup-step th { font-weight: normal; }
+  .status-checklist .setup-step th { padding-left: 1.8rem; }
+  .setup-step { color: var(--muted); font-size: .8rem; }
+  .choice-chart { margin-left: .6rem; padding: 0; border: 0; font-size: .75rem; }
   .status-usage-note { margin: .5rem 1rem; color: var(--muted); font-size: .7rem; }
   .parameter-description { color: var(--muted); font-size: .75rem; margin-left: .8rem; }
   .pending .parameter-value, .pending-label { color: var(--muted); }

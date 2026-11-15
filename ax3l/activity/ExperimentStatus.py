@@ -20,11 +20,10 @@ RUN_PHASES = {
 def _elapsed(seconds: float | None) -> str:
     if seconds is None:
         return "—"
-    if seconds < 60:
-        return f"{seconds:.3f} s"
     hours, remainder = divmod(int(seconds), 3600)
     minutes, seconds = divmod(remainder, 60)
-    return f"{hours:02}:{minutes:02}:{seconds:02}"
+    clock = f"{minutes:02}:{seconds:02}"
+    return f"{hours:02}:{clock}" if hours else clock
 
 
 def _rows(draft: ConfigurationDraft, activity: dict[str, dict]) -> list[dict]:
@@ -86,8 +85,15 @@ def experiment_status(draft: ConfigurationDraft | None, run: dict | None = None,
                    "New golden" if comparison["current_golden_run_id"] == draft.run_id else "Golden retained")
     elif run is not None and run["status"] in ("failed", "cancelled"):
         outcome = "No completed result"
+    rows = _rows(draft, activity or {})
+    steps = [step for row in rows for step in row["steps"]]
+    seconds = sum(step["seconds"] for step in steps if step["seconds"] is not None)
+    input_tokens = sum(step["input_tokens"] for step in steps if step["input_tokens"] is not None)
+    output_tokens = sum(step["output_tokens"] for step in steps if step["output_tokens"] is not None)
     return dict(
-        draft=draft, rows=_rows(draft, activity or {}), phase=phase, detail=detail,
+        draft=draft, rows=rows, phase=phase, detail=detail,
+        totals=dict(elapsed=_elapsed(seconds), input_tokens=input_tokens,
+                    output_tokens=output_tokens, tokens=input_tokens + output_tokens),
         choices_selected=len(draft.selections), choices_total=len(PARAMETER_ORDER),
         high_score=score, target_score=target,
         difference=score - target if score is not None else None, outcome=outcome,

@@ -65,18 +65,22 @@ task requires; navigation never injects the entire knowledge base. Chart prompts
 provide their direct guide URL and selection context points to `/selection`.
 General background lives in `knowledge/`, not in every prompt.
 
-`data_tool(url)` reads one small English page of experiment data. Start at `/`
+`data_tool(url)` reads one small page of experiment data. Start at `/`
 for reference runs or `/draft` for current values marked chosen or pending.
 Use the short labels `latest`, `golden`, and `best`; Qwen never needs a run UUID.
 The draft ID is bound privately to the conversation. The root groups labels
-that refer to the same run.
+that refer to the same run. Navigation stays in readable text with links;
+actual values are JSON, including the draft choices and run comparisons in
+overview pages' JSON blocks. Terminal data pages return a JSON object directly.
 
 Each reference overview links to `scores`, `endings`, `activity`, `notes`,
 `model`, `training`, `exploration`, `rewards`, and `game`. For example,
 `/latest/notes` reads saved chart observations and `/golden/model` reads only
 model settings. Draft pages expose the five configuration sections. Endings
-include counts and percentages rounded to one decimal; stored values remain
-unchanged. Selection rules use English in the submission tool's description.
+include numeric counts and exact recorded percentages. Missing statistics are
+JSON null, and saved observations are JSON strings. Settings retain their
+configuration keys and numeric types. Selection rules use English in the
+submission tool's description.
 
 Every parameter conversation can browse saved analyses for:
 
@@ -100,8 +104,8 @@ MCP session for each conversation and sends the assigned submission tool plus
 and data functions forward requests over ZeroMQ; Ax3l owns validation,
 persistence, and reads through `ExperimentDb` and the shared `DbMgr`.
 KB reads use only the explicitly addressed local page. Reads never save choices
-or submit simulations. Qwen receives plain page text; structured results and
-full identifiers remain in the internal logs.
+or submit simulations. Qwen receives the requested page content, including its
+JSON data; transport envelopes and full identifiers remain internal.
 
 | Tool | Model arguments | Bound by Ax3l |
 | --- | --- | --- |

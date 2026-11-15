@@ -1,6 +1,7 @@
 """Bound data browsing stays small, readable, read-only, and tied to saved references."""
 
 from copy import deepcopy
+import json
 import re
 import unittest
 from unittest.mock import Mock, patch
@@ -33,8 +34,16 @@ class SimulationDataTests(unittest.TestCase):
     def read(self, url):
         return self.data.read({'draft_id': self.draft.draft_id, 'url': url})
 
-    def test_navigation_reaches_all_facts_as_small_english_pages_without_ids(self):
+    def payload(self, url):
+        page = self.read(url)['page']
+        if url in ('/draft', '/latest', '/golden', '/best'):
+            page = page.split('```json\n', 1)[1].split('\n```', 1)[0]
+        return json.loads(page)
+
+    def test_navigation_reaches_small_json_payloads_without_ids(self):
         pending, pages = ['/'], {}
+        configs = dict(draft=self.draft.config, latest=self.analyses[self.latest].config,
+                       golden=self.analyses[self.gold].config, best=self.analyses[self.best].config)
         while pending:
             url = pending.pop()
             if url in pages:
@@ -43,19 +52,24 @@ class SimulationDataTests(unittest.TestCase):
             self.assertEqual(result['status'], 'ok', url)
             page = pages[url] = result['page']
             self.assertLessEqual(len(page.split()), 160, url)
-            self.assertNotIn('{', page)
             for run_id in (*self.analyses, self.draft.draft_id):
                 self.assertNotIn(run_id.split('-')[0], page)
+            if url.count('/') == 2:
+                data = json.loads(page)
+                scope = url.split('/')[1]
+                self.assertEqual(data['scope'], scope)
+                self.assertEqual(data['seed'], configs[scope]['seed'])
             pending.extend(re.findall(r'\]\(([^)]+)\)', page))
         self.assertEqual(len(pages), 37)
-        self.assertIn('high score: 2', pages['/latest/scores'])
-        self.assertIn('move limit: 1 (100.0%)', pages['/latest/endings'])
-        self.assertIn('safe detour moves: 3', pages['/latest/activity'])
-        self.assertIn('Loss declined.', pages['/latest/notes'])
-        self.assertIn('replay frames: 100000', pages['/golden/training'])
+        self.assertEqual(json.loads(pages['/latest/scores'])['high_score'], 2)
+        self.assertEqual(json.loads(pages['/latest/endings'])['termination_reasons']['max_moves'],
+                         dict(count=1, percent=100.0))
+        self.assertEqual(json.loads(pages['/latest/activity'])['nice_overrides'], 3)
+        self.assertIn('Loss declined.', json.loads(pages['/latest/notes'])['summary'])
+        self.assertEqual(json.loads(pages['/golden/training'])['training']['replay_max_frames'], 100000)
         self.assertIn('Different seed: historical context', pages['/best'])
-        self.assertIn('Episodes: 500', pages['/draft/game'])
-        self.assertIn('Safe detours: chance 0.005; moves 20', pages['/draft/exploration'])
+        self.assertEqual(json.loads(pages['/draft/game'])['epochs'], 500)
+        self.assertEqual(json.loads(pages['/draft/exploration'])['epsilon_nice'], dict(probability=.005, steps=20))
         self.store.save_draft.assert_not_called()
         self.store.save_analysis.assert_not_called()
 
@@ -66,18 +80,19 @@ class SimulationDataTests(unittest.TestCase):
         self.read('/latest/model')
         self.store.analysis.assert_called_once_with(self.latest)
         self.store.draft.assert_called_with(self.draft.draft_id)
-        self.assertIn('gap: 0', self.read('/latest')['page'])
+        self.assertEqual(self.payload('/latest')['score_difference'], 0)
         self.assertEqual([call.args[0] for call in self.store.analysis.call_args_list],
                          [self.latest, self.latest, self.gold])
 
     def test_draft_reads_include_saved_earlier_choices_after_restart(self):
         self.draft.config['model']['hidden_size'] = 272
         self.draft.selections = ['hidden_size']
-        page = self.read('/draft')['page']
-        self.assertIn('hidden size: 272 (chosen)', page)
-        self.assertIn('sequence length: 8 (pending)', page)
-        self.assertIn('hidden size: 272', self.read('/draft/model')['page'])
-        self.assertIn('hidden size: 224', self.read('/golden/model')['page'])
+        choices = self.payload('/draft')['choices']
+        self.assertEqual(choices['hidden_size'], dict(state='chosen', values=dict(hidden_size=272)))
+        self.assertEqual(choices['sequence_length'], dict(state='pending', values=dict(sequence_length=8)))
+        self.assertEqual(choices['epsilon_nice_pair']['values'], dict(probability=.005, steps=20))
+        self.assertEqual(self.payload('/draft/model')['model']['hidden_size'], 272)
+        self.assertEqual(self.payload('/golden/model')['model']['hidden_size'], 224)
 
     def test_shared_reference_runs_have_one_index_entry_and_all_aliases_work(self):
         self.draft.references = dict.fromkeys(self.draft.references, self.gold)
@@ -86,7 +101,8 @@ class SimulationDataTests(unittest.TestCase):
         self.assertEqual(len(re.findall(r'\]\(', index)), 2)
         for label in ('latest', 'golden', 'best'):
             page = self.read(f'/{label}')['page']
-            self.assertIn('Roles: latest, golden, best', page)
+            self.assertEqual(self.payload(f'/{label}')['roles'], ['latest', 'golden', 'best'])
+            self.assertIs(self.payload(f'/{label}')['same_seed_as_draft'], True)
             self.assertIn('Same seed as draft.', page)
 
     def test_bad_paths_and_arguments_are_rejected_before_reading_data(self):
@@ -110,6 +126,23 @@ class SimulationDataTests(unittest.TestCase):
 
     def test_missing_score_statistics_remain_unrecorded(self):
         self.analyses[self.latest].metrics.update(measure([], 0))
-        page = self.read('/latest/scores')['page']
-        self.assertIn('mean score: unrecorded', page)
-        self.assertIn('first 50 mean: unrecorded', page)
+        scores = self.payload('/latest/scores')
+        self.assertIsNone(scores['mean_score'])
+        self.assertIsNone(scores['mean_first_50_scores'])
+        self.assertEqual(scores['high_score'], 0)
+        self.assertEqual(scores['episodes'], 0)
+
+    def test_json_preserves_numbers_percentages_and_observation_text(self):
+        metrics = self.analyses[self.latest].metrics
+        metrics['mean_score'] = 1 / 3
+        metrics['termination_reasons']['wall']['percent'] = 100 / 3
+        self.assertEqual(self.payload('/latest/scores')['mean_score'], 1 / 3)
+        self.assertEqual(self.payload('/latest/endings')['termination_reasons'], metrics['termination_reasons'])
+        for page, key in (('model', 'model'), ('training', 'training'), ('exploration', 'epsilon_nice')):
+            self.assertEqual(self.payload(f'/latest/{page}')[key], self.config[key])
+        self.assertEqual(self.payload('/latest/rewards')['rewards'], self.config['game']['rewards'])
+        self.assertEqual(self.payload('/latest/activity')['total_steps'], metrics['total_steps'])
+        self.analyses[self.latest] = SimulationAnalysis(self.latest, self.config, metrics,
+            'Score trends: "flat".\nTraining loss: missing — path \\loss.')
+        self.assertEqual(self.payload('/latest/notes')['summary'], self.analyses[self.latest].summary)
+        self.assertIs(self.payload('/best')['same_seed_as_draft'], False)

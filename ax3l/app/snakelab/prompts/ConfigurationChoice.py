@@ -14,7 +14,7 @@ class ConfigurationChoice(Prompt):
             f"Goal: beat golden's {target} points on seed {draft.config['seed']}.\n"
             f"Choose {CHOICE_LABELS[parameter]}.\n"
             "Use data_tool: read /draft for current choices, then / for reference runs. "
-            "Follow relevant links for scores, notes, or settings.\n"
+            "Follow relevant links for scores, notes, or settings. Data values are JSON; null means unrecorded.\n"
             f"Call {tool} to save your choice. Same values allowed. "
             "Ax3l runs once all choices are saved."
         )

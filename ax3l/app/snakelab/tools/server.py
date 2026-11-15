@@ -65,7 +65,7 @@ async def kb_tool(url: StrictStr) -> str:
                            "source_name": "KnowledgeBase", "prompt": {"role": "user", "content": reason}})
 
 
-@mcp.tool(description="Read one small data page. Start at /draft or /. Follow links for runs, scores, notes, or settings.")
+@mcp.tool(description="Read one small data page. Start at /draft or /. Follow links for runs, scores, notes, or settings. Data payloads are JSON; null means unrecorded.")
 async def data_tool(url: StrictStr) -> str:
     if (parameter not in SINGLE_PARAMETERS and parameter not in PAIR_PARAMETERS) or not draft_id:
         raise ValueError("Ax3l must bind a configuration choice before data lookup")

@@ -51,9 +51,12 @@ pairs. The sum of the two distance rewards must be non-positive. Seeds and
 schema-fixed settings remain controlled by Ax3l.
 
 Each choice prompt names the task and score to beat. `data_tool(url)` lets Qwen
-browse the draft and saved reference data in small English pages, using `latest`,
+browse the draft and saved reference data in small linked pages, using `latest`,
 `golden`, and `best` rather than run UUIDs. `/draft` marks saved and pending
 values; each reference links to scores, endings, activity, notes, and settings.
+Navigation stays readable; actual values use JSON, including JSON blocks in
+draft and run overviews. Terminal data pages return one JSON object. Numbers
+retain their types and precision, and missing statistics are JSON null.
 Choice rules use English in the submission tool description. Accepted choices are
 saved without starting a simulation. A value can remain unchanged. After all
 eight selection steps, Ax3l checks the full draft for duplicates, submits one

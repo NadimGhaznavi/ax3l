@@ -19,5 +19,7 @@ Transformer width; batch size counts sampled sequences. Learning rate controls
 update size, and gamma discounts future rewards. Choice rules are in your
 submission tool.
 
+The move limit is max_moves_multiplier times the current snake length.
+
 - [Choosing one setting](/selection)
 - [Reference index](/)

@@ -60,8 +60,20 @@
         {% endfor %}
         {% endfor %}
       </tbody>
+      <tfoot>
+        <tr class="status-total">
+          <td></td><th scope="row" colspan="2">Totals</th>
+          <td class="item-elapsed">{{ totals.elapsed }}</td>
+          <td class="item-tokens">{{ '{:,}'.format(totals.input_tokens) }}</td>
+          <td class="item-tokens">{{ '{:,}'.format(totals.output_tokens) }}</td>
+        </tr>
+        <tr class="status-total">
+          <td></td><th scope="row" colspan="3">Total tokens</th>
+          <td class="item-tokens" colspan="2">{{ '{:,}'.format(totals.tokens) }}</td>
+        </tr>
+      </tfoot>
     </table>
-    <p class="status-usage-note">Elapsed time updates for the running step. Token counts appear when Qwen replies.</p>
+    <p class="status-usage-note">Elapsed time and totals update every 5 seconds, including the running step. Token totals include replies received so far.</p>
     <dl class="status-results" aria-label="Simulation results">
       <div><dt>High score</dt><dd>{{ '{:,}'.format(high_score) if high_score is not none else '—' }}</dd></div>
       <div><dt>Golden score to beat</dt><dd><a href="/simulations/{{ draft.golden_run_id }}">{{ '{:,}'.format(target_score) }}</a></dd></div>

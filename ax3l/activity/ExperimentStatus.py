@@ -46,13 +46,16 @@ def _prerequisites(draft: ConfigurationDraft, states: dict[str, dict]) -> list[d
     for run_id, labels in roles.items():
         state = states[run_id]
         analysis, sections, task = state["analysis"], state["sections"], state["task"]
-        rows.append(dict(
-            run_id=run_id, label=" / ".join(labels), selected=analysis is not None,
-            value=_analysis_value(analysis, sections, task),
-            current=(analysis is None and task is not None and task.phase in ("preparing", "analyzing")
-                     and task.section not in sections),
-            phase=task.phase if task is not None and analysis is None else None,
-        ))
+        for section, label in DSimulationAnalysis.SECTIONS.items():
+            selected = analysis is not None or section in sections
+            phase = task.phase if task is not None and task.section == section and not selected else None
+            value = "Complete" if selected else "Pending"
+            if phase in ("preparing", "analyzing", "failed", "stopped"):
+                value = _analysis_value(analysis, sections, task)
+            rows.append(dict(
+                run_id=run_id, section=section, label=label, roles=" / ".join(labels),
+                selected=selected, value=value, current=phase in ("preparing", "analyzing"), phase=phase,
+            ))
     return rows
 
 
@@ -80,9 +83,9 @@ def _phase(draft: ConfigurationDraft, run: dict | None, comparison: dict | None,
     if draft.phase == "preparing":
         for row in prerequisites:
             if row["phase"] in ("failed", "stopped"):
-                return f"Reference analysis {row['phase']}", f"{row['value']} for {row['label']}."
+                return f"Reference analysis {row['phase']}", f"{row['value']} for {row['roles']}."
             if row["current"]:
-                return "Preparing references", f"{row['value']} for {row['label']}."
+                return "Preparing references", f"{row['value']} for {row['roles']}."
         return "Preparing references", "Reference image analyses must be saved before configuration selection begins."
     if draft.phase == "choosing":
         return (f"Choosing: {FIELD_TO_LABEL_MAP[draft.next_parameter]}",

@@ -44,9 +44,9 @@
       <tbody class="status-prerequisites">
         <tr class="status-section-heading"><th scope="rowgroup" colspan="3">Pre-Requisites</th></tr>
         {% for row in prerequisites %}
-        <tr class="{{ 'selected' if row.selected else 'pending' }}{% if row.current %} current-choice{% endif %}"{% if row.current %} aria-current="step"{% endif %}>
-          <td><input type="checkbox" disabled {% if row.selected %}checked{% endif %} aria-label="{{ row.label }} analysis saved"></td>
-          <th scope="row"><span class="parameter-label">{{ row.label }}</span><span class="parameter-description">Image analysis · <a href="/simulations/{{ row.run_id }}">{{ row.run_id.split('-')[0] }}</a></span></th>
+        <tr data-analysis="{{ row.section }}" data-run="{{ row.run_id }}" class="{{ 'selected' if row.selected else 'pending' }}{% if row.current %} current-choice{% endif %}"{% if row.current %} aria-current="step"{% endif %}>
+          <td><input type="checkbox" disabled {% if row.selected %}checked{% endif %} aria-label="{{ row.roles }} {{ row.label }} analysis saved"></td>
+          <th scope="row"><span class="parameter-label">{{ row.label }}</span><span class="parameter-description">{{ row.roles }} · <a href="/simulations/{{ row.run_id }}">{{ row.run_id.split('-')[0] }}</a></span></th>
           <td class="prerequisite-value">{{ row.value }}</td>
         </tr>
         {% else %}

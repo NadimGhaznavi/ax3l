@@ -9,7 +9,7 @@ from ax3l.zmq.ZMQServer import ZMQServer
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run Ax3l and its single-parameter optimization loop.")
+    parser = argparse.ArgumentParser(description="Run Ax3l's complete-configuration optimization and analysis loop.")
     parser.add_argument("--llm-url", type=Configuration.validate_llamasrv_url,
                         help="Override the configured LlamaSrv base URL")
     parser.add_argument("--output", default="tmp/snakelab")

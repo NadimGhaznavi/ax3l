@@ -1,4 +1,4 @@
-"""Run one conversation until MCP accepts a simulation submission."""
+"""Run one conversation until its bound MCP tool accepts a result."""
 
 import asyncio
 import json
@@ -9,8 +9,9 @@ from ax3l.constants.DAx3l import DAx3l
 from ax3l.constants.DEventCategory import DEventCategory as Events
 
 
-async def converse(llm, output, db, tools, prompts, *, parameter: str | None = None) -> str:
-    process_id = str(uuid4())
+async def converse(llm, output, db, tools, prompts, *, parameter: str | None = None,
+                   process_id: str | None = None) -> dict:
+    process_id = process_id or str(uuid4())
     print(f"Conversation: {process_id}", flush=True)
     conversation_id = db.log(Events.Conversation.STARTED, Events.Conversation.CATEGORY,
                              "INFO", f"Conversation started with {llm.url}.", process_id=process_id)
@@ -20,7 +21,7 @@ async def converse(llm, output, db, tools, prompts, *, parameter: str | None = N
                       parent_event_id=conversation_id, source_name=source_name,
                       parameter=parameter if category is Events.Conversation and name == Events.Conversation.PROMPT else None)
 
-    outcome, level = "Simulation submitted.", "INFO"
+    outcome, level = "Tool result accepted.", "INFO"
     try:
         tool_name = tools.definition["function"]["name"]
         argument_names = set(tools.definition["function"]["parameters"]["properties"])
@@ -34,7 +35,7 @@ async def converse(llm, output, db, tools, prompts, *, parameter: str | None = N
             payload = json.dumps({"messages": messages, "tools": [tools.definition],
                                   "tool_choice": "required", "parallel_tool_calls": False,
                                   "stream": False}, ensure_ascii=False).encode()
-            prefix = output / f"{process_id}-{turn:04d}"
+            prefix = output / f"{process_id}-{conversation_id}-{turn:04d}"
             if DAx3l.RAW_LOGS_ENABLED:
                 prefix.with_suffix(".request.json").write_bytes(payload)
             try:
@@ -66,7 +67,7 @@ async def converse(llm, output, db, tools, prompts, *, parameter: str | None = N
                     result = {"status": "rejected", "code": "invalid_arguments",
                               "source_name": "ToolConversation",
                               "prompt": {"role": "user", "content":
-                                  f"Call {tool_name} with exactly these numeric fields: "
+                                  f"Call {tool_name} with exactly these fields: "
                                   + ", ".join(sorted(argument_names)) + "."}}
                 else:
                     result = await tools.submit(arguments)
@@ -77,7 +78,7 @@ async def converse(llm, output, db, tools, prompts, *, parameter: str | None = N
                 raise
             log(Events.Tool, Events.Tool.COMPLETED, json.dumps(result))
             if result["status"] == "ok":
-                return result["run_id"]
+                return result
             # Explicit validation rejections are safe to correct. Transport failures are not retried.
             messages.append({"role": "tool", "tool_call_id": call["id"],
                              "content": json.dumps(result)})

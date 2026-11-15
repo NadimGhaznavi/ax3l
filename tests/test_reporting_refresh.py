@@ -17,7 +17,6 @@ from ax3l.app.DbMgr import DbMgr
 from ax3l.app.EventLogDb import EventLogDb
 from ax3l.app.ReportingDb import ReportingDb
 from ax3l.app.ReportingRefresh import ReportingRefresh
-from ax3l.app.snakelab.RoundRobinState import ROUND_ROBIN_ORDER
 from ax3l.constants.DSnakeLab import DSnakeLab
 
 
@@ -79,12 +78,10 @@ class ReportingRefreshTests(unittest.TestCase):
         self.db.execute("INSERT INTO event_messages VALUES (%s, %s)", (event_id, content))
         return event_id
 
-    def turn(self, index, process_id=None, exhausted=False):
-        self.event('round_robin_checkpoint', content=json.dumps(
-            dict(parameter_order=ROUND_ROBIN_ORDER, index=index)))
-        if not exhausted:
-            self.event('proposal_accepted', process_id)
-        return self.event('parameter_space_exhausted' if exhausted else 'configuration_compared', process_id)
+    def turn(self, index=0, process_id=None):
+        process_id = process_id or str(uuid4())
+        self.event('proposal_accepted', process_id)
+        return self.event('configuration_compared', process_id)
 
     def test_backfill_excludes_unfinished_and_unsuccessful_runs_and_is_repeatable(self):
         self.run_row(1, score=11)
@@ -109,33 +106,22 @@ class ReportingRefreshTests(unittest.TestCase):
         self.assertEqual(self.db.query('SELECT * FROM simulation_runs ORDER BY id'), source_runs)
         self.assertEqual(self.db.query('SELECT * FROM simulation_episodes ORDER BY run_id, episode'), source_episodes)
 
-    def test_round_count_matches_original_with_duplicates_skips_and_restart(self):
-        for index in range(len(ROUND_ROBIN_ORDER)):
+    def test_complete_proposals_count_once_across_repeated_events_and_refreshes(self):
+        for index in range(8):
             process = str(uuid4())
-            self.turn(index, process, exhausted=index % 2 == 0)
-            if index % 2:
-                self.event('configuration_compared', process)
-        self.assertEqual(self.refresh.refresh()['experiment_cycles'], 1)
-        self.assertEqual(EventLogDb(self.db).experiment_cycles(), 1)
-        # Resume across refresh instances in the middle of a round.
-        self.turn(0, str(uuid4()))
-        self.assertEqual(self.refresh.refresh()['experiment_cycles'], 1)
-        for index in range(1, len(ROUND_ROBIN_ORDER)):
-            self.turn(index, str(uuid4()))
-        self.assertEqual(ReportingRefresh(self.db).refresh()['experiment_cycles'], 2)
-        self.assertEqual(EventLogDb(self.db).experiment_cycles(), 2)
+            self.turn(index, process)
+            self.event('configuration_compared', process)
+        self.assertEqual(self.refresh.refresh()['experiment_cycles'], 8)
+        self.assertEqual(EventLogDb(self.db).experiment_cycles(), 8)
+        self.turn()
+        self.assertEqual(ReportingRefresh(self.db).refresh()['experiment_cycles'], 9)
 
     def test_late_visible_completion_replays_only_projected_turns(self):
-        self.event('round_robin_checkpoint', content=json.dumps(
-            dict(parameter_order=ROUND_ROBIN_ORDER, index=0)), event_id=1)
-        self.event('round_robin_checkpoint', content=json.dumps(
-            dict(parameter_order=ROUND_ROBIN_ORDER, index=1)), event_id=3)
-        self.event('parameter_space_exhausted', event_id=4)
-        self.refresh.refresh()
+        self.event('configuration_compared', str(uuid4()), event_id=4)
+        self.assertEqual(self.refresh.refresh()['experiment_cycles'], 1)
+        self.event('configuration_compared', str(uuid4()), event_id=2)
+        self.assertEqual(self.refresh.refresh()['experiment_cycles'], 2)
         self.assertEqual(self.reports.lock_state()['expected_parameter'], 0)
-        self.event('parameter_space_exhausted', event_id=2)
-        self.refresh.refresh()
-        self.assertEqual(self.reports.lock_state()['expected_parameter'], 2)
         self.assertEqual(self.refresh.refresh()['experiment_cycles'], EventLogDb(self.db).experiment_cycles())
 
     def test_failure_rolls_back_projection_counters_and_progress(self):
@@ -150,37 +136,26 @@ class ReportingRefreshTests(unittest.TestCase):
         self.assertEqual(self.refresh.refresh()['games_played'], 2)
         self.assertEqual(self.refresh.refresh()['games_played'], 2)
 
-    def test_late_checkpoint_reinterprets_an_already_projected_turn(self):
-        self.event('round_robin_checkpoint', content=json.dumps(
-            dict(parameter_order=ROUND_ROBIN_ORDER, index=0)), event_id=1)
-        self.event('parameter_space_exhausted', event_id=4)
-        self.refresh.refresh()
-        self.assertEqual(self.reports.lock_state()['expected_parameter'], 1)
-        self.event('round_robin_checkpoint', content=json.dumps(
-            dict(parameter_order=ROUND_ROBIN_ORDER, index=1)), event_id=3)
-        self.refresh.refresh()
-        self.assertEqual(self.reports.lock_state()['expected_parameter'], 0)
-        self.assertEqual(self.db.query('SELECT parameter_index FROM report_turns')[0]['parameter_index'], 1)
+    def test_draft_progress_does_not_change_completed_cycles(self):
+        self.event('configuration_draft_saved', str(uuid4()), event_id=1)
+        self.event('configuration_compared', str(uuid4()), event_id=4)
+        self.assertEqual(self.refresh.refresh()['experiment_cycles'], 1)
+        self.event('configuration_draft_saved', str(uuid4()), event_id=3)
+        self.assertEqual(self.refresh.refresh()['experiment_cycles'], 1)
 
-    def test_unresolved_comparison_is_revisited_when_its_proposal_arrives(self):
-        self.event('round_robin_checkpoint', content=json.dumps(
-            dict(parameter_order=ROUND_ROBIN_ORDER, index=0)))
+    def test_comparison_counts_without_waiting_for_other_events(self):
         process = str(uuid4())
         self.event('configuration_compared', process)
-        self.refresh.refresh()
-        self.assertEqual(self.reports.lock_state()['expected_parameter'], 0)
+        self.assertEqual(self.refresh.refresh()['experiment_cycles'], 1)
         self.event('proposal_accepted', process)
-        self.refresh.refresh()
-        self.assertEqual(self.reports.lock_state()['expected_parameter'], 1)
-        self.assertEqual(self.refresh.refresh()['experiment_cycles'], EventLogDb(self.db).experiment_cycles())
+        self.assertEqual(self.refresh.refresh()['experiment_cycles'], 1)
 
-    def test_invalid_checkpoint_rolls_back_backfill(self):
+    def test_incomplete_drafts_do_not_count_as_experiments(self):
         self.run_row(1)
-        self.event('round_robin_checkpoint', content=json.dumps(dict(parameter_order=['changed'], index=0)))
-        self.event('parameter_space_exhausted')
-        with self.assertRaisesRegex(ValueError, 'Search parameter order changed'):
-            self.refresh.refresh()
-        self.assertEqual(self.db.query('SELECT COUNT(*) AS n FROM report_runs')[0]['n'], 0)
+        self.event('configuration_draft_saved', str(uuid4()), content='{}')
+        totals = self.refresh.refresh()
+        self.assertEqual(totals['experiment_cycles'], 0)
+        self.assertEqual(totals['games_played'], 2)
 
     def test_no_new_runs_does_not_read_episodes_again(self):
         self.run_row(1)
@@ -193,11 +168,11 @@ class ReportingRefreshTests(unittest.TestCase):
         for source_id in range(1, 260):
             self.run_row(source_id, steps=(1,))
         for index in range(520):
-            self.turn(index % len(ROUND_ROBIN_ORDER), exhausted=True)
+            self.turn(index)
         totals = self.refresh.refresh()
         self.assertEqual(totals['games_played'], 259)
         self.assertEqual(totals['moves_made'], 259)
-        self.assertEqual(totals['experiment_cycles'], 520 // len(ROUND_ROBIN_ORDER))
+        self.assertEqual(totals['experiment_cycles'], 520)
         self.assertEqual(self.refresh.refresh(), totals)
 
 

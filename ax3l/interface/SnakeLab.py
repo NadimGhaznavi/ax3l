@@ -59,6 +59,27 @@ class SnakeLab:
         finally:
             db.close()
 
+    def get_analysis_episodes(self, run_id: str) -> list[dict]:
+        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
+        try:
+            return SnakeLabDb(db).get_analysis_episodes(run_id)
+        finally:
+            db.close()
+
+    def get_latest_completed_run_id(self) -> str | None:
+        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
+        try:
+            return SnakeLabDb(db).get_latest_completed_run_id()
+        finally:
+            db.close()
+
+    def get_all_time_best_run_id(self) -> str | None:
+        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
+        try:
+            return SnakeLabDb(db).get_all_time_best_run_id()
+        finally:
+            db.close()
+
     def is_simulation_running(self) -> bool:
         """Return whether work is running, paused, cancelling, or queued.
 

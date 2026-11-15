@@ -4,30 +4,25 @@ author_profile: true
 layout: single
 ---
 
-![Ax3l Runtime](/pages/images/ax3l-runtime.png)
+# Complete-configuration experiments
 
-The runtime behaviour has two phases: an initial phase, which runs once and finishes quickly, and the **Round Robin Phase**, which governs subsequent operation.
+Ax3l chooses every tunable setting before running one 500-episode SnakeLab
+simulation. It uses Qwen's visual interpretation of completed runs, combined
+with exact numeric diagnostics, to inform each parameter conversation.
 
-## Initial Experiment Startup
+## Initial startup
 
-When the Ax3l system is started for the first time, there must be no simulation records in the [Snake Server](https://snakelabserver.osoyalce.com) database. The [Snake Lab Server](https://snakelabserver.osoyalce.com) simulation configuration is defined as a JSON document that enforces data type choices (e.g. the **seed** must be a non-negative integer). That document also defines default values.
+With an empty experiment, Ax3l submits the schema defaults once. The baseline
+uses SnakeLab 3.0.1, a four-head Transformer, required EpsilonNice, and 500
+episodes. On completion, it becomes the initial golden configuration and
+receives its first simulation analysis. Interrupted initial seeding resumes
+its recorded submission.
 
-The initial startup executes the following steps.
+## Choosing a complete configuration
 
-1. The Ax3l server queries the Snake Lab database and sees that there are no simulations present.
-2. The Ax3l server generates a configuration using the defaults in the JSON configuration document.
-3. The Ax3l server submits the simulation run request to the Snake Lab server.
-
-The baseline uses Snake Lab 3.0.1, a Transformer with four attention heads, 500 episodes, and required EpsilonNice (probability 0.005, 20 steps). Ordinary epsilon starts at 0.96 and decays by 0.97, making Nice eligible at episode 227. The full decay range remains available, including schedules that never enable Nice within 500 episodes. Food gives +10, wall/body/move-limit endings give -10, and distance shaping defaults to +1/-1.
-
-After this, the system enters the **Round Robin Phase**.
-
-## Round Robin Phase
-
-
-### Tunable Parameters
-
-The system currently allows the LLM to configure the following parameters:
+A new draft starts from the current golden configuration. It freezes the latest,
+golden, and all-time best reference runs for the entire selection pass. Qwen
+chooses the following settings in order:
 
 | Parameter | Purpose | Allowed values | Tuned with |
 | --- | --- | --- | --- |
@@ -43,64 +38,74 @@ The system currently allows the LLM to configure the following parameters:
 | EpsilonNice: probability | Chance per eligible move of starting a safe detour. | Numbers greater than 0 and at most 1. | EpsilonNice: steps |
 | EpsilonNice: steps | Duration of each detour, reset each episode. | Integers from 1 to 1000. | EpsilonNice: probability |
 
-The *initial epsilon* and *epsilon decay* are tuned together; i.e., the LLM submits values for both parameters in a single submission. The two *food reward* parameters are also tuned together; their sum must be non-positive. EpsilonNice probability and duration form a third pair.
+The epsilon settings, distance rewards, and EpsilonNice settings are chosen in
+pairs. The sum of the two distance rewards must be non-positive. Seeds and
+schema-fixed settings remain controlled by Ax3l.
 
-One Ax3l experiment cycle visits all eight parameter steps, with up to eight
-submissions of one or two values before the cycle repeats.
+Each conversation receives the project goal, the reference analyses and their
+configurations, the current draft, and previous choices. Accepted choices are
+saved without starting a simulation. A value can remain unchanged. After all
+eight selection steps, Ax3l checks the full draft for duplicates, submits one
+simulation, and waits for its result.
 
-An exhausted parameter is skipped and still counts as a completed step in the
-cycle. After nine complete cycles without a new golden configuration, Ax3l
-increments the seed and runs the golden configuration again to establish a fresh
-baseline. Previously tested parameter values become eligible on the new seed,
-except for configurations already run on that seed, including the fresh baseline.
-A new golden configuration resets the stagnation count.
+## Simulation analysis
 
-### For Each Tunable Parameter or Parameter Pair
+For each completed run, Ax3l generates a PNG containing episode scores during
+training, the distribution of episode scores, and training loss. Plots include
+titles, labeled axes and units, the high-score objective, seed, episode count,
+and the first eight characters of the run UUID. Loss is mean Smooth L1 loss in
+its native training scale; missing measurements remain gaps.
 
-The **Ax3l Server** executes the following steps 8 times for one complete experiment cycle:
+Ax3l calculates score statistics and termination counts/percentages directly
+from episode data. Termination categories include wall collisions, body
+collisions, move-limit endings, board completion, and unrecorded/other outcomes.
+Percentages use all recorded episodes as their denominator.
 
-1. Communicate with the shared LlamaSrv inference endpoint that houses the LLM.
-  1(a). Present the LLM with simulation run data.
-  1(b). Ask the LLM to tune one or two parameters.
-2. Validate the LLM's new parameter choice(s).
-3. Create a simulation configuration with the new value(s).
-4. Submit the configuration to the [Snake Lab Server](https://snakelabserver.osoyalce.com/) service for execution.
-5. Wait for the simulation to finish.
-6. Return to step 1.
+Qwen receives the image and measured facts and calls
+`submit_simulation_summary` with 2–3 sentences, at most 80 words. This
+interpretation is saved once per run. It describes observed behavior without
+assuming that an individual parameter caused it.
 
-The system has been built to be resilient. The services can be interrupted or restarted and the server can be rebooted. The system will resume from where it left off.
+Every parameter conversation receives up to three distinct saved analyses:
 
----
+| Reference | Role |
+| --- | --- |
+| Latest simulation | Feedback from the most recently completed run, even if it lost. |
+| Current golden | Current-seed baseline and score to beat. |
+| All-time best | Highest completed simulation score across seeds in this experiment. |
 
-## Golden Configuration
+A shared run appears once with multiple role labels. Different runs retain
+separate analyses even when their tunable values match. Seeds are explicit;
+results on different seeds are historical context rather than controlled
+comparisons. The all-time reference uses the earliest stored run to resolve
+score ties. Current comparisons are calculated separately from the saved
+interpretation, so role changes do not require another vision call.
 
-Ax3l maintains a **golden configuration**, which is the current reference configuration for the experiment.
+## Golden configurations and seed rotation
 
-Each new parameter experiment begins with the golden configuration and changes only the parameter, or parameter pair, currently being tested. All other configuration values remain unchanged. This allows Ax3l to evaluate one part of the configuration at a time while preserving the strongest configuration discovered so far.
+A candidate becomes golden only if its high score strictly exceeds the current
+golden score. A tie retains the golden. Each completed configuration comparison
+counts as one experiment cycle.
 
-When a completed simulation produces a high score greater than the current golden high score, that simulation's configuration becomes the new golden configuration.
+After nine complete proposals without an improvement, Ax3l increments the seed
+and reruns the golden settings to establish a fresh score baseline. Its analysis
+is generated before parameter selection resumes. The all-time best remains a
+separate historical reference and can come from an earlier seed.
 
-The new golden configuration is then used as the starting point for subsequent parameter experiments.
+## Restart behavior
 
-Promoting a new golden configuration also resets the stagnation counter used to determine when the experiment should move to a new seed.
+Drafts, choices, submission intent, comparisons, and analyses are stored in
+MariaDB's shared event log. Restarting during selection resumes the first
+unselected parameter. An interrupted submission is reconciled by its full
+configuration; an ambiguous send is never retried automatically. A saved
+comparison or promotion is completed before another proposal begins.
 
-The golden configuration should not be confused with the all-time high score. When the seed changes, the golden configuration is re-run to establish its performance under the new seed. The new run has historically always produced a lower score. This lower score, with the new seed, becomes the score for the LLM to beat.
+Failed or cancelled simulations mark their draft failed and stop the loop.
+A later startup starts a new draft from the retained golden. Transport and
+database failures propagate with their cause.
 
----
-
-## Seed Incrementing
-
-A single random seed can result in a *lucky run*, where the food randomly placed in just the right position a few times. Changing the seed changes where the food is placed. This weeds out a *lucky* configuration from a *good* configuration.
-
-Ax3l counts complete Round Robin cycles that finish without producing a new golden configuration.
-
-After **nine complete cycles** without a new golden configuration:
-
-1. Ax3l increments the simulation seed.
-2. The current golden configuration is submitted unchanged using the new seed.
-3. The result of that simulation becomes the baseline for the new seed.
-4. Parameter tuning resumes from the golden configuration.
-
-The new score for the system to beat is the one that was achieved using the previous golden configuration, but with a new seed value.
+This workflow is intended for a reset experiment; no migration or backward
+compatibility path is provided. The experiment-reset script clears its event
+snapshots and saved analyses along with the original experiment data.
 
 [Back](/)

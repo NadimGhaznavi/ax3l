@@ -138,6 +138,31 @@ class SnakeLabDb:
         )
         return [(row["episode"], row["loss"]) for row in rows]
 
+    def get_analysis_episodes(self, run_id: str) -> list[dict]:
+        """Read completed-run observations in episode order for analysis."""
+        return self._db.query("""
+            SELECT episode, score, steps, epsilon, loss, outcome,
+                   epsilon_injections, epsilon_nice_injections
+            FROM simulation_episodes WHERE run_id = %s ORDER BY episode
+        """, (run_id,))
+
+    def get_latest_completed_run_id(self) -> str | None:
+        rows = self._db.query("""
+            SELECT run_id FROM simulation_runs
+            WHERE status = 'completed' AND high_score IS NOT NULL
+            ORDER BY completed_at DESC, id DESC LIMIT 1
+        """)
+        return rows[0]["run_id"] if rows else None
+
+    def get_all_time_best_run_id(self) -> str | None:
+        """Use the earliest completed record to resolve tied all-time scores."""
+        rows = self._db.query("""
+            SELECT run_id FROM simulation_runs
+            WHERE status = 'completed' AND high_score IS NOT NULL
+            ORDER BY high_score DESC, id LIMIT 1
+        """)
+        return rows[0]["run_id"] if rows else None
+
     def find_config_run(self, config: dict) -> str | None:
         conditions = " AND ".join(f"c.{column} = %s" for column, _, _ in CONFIGURATION_FIELDS)
         rows = self._db.query(

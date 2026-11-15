@@ -138,6 +138,12 @@ exec /usr/bin/systemd-analyze "$@"
                 for module in ('app/snakelab/tools/__main__.py', 'activity/SimulationAnimation.py',
                                'activity/fonts/DejaVuSansMono.ttf', 'activity/fonts/LICENSE.txt',
                                'interface/SimulationGifStore.py', 'interface/SimulationConfiguration.py',
+                               'activity/RunAnalysis.py', 'entities/ConfigurationDraft.py',
+                               'entities/SimulationAnalysis.py', 'app/snakelab/AnalyzeRun.py',
+                               'app/snakelab/ExperimentDb.py', 'app/snakelab/prompts/AnalyzeSimulation.py',
+                               'app/snakelab/prompts/ConfigurationChoice.py',
+                               'app/snakelab/SubmitSimulationSummaryHandler.py',
+                               'app/snakelab/tools/SubmitSimulationSummary.py',
                                'app/snakelab/prompts/FirstContactEpsilonNicePair.py',
                                'app/snakelab/prompts/ComparisonEpsilonNicePair.py', 'app/ReportBackground.py'):
                     self.assertTrue((self.app / 'ax3l' / module).is_file(), module)

@@ -16,7 +16,7 @@
         <tr>
           <td>{{ config.occurred_at.strftime('%Y-%m-%d') if config.occurred_at else '' }}</td>
           <td>{{ config.occurred_at.strftime('%H:%M:%S') if config.occurred_at else '' }}</td>
-          <td>{% if config.process_id %}<a href="/simulations/{{ config.process_id }}/config">{{ config.process_id[:13] }}</a>{% endif %}</td>
+          <td>{% if config.process_id %}<a href="/simulations/{{ config.process_id }}/config">{{ config.process_id.split('-')[0] }}</a>{% endif %}</td>
           <td>{% if config.process_id %}<a href="/simulations/{{ config.process_id }}">Details</a>{% endif %}</td>
           <td>{{ config.high_score if config.high_score is not none else '' }}</td>
           <td>{{ field_labels.get(config.parameter, config.parameter) or '' }}</td>

@@ -210,6 +210,7 @@ class AnimationReportTests(unittest.TestCase):
     def setUp(self):
         self.directory = self.enterContext(TemporaryDirectory())
         self.run_id = str(uuid4())
+        self.enterContext(patch('ax3l.server.ReportingServer.ExperimentDb')).return_value.analysis.return_value = None
         self.enterContext(patch('ax3l.server.ReportingServer.DbMgr'))
         self.log = self.enterContext(patch('ax3l.server.ReportingServer.EventLogDb')).return_value
         self.log.recent.return_value = []

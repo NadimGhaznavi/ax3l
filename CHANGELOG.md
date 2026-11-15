@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.1.0] - 2026-11-15 @ 07:03
+
+### Summary
+
+Choose every tunable setting before executing one simulation, and use saved
+visual analyses of the latest, golden, and all-time best runs to inform choices.
+
+- Save each single/pair choice in a durable configuration draft; allow unchanged
+  values and check duplicates only after the complete configuration is selected.
+- Generate labeled score-timeline, episode-distribution, and Smooth L1 loss plots;
+  accept a 2–3 sentence, 80-word interpretation through a run-bound MCP tool.
+- Calculate exact score statistics and termination counts/percentages from
+  episode records, including unrecorded outcomes, separately from interpretation.
+- Deduplicate shared reference runs, preserve seed/configuration context, and
+  reuse saved analyses when golden or all-time roles change.
+- Recover unfinished choices, ambiguous submissions, comparisons, and analyses
+  from event snapshots without automatically repeating a simulation submission.
+- Count complete configuration comparisons for reporting and seed stagnation;
+  include all draft conversations and vision analysis in reported LLM time.
+- Show saved analyses in simulation details and shorten displayed run UUIDs to
+  their first group while preserving full identifiers in storage and links.
+- Update runtime/prompt documentation and tests for reset experiments; no
+  migration or backward compatibility path is introduced.
+
 ## [4.0.0] - 2026-11-14 @ 20:19
 
 ### Summary

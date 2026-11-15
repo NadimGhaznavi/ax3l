@@ -16,7 +16,7 @@ def highscores(history: list[dict], total: int) -> dict:
         for index, row in enumerate(history)
     ]
     details = [
-        [row["seed"], escape(row["run_id"]), escape(row["reason"]),
+        [row["seed"], escape(row["run_id"].split('-')[0]), escape(row["reason"]),
          "<br>Seed change" if changed else ""]
         for row, changed in zip(history, seed_changes)
     ]

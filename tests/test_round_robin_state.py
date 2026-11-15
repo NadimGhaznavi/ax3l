@@ -43,52 +43,7 @@ class EventDb:
 
 
 class RoundRobinTests(unittest.TestCase):
-    def test_exhausted_steps_survive_restart_and_count_toward_cycles(self):
-        self.db.log('golden_config_created')
-        for turn in range(9 * len(self.order)):
-            parameter = self.restart()
-            self.assertEqual(parameter, self.order[turn % len(self.order)])
-            if parameter in ('sequence_length', 'reward_pair'):
-                RoundRobinState(self.db).skip_exhausted(parameter)
-            else:
-                self.db.log('proposal_accepted', process_id=str(turn))
-                self.db.log('configuration_compared', process_id=str(turn))
-            self.assertEqual(EventLogDb(self.db).stagnant_rounds(), (turn + 1) // len(self.order))
-            self.assertEqual(EventLogDb(self.db).experiment_cycles(), (turn + 1) // len(self.order))
-        self.assertEqual(self.restart(), self.order[0])
-        self.assertEqual(self.restart(), self.order[0])
 
-    def test_rotation_after_ninth_complete_cycle_with_skips(self):
-        self.assertEqual(DSnakeLab.SEED_STAGNANT_ROUNDS, 9)
-        self.db.log('golden_config_created')
-        snake = Mock()
-        config = GenerateDefaultConfig().run()
-        snake.get_config.return_value = config
-        snake.find_config_run.return_value = None
-        snake.submit_simulation.return_value = 'new-seed'
-        snake.get_run_result.return_value = {'status': 'completed', 'high_score': 1}
-        events = Mock()
-        events.pending_seed_rotation.return_value = None
-        events.current_golden_config.return_value = {'process_id': 'gold'}
-        # Exercise the real persisted cycle counter through the rotation gate.
-        events.stagnant_rounds.side_effect = lambda: EventLogDb(self.db).stagnant_rounds()
-        wait = AsyncMock()
-        with patch('ax3l.app.snakelab.SeedRotation.EventLogDb', return_value=events):
-            for turn in range(9 * len(self.order)):
-                self.assertIsNone(asyncio.run(rotate_if_needed(snake, Mock(), wait)))
-                snake.submit_simulation.assert_not_called()
-                parameter = self.restart()
-                if parameter in ('sequence_length', 'reward_pair'):
-                    RoundRobinState(self.db).skip_exhausted(parameter)
-                else:
-                    self.db.log('proposal_accepted', process_id=str(turn))
-                    self.db.log('configuration_compared', process_id=str(turn))
-            self.assertEqual(asyncio.run(rotate_if_needed(snake, Mock(), wait)), 'new-seed')
-        snake.submit_simulation.assert_called_once_with({**config, 'seed': config['seed'] + 1})
-        wait.assert_awaited_once()
-        self.db.log('golden_config_created', process_id='new-seed')
-        self.assertEqual(EventLogDb(self.db).stagnant_rounds(), 0)
-        self.assertEqual(EventLogDb(self.db).experiment_cycles(), 9)
 
     def setUp(self):
         folder = tempfile.TemporaryDirectory()
@@ -145,58 +100,10 @@ class RoundRobinTests(unittest.TestCase):
             self.db.log('golden_config_created', process_id=run_id)
         return parameter
 
-    def test_stagnation_counts_three_complete_cycles_across_restart(self):
-        self.db.log('golden_config_created')
-        for turn in range(3 * len(self.order)):
-            self.assertEqual(EventLogDb(self.db).stagnant_rounds(), turn // len(self.order))
-            self.complete_turn(str(turn))
-            # Replayed comparison events must not count the run twice.
-            self.db.log('configuration_compared', process_id=str(turn))
-            self.db.connection.close()
-            self.db = EventDb(self.path)
-            self.assertEqual(EventLogDb(self.db).stagnant_rounds(), (turn + 1) // len(self.order))
 
-    def test_improvement_discards_partial_cycle_and_resets_stagnation(self):
-        for turn in range(len(self.order) + 1):
-            self.complete_turn(str(turn), improved=turn == len(self.order))
-        self.assertEqual(EventLogDb(self.db).stagnant_rounds(), 0)
-        for turn in range(len(self.order) + 1, 3 * len(self.order) - 1):
-            self.complete_turn(str(turn))
-            self.assertEqual(EventLogDb(self.db).stagnant_rounds(), 0)
-        self.complete_turn(str(3 * len(self.order) - 1))
-        self.assertEqual(EventLogDb(self.db).stagnant_rounds(), 1)
-        self.db.log('golden_config_created')  # Fresh seed baseline.
-        self.assertEqual(EventLogDb(self.db).stagnant_rounds(), 0)
 
-    def test_pending_last_run_does_not_finish_cycle(self):
-        for turn in range(len(self.order) - 1):
-            self.complete_turn(str(turn))
-        self.restart()
-        self.db.log('proposal_invalid')
-        self.db.log('proposal_accepted', process_id='pending')
-        self.assertEqual(EventLogDb(self.db).stagnant_rounds(), 0)
-        self.assertEqual(EventLogDb(self.db).experiment_cycles(), 0)
-        self.db.log('configuration_compared', process_id='pending')
-        self.assertEqual(EventLogDb(self.db).stagnant_rounds(), 1)
-        self.assertEqual(EventLogDb(self.db).experiment_cycles(), 1)
 
-    def test_experiment_cycles_survive_improvements_seeds_and_restarts(self):
-        self.assertEqual(EventLogDb(self.db).experiment_cycles(), 0)
-        self.db.log('configuration_compared', process_id='uncheckpointed')
-        for turn in range(12):
-            self.complete_turn(str(turn), improved=turn in (2, 4, 8))
-            self.db.log('configuration_compared', process_id=str(turn))
-            if turn == 6:
-                self.db.log('golden_config_seed_incremented', process_id='baseline')
-                self.db.log('golden_config_created', process_id='baseline')
-            self.db.connection.close()
-            self.db = EventDb(self.path)
-            self.assertEqual(EventLogDb(self.db).experiment_cycles(), (turn + 1) // len(self.order))
 
-    def test_improvement_on_last_parameter_does_not_count_that_cycle(self):
-        for turn in range(2 * len(self.order)):
-            self.complete_turn(str(turn), improved=turn == len(self.order) - 1)
-            self.assertEqual(EventLogDb(self.db).stagnant_rounds(), 1 if turn == 2 * len(self.order) - 1 else 0)
 
 
 class ConversationParameterTests(unittest.IsolatedAsyncioTestCase):
@@ -210,8 +117,49 @@ class ConversationParameterTests(unittest.IsolatedAsyncioTestCase):
         llm.complete.side_effect = [reply({'parameter': 'gamma', 'value': .9}),
                                     reply({'value': 16})]
         tools = Mock(definition={'function': {'name': 'submit_single_value', 'parameters': {'properties': {'value': {}}}}}, submit=AsyncMock(return_value={'status': 'ok', 'run_id': 'next'}))
-        self.assertEqual(await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('test')]), 'next')
+        self.assertEqual(await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('test')]), {'status': 'ok', 'run_id': 'next'})
         tools.submit.assert_awaited_once_with({'value': 16})
         request = json.loads(llm.complete.call_args.args[0])
         self.assertEqual(json.loads(request['messages'][2]['content'])['status'], 'rejected')
         self.assertEqual(request['messages'][2]['tool_call_id'], 'call-1')
+
+
+class ConfigurationProgressTests(unittest.TestCase):
+    def setUp(self):
+        self.folder = tempfile.TemporaryDirectory()
+        self.addCleanup(self.folder.cleanup)
+        self.path = Path(self.folder.name) / 'events.db'
+        self.db = EventDb(self.path)
+        self.addCleanup(lambda: self.db.connection.close())
+
+    def restart(self):
+        self.db.connection.close()
+        self.db = EventDb(self.path)
+        return EventLogDb(self.db)
+
+    def test_only_compared_configurations_count_and_repeated_events_count_once(self):
+        self.db.log('golden_config_created')
+        self.db.log('configuration_draft_saved', process_id='draft')
+        self.db.log('proposal_accepted', process_id='run')
+        self.assertEqual(self.restart().experiment_cycles(), 0)
+        self.db.log('configuration_compared', process_id='run')
+        self.db.log('configuration_compared', process_id='run')
+        self.assertEqual(self.restart().experiment_cycles(), 1)
+        self.assertEqual(self.restart().stagnant_rounds(), 1)
+
+    def test_promotion_resets_stagnation_without_erasing_completed_cycles(self):
+        self.db.log('configuration_compared', process_id='first')
+        self.db.log('golden_config_created', process_id='first')
+        self.assertEqual(self.restart().stagnant_rounds(), 0)
+        self.db.log('configuration_compared', process_id='second')
+        self.assertEqual(self.restart().stagnant_rounds(), 1)
+        self.assertEqual(self.restart().experiment_cycles(), 2)
+
+    def test_rotation_gate_counts_nine_complete_configuration_proposals(self):
+        self.db.log('golden_config_created')
+        for number in range(9):
+            self.db.log('configuration_compared', process_id=str(number))
+            self.assertEqual(self.restart().stagnant_rounds(), number + 1)
+        self.db.log('golden_config_created', process_id='next-seed')
+        self.assertEqual(self.restart().stagnant_rounds(), 0)
+        self.assertEqual(self.restart().experiment_cycles(), 9)

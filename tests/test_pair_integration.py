@@ -14,37 +14,6 @@ from ax3l.app.snakelab.prompts.FirstContactRewardPair import FirstContactRewardP
 
 
 class PairIntegrationTests(unittest.IsolatedAsyncioTestCase):
-    async def test_cycle_selects_pair_reports_prompts_and_bound_tools(self):
-        module = 'ax3l.app.snakelab.SnakeLabLoop.'
-        snake = Mock()
-        snake.parameter_space_exhausted.return_value = False
-        snake.is_simulation_running.return_value = False
-        snake.get_run_result.return_value = {'status': 'completed', 'high_score': 37}
-        golden = Mock(run_id='gold')
-        events = Mock()
-        events.latest_snakelab_proposal.return_value = None
-        events.latest_seed_baseline.return_value = None
-        with patch(module + 'SnakeLab', return_value=snake), patch(module + 'GoldenConfig', return_value=golden), patch(module + 'EventLogDb', return_value=events), patch(module + 'rotate_if_needed', new_callable=AsyncMock, return_value=None), patch(module + 'RoundRobinState') as selector, patch(module + 'SnakeLabTools', return_value=AsyncMock()) as tools, patch(module + 'converse', new_callable=AsyncMock) as conversation, patch(module + 'wait_for_run', new_callable=AsyncMock) as wait, patch(module + 'compare', return_value='gold'), patch(module + 'Comparison', return_value=Prompt('single')), patch(module + 'ComparisonEpsilonPair', return_value=Prompt('epsilon report')) as epsilon, patch(module + 'ComparisonRewardPair', return_value=Prompt('reward grid')) as reward, patch(module + 'ComparisonEpsilonNicePair', return_value=Prompt('nice report')) as nice:
-            selector.return_value.begin.side_effect = ROUND_ROBIN_ORDER + ROUND_ROBIN_ORDER[:1]
-            conversation.side_effect = [f'run-{i}' for i in range(len(ROUND_ROBIN_ORDER))] + [asyncio.CancelledError()]
-            with self.assertRaises(asyncio.CancelledError):
-                await optimize(Mock(), Path('/tmp'), Mock(), 'endpoint')
-            self.assertEqual([call.args[1] for call in tools.call_args_list], ROUND_ROBIN_ORDER + ROUND_ROBIN_ORDER[:1])
-            self.assertEqual([call.kwargs['parameter'] for call in conversation.call_args_list],
-                             ROUND_ROBIN_ORDER + ROUND_ROBIN_ORDER[:1])
-            epsilon.assert_called_once_with('gold')
-            reward.assert_called_once_with('gold')
-            nice.assert_called_once_with('gold')
-            epsilon_prompts = conversation.call_args_list[5].args[4]
-            reward_prompts = conversation.call_args_list[6].args[4]
-            self.assertEqual(epsilon_prompts[1].to_md(), 'epsilon report')
-            self.assertIsInstance(epsilon_prompts[2], FirstContactEpsilonPair)
-            self.assertEqual(reward_prompts[1].to_md(), 'reward grid')
-            self.assertIsInstance(reward_prompts[2], FirstContactRewardPair)
-            nice_prompts = conversation.call_args_list[7].args[4]
-            self.assertEqual(nice_prompts[1].to_md(), 'nice report')
-            self.assertIsInstance(nice_prompts[2], FirstContactEpsilonNicePair)
-            self.assertEqual(wait.await_count, len(ROUND_ROBIN_ORDER))
 
     async def test_pair_arguments_cannot_override_assignment_and_rejections_retry(self):
         def reply(arguments):
@@ -61,7 +30,7 @@ class PairIntegrationTests(unittest.IsolatedAsyncioTestCase):
                 {'status': 'ok', 'run_id': 'next'}]))
         db = Mock()
         self.assertEqual(await converse(llm, Path('/tmp'), db, tools, [Prompt('pair')],
-                                        parameter='epsilon_pair'), 'next')
+                                        parameter='epsilon_pair'), {'status': 'ok', 'run_id': 'next'})
         prompt_logs = [call for call in db.log.call_args_list if call.args[0] == 'prompt_sent']
         self.assertEqual([call.kwargs['parameter'] for call in prompt_logs], ['epsilon_pair'] * 4)
         self.assertEqual([call.args[0] for call in tools.submit.await_args_list], [

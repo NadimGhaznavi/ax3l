@@ -46,6 +46,7 @@ class DEventCategory:
         CANCELLED = "simulation_cancelled"
         FAILED = "simulation_failed"
         RESTARTED = "simulation_restarted"
+        ANALYZED = "simulation_analyzed"
         LABELS = {
             SUBMITTED: "Simulation submitted",
             QUEUED: "Simulation queued",
@@ -54,6 +55,7 @@ class DEventCategory:
             CANCELLED: "Simulation cancelled",
             FAILED: "Simulation failed",
             RESTARTED: "Simulation restarted",
+            ANALYZED: "Simulation analyzed",
         }
         TERMINAL_EVENTS = {"completed": COMPLETED, "cancelled": CANCELLED, "failed": FAILED}
 
@@ -69,6 +71,7 @@ class DEventCategory:
         GOLDEN_RETAINED = "golden_config_retained"
         SEED_ROTATION_STARTED = "seed_rotation_started"
         GOLDEN_SEED_INCREMENTED = "golden_config_seed_incremented"
+        DRAFT_SAVED = "configuration_draft_saved"
         LABELS = {
             PROPOSAL_ACCEPTED: "Proposal accepted",
             PROPOSAL_INVALID: "Invalid proposal",
@@ -80,6 +83,7 @@ class DEventCategory:
             GOLDEN_RETAINED: "Golden retained",
             SEED_ROTATION_STARTED: "Seed rotation started",
             GOLDEN_SEED_INCREMENTED: "Golden seed incremented",
+            DRAFT_SAVED: "Configuration draft saved",
         }
 
     ALL = (Conversation, LLM, Tool, SnakeLab, Configuration)

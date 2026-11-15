@@ -189,7 +189,7 @@ class DbMgrTests(unittest.TestCase):
         self.assertEqual(dal.stagnant_rounds(), 0)
         log('configuration_compared')
         log('configuration_compared')
-        self.assertEqual(dal.stagnant_rounds(), 0)  # Uncheckpointed comparisons are not full cycles.
+        self.assertEqual(dal.stagnant_rounds(), 1)  # One complete configuration; repeated events count once.
         log('golden_config_created')
         self.assertEqual(dal.stagnant_rounds(), 0)
         log('proposal_accepted')

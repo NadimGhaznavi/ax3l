@@ -175,29 +175,34 @@ class MetricsDatabaseTests(unittest.TestCase):
                        (id, run, status, start + timedelta(seconds=offset),
                         start + timedelta(seconds=offset + duration) if duration is not None else None))
 
-        def event(name, seconds, process='conversation', category='Conversation', content='{}'):
-            id = db.log(name, category, 'INFO', content, process_id=process)
+        def event(name, seconds, process='conversation', category='Conversation', content='{}', parent=1):
+            id = db.log(name, category, 'INFO', content, process_id=process, parent_event_id=parent)
             db.execute('UPDATE events SET occurred_at=%s WHERE event_id=%s',
                        (start + timedelta(seconds=seconds), id))
 
-        event('prompt_sent', 1)  # Context and user prompt are a single request.
+        event('prompt_sent', 1)
         event('prompt_sent', 2)
-        event('reply_received', 4.5)  # 2.5 seconds, not 6 seconds.
+        event('reply_received', 4.5)  # Context prompts share one request: 2.5 seconds.
         event('tool_execution_completed', 5, category='Tool', content='{"status":"rejected"}')
         event('prompt_sent', 10)
-        event('reply_received', 11, process='unrelated')
-        event('reply_received', 20)  # Retry adds 10 seconds; tool time is excluded.
-        event('tool_execution_completed', 21, category='Tool',
-              content=json.dumps({'status': 'ok', 'run_id': 'retry'}))
-        event('tool_execution_completed', 22, category='Tool', content='invalid JSON')
-        event('reply_received', 25, process='missing-conversation')
-        event('tool_execution_completed', 26, process='missing-conversation', category='Tool',
-              content=json.dumps({'status': 'ok', 'run_id': 'missing'}))
+        event('reply_received', 11, process='unrelated', parent=99)
+        event('reply_received', 20)  # Retry: 10 seconds, excluding tool processing.
+        event('prompt_sent', 21, parent=2)
+        event('reply_received', 24, parent=2)  # A second parameter in the same draft.
+        event('proposal_accepted', 25, process='retry', category='Configuration',
+              content=json.dumps({'draft_id': 'conversation'}))
+        event('reply_received', 25, process='missing-conversation', parent=98)
+        event('proposal_accepted', 26, process='missing', category='Configuration',
+              content=json.dumps({'draft_id': 'missing-conversation'}))
+        event('prompt_sent', 52, process='retry', parent=3)
+        event('reply_received', 56, process='retry', parent=3)  # Vision analysis: 4 seconds.
+        event('prompt_sent', 11, process='baseline', parent=4)
+        event('reply_received', 13, process='baseline', parent=4)
         rows = EventLogDb(db).simulation_metrics()
         self.assertEqual([row['run_id'] for row in rows], ['baseline', 'retry', 'missing'])
         self.assertEqual([float(row['runtime_seconds']) for row in rows], [10, 20, 10])
-        self.assertEqual(float(rows[0]['llm_seconds']), 0)
-        self.assertEqual(float(rows[1]['llm_seconds']), 12.5)
+        self.assertEqual(float(rows[0]['llm_seconds']), 2)
+        self.assertEqual(float(rows[1]['llm_seconds']), 19.5)
         self.assertIsNone(rows[2]['llm_seconds'])
         self.assertEqual(rows[1]['total_steps'], 400)
         self.assertEqual(rows[1]['steps_per_episode'], 200)

@@ -12,10 +12,10 @@ class SubmitPairValues:
     def __init__(self, endpoint: str | None = None):
         self._client = ZMQClient(endpoint if endpoint is not None else Network.endpoint(destination=True))
 
-    async def submit(self, pair: str, value_1: int | float, value_2: int | float) -> str:
+    async def submit(self, draft_id: str, pair: str, value_1: int | float, value_2: int | float) -> str:
         response = await asyncio.to_thread(
             self._client.request,
             ZMQMsg(sender="mcp-snakelab", target="snakelab", method="submit_pair_values",
-                   payload={"pair": pair, "value_1": value_1, "value_2": value_2}),
+                   payload={"draft_id": draft_id, "pair": pair, "value_1": value_1, "value_2": value_2}),
         )
         return json.dumps(response.payload, ensure_ascii=False, allow_nan=False)

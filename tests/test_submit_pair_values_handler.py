@@ -1,112 +1,74 @@
+"""Joint choices are atomic; duplicates are rejected only for complete drafts."""
+
 from copy import deepcopy
 import unittest
 from unittest.mock import Mock, patch
 
-from jsonschema import ValidationError
-
-from ax3l.constants.DAx3l import DAx3l
-from ax3l.app.snakelab.GenerateDefaultConfig import GenerateDefaultConfig
 from ax3l.app.snakelab.SubmitPairValuesHandler import SubmitPairValuesHandler
+from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
+from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 
 
 class SubmitPairValuesHandlerTests(unittest.TestCase):
     def setUp(self):
-        self.db = Mock()
-        shared = 'ax3l.app.snakelab.SubmitSingleValueHandler'
-        self.snake = self.enterContext(patch(shared + '.SnakeLab')).return_value
-        self.events = self.enterContext(patch(shared + '.EventLogDb')).return_value
-        self.events.current_golden_config.return_value = {'process_id': 'golden-run'}
-        self.baseline = GenerateDefaultConfig().run()
-        self.snake.get_config.return_value = self.baseline
+        module = 'ax3l.app.snakelab.SubmitSingleValueHandler.'
+        self.snake = self.enterContext(patch(module + 'SnakeLab')).return_value
         self.snake.is_config_unique.return_value = True
-        self.snake.submit_simulation.return_value = 'new-run'
-        self.handler = SubmitPairValuesHandler(self.db)
+        self.experiments = self.enterContext(patch(module + 'ExperimentDb')).return_value
+        self.handler = SubmitPairValuesHandler(Mock())
+        self.bind('epsilon_pair')
 
-    def test_invalid_pairs_and_values_do_not_reach_backend(self):
-        valid = {'pair': 'epsilon_pair', 'value_1': .91, 'value_2': .95}
-        proposals = [None, {}, {**valid, 'extra': 1}, {'pair': 'epsilon_pair', 'value_1': .91}]
-        proposals += [{**valid, 'pair': pair} for pair in (None, [], 'seed', 'learning_rate', 'unknown')]
-        for field in ('value_1', 'value_2'):
-            proposals += [{**valid, field: value} for value in (True, '0.95', None, float('nan'), float('inf'), -.1, 1)]
-        proposals += [
-            {'pair': 'reward_pair', 'value_1': first, 'value_2': second}
-            for first, second in ((-1, -2), (7, -2), (2, -7), (2, 1), (2.5, -2), (2, -2.5), (6, 0), (1, -.5))
-        ]
-        proposals += [{'pair': 'epsilon_nice_pair', 'value_1': p, 'value_2': n}
-                      for p, n in ((0, 20), (-.01, 20), (1.1, 20), (.005, 0), (.005, 1001), (.005, 2.5))]
-        for proposal in proposals:
-            with self.subTest(proposal=proposal):
-                result = self.handler.submit(proposal)
-                self.assertEqual(result['code'], 'invalid_value')
-                self.assertEqual(result['prompt']['role'], 'user')
-        self.events.current_golden_config.assert_not_called()
+    def bind(self, pair):
+        self.draft = ConfigurationDraft('draft', 'gold', {'golden': 'gold'}, SimulationConfiguration.defaults(),
+                                        PARAMETER_ORDER[:PARAMETER_ORDER.index(pair)])
+        self.experiments.draft.return_value = self.draft
+
+    def submit(self, pair='epsilon_pair', first=.91, second=.95):
+        return self.handler.submit({'draft_id': 'draft', 'pair': pair, 'value_1': first, 'value_2': second})
+
+    def test_invalid_pairs_and_values_never_write_a_partial_choice(self):
+        for pair, first, second in (('unknown', 1, 1), ('epsilon_pair', .91, 1.5),
+                                    ('epsilon_pair', True, .95), ('epsilon_pair', '.91', .95),
+                                    ('reward_pair', 6, 0), ('reward_pair', .25, -.1),
+                                    ('reward_pair', 2.5, -3), ('epsilon_nice_pair', 0, 20),
+                                    ('epsilon_nice_pair', .01, 2.5)):
+            with self.subTest(pair=pair, values=(first, second)):
+                self.assertEqual(self.submit(pair, first, second)['code'], 'invalid_value')
+        for payload in (None, {}, {'pair': 'epsilon_pair', 'value_1': .91}):
+            self.assertEqual(self.handler.submit(payload)['code'], 'invalid_value')
+        self.experiments.draft.assert_not_called()
+        self.experiments.save_draft.assert_not_called()
         self.snake.submit_simulation.assert_not_called()
 
-    def test_joint_changes_preserve_baseline_and_log_one_submission(self):
-        for pair, section, values in (
-            ('epsilon_pair', ('epsilon',), {'initial': .85, 'decay': .999}),
-            ('reward_pair', ('game', 'rewards'), {'closer_to_food': .25, 'further_from_food': -.5}),
-            ('epsilon_nice_pair', ('epsilon_nice',), {'probability': .01, 'steps': 40}),
+    def test_both_values_are_saved_together_and_unchanged_values_are_allowed(self):
+        for pair, first, second, section, expected in (
+            ('epsilon_pair', .96, .97, 'epsilon', {'initial': .96, 'decay': .97, 'minimum': 0}),
+            ('reward_pair', .25, -.5, 'game', None),
+            ('epsilon_nice_pair', .01, 40, 'epsilon_nice', {'probability': .01, 'steps': 40}),
         ):
             with self.subTest(pair=pair):
-                self.db.reset_mock()
-                self.snake.reset_mock()
-                original = deepcopy(self.baseline)
-                expected = deepcopy(original)
-                node = expected
-                for key in section:
-                    node = node[key]
-                node.update(values)
-                first, second = values.values()
-                result = self.handler.submit({'pair': pair, 'value_1': first, 'value_2': second})
-                self.assertEqual(result, {'status': 'ok', 'run_id': 'new-run'})
-                self.assertEqual(self.db.log.call_args.kwargs['ax3l_version'], DAx3l.VERSION)
-                self.snake.is_config_unique.assert_called_once_with(expected)
-                self.snake.submit_simulation.assert_called_once_with(expected)
-                self.assertEqual(self.baseline, original)
-                self.assertEqual([c.args[0] for c in self.db.log.call_args_list],
-                                 ['proposal_accepted', 'simulation_submitted'])
-                self.assertIn(pair, self.db.log.call_args_list[0].args[3])
-                if pair == 'reward_pair':
-                    rewards = self.snake.submit_simulation.call_args.args[0]['game']['rewards']
-                    self.assertIs(type(rewards['closer_to_food']), float)
-                    self.assertIs(type(rewards['further_from_food']), float)
+                self.bind(pair)
+                result = self.submit(pair, first, second)
+                self.assertEqual(result['status'], 'ok')
+                if expected is not None:
+                    self.assertEqual(self.draft.config[section], expected)
+                else:
+                    self.assertEqual(self.draft.config['game']['rewards']['closer_to_food'], .25)
+                    self.assertEqual(self.draft.config['game']['rewards']['further_from_food'], -.5)
+        self.assertEqual(self.draft.phase, 'ready')
+        self.assertIsNone(self.draft.next_parameter)
+        self.snake.is_config_unique.assert_called_once_with(self.draft.config)
+        self.snake.submit_simulation.assert_not_called()
 
-    def test_unchanged_and_historical_pairs_are_duplicates(self):
-        epsilon = self.baseline['epsilon']
-        payload = {'pair': 'epsilon_pair', 'value_1': epsilon['initial'], 'value_2': epsilon['decay']}
-        self.assertEqual(self.handler.submit(payload)['code'], 'duplicate_config')
-        self.snake.is_config_unique.assert_not_called()
+    def test_duplicate_final_configuration_is_rejected_without_losing_previous_choices(self):
+        self.bind('epsilon_nice_pair')
+        original = deepcopy(self.draft)
         self.snake.is_config_unique.return_value = False
-        payload['value_1'] = .91
-        self.assertEqual(self.handler.submit(payload)['code'], 'duplicate_config')
+        result = self.submit('epsilon_nice_pair', .005, 20)
+        self.assertEqual(result['code'], 'duplicate_config')
+        self.assertEqual(self.draft, original)
+        self.experiments.save_draft.assert_not_called()
+        self.snake.is_config_unique.return_value = True
+        self.assertEqual(self.submit('epsilon_nice_pair', .01, 40)['status'], 'ok')
+        self.assertEqual(self.draft.phase, 'ready')
         self.snake.submit_simulation.assert_not_called()
-
-    def test_one_value_may_remain_unchanged(self):
-        self.assertEqual(self.handler.submit({
-            'pair': 'epsilon_pair', 'value_1': .91,
-            'value_2': self.baseline['epsilon']['decay'],
-        })['status'], 'ok')
-
-    def test_missing_or_broken_golden_is_a_server_error(self):
-        payload = {'pair': 'reward_pair', 'value_1': 3, 'value_2': -3}
-        self.events.current_golden_config.return_value = None
-        with self.assertRaises(RuntimeError):
-            self.handler.submit(payload)
-        self.events.current_golden_config.return_value = {'process_id': 'golden-run'}
-        self.snake.get_config.return_value = None
-        with self.assertRaises(RuntimeError):
-            self.handler.submit(payload)
-        self.snake.get_config.return_value = self.baseline
-        self.baseline['epochs'] = -1
-        with self.assertRaises(ValidationError):
-            self.handler.submit(payload)
-        self.snake.submit_simulation.assert_not_called()
-        self.db.log.assert_not_called()
-
-    def test_submission_failure_propagates_without_retry_or_acceptance(self):
-        self.snake.submit_simulation.side_effect = TimeoutError('timeout')
-        with self.assertRaises(TimeoutError):
-            self.handler.submit({'pair': 'reward_pair', 'value_1': 3, 'value_2': -3})
-        self.snake.submit_simulation.assert_called_once()
-        self.db.log.assert_not_called()

@@ -1,208 +1,107 @@
-# Round-robin optimization
+# Complete-configuration optimization
 
-The optimizer visits hidden size, sequence length, batch size, learning rate,
-and gamma in schema order, followed by `epsilon_pair`, `reward_pair`, and
-`epsilon_nice_pair`, then wraps to hidden size. Each conversation may change only
-its assigned single or pair. Before asking the LLM, Ax3l stores the parameter
-order and current index as a `round_robin_checkpoint` event in its database.
-Restarting during thinking or validation retries resumes that parameter. An
-accepted proposal advances the next turn once, even if the MCP reply was lost;
-existing startup recovery finishes its simulation and comparison first.
-Golden and seed changes preserve position. A changed schema parameter order
-requires resetting experiment events before resuming. There is no upgrade path
-for old five-entry checkpoints. A fresh experiment starts at hidden size.
+Ax3l asks Qwen to choose every tunable setting before executing one SnakeLab
+simulation. A pass contains five single choices—hidden size, sequence length,
+batch size, learning rate, and gamma—followed by the epsilon, distance-reward,
+and EpsilonNice pairs. Each conversation saves its choice in a durable draft.
+It never submits a simulation. Unchanged values are permitted.
 
-Before opening an LLM conversation, Ax3l checks finite schema domains (currently
-hidden size, sequence length, batch size, and the 55 legal reward pairs, including
-fractional choices). If every legal choice already has a run with the current
-seed and all other settings unchanged,
-it records `parameter_space_exhausted` and advances to the next step. Runs in any
-status count as existing choices, matching duplicate-proposal validation. Earlier
-seeds and different settings do not exhaust the current domain. Skips survive
-restarts and count as completed steps; continuous domains are not skipped.
+The baseline still uses SnakeLab 3.0.1, a four-head Transformer, 500 episodes,
+and required EpsilonNice. `SimulationConfiguration` owns defaults, schema
+validation, and the non-positive-sum reward-pair rule. Seeds and fixed fields
+remain application-controlled.
 
-Seed rotation occurs after `DSnakeLab.SEED_STAGNANT_ROUNDS` (9) complete
-round-robin cycles without a new high score. Each cycle includes all eight
-entries and counts only once each step has been compared or skipped as exhausted.
-A new golden configuration resets the count; a cycle containing an improvement
-does not count as stagnant. Rotation increments the seed and reruns the golden
-configuration to establish a fresh score baseline. The count survives restarts.
+After the last pair is chosen, Ax3l checks the **whole configuration** against
+all stored runs. A duplicate is rejected within the last conversation so Qwen
+can select a different final pair. Individual parameter domains are not skipped
+as exhausted: other settings can change within the same draft.
 
-## Simulation policy
+## Analysis and reference context
 
-`SimulationConfiguration` owns the bundled Ax3l schema, default generation, field
-validation, and reward-pair rule. Ax3l fixes the model to Transformer with four
-heads and each run to 500 episodes. Nice probability must be positive; its
-probability and duration are tunable together. Defaults use probability 0.005 and
-20 steps, with ordinary epsilon 0.96/0/0.97. The full epsilon decay range remains
-0.9–0.999.
+Each completed run receives one saved analysis containing its configuration,
+exact measurements, and Qwen's 2–3 sentence interpretation (at most 80 words).
+Ax3l generates a static three-panel PNG:
 
-Distance reward choices add 0.1, 0.25, and 0.5 to the existing integer magnitudes
-0–6. Only pairs with a non-positive sum are legal; defaults are +1/-1 and (0,0)
-remains the no-shaping control. The same 55 legal pairs drive validation,
-exhaustion, and comparison grids.
+1. Episode scores, a trailing mean of up to 20 episodes, the score target at
+   analysis time, and an ordinary-epsilon-end marker when observed.
+2. Episode score distribution within that run.
+3. Mean Smooth L1 training loss, retaining gaps for unrecorded losses.
 
-The run report displays architecture, Nice settings and override counts, ordinary
-epsilon injections, total training reward, and episode termination outcomes from
-database schema v7. High score remains the promotion metric.
+The image includes a title, the first UUID group, seed, episode count, the
+high-score objective, and labeled axes with units. SnakeLab's loss is a training
+diagnostic in its native scale; changing rewards can change that scale.
+
+Termination reasons do not require vision. Ax3l calculates wall/body collisions,
+move-limit endings, board completions, and unrecorded/other outcomes as counts
+and percentages of all recorded episodes. It supplies these alongside exact
+score statistics, steps, and exploration counts in the vision prompt and every
+parameter-selection prompt. Missing loss is not treated as zero.
+
+Every parameter conversation receives saved analyses for:
+
+- The latest completed simulation, including unsuccessful proposals.
+- The current golden simulation, whose score on the current seed is the target.
+- The all-time best completed simulation across seeds in this experiment.
+  Ties select the earliest stored run for a stable reference.
+
+A run serving multiple roles appears once with all its role labels. Different
+runs retain separate analyses, even if only their seeds differ. Reference roles
+and target comparisons are attached separately from the saved interpretation,
+so promotions do not require another vision call. All reference IDs are frozen
+for the duration of a draft. Every selection also sees the current draft and
+its previously selected settings.
 
 ## MCP tools
 
-The SnakeLab MCP entry point is `python -m ax3l.app.snakelab.tools` and uses
-stdio. Register domain tool functions in `tools/server.py` with `@mcp.tool()`.
-It exposes `submit_single_value(value)` through `SubmitSingleValue`.
-Ax3l starts a dedicated MCP session for each conversation, binding its parameter
-through `AX3L_CONVERSATION_PARAMETER`. The LLM supplies only a JSON integer or number.
-The tool description identifies the assigned parameter and includes its schema rules.
-FirstContactSingle and ComparisonSingle include the assigned parameter’s schema description
-before requesting a value. Other conversation prompts show its golden value, high score,
-and comparable history. MCP rejects strings and booleans as numeric values.
-Parameter existence, permitted ranges, duplicates, and submission decisions
-belong to Ax3l, not the MCP tool.
+The stdio entry point is `python -m ax3l.app.snakelab.tools`. Ax3l starts a private
+MCP session for each conversation and sends only the assigned tool definition
+to LlamaSrv. Tool functions forward requests to Ax3l over the existing ZeroMQ
+transport; Ax3l owns validation and persistence.
 
-LlamaSrv provides shared inference. The optimization loop configures its own
-bound MCP sessions and supplies the appropriate tool definition with each
-request. Ax3l executes the returned tool calls; its tools are never registered
-globally with the shared inference service.
-
-The installer installs the project requirements in `<app>/.venv`, used by both
-Ax3l and its MCP child processes. Installation needs Python's venv/pip support
-and package-index access for this step.
-
-Submission requires an Ax3l-assigned `AX3L_CONVERSATION_PARAMETER` in the MCP
-process environment. The tool forwards requests
-over ZeroMQ using the project-wide `ax3l/zmq/ZMQMsg.py` and `ZMQClient.py`:
-
-```json
-{
-  "protocol_version": 1,
-  "sender": "mcp-snakelab",
-  "target": "snakelab",
-  "method": "submit_single_value",
-  "payload": {"parameter": "learning_rate", "value": 0.003}
-}
-```
-
-The default endpoint comes from the `zmq` network binding in
-`/opt/prod/ax3l/conf/ax3l.json`, falling back to `DAx3l.CMDB_NETWORK`
-(`tcp://127.0.0.1:61970`).
-Override it with `AX3L_ZMQ_ENDPOINT` in the MCP process environment, including through the `env` entry in `mcp.json`.
-Ax3l replies with the same envelope shape and an application result in `payload`;
-the tool returns that payload as JSON text without changing acceptance or rejection.
-`DZMQ.TIMEOUT_SECONDS` bounds send and receive waits. Transport failures propagate
-as tool errors; calls are never retried automatically because a timed-out request
-may already have been processed. No database or Snake Lab submission occurs in
-the tool.
-
-Ax3l starts `ZMQServer` and keeps it available
-while the LLM request runs. Domain dispatch lives in `server/ToolHandler.py`;
-SnakeLab validation and submission live in `SubmitSingleValueHandler.py`.
-The listener uses the configured `zmq` binding; Ax3l passes its endpoint to each private MCP session.
-`--zmq-endpoint` overrides the listener endpoint for manual runs.
-
-The handler verifies the exact payload fields, finite numeric values, parameter
-name, and JSON-schema constraints before building a candidate from the golden
-configuration. It changes only the selected parameter. A legal but unchanged
-configuration is rejected; `SnakeLab.is_config_unique(config)` then checks all
-stored runs through `SnakeLabDb`, regardless of status or project version.
-Equality compares all 26 numeric columns in `configurations`, including seed,
-while ignoring object key order and equivalent numeric representations.
-
-Illegal values return `status: rejected`, `code: invalid_value`, and an
-`InvalidValue` prompt. Duplicates return `code: duplicate_config` and a
-`NoDupes` prompt. These prompt messages travel back in the MCP result;
-the handler does not start a separate LLM conversation. Accepted candidates
-return `status: ok` and their submitted `run_id`, with proposal and submission
-events logged. Golden selection is unchanged. The listener handles requests
-serially; external writers to SnakeLab are outside that serialization boundary.
-
-The single-parameter search space is `hidden_size`, `sequence_length`, `batch_size`,
-`learning_rate`, and `gamma`. Each conversation chooses a value for its assigned parameter.
-Reward distance values, epsilon initial/decay, and Nice probability/steps are tuned in their own pair
-entries. Seed and schema-fixed settings cannot be proposed. Comparison histories hold all other settings equal
-to the current golden configuration for each parameter.
-
-## Conversation snippets
-
-### Pair MCP tool
-
-`submit_pair_values(value_1, value_2)` forwards a joint proposal to Ax3l.
-Bind `AX3L_CONVERSATION_PARAMETER` to `epsilon_pair`, `reward_pair`, or `epsilon_nice_pair`:
-
-| Assignment | value_1 | value_2 |
+| Tool | Model arguments | Bound by Ax3l |
 | --- | --- | --- |
-| epsilon_pair | epsilon.initial | epsilon.decay |
-| reward_pair | game.rewards.closer_to_food | game.rewards.further_from_food |
-| epsilon_nice_pair | epsilon_nice.probability | epsilon_nice.steps |
+| `submit_single_value` | `value` | Draft UUID and assigned parameter |
+| `submit_pair_values` | `value_1`, `value_2` | Draft UUID and assigned pair |
+| `submit_simulation_summary` | `summary` | Completed run UUID |
 
-The bound tool description includes these mappings and their schema rules.
-The LLM supplies only the two numeric values; the MCP server supplies the pair
-identity. Strings and booleans are rejected. Range, integer constraints for duration, legal reward-pair constraints, duplicate checks, and simulation submission belong to Ax3l.
-The forwarded ZMQ method is `submit_pair_values`, with payload
-`{"pair": "epsilon_pair", "value_1": 0.96, "value_2": 0.97}`.
-Replies pass through unchanged and transport errors are not retried.
-Unbound sessions permit discovery but reject submissions; single assignments
-reject pair submissions and pair assignments reject single submissions.
-`SnakeLabTools` discovers and calls the tool for its assigned single or pair.
-Ax3l dispatches this method to `SubmitPairValuesHandler`. It validates both
-values before reading the golden configuration, changes only the assigned pair
-in a copy, validates the full candidate, and rejects unchanged or previously
-stored configurations. Either value may remain unchanged if the other changes.
-Accepted candidates are submitted once and logged through the shared single/pair
-submission workflow. Backend failures propagate without automatic retries.
-All three pair entries are active in the round robin. The conversation dispatcher
-uses the discovered tool name and argument fields for the assigned entry.
+`AX3L_CONVERSATION_PARAMETER` identifies the single, pair, or `simulation_summary`.
+`AX3L_CONFIGURATION_DRAFT` binds selection sessions;
+`AX3L_ANALYSIS_RUN` binds analysis sessions. Numeric inputs reject strings,
+booleans, nonfinite values, and schema violations. Summaries require 2–3 sentences
+and at most 80 words. Unbound sessions permit discovery but reject submissions.
+The model cannot replace the bound identifiers in its tool arguments.
 
-### Active optimization flow
+`AX3L_ZMQ_ENDPOINT` overrides the configured Ax3l listener for a session.
+Transport errors propagate without automatic retries. Explicit validation
+rejections receive feedback in the same conversation. Missing or unexpected
+tool calls stop the conversation with a logged error.
 
-The optimization flow sends text-only prompts. Every conversation starts with
-`ProjectContext`, describing the 24-feature vector, Transformer training, and required EpsilonNice in Snake Lab 3.0.1. The initial conversation then uses
-`FirstContact`, `Comparison`, and `FirstContactSingle()`.
-Subsequent conversations use `Comparison` and `ComparisonSingle` to choose the
-next single-parameter change from high-score history. Epsilon turns use
-`ComparisonEpsilonPair` and `FirstContactEpsilonPair`; reward turns use
-`ComparisonRewardPair` and `FirstContactRewardPair`. Nice turns use `ComparisonEpsilonNicePair` and `FirstContactEpsilonNicePair`. Each pair turn includes its
-report and pair instructions. After seed rotation, the next entry uses the new
-golden baseline. `LossPlot` and `ComparisonPlot` are no
-longer included, so this flow does not require PNG rendering or a vision model.
+## Persistence and restart
 
-`SnakeLab().get_num_sims()` returns the number of rows in Snake Lab's
-`simulation_runs` table, across all statuses and including repeated configurations.
-Reads use Ax3l's existing `DB_*` credentials and select the `snakelab` database.
-Installation grants the Ax3l database user `SELECT` on `snakelab`.*. No separate
-SnakeLab credentials are needed. Each call opens and closes its connection without
-initializing tables. Simulation submissions still go through SnakeLab's ZMQ API.
+`ExperimentDb` stores immutable draft snapshots and analyses in the existing
+Ax3l event tables through `DbMgr`. No new tables or migrations are required.
+Resetting experiment events also removes drafts and saved analyses.
+After resetting source data, rebuild reporting projections with
+`python -m ax3l.app.ReportingRefresh --rebuild` using the installed database
+environment, before using the cached reports.
 
-At startup, `main-loop.py` checks the simulation count. If it is zero, it
-submits the JSON spec's default configuration once and records the submission.
-It polls the run through its terminal status and accepts the initial golden config
-once its completed score is available. A restart before that acceptance resumes
-the recorded initial submission. With an existing golden config it skips seeding.
+A restart resumes the first unselected parameter, including when an accepted
+choice's MCP reply was lost. A complete draft records submission intent before
+calling SnakeLab. If interrupted during submission, Ax3l reconciles by the full
+configuration and monitors the existing run; it never automatically sends an
+ambiguous submission again. A missing matching run raises an explicit error.
+Recorded comparisons and promotions are recovered before the next draft starts.
+Failed or cancelled runs mark their draft failed and stop the current loop;
+a later startup begins a new draft using the retained golden configuration.
 
-The report server's `/experiment-highscores` page plots accepted config scores
-against the total simulation count at acceptance. The `experiment_highscores`
-table stores each score, seed, and count atomically with its golden creation event;
-the event supplies the run reference and reason. Seed rotation records the new
-baseline even when its score drops. The step line remains flat across unsuccessful
-or pending submissions, extending to the current submission count. The page uses
-self-contained Plotly JavaScript; reload it to update. A fresh installation starts
-an empty history, and wiping events also deletes their score snapshots.
+A completed configuration comparison counts as one experiment cycle. After nine
+proposals without a new golden score, seed rotation reruns the golden settings
+on the next seed and establishes a new baseline. The old per-parameter cycle
+and exhaustion rules are no longer used by the optimization loop.
 
-The loop resolves the current golden configuration and submits proposals through
-`submit_single_value` or `submit_pair_values`. Each serialized prompt is stored in a `prompt_sent` entry
-linked to its conversation, using the same snapshot sent to the model.
-Invalid or duplicate proposals receive correction prompts. After an accepted
-submission completes, the loop compares high scores, updates the golden
-configuration when the score improves, and starts the next conversation.
+## Running and reporting
 
-Raw file capture is off by default. Set `DAx3l.RAW_LOGS_ENABLED = True` in
-`ax3l/constants/DAx3l.py` to enable the capture files described below.
-When off, no capture output directory or files are created, including under
-`/var/lib/ax3l/snakelab`. Database logging continues; status and errors go to the
-console (the systemd journal for service runs). Existing captures are retained.
-
-From the checkout root, load the installed database credentials into the
-environment, then run the loop against the configured LlamaSrv endpoint:
+Load the installed database environment and run:
 
 ```sh
 set -a
@@ -211,22 +110,18 @@ set +a
 .venv/bin/python -m ax3l.app.snakelab.main-loop
 ```
 
-The loop uses `llamasrv_url` from `/opt/prod/ax3l/conf/ax3l.json`, defaulting
-to `http://127.0.0.1:51001`. Use `--url http://HOST:51001` for an individual
-invocation.
+The loop uses configured `llamasrv_url`, defaulting to
+`http://127.0.0.1:51001`; `--url` overrides it. LlamaSrv must serve the loaded
+Qwen model with image input and tool calling enabled. Model provisioning and
+service lifecycle remain owned by LlamaSrv.
 
-The Python environment must have the project's PyMySQL dependency installed.
+Fresh startup submits the default configuration once and promotes its completed
+result as the initial golden. Analysis follows before the first draft.
 
-The loop records conversation start/end, prompt snapshots, full reply JSON, and
-LLM failures through `DbMgr.log()`. Events share a process ID printed in
-`run.log`, and replies link to their prompt events. Reply metrics remain in
-the captured JSON for now. Database errors stop the loop.
-
-The active flow continues optimizing until stopped or an error occurs.
-Use `--output PATH` to choose the optional capture directory. Service
-installations run Ax3l from the installed `.venv`.
-
-Prompt events record the assigned single parameter or pair name in `events.parameter`,
-including retry feedback. The Event Log shows a Parameter column and filter when
-Prompt is selected; prompt details retain the source and include the parameter.
-This schema change requires recreating the event tables; existing tables are not migrated.
+Prompts (including embedded PNGs), replies, tool results, draft snapshots, and
+analyses are logged to MariaDB. Simulation details display the saved narrative
+and exact termination percentages. Displayed run IDs use their first eight
+characters; storage and navigation use full UUIDs. The metrics report includes
+all parameter conversations for a draft and its run's vision-analysis time.
+Raw file capture remains controlled by `DAx3l.RAW_LOGS_ENABLED` and is off by
+default; `--output` selects its directory when enabled.

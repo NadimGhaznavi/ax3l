@@ -6,7 +6,6 @@ import json
 from ax3l.activity.CompletedRounds import completed_rounds
 from ax3l.app.DbMgr import DbMgr
 from ax3l.app.ReportingDb import ReportingDb
-from ax3l.app.snakelab.RoundRobinState import ROUND_ROBIN_ORDER
 
 
 class ReportingRefresh:
@@ -37,8 +36,7 @@ class ReportingRefresh:
                     reordered |= event["event_id"] < last_event
                     self._reports.save_event(event)
             if reordered:
-                # An earlier checkpoint/proposal can change a turn's meaning.
-                # Resolve it again from the local event projection.
+                # Reconstruct progress when a comparison commits out of order.
                 self._reports.reset_turns()
             last_completion = state["last_completion_id"]
             replay = reordered
@@ -53,7 +51,7 @@ class ReportingRefresh:
             # Recompute from our small projection only in that case.
             turns = self._reports.turns_after(0 if replay else last_completion)
             rounds, expected = completed_rounds(
-                turns, len(ROUND_ROBIN_ORDER),
+                turns, 1,
                 0 if replay else state["experiment_cycles"],
                 0 if replay else state["expected_parameter"])
             if turns:

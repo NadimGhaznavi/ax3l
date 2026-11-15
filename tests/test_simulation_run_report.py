@@ -146,6 +146,8 @@ class SimulationRunReportTests(unittest.TestCase):
 
     def test_completed_link_and_summary(self):
         self.enterContext(patch('ax3l.server.ReportingServer.DbMgr'))
+        analyses = self.enterContext(patch('ax3l.server.ReportingServer.ExperimentDb')).return_value
+        analyses.analysis.return_value = None
         log = self.enterContext(patch('ax3l.server.ReportingServer.EventLogDb')).return_value
         snake = self.enterContext(patch('ax3l.server.ReportingServer.SnakeLab')).return_value
         snake.get_config.return_value = GenerateDefaultConfig().run()
@@ -190,7 +192,7 @@ class SimulationRunReportTests(unittest.TestCase):
             self.assertIn(f'href="{path}">{text}</a>', event_page)
             self.assertIn(f'title="{text}"', event_page)
         page = get(path)
-        for expected in ('Simulation Run', 'Run ID', run_id, 'Project Version',
+        for expected in ('Simulation Run', 'Run ID', run_id[:8], 'Project Version',
                          '&lt;version&gt;', 'High Score', '<td>0</td>', 'Completed At',
                          '2026-09-15 12:30:45', 'Back to event log'):
             self.assertIn(expected, page)
@@ -198,6 +200,20 @@ class SimulationRunReportTests(unittest.TestCase):
         for text in ('transformer (4 attention heads)', 'EpsilonNice Overrides', '<td>42</td>', 'Move-limit Endings', '<td>49</td>', 'Total Training Reward'):
             self.assertIn(text, page)
         self.assertIn('No saved board is available', page)
+        self.assertNotIn(run_id, page)
+        from ax3l.entities.SimulationAnalysis import SimulationAnalysis
+        analyses.analysis.return_value = SimulationAnalysis(run_id, {}, {
+            'mean_score': 0, 'median_score': 0,
+            'termination_reasons': {
+                key: dict(count=count, percent=percent) for key, count, percent in (
+                    ('wall', 200, 40), ('snake', 250, 50), ('max_moves', 49, 9.8),
+                    ('board_filled', 1, .2), ('unrecorded_or_other', 0, 0))}},
+            'Scores stayed at zero. Most games ended in body collisions <example>.')
+        analysis_page = get(path)
+        self.assertIn('Simulation Analysis', analysis_page)
+        self.assertIn('body collisions &lt;example&gt;', analysis_page)
+        self.assertIn('200 episodes (40.0%)', analysis_page)
+        self.assertIn('49 episodes (9.8%)', analysis_page)
         snake.get_run_summary.return_value['high_score_snapshot'] = json.dumps(SNAPSHOT)
         board_page = get(path)
         self.assertIn('<svg ', board_page)

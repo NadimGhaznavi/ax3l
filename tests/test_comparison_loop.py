@@ -96,57 +96,8 @@ class ComparisonTests(unittest.TestCase):
 
 
 class LoopTests(unittest.IsolatedAsyncioTestCase):
-    async def test_nice_turn_uses_pair_prompts_and_the_pair_tool(self):
-        from ax3l.app.snakelab.GenerateDefaultConfig import GenerateDefaultConfig
-        snake = Mock()
-        snake.is_simulation_running.return_value = False
-        snake.get_run_result.return_value = dict(status='completed', high_score=10,
-                                                config=GenerateDefaultConfig().run())
-        snake.get_epsilon_nice_report.return_value = []
-        with patch(MODULE + 'SnakeLab', return_value=snake), \
-                patch('ax3l.app.snakelab.prompts.ComparisonEpsilonNicePair.SnakeLab', return_value=snake), \
-                patch(MODULE + 'GoldenConfig', return_value=Mock(run_id='gold')), \
-                patch(MODULE + 'EventLogDb') as events, \
-                patch(MODULE + 'RoundRobinState') as selector, \
-                patch(MODULE + 'SnakeLabTools') as tools, \
-                patch(MODULE + 'converse', new_callable=AsyncMock) as conversation:
-            events.return_value.latest_snakelab_proposal.return_value = None
-            events.return_value.latest_seed_baseline.return_value = None
-            selector.return_value.begin.return_value = 'epsilon_nice_pair'
-            conversation.side_effect = asyncio.CancelledError()
-            with self.assertRaises(asyncio.CancelledError):
-                await optimize(Mock(), Path('/tmp'), Mock(), 'endpoint')
-            tools.assert_called_once_with('endpoint', 'epsilon_nice_pair')
-            names = [type(prompt).__name__ for prompt in conversation.call_args.args[4]]
-            self.assertIn('ComparisonEpsilonNicePair', names)
-            self.assertIn('FirstContactEpsilonNicePair', names)
 
-    async def test_exhausted_sequence_skips_without_prompt_or_submission(self):
-        snake = Mock()
-        snake.is_simulation_running.return_value = False
-        snake.get_run_result.return_value = result(10, .002)
-        snake.parameter_space_exhausted.return_value = True
-        golden = Mock(run_id='gold')
-        with patch(MODULE + 'SnakeLab', return_value=snake), patch(MODULE + 'GoldenConfig', return_value=golden), patch(MODULE + 'EventLogDb') as events, patch(MODULE + 'RoundRobinState') as selector, patch(MODULE + 'SnakeLabTools') as tools, patch(MODULE + 'Comparison') as prompt, patch(MODULE + 'converse') as conversation:
-            events.return_value.latest_snakelab_proposal.return_value = None
-            events.return_value.latest_seed_baseline.return_value = None
-            selector.return_value.begin.side_effect = ['sequence_length', asyncio.CancelledError()]
-            with self.assertRaises(asyncio.CancelledError):
-                await optimize(Mock(), Path('/tmp'), Mock(), 'endpoint')
-            snake.parameter_space_exhausted.assert_called_once_with('gold', 'sequence_length')
-            selector.return_value.skip_exhausted.assert_called_once_with('sequence_length')
-            self.assertEqual(selector.return_value.begin.call_count, 2)
-            tools.assert_not_called()
-            prompt.assert_not_called()
-            conversation.assert_not_called()
 
-    def setUp(self):
-        selector = patch(MODULE + 'RoundRobinState')
-        selector.start().return_value.begin.return_value = 'learning_rate'
-        self.addCleanup(selector.stop)
-        rotation = patch(MODULE + 'rotate_if_needed', new_callable=AsyncMock, return_value=None)
-        rotation.start()
-        self.addCleanup(rotation.stop)
 
     async def test_rejection_feedback_then_acceptance_in_same_conversation(self):
         llm = Mock(url='fixture')
@@ -154,7 +105,7 @@ class LoopTests(unittest.IsolatedAsyncioTestCase):
         db = Mock()
         tools = Mock(definition={'function': {'name': 'submit_single_value', 'parameters': {'properties': {'value': {}}}}})
         tools.submit = AsyncMock(side_effect=[{'status': 'rejected', 'source_name': 'NoDupes', 'prompt': {'role': 'user', 'content': 'Duplicate value'}}, {'status': 'ok', 'run_id': 'next'}])
-        self.assertEqual(await converse(llm, Path('/tmp'), db, tools, [Prompt('initial')], parameter='learning_rate'), 'next')
+        self.assertEqual(await converse(llm, Path('/tmp'), db, tools, [Prompt('initial')], parameter='learning_rate'), {'status': 'ok', 'run_id': 'next'})
         first, second = [json.loads(call.args[0]) for call in llm.complete.call_args_list]
         self.assertEqual(len(first['messages']), 1)
         self.assertEqual(second['messages'][2]['tool_call_id'], 'call-0.002')
@@ -213,37 +164,8 @@ class LoopTests(unittest.IsolatedAsyncioTestCase):
             await wait_for_run(snake, db, 'run')
         self.assertEqual([c.args[0] for c in db.log.call_args_list], ['simulation_started', 'simulation_failed'])
 
-    async def exercise_loop(self, proposal=None, resume_error=None):
-        snake = Mock()
-        snake.is_simulation_running.return_value = False
-        snake.get_run_result.return_value = result(10, .002)
-        golden = Prompt('golden')
-        golden.run_id = 'gold'
-        context = AsyncMock()
-        conversations = AsyncMock(side_effect=['last', 'next', asyncio.CancelledError()])
-        with patch(MODULE + 'SnakeLab', return_value=snake), patch(MODULE + 'GoldenConfig', return_value=golden), patch(MODULE + 'SnakeLabTools', return_value=context), patch(MODULE + 'EventLogDb') as events, patch(MODULE + 'converse', conversations), patch(MODULE + 'wait_for_run', new_callable=AsyncMock) as wait, patch(MODULE + 'compare', side_effect=['last', 'last']) as comparison, patch(MODULE + 'Comparison', side_effect=lambda *ids: Prompt(str(ids))) as prompt:
-            if resume_error is not None:
-                wait.side_effect = [resume_error, None, None]
-            events.return_value.latest_seed_baseline.return_value = None
-            events.return_value.latest_snakelab_proposal.return_value = proposal
-            with self.assertRaises(asyncio.CancelledError):
-                await optimize(Mock(), Path('/tmp'), Mock(), 'endpoint')
-            return conversations, comparison, prompt, wait
 
-    async def test_restart_skips_interrupted_proposal_and_continues_with_golden(self):
-        for error in (SimulationUnavailable('forgotten'), SimulationUnsuccessful('cancelled')):
-            with self.subTest(error=error):
-                conversations, comparison, prompt, wait = await self.exercise_loop(
-                    {'process_id': 'interrupted', 'comparison': None}, error)
-                self.assertEqual(wait.call_args_list[0].args[2], 'interrupted')
-                self.assertEqual(comparison.call_args_list[0].args[2:], ('gold', 'last'))
-                self.assertEqual(comparison.call_count, 2)
-                self.assertEqual(prompt.call_args_list[0].args, ('gold', 'learning_rate'))
-                self.assertEqual(len(conversations.call_args_list[0].args[4]), 3)
 
-    async def test_restart_does_not_swallow_transport_failure(self):
-        with self.assertRaises(TimeoutError):
-            await self.exercise_loop({'process_id': 'pending', 'comparison': None}, TimeoutError())
 
     async def test_monitor_logs_forgotten_run(self):
         snake, db = Mock(), Mock()
@@ -252,37 +174,3 @@ class LoopTests(unittest.IsolatedAsyncioTestCase):
             await wait_for_run(snake, db, 'interrupted')
         self.assertEqual(db.log.call_args.args[0], 'simulation_failed')
         self.assertEqual(db.log.call_args.kwargs['process_id'], 'interrupted')
-
-    async def test_first_round_then_repeated_fresh_comparisons(self):
-        conversations, comparison, prompt, wait = await self.exercise_loop()
-        self.assertEqual([len(c.args[4]) for c in conversations.call_args_list], [4, 3, 3])
-        self.assertEqual(comparison.call_args_list[0].args[2:], ('gold', 'last'))
-        self.assertEqual(comparison.call_args_list[1].args[2:], ('last', 'next'))
-        self.assertEqual(prompt.call_args_list[0].args, ('gold', 'learning_rate'))
-        self.assertEqual(prompt.call_args_list[1].args, ('last', 'learning_rate'))
-        for call in conversations.call_args_list:
-            self.assertTrue(all(isinstance(json.loads(p.to_json())['content'], str) for p in call.args[4]))
-            self.assertIn('learning_rate', call.args[4][-1].to_md())
-            self.assertNotIn('hidden_size', call.args[4][-1].to_md())
-        self.assertEqual(wait.await_count, 2)
-
-    async def test_restart_uses_recorded_comparison_without_first_contact(self):
-        snapshot = {'golden_run_id': 'old', 'latest_run_id': 'previous', 'current_golden_run_id': 'gold', 'reason': 'retained'}
-        conversations, _, prompt, _ = await self.exercise_loop({'process_id': 'previous', 'comparison_id': 1, 'comparison': json.dumps(snapshot)})
-        self.assertEqual(len(conversations.call_args_list[0].args[4]), 3)
-        self.assertEqual(prompt.call_args_list[0].args, ('gold', 'learning_rate'))
-
-    async def test_restart_monitors_pending_submission_before_requesting_next_value(self):
-        snake, db = Mock(), Mock()
-        snake.is_simulation_running.return_value = False
-        snake.get_run_result.return_value = result(10, .002)
-        golden = Prompt('golden')
-        golden.run_id = 'gold'
-        with patch(MODULE + 'SnakeLab', return_value=snake), patch(MODULE + 'GoldenConfig', return_value=golden), patch(MODULE + 'SnakeLabTools', return_value=AsyncMock()), patch(MODULE + 'EventLogDb') as events, patch(MODULE + 'converse', new_callable=AsyncMock) as conversation, patch(MODULE + 'wait_for_run', new_callable=AsyncMock) as wait, patch(MODULE + 'compare', return_value='pending') as comparison, patch(MODULE + 'Comparison', return_value=Prompt('comparison')), patch(MODULE + 'FirstContact') as first:
-            events.return_value.latest_snakelab_proposal.return_value = {'process_id': 'pending', 'comparison': None}
-            conversation.side_effect = asyncio.CancelledError()
-            with self.assertRaises(asyncio.CancelledError):
-                await optimize(Mock(), Path('/tmp'), db, 'endpoint')
-            wait.assert_awaited_once_with(snake, db, 'pending')
-            comparison.assert_called_once_with(snake, db, 'gold', 'pending')
-            first.assert_not_called()

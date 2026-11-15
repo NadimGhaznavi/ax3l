@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.4.1] - 2026-11-15 @ 13:02
+
 ### Summary
 
 Let image analysis inspect the settings behind each chart and recommend a

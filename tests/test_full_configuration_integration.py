@@ -96,10 +96,13 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
                     if len(pages) < len(paths):
                         tool, arguments = 'data_tool', {'url': paths[len(pages)]}
                     else:
+                        notes = json.loads(pages[-1])
                         for label in DSimulationAnalysis.SECTIONS.values():
-                            self_test.assertIn(f'{label}: {label} observation.', pages[-1])
+                            self_test.assertIn(f'{label}: {label} observation.', notes['summary'])
+                        draft_data = json.loads(pages[0].split('```json\n', 1)[1].split('\n```', 1)[0])
                         if selections:
-                            self_test.assertIn('hidden size: 240 (chosen)', pages[0])
+                            self_test.assertEqual(draft_data['choices']['hidden_size'],
+                                                  dict(state='chosen', values=dict(hidden_size=240)))
                         self_test.assertNotIn(baseline_id.split('-')[0], '\n'.join(pages))
                         selections.append(parameter)
                         value = values[parameter]

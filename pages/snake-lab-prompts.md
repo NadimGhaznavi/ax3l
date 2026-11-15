@@ -7,7 +7,7 @@ layout: single
 # Snake Lab Prompts
 
 The optimizer first completes the reference runs' image-analysis jobs, then
-lets Qwen browse their saved observations through small English data pages.
+lets Qwen browse their saved observations through small linked data pages.
 It chooses all tunable settings in a draft before executing one simulation.
 Three separate conversations per completed run interpret one chart each and
 produce reusable observations. Resuming a draft completes unfinished reference
@@ -38,8 +38,12 @@ The `/` index links to `draft`, `latest`, `golden`, and `best`. Reference pages
 link to scores, endings, activity, notes, and five settings sections. For example,
 `/latest/notes` reads the saved observations, and `/draft/training` reads current
 training settings. `/draft` shows each tunable value as chosen or pending.
-Only the requested page is returned, as plain English text. Full identifiers
-stay in storage and transport. Chart facts also use compact English labels.
+Navigation uses readable text and links. Actual data is JSON: overviews embed
+JSON blocks for draft choices and run comparisons, while terminal pages return
+a JSON object for the requested metrics, settings, or observations. Numbers
+retain their types and precision; missing statistics are JSON null. Only the
+requested page is returned. Full identifiers stay in storage and transport.
+Chart facts also use compact English labels.
 
 Saved interpretations describe the run's intrinsic behavior. Current roles
 and score comparisons are added when building selection context. One run can

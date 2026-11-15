@@ -129,13 +129,15 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_data_drill_down_binds_the_draft_and_only_submission_finishes(self):
         requests = []
+        model_json = json.dumps(dict(scope='latest', seed=1970, model=dict(hidden_size=224, dropout=0.1)))
         def handle(message):
             requests.append(message)
             if message.method == 'read_simulation_data':
                 if message.payload['url'] == '/missing':
                     return {'status': 'rejected', 'reason': 'Unknown data page.', 'source_name': 'SimulationData',
                             'prompt': {'role': 'user', 'content': 'Unknown data page. Read /.'}}
-                return {'status': 'ok', 'page': f"Page {message.payload['url']}"}
+                return {'status': 'ok', 'page': (model_json if message.payload['url'] == '/latest/model'
+                                                else f"Page {message.payload['url']}")}
             return {'status': 'ok', 'draft_id': 'private-draft'}
         def reply(name, arguments):
             return 200, '', json.dumps({'choices': [{'message': {
@@ -150,6 +152,7 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
             async with SnakeLabTools(server.endpoint, 'hidden_size', draft_id='private-draft') as tools:
                 definition = next(d for d in tools.definitions if d['function']['name'] == 'data_tool')
                 self.assertEqual(set(definition['function']['parameters']['properties']), {'url'})
+                self.assertIn('Data payloads are JSON', definition['function']['description'])
                 result = await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('Choose hidden size.')])
                 before = len(requests)
                 with self.assertRaises(RuntimeError):
@@ -159,8 +162,9 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([r.method for r in requests], ['read_simulation_data'] * 3 + ['submit_single_value'])
         self.assertEqual(requests[1].payload, {'draft_id': 'private-draft', 'url': '/draft'})
         payloads = [json.loads(call.args[0]) for call in llm.complete.call_args_list]
-        self.assertEqual([m['content'] for m in payloads[-1]['messages'] if m['role'] == 'tool'],
-                         ['Rejected.', 'Page /draft', 'Page /latest/model'])
+        tool_content = [m['content'] for m in payloads[-1]['messages'] if m['role'] == 'tool']
+        self.assertEqual(tool_content, ['Rejected.', 'Page /draft', model_json])
+        self.assertEqual(json.loads(tool_content[-1])['model']['hidden_size'], 224)
         feedback = [m['content'] for m in payloads[-1]['messages'] if m['role'] == 'user']
         self.assertEqual(feedback, ['Choose hidden size.', 'Unknown data page. Read /.'])
         self.assertNotIn('private-draft', json.dumps(payloads))

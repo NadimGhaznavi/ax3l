@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.2.0] - 2026-11-15 @ 09:15
+
 ### Summary
 
 Show experiment progress and completed results in a compact report card and

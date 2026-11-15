@@ -150,6 +150,7 @@ class ExperimentStatusTests(unittest.TestCase):
 
     def test_status_counts_render_and_update(self):
         from ax3l.server.ReportingServer import make_server
+        from ax3l.constants.DAx3l import DAx3l
 
         self.enterContext(patch('ax3l.server.ReportingServer.DbMgr'))
         log = self.enterContext(patch('ax3l.server.ReportingServer.EventLogDb')).return_value
@@ -187,6 +188,8 @@ class ExperimentStatusTests(unittest.TestCase):
                 self.assertLess(page.index('Completed Experiments:'), page.index('Simulations Submitted:'))
                 self.assertIn(f"Current Highscore: {format(score, ',') if score is not None else '—'}", page)
                 self.assertIn('class="server-bar experiment-status"', page)
+                self.assertIn(f'Version: {DAx3l.VERSION} ({DAx3l.CMDB_CODENAME})', page)
+                self.assertIn('href="/experiment-status">Experiment Status</a>', page)
                 if score is not None:
                     snake.get_run_summary.assert_called_with(run_id)
                     self.assertIn('viewBox="0 0 128 96"', page)

@@ -22,12 +22,14 @@ from ax3l.activity.ReplyReport import fields, reply_content, reasoning_content
 from ax3l.activity.PromptReport import parts, summary
 from ax3l.activity.ScoreDistribution import distribution
 from ax3l.activity.ExperimentHighscores import highscores
+from ax3l.activity.ExperimentStatus import experiment_status
 from ax3l.activity.GoldenConfigurations import parameter_change
 from ax3l.activity.SimulationBoard import board_svg
 from ax3l.activity.SimulationAnimation import SimulationAnimation
 from ax3l.interface.SimulationGifStore import SimulationGifStore
 from ax3l.activity.SimulationMetrics import metrics
 from ax3l.constants.DReportMgr import DReportMgr
+from ax3l.constants.DAx3l import DAx3l
 from ax3l.constants.DLabel import FIELD_TO_LABEL_MAP
 from ax3l.interface.SnakeLab import SnakeLab
 from ax3l.interface.Network import Network
@@ -65,6 +67,8 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
         autoescape=select_autoescape(["html"]),
     )
     templates.globals["field_labels"] = FIELD_TO_LABEL_MAP
+    templates.globals["application_version"] = DAx3l.VERSION
+    templates.globals["application_codename"] = DAx3l.CMDB_CODENAME
     template = templates.get_template("events.html")
     templates.globals["event_label"] = DEventCategory.label
     templates.globals["event_choices"] = {
@@ -130,6 +134,33 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
                 except Exception:
                     traceback.print_exc()
                     self.send_error(500, "Unable to load golden configurations")
+                    return
+            elif urlsplit(self.path).path == "/experiment-status":
+                views = parse_qs(urlsplit(self.path).query, keep_blank_values=True).get("view", ["current"])
+                if len(views) != 1 or views[0] not in ("current", "completed"):
+                    self.send_error(400, "View must be current or completed")
+                    return
+                view = views[0]
+                try:
+                    db = DbMgr(initialize_event_tables=False)
+                    try:
+                        experiments = ExperimentDb(db)
+                        draft = experiments.draft() if view == "current" else experiments.last_completed_draft()
+                        comparison = experiments.comparison(draft.run_id) if draft and draft.run_id else None
+                        analysis = experiments.analysis(draft.run_id) if draft and draft.run_id else None
+                        sections = experiments.analysis_sections(draft.run_id) if draft and draft.run_id else {}
+                    finally:
+                        db.close()
+                    snake = SnakeLab()
+                    run = snake.get_run_result(draft.run_id) if draft and draft.run_id else None
+                    golden = snake.get_run_result(draft.golden_run_id) if draft else None
+                    body = templates.get_template("experiment_status.html").render(
+                        view=view, **experiment_status(draft, run, golden, comparison, analysis, sections)
+                    ).encode("utf-8")
+                    content_type = "text/html; charset=utf-8"
+                except Exception:
+                    traceback.print_exc()
+                    self.send_error(500, "Unable to load experiment status")
                     return
             elif urlsplit(self.path).path == "/simulation-metrics":
                 sizes = parse_qs(urlsplit(self.path).query, keep_blank_values=True).get(

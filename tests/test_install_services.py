@@ -140,7 +140,7 @@ exec /usr/bin/systemd-analyze "$@"
                                'interface/SimulationGifStore.py', 'interface/SimulationConfiguration.py',
                                'activity/RunAnalysis.py', 'entities/ConfigurationDraft.py',
                                'entities/SimulationAnalysis.py', 'app/snakelab/AnalyzeRun.py',
-                               'app/snakelab/ExperimentDb.py', 'app/snakelab/prompts/AnalyzeSimulation.py',
+                               'app/snakelab/ExperimentDb.py', 'app/snakelab/knowledge/choose-snake-setting/SKILL.md',
                                'app/snakelab/prompts/ConfigurationChoice.py',
                                'app/snakelab/SubmitSimulationSummaryHandler.py',
                                'app/snakelab/tools/SubmitSimulationSummary.py',

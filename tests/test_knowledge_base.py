@@ -3,7 +3,6 @@
 import re
 import unittest
 
-from ax3l.app.snakelab.prompts.ProjectContext import ProjectContext
 from ax3l.interface.KnowledgeBase import KnowledgeBase
 
 
@@ -30,9 +29,8 @@ class KnowledgeBaseTests(unittest.TestCase):
             with self.subTest(url=url), self.assertRaises(ValueError):
                 KnowledgeBase().read(url)
 
-    def test_project_context_links_to_reference_material_instead_of_embedding_it(self):
-        text = ProjectContext().to_md()
+    def test_selection_skill_loads_only_instructions(self):
+        text = KnowledgeBase().read('/selection')
         self.assertLess(len(text.split()), 70)
-        self.assertIn('kb_tool', text)
-        self.assertIn('/selection', text)
-        self.assertNotIn('24-value', text)
+        self.assertNotIn('description:', text)
+        self.assertIn('500 episodes', text)

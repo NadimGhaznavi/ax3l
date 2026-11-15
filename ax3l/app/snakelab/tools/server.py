@@ -55,7 +55,7 @@ async def submit_simulation_summary(summary: StrictStr) -> str:
     return await SubmitSimulationSummary(endpoint).submit(run_id, section, summary)
 
 
-@mcp.tool(description="Read one short guide. Start at / or use your task's guide URL.")
+@mcp.tool(description="Read a Snake Lab guide. Use / for the guide list.")
 async def kb_tool(url: StrictStr) -> str:
     try:
         return json.dumps({"status": "ok", "page": KnowledgeBase().read(url)}, ensure_ascii=False)
@@ -69,8 +69,8 @@ data_description = (
     "Read the settings that produced this chart. Start at /run; follow links for settings and allowed value rules. "
     "Read current values and /run/rules before recommending a value. Data payloads are JSON."
     if parameter == "simulation_summary" else
-    "Read one small data page. Start at /draft or /. Follow links for runs, scores, notes, or settings. "
-    "Data payloads are JSON; null means unrecorded."
+    "Read experiment data using the path in your task, or use / for the menu. "
+    "Data payloads are JSON. Null means unrecorded."
 )
 
 

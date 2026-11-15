@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.4.2] - 2026-11-15 @ 16:55
+
+### Summary
+
+Give Qwen charts and measured data during parameter selection, and show each
+setup step as it happens in Experiment Status. Improved reporting.
+
+### Changed
+
+- Load a short selection skill for each choice. Show training loss for learning
+  rate, score trends for epsilon, and score distribution for distance rewards.
+  Use the latest run on the current seed, with the golden run as the fallback.
+- Give Qwen direct English directions to data pages. Keep settings and
+  measurements in JSON.
+- Time each chart render, Qwen request, tool lookup, and submission on its own.
+  Show input and output tokens separately for each Qwen reply.
+
+### Removed
+
+- Remove standalone chart-summary requests from the optimization loop. Ax3l
+  records measurements directly from completed runs.
+
 ## [4.4.1] - 2026-11-15 @ 13:02
 
 ### Summary

@@ -29,7 +29,7 @@
     </table>
     {% if analysis %}
     <h2>Simulation Analysis</h2>
-    <p>{{ analysis.summary }}</p>
+    {% if analysis.summary %}<p>{{ analysis.summary }}</p>{% endif %}
     <table aria-label="Measured simulation analysis">
       <tr><th scope="row">Mean Episode Score</th><td>{{ analysis.metrics.mean_score }} points</td></tr>
       <tr><th scope="row">Median Episode Score</th><td>{{ analysis.metrics.median_score }} points</td></tr>

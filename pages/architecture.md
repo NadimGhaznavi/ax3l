@@ -30,7 +30,9 @@ sends its discovered tool definitions with inference requests. Ax3l executes
 the returned tool calls; the shared inference service has no global Ax3l tool
 registration.
 
-- The MCP tools save parameter choices in an Ax3l-owned configuration draft and accept a short interpretation for a bound completed run. Ax3l submits a simulation only after every tunable setting has been selected.
+- The MCP tools let Qwen look up measurements and save parameter choices in an
+  Ax3l-owned configuration draft. Ax3l submits the complete draft after it
+  accepts every choice.
 - The tools use the [ZeroMQ](http://zeromq.org) messaging framework to deliver the results to the Ax3l server.
 
 ## MariaDB
@@ -45,15 +47,14 @@ registration.
 - Offers an Experiment Status report card with eleven configuration values and
   read-only checkmarks for accepted LLM choices, including unchanged values.
   Paired settings advance together, inherited pending values remain visible,
-  and the next selection is highlighted. Simulation and analysis phases are
+  and the next selection is highlighted. Simulation and measurement phases are
   shown separately, with the result compared against the draft's original
   golden baseline. Current and Last completed views refresh every five seconds;
   a failed refresh keeps the last successful card and its timestamp visible.
-  Pre-Requisites share the same checklist and show reference image preparation,
-  the LLM's current image-analysis task, and saved completion. Shared reference
-  runs appear once with combined role labels.
+  Each choice shows its chart preparation, inference requests, tool lookups,
+  and submission with per-step timings and per-request input and output tokens.
 - Presents a histogram showing score distribution across simulation runs.
-- Simulation details show the saved Qwen analysis and exact termination counts/percentages. Run labels use the first UUID group; navigation retains full UUIDs.
+- Simulation details show exact termination counts and percentages and any previously saved Qwen notes. Run labels use the first UUID group; navigation retains full UUIDs.
 - Presents a plot of the high score over time, including the dips due to seed rotation events.
 - Presents an event log with filtering.
 - Handles HTTP connections in separate threads with a 30-second client timeout, so idle browser connections cannot block other pages or health checks. Shared background cache scheduling is serialized.

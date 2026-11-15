@@ -1,7 +1,7 @@
 """Configuration checklist semantics, lifecycle states, and report navigation."""
 
 from copy import deepcopy
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import os
 from threading import Thread
@@ -14,10 +14,8 @@ from uuid import uuid4
 from ax3l.activity.ExperimentStatus import experiment_status
 from ax3l.app.DbMgr import DbMgr
 from ax3l.app.snakelab.ExperimentDb import ExperimentDb
-from ax3l.constants.DSimulationAnalysis import DSimulationAnalysis
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
-from ax3l.entities.AnalysisTask import AnalysisTask
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 from ax3l.server.ReportingServer import make_server
 
@@ -31,7 +29,7 @@ class ExperimentStatusTests(unittest.TestCase):
         return experiment_status(self.draft, golden=self.golden, **kwargs)
 
     def test_saved_unchanged_values_count_and_paired_rows_advance_together(self):
-        self.assertEqual(self.report()['phase'], 'Choosing: Hidden Size')
+        self.assertEqual(self.report()['phase'], 'Choosing Hidden Size')
         self.draft.selections = PARAMETER_ORDER[:5]
         report = self.report()
         self.assertEqual(report['choices_selected'], 5)
@@ -61,7 +59,7 @@ class ExperimentStatusTests(unittest.TestCase):
             report = self.report()
             self.assertEqual(report['phase'], label)
             self.assertFalse(any(row['current'] for row in report['rows']))
-        self.assertIn('not retried automatically', report['detail'])
+        self.assertIn('confirm the simulation', report['detail'])
         self.draft.phase = 'submitted'
         self.draft.run_id = str(uuid4())
         self.assertEqual(self.report()['phase'], 'Simulation unavailable')
@@ -84,10 +82,9 @@ class ExperimentStatusTests(unittest.TestCase):
         self.assertEqual(report['phase'], 'Comparing results')
         self.assertEqual(report['outcome'], 'Awaiting comparison')
         comparison = {'current_golden_run_id': self.draft.run_id}
-        report = self.report(run=run, comparison=comparison, sections={'scores': 'Scores improved.'})
-        self.assertEqual(report['phase'], 'Analyzing simulation')
-        self.assertIn('Score distribution', report['detail'])
-        self.assertEqual(report['analysis_status'], 'In progress (1/3)')
+        report = self.report(run=run, comparison=comparison)
+        self.assertEqual(report['phase'], 'Recording results')
+        self.assertEqual(report['analysis_status'], 'Recording')
         self.assertEqual(report['outcome'], 'New golden')
         self.assertEqual(report['target_score'], 20)
         self.assertEqual(report['difference'], 5)
@@ -95,7 +92,7 @@ class ExperimentStatusTests(unittest.TestCase):
         report = self.report(run=run, comparison=comparison,
                              analysis=SimulationAnalysis(self.draft.run_id, self.draft.config, {}, 'Saved.'))
         self.assertEqual(report['phase'], 'Complete')
-        self.assertEqual(report['analysis_status'], 'Complete')
+        self.assertEqual(report['analysis_status'], 'Saved')
 
     def test_zero_ties_and_lower_scores_retain_golden(self):
         self.draft.selections = PARAMETER_ORDER.copy()
@@ -110,114 +107,12 @@ class ExperimentStatusTests(unittest.TestCase):
                 self.assertEqual(report['difference'], score - target)
                 self.assertEqual(report['outcome'], 'Golden retained')
 
-    def test_preparing_references_groups_shared_runs_and_shows_the_active_image(self):
-        run_id, best_id = self.draft.golden_run_id, str(uuid4())
+    def test_preparing_references_loads_measured_data_without_starting_choices(self):
         self.draft.phase = 'preparing'
-        self.draft.references = dict(latest=run_id, golden=run_id, all_time_best=best_id)
-        states = {
-            run_id: dict(analysis=None, sections={'scores': 'Saved.'},
-                         task=AnalysisTask(run_id, 'distribution', 'analyzing')),
-            best_id: dict(analysis=SimulationAnalysis(best_id, {}, {}, 'Saved.'), sections={}, task=None),
-        }
-        report = self.report(reference_states=states)
+        report = self.report()
         self.assertEqual(report['phase'], 'Preparing references')
-        self.assertIn('Analyzing distribution image', report['detail'])
-        self.assertEqual(len(report['prerequisites']), 6)
-        scores, current, loss, *best = report['prerequisites']
-        self.assertEqual(current['roles'], 'Latest simulation / Current golden')
-        self.assertEqual(current['label'], 'Score distribution')
-        self.assertTrue(scores['selected'])
-        self.assertEqual(scores['value'], 'Complete')
-        self.assertFalse(scores['current'])
-        self.assertFalse(current['selected'])
-        self.assertTrue(current['current'])
-        self.assertFalse(loss['selected'])
-        self.assertFalse(loss['current'])
-        self.assertEqual(loss['value'], 'Pending')
-        self.assertTrue(all(row['selected'] for row in best))
-        self.assertEqual([row['section'] for row in best], list(DSimulationAnalysis.SECTIONS))
+        self.assertIn('Loading measured data', report['detail'])
         self.assertFalse(any(row['current'] for row in report['rows']))
-        for phase in ('preparing', 'failed', 'stopped'):
-            states[run_id]['task'] = AnalysisTask(run_id, 'distribution', phase)
-            report = self.report(reference_states=states)
-            self.assertIn('distribution image', report['prerequisites'][1]['value'])
-            if phase in ('failed', 'stopped'):
-                self.assertEqual(report['phase'], 'Reference analysis ' + phase)
-        states[run_id]['analysis'] = SimulationAnalysis(run_id, {}, {}, 'Saved.')
-        self.draft.phase = 'choosing'
-        report = self.report(reference_states=states)
-        self.assertTrue(all(row['selected'] for row in report['prerequisites']))
-        self.assertTrue(all(row['value'] == 'Complete' for row in report['prerequisites']))
-
-    def test_each_distinct_reference_has_three_image_rows(self):
-        run_ids = [str(uuid4()) for _ in range(3)]
-        for count in (1, 2, 3):
-            with self.subTest(distinct_runs=count):
-                self.draft.phase = 'preparing'
-                self.draft.references = dict(zip(('latest', 'golden', 'all_time_best'),
-                                                (run_ids[index % count] for index in range(3))))
-                states = {run_id: dict(analysis=None, sections={}, task=None) for run_id in run_ids[:count]}
-                rows = self.report(reference_states=states)['prerequisites']
-                self.assertEqual(len(rows), count * 3)
-                self.assertEqual([(row['run_id'], row['section']) for row in rows],
-                                 [(run_id, section) for run_id in run_ids[:count]
-                                  for section in DSimulationAnalysis.SECTIONS])
-                self.assertTrue(all(row['value'] == 'Pending' and not row['selected'] for row in rows))
-
-    def test_saved_image_is_complete_even_when_its_last_task_is_stale(self):
-        run_id = self.draft.golden_run_id
-        self.draft.phase = 'preparing'
-        self.draft.references = {'golden': run_id}
-        for phase in ('preparing', 'analyzing', 'saved', 'failed', 'stopped'):
-            with self.subTest(phase=phase):
-                state = dict(analysis=None, sections={'scores': 'Saved.'},
-                             task=AnalysisTask(run_id, 'scores', phase))
-                rows = self.report(reference_states={run_id: state})['prerequisites']
-                self.assertTrue(rows[0]['selected'])
-                self.assertEqual(rows[0]['value'], 'Complete')
-                self.assertTrue(all(not row['current'] and row['phase'] is None for row in rows))
-
-    def test_result_analysis_reports_the_recorded_task_and_failure(self):
-        self.draft.phase, self.draft.run_id = 'submitted', str(uuid4())
-        for phase in ('preparing', 'analyzing', 'failed', 'stopped'):
-            report = self.report(run=dict(status='completed', high_score=25),
-                                 comparison={'current_golden_run_id': self.draft.run_id},
-                                 task=AnalysisTask(self.draft.run_id, 'loss', phase))
-            self.assertIn('training loss image', report['detail'])
-            if phase in ('failed', 'stopped'):
-                self.assertEqual(report['phase'], 'Analysis ' + phase)
-
-    def test_current_images_and_all_configuration_rows_share_work_without_double_counting_totals(self):
-        self.draft.run_id = str(uuid4())
-        self.draft.phase = 'submitted'
-        self.draft.references = dict(latest=self.draft.golden_run_id, golden=self.draft.golden_run_id)
-        activity = {
-            (self.draft.golden_run_id, 'scores'): dict(seconds=30, tokens=100, image_event_id=10),
-            (self.draft.run_id, 'scores'): dict(seconds=65, tokens=200, image_event_id=20),
-            (self.draft.draft_id, 'epsilon_pair'): dict(seconds=3661, tokens=300, image_event_id=None),
-        }
-        report = self.report(
-            run=dict(status='completed', high_score=2), activity=activity,
-            reference_states={self.draft.golden_run_id: dict(analysis=None, sections={}, task=None)},
-            task=AnalysisTask(self.draft.run_id, 'scores', 'analyzing'))
-        self.assertEqual(len(report['prerequisites']), 6)
-        current = report['prerequisites'][3:]
-        self.assertEqual([row['section'] for row in current], list(DSimulationAnalysis.SECTIONS))
-        self.assertTrue(all(row['roles'] == 'Current simulation' for row in current))
-        self.assertEqual(current[0]['image_url'], f'/analysis-images/{self.draft.run_id}/scores.png')
-        self.assertEqual(current[0]['elapsed'], '00:01:05')
-        self.assertEqual(current[0]['tokens'], 200)
-        self.assertTrue(current[0]['current'])
-        self.assertIsNone(current[1]['image_url'])
-        for row in report['rows'][5:7]:
-            self.assertEqual(row['elapsed'], '01:01:01')
-            self.assertEqual(row['tokens'], 300)
-        self.assertEqual(report['totals'], dict(elapsed='01:02:36', tokens=600))
-        self.assertEqual(report['rows'][0]['elapsed'], '—')
-        self.assertIsNone(report['rows'][0]['tokens'])
-        activity[self.draft.run_id, 'scores']['tokens'] = None
-        self.assertIsNone(self.report(activity=activity, reference_states={
-            self.draft.golden_run_id: dict(analysis=None, sections={}, task=None)})['totals']['tokens'])
 
 
 class ExperimentStatusHttpTests(unittest.TestCase):
@@ -230,12 +125,8 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         self.experiments.last_completed_draft.return_value = None
         self.experiments.comparison.return_value = None
         self.experiments.analysis.return_value = None
-        self.experiments.analysis_sections.return_value = {}
+        self.experiments.choice_events.return_value = []
         self.experiments.activity_events.return_value = []
-        self.experiments.analysis_states.side_effect = lambda run_ids: {
-            run_id: dict(analysis=self.experiments.analysis(run_id),
-                         sections=self.experiments.analysis_sections(run_id), task=None)
-            for run_id in run_ids}
         self.snake.get_run_result.return_value = dict(status='completed', high_score=0)
         server = make_server('127.0.0.1', 0)
         thread = Thread(target=server.serve_forever, daemon=True)
@@ -252,10 +143,10 @@ class ExperimentStatusHttpTests(unittest.TestCase):
 
     def test_live_checklist_refresh_and_preserved_completed_view(self):
         page = self.get()
-        self.assertIn('Choosing: Hidden Size', page)
+        self.assertIn('Choosing Hidden Size', page)
         self.assertIn('0 / 8 choices saved', page)
         self.assertEqual(page.count('type="checkbox" disabled'), 11)
-        self.assertIn('pending · inherited', page)
+        self.assertIn('>inherited</span>', page)
         self.assertIn('window.setTimeout(refreshStatus, 5000)', page)
         self.assertIn('Showing the last successful report', page)
         self.assertIn('cache: \'no-store\'', page)
@@ -270,12 +161,12 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         self.experiments.last_completed_draft.return_value = completed
         self.experiments.draft.return_value = ConfigurationDraft(
             str(uuid4()), self.draft.golden_run_id, {}, SimulationConfiguration.defaults())
-        self.assertIn('Choosing: Hidden Size', self.get())
+        self.assertIn('Choosing Hidden Size', self.get())
         page = self.get('/experiment-status?view=completed')
         self.assertIn('aria-current="page">Last completed</a>', page)
         self.assertIn('id="experiment-phase" role="status">Complete</h2>', page)
-        self.assertEqual(page.count('disabled checked'), 14)
-        self.assertNotIn('pending · inherited', page)
+        self.assertEqual(page.count('disabled checked'), 11)
+        self.assertNotIn('>inherited</span>', page)
         self.assertIn('<dt>High score</dt><dd>0</dd>', page)
         self.assertIn('<dt>Difference</dt><dd>+0</dd>', page)
         self.assertIn('Golden retained', page)
@@ -297,66 +188,46 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         self.assertEqual(error.exception.code, 500)
         self.db.close.assert_called_once()
 
-    def test_prerequisites_are_in_the_same_table_and_refresh_before_choices(self):
-        run_id = self.draft.golden_run_id
-        self.draft.phase = 'preparing'
-        self.draft.references = dict(latest=run_id, golden=run_id, all_time_best=run_id)
-        state = dict(analysis=None, sections={}, task=AnalysisTask(run_id, 'scores', 'preparing'))
-        self.experiments.analysis_states.side_effect = lambda run_ids: {run_id: state}
-        page = self.get()
-        self.assertEqual(page.count('<table '), 1)
-        self.assertLess(page.index('>Pre-Requisites</th>'), page.index('>Configuration</th>'))
-        self.assertIn('Preparing score trends image', page)
-        self.assertIn('Latest simulation / Current golden / All-time best', page)
-        self.assertEqual(page.count('type="checkbox" disabled'), 14)
-        self.assertEqual(page.count('disabled checked'), 0)
-        self.assertEqual(page.count('data-analysis='), 3)
-        for section in DSimulationAnalysis.SECTIONS:
-            self.assertIn(f'data-analysis="{section}"', page)
-        state['task'] = AnalysisTask(run_id, 'scores', 'analyzing')
-        self.assertIn('Analyzing score trends image', self.get())
-        state['sections'] = {'scores': 'Saved.'}
-        state['task'] = AnalysisTask(run_id, 'distribution', 'analyzing')
-        page = self.get()
-        self.assertEqual(page.count('disabled checked'), 1)
-        self.assertIn('Analyzing distribution image', page)
-        state['analysis'] = SimulationAnalysis(run_id, {}, {}, 'Saved.')
-        self.draft.phase = 'choosing'
-        page = self.get()
-        self.assertIn('Choosing: Hidden Size', page)
-        self.assertEqual(page.count('disabled checked'), 3)
+    def test_setup_shows_live_steps_with_separate_turn_times_and_tokens(self):
+        stamp = datetime(2026, 11, 15, 12)
+        observed = stamp + timedelta(seconds=400)
 
-    def test_three_distinct_reference_runs_render_nine_image_items_above_configuration(self):
-        self.draft.phase = 'preparing'
-        self.draft.references = dict(zip(('latest', 'golden', 'all_time_best'),
-                                        (str(uuid4()) for _ in range(3))))
-        page = self.get()
-        self.assertEqual(page.count('data-analysis='), 9)
-        self.assertEqual(page.count('type="checkbox" disabled'), 20)
-        for section in DSimulationAnalysis.SECTIONS:
-            self.assertEqual(page.count(f'data-analysis="{section}"'), 3)
-        self.assertLess(page.rindex('data-analysis='), page.index('>Configuration</th>'))
+        def event(event_id, name, seconds, *, parent=None, parameter=None, image=False, detail=None):
+            return dict(event_id=event_id, name=name, occurred_at=stamp + timedelta(seconds=seconds),
+                        observed_at=observed, parent_event_id=parent, parameter=parameter,
+                        has_image=image, detail=detail)
 
-    def test_current_image_links_time_tokens_and_total_cover_every_item(self):
-        self.draft.phase, self.draft.run_id = 'submitted', str(uuid4())
-        activity = {
-            (self.draft.run_id, 'scores'): dict(seconds=60, tokens=1000, image_event_id=10),
-            (self.draft.draft_id, 'epsilon_pair'): dict(seconds=30, tokens=250, image_event_id=None),
-        }
-        with patch('ax3l.server.ReportingServer.item_activity', return_value=activity):
-            page = self.get()
-        self.assertEqual(page.count('data-analysis='), 3)
-        self.assertIn(f'href="/analysis-images/{self.draft.run_id}/scores.png"', page)
-        self.assertIn('>Score trends image</a>', page)
-        self.assertIn('Score distribution image</span>', page)
-        self.assertNotIn(f'href="/analysis-images/{self.draft.run_id}/distribution.png"', page)
-        self.assertEqual(page.count('class="item-elapsed"'), 15)
-        self.assertEqual(page.count('class="item-tokens"'), 15)
-        self.assertIn('<th scope="col">Elapsed time</th><th scope="col">Tokens</th>', page)
-        self.assertIn('class="item-tokens">1,000</td>', page)
-        self.assertIn('colspan="3">Total</th><td class="item-elapsed">00:01:30</td>', page)
-        self.assertIn('class="item-tokens">1,250</td>', page)
-        self.assertGreater(page.index('class="status-total"'), page.rindex('data-parameter='))
+        self.draft.selections = PARAMETER_ORDER[:5]
+        self.experiments.choice_events.return_value = [
+            event(1, 'choice_chart_started', 0, parameter='epsilon_pair', detail='Score trends'),
+            event(2, 'choice_chart_finished', 1, parameter='epsilon_pair', detail='Complete'),
+            event(4, 'prompt_sent', 2, parent=3, parameter='epsilon_pair', image=True),
+            event(5, 'llm_request_started', 3, parent=3),
+            event(6, 'reply_received', 73, parent=3,
+                  detail=json.dumps(dict(prompt_tokens=1234, completion_tokens=321))),
+            event(7, 'tool_execution_started', 74, parent=3, detail=json.dumps(dict(
+                function=dict(name='data_tool', arguments=json.dumps(dict(url='/latest/scores')))))),
+            event(8, 'tool_execution_completed', 74.05, parent=3, detail='ok'),
+            event(9, 'llm_request_started', 75, parent=3),
+            event(10, 'reply_received', 90, parent=3,
+                  detail=json.dumps(dict(prompt_tokens=1350, completion_tokens=50))),
+            event(11, 'llm_request_started', 100, parent=3),
+        ]
+        page = self.get()
+        self.assertIn('class="choice-chart" href="/events/4"', page)
+        self.assertIn('Render score trends chart', page)
+        self.assertIn('Read data /latest/scores', page)
+        self.assertIn('0.050 s', page)
+        self.assertIn('00:01:10', page)
+        self.assertIn('15.000 s', page)
+        self.assertIn('00:05:00', page)
+        self.assertIn('>Running</td>', page)
+        self.assertIn('>Input tokens</th>', page)
+        self.assertIn('>Output tokens</th>', page)
+        for count in ('1,234', '321', '1,350', '50'):
+            self.assertEqual(page.count(f'class="item-tokens">{count}</td>'), 1)
+        self.assertNotIn('status-total', page)
+        self.assertEqual(page.count('>Qwen request</th>'), 3)
 
     def test_image_endpoint_returns_latest_exact_png_and_missing_images_are_unlinked(self):
         run_id = str(uuid4())

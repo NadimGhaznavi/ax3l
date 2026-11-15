@@ -37,6 +37,14 @@ class ExperimentDb:
         self._db.log(Events.SnakeLab.ANALYZED, Events.SnakeLab.CATEGORY, "INFO",
                      json.dumps(asdict(analysis), allow_nan=False), process_id=analysis.run_id)
 
+    def analysis_sections(self, run_id: str) -> dict[str, str]:
+        data = self._latest(Events.SnakeLab.CATEGORY, Events.SnakeLab.ANALYSIS_PROGRESS, run_id)
+        return data if data is not None else {}
+
+    def save_analysis_sections(self, run_id: str, sections: dict[str, str]) -> None:
+        self._db.log(Events.SnakeLab.ANALYSIS_PROGRESS, Events.SnakeLab.CATEGORY, "INFO",
+                     json.dumps(sections, allow_nan=False), process_id=run_id)
+
     def comparison(self, run_id: str) -> dict | None:
         rows = self._db.query("""
             SELECT e.event_id, m.content FROM events e JOIN event_messages m USING (event_id)

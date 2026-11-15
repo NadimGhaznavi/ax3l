@@ -47,6 +47,7 @@ class DEventCategory:
         FAILED = "simulation_failed"
         RESTARTED = "simulation_restarted"
         ANALYZED = "simulation_analyzed"
+        ANALYSIS_PROGRESS = "simulation_analysis_progress"
         LABELS = {
             SUBMITTED: "Simulation submitted",
             QUEUED: "Simulation queued",
@@ -56,6 +57,7 @@ class DEventCategory:
             FAILED: "Simulation failed",
             RESTARTED: "Simulation restarted",
             ANALYZED: "Simulation analyzed",
+            ANALYSIS_PROGRESS: "Analysis section saved",
         }
         TERMINAL_EVENTS = {"completed": COMPLETED, "cancelled": CANCELLED, "failed": FAILED}
 

@@ -15,6 +15,7 @@ from ax3l.app.EventLogDb import EventLogDb
 from ax3l.app.snakelab.ExperimentDb import ExperimentDb
 from ax3l.app.snakelab.SnakeLabLoop import optimize
 from ax3l.entities.ConfigurationDraft import PARAMETER_ORDER
+from ax3l.constants.DSimulationAnalysis import DSimulationAnalysis
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 from ax3l.server.ToolHandler import handle_tool
 from ax3l.zmq.ZMQServer import ZMQServer
@@ -36,6 +37,7 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
         results = {baseline_id: dict(status='completed', high_score=10, config=config)}
         calls = []
         selections = []
+        analysis_tasks = []
         values = dict(hidden_size=240, sequence_length=12, batch_size=26,
                       learning_rate=.003, gamma=.97, epsilon_pair=(.91, .95),
                       reward_pair=(.25, -.5), epsilon_nice_pair=(.01, 40))
@@ -77,11 +79,18 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
                 request = json.loads(payload)
                 tool = request['tools'][0]['function']['name']
                 if tool == 'submit_simulation_summary':
+                    self_test.assertEqual(len(request['messages']), 1)
                     self_test.assertEqual(request['messages'][-1]['content'][1]['type'], 'image_url')
-                    arguments = {'summary': 'Scores improved during training. Most games ended in body collisions.'}
+                    content = request['messages'][0]['content'][0]['text']
+                    label = next(label for label in DSimulationAnalysis.SECTIONS.values()
+                                 if f'Task: {label} ' in content)
+                    analysis_tasks.append(label)
+                    arguments = {'summary': f'{label} observation.'}
                 else:
                     self_test.assertEqual(calls, [])
                     content = request['messages'][-1]['content']
+                    for label in DSimulationAnalysis.SECTIONS.values():
+                        self_test.assertIn(f'{label}: {label} observation.', content)
                     parameter = next(name for name in PARAMETER_ORDER if f'Choose {name}.' in content)
                     selections.append(parameter)
                     value = values[parameter]
@@ -109,6 +118,7 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(asyncio.CancelledError):
                 await optimize(InferenceFixture(), Path('/tmp'), db, server.endpoint)
         self.assertEqual(len(calls), 1)
+        self.assertEqual(analysis_tasks, list(DSimulationAnalysis.SECTIONS.values()) * 2)
         self.assertEqual(calls[0]['model']['hidden_size'], 240)
         self.assertEqual(calls[0]['epsilon_nice'], {'probability': .01, 'steps': 40})
         self.assertEqual(EventLogDb(db).current_golden_config()['process_id'], candidate_id)
@@ -118,6 +128,7 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
         saved = ExperimentDb(db).analysis(candidate_id)
         self.assertEqual(saved.metrics['termination_reasons']['wall'], {'count': 3, 'percent': 30})
         self.assertEqual(saved.metrics['termination_reasons']['snake'], {'count': 7, 'percent': 70})
-        rows = db.query("SELECT name, COUNT(*) AS n FROM events WHERE event_id>%s AND name IN ('simulation_analyzed','simulation_submitted','configuration_compared') GROUP BY name", (first_event,))
+        rows = db.query("SELECT name, COUNT(*) AS n FROM events WHERE event_id>%s AND name IN ('simulation_analyzed','simulation_analysis_progress','simulation_submitted','configuration_compared') GROUP BY name", (first_event,))
         self.assertEqual({row['name']: row['n'] for row in rows},
-                         {'simulation_analyzed': 2, 'simulation_submitted': 1, 'configuration_compared': 1})
+                         {'simulation_analyzed': 2, 'simulation_analysis_progress': 4,
+                          'simulation_submitted': 1, 'configuration_compared': 1})

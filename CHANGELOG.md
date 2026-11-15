@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Deliver experiment data to Qwen as JSON while preserving linked tool navigation.
+
+### Changed
+
+- Return JSON payloads for settings, scores, termination reasons, activity, and
+  saved observations, with JSON data blocks in draft and run overviews.
+- Preserve numeric types, recorded percentage precision, and missing statistics
+  as JSON null. Explain the data format in Qwen's prompt and tool instructions.
+
 ## [4.3.3] - 2026-11-15 @ 11:57
 
 ### Summary

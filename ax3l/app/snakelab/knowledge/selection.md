@@ -3,6 +3,8 @@
 Goal: improve the high score over 500 episodes. Choose only the assigned
 setting or pair, using the rules in your submission tool. Read data_tool /draft
 for current choices, then / for runs. Keeping a value unchanged is allowed.
+Data values are JSON; null means unrecorded. Navigation pages link to the
+requested settings, scores, activity, endings, and observations.
 
 Latest is feedback from the last completed run, even if unsuccessful. Golden
 is the current-seed baseline. Best is historical context; different

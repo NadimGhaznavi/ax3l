@@ -17,6 +17,7 @@ from ax3l.app.DbMgr import DbMgr
 from ax3l.app.ReportBackground import ReportBackground
 from ax3l.constants.DEventCategory import DEventCategory
 from ax3l.app.EventLogDb import EventLogDb
+from ax3l.app.snakelab.ExperimentDb import ExperimentDb
 from ax3l.activity.ReplyReport import fields, reply_content, reasoning_content
 from ax3l.activity.PromptReport import parts, summary
 from ax3l.activity.ScoreDistribution import distribution
@@ -192,11 +193,17 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
                     if run is None:
                         self.send_error(404, "Simulation not found")
                         return
+                    db = DbMgr(initialize_event_tables=False)
+                    try:
+                        analysis = ExperimentDb(db).analysis(run_id)
+                    finally:
+                        db.close()
                     body = templates.get_template("simulation_run.html").render(
                         run=run, board_gif_url=animation_url(run_id, run["id"]),
                         board_svg=board_svg(run.get("high_score_snapshot")),
                         config=snake.get_config(run_id),
                         diagnostics=snake.get_episode_diagnostics(run_id),
+                        analysis=analysis,
                     ).encode("utf-8")
                     content_type = "text/html; charset=utf-8"
                 except Exception:

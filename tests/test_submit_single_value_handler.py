@@ -1,90 +1,79 @@
+"""Single choices update a durable draft without starting simulations."""
+
 from copy import deepcopy
 import unittest
 from unittest.mock import Mock, patch
 
-from ax3l.constants.DAx3l import DAx3l
-from ax3l.app.snakelab.GenerateDefaultConfig import GenerateDefaultConfig
 from ax3l.app.snakelab.SubmitSingleValueHandler import SubmitSingleValueHandler
+from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
+from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 
 
 class SubmitSingleValueHandlerTests(unittest.TestCase):
     def setUp(self):
-        self.db = Mock()
-        self.snake = self.enterContext(patch('ax3l.app.snakelab.SubmitSingleValueHandler.SnakeLab')).return_value
-        self.events = self.enterContext(patch('ax3l.app.snakelab.SubmitSingleValueHandler.EventLogDb')).return_value
-        self.events.current_golden_config.return_value = {'process_id': 'golden-run'}
-        self.baseline = GenerateDefaultConfig().run()
-        self.snake.get_config.return_value = self.baseline
-        self.snake.is_config_unique.return_value = True
-        self.snake.submit_simulation.return_value = 'new-run'
-        self.handler = SubmitSingleValueHandler(self.db)
+        module = 'ax3l.app.snakelab.SubmitSingleValueHandler.'
+        self.snake = self.enterContext(patch(module + 'SnakeLab')).return_value
+        self.experiments = self.enterContext(patch(module + 'ExperimentDb')).return_value
+        self.handler = SubmitSingleValueHandler(Mock())
+        self.baseline = SimulationConfiguration.defaults()
+        self.bind('learning_rate')
 
-    def test_illegal_values_return_invalid_value_prompt_without_submission(self):
-        proposals = [{}, {'parameter': 'learning_rate', 'value': 0.003, 'extra': 1}]
-        proposals += [{'parameter': 'learning_rate', 'value': value}
-                      for value in (True, '0.003', None, float('nan'), float('inf'), 0, 0.02)]
-        proposals += [{'parameter': 'unknown', 'value': 1},
-                      {'parameter': 'epochs', 'value': 501},
-                      {'parameter': 'batch_size', 'value': 25}]
-        for proposal in proposals:
-            with self.subTest(proposal=proposal):
-                result = self.handler.submit(proposal)
-                self.assertEqual(result['code'], 'invalid_value')
-                self.assertEqual(result['source_name'], 'InvalidValue')
-                self.assertIn('Invalid value:', result['prompt']['content'])
-        self.snake.submit_simulation.assert_not_called()
-        self.events.current_golden_config.assert_not_called()
+    def bind(self, parameter):
+        self.draft = ConfigurationDraft('draft', 'gold', {'golden': 'gold'}, deepcopy(self.baseline),
+                                        PARAMETER_ORDER[:PARAMETER_ORDER.index(parameter)])
+        self.experiments.draft.return_value = self.draft
 
-    def test_unchanged_and_historical_configurations_are_duplicates(self):
-        rate = self.baseline['training']['learning_rate']
-        result = self.handler.submit({'parameter': 'learning_rate', 'value': rate})
-        self.assertEqual(result['code'], 'duplicate_config')
-        self.assertEqual(result['source_name'], 'NoDupes')
-        self.snake.is_config_unique.assert_not_called()
-        self.snake.is_config_unique.return_value = False
-        result = self.handler.submit({'parameter': 'learning_rate', 'value': 0.003})
-        self.assertEqual(result['code'], 'duplicate_config')
-        self.assertIn('already exists in the simulation database', result['prompt']['content'])
+    def submit(self, parameter='learning_rate', value=.003, **extra):
+        return self.handler.submit({'draft_id': 'draft', 'parameter': parameter, 'value': value, **extra})
+
+    def test_invalid_values_do_not_read_or_write_the_draft(self):
+        for value in (True, '0.003', None, float('nan'), float('inf'), 0, .02):
+            with self.subTest(value=value):
+                self.assertEqual(self.submit(value=value)['code'], 'invalid_value')
+        for parameter, value in (('seed', 1), ('epochs', 500), ('initial', .95), ('unknown', 1),
+                                 ('batch_size', 25)):
+            self.assertEqual(self.submit(parameter, value)['code'], 'invalid_value')
+        self.assertEqual(self.submit(extra=1)['code'], 'invalid_value')
+        self.assertEqual(self.handler.submit({})['code'], 'invalid_value')
+        self.experiments.draft.assert_not_called()
+        self.experiments.save_draft.assert_not_called()
         self.snake.submit_simulation.assert_not_called()
 
-    def test_only_selected_field_changes_and_submission_is_logged_once(self):
+    def test_choice_preserves_earlier_choices_and_does_not_submit_or_check_duplicates(self):
+        self.draft.config['model']['hidden_size'] = 240
         original = deepcopy(self.baseline)
-        result = self.handler.submit({'parameter': 'learning_rate', 'value': 0.003})
-        candidate = deepcopy(original)
-        candidate['training']['learning_rate'] = 0.003
-        self.assertEqual(result, {'status': 'ok', 'run_id': 'new-run'})
-        self.snake.is_config_unique.assert_called_once_with(candidate)
-        self.snake.submit_simulation.assert_called_once_with(candidate)
-        self.assertEqual(self.db.log.call_args.kwargs["ax3l_version"], DAx3l.VERSION)
+        result = self.submit()
+        self.assertEqual(result, {'status': 'ok', 'draft_id': 'draft', 'phase': 'choosing'})
+        saved = self.experiments.save_draft.call_args.args[0]
+        self.assertEqual(saved.config['model']['hidden_size'], 240)
+        self.assertEqual(saved.config['training']['learning_rate'], .003)
+        self.assertEqual(saved.next_parameter, 'gamma')
         self.assertEqual(self.baseline, original)
-        self.assertEqual([c.args[0] for c in self.db.log.call_args_list],
-                         ['proposal_accepted', 'simulation_submitted'])
-
-    def test_all_single_parameters_change_exactly_one_field(self):
-        for section, parameter, value in [('model', 'hidden_size', 240),
-                                           ('training', 'sequence_length', 12),
-                                           ('training', 'batch_size', 26),
-                                           ('training', 'learning_rate', .003),
-                                           ('training', 'gamma', .97)]:
-            with self.subTest(parameter=parameter):
-                candidate = deepcopy(self.baseline)
-                candidate[section][parameter] = value
-                self.assertEqual(self.handler.submit({'parameter': parameter, 'value': value})['status'], 'ok')
-                self.snake.submit_simulation.assert_called_with(candidate)
-
-    def test_pairs_and_managed_settings_are_rejected_even_with_legal_values(self):
-        for parameter, value in [('closer_to_food', 3), ('further_from_food', -3),
-                                 ('initial', .95), ('decay', .98), ('seed', 1971),
-                                 ('epochs', 1500), ('layers', 4)]:
-            with self.subTest(parameter=parameter):
-                self.assertEqual(self.handler.submit({'parameter': parameter, 'value': value})['code'],
-                                 'invalid_value')
+        self.snake.is_config_unique.assert_not_called()
         self.snake.submit_simulation.assert_not_called()
-        self.events.current_golden_config.assert_not_called()
 
-    def test_backend_failure_is_not_retried_or_logged_as_accepted(self):
-        self.snake.submit_simulation.side_effect = TimeoutError('timeout')
-        with self.assertRaises(TimeoutError):
-            self.handler.submit({'parameter': 'learning_rate', 'value': 0.003})
-        self.snake.submit_simulation.assert_called_once()
-        self.db.log.assert_not_called()
+    def test_unchanged_value_is_an_explicit_accepted_choice(self):
+        self.assertEqual(self.submit(value=self.baseline['training']['learning_rate'])['status'], 'ok')
+        self.experiments.save_draft.assert_called_once()
+
+    def test_all_single_parameters_are_staged(self):
+        for name, value in (('hidden_size', 240), ('sequence_length', 12), ('batch_size', 26),
+                             ('learning_rate', .003), ('gamma', .97)):
+            with self.subTest(parameter=name):
+                self.bind(name)
+                self.assertEqual(self.submit(name, value)['status'], 'ok')
+                self.assertEqual(self.draft.selections[-1], name)
+        self.snake.submit_simulation.assert_not_called()
+
+    def test_stale_draft_and_wrong_parameter_cannot_change_the_active_draft(self):
+        self.assertEqual(self.submit('gamma', .97)['status'], 'rejected')
+        self.assertEqual(self.handler.submit({'draft_id': 'old', 'parameter': 'learning_rate',
+                                              'value': .003})['status'], 'rejected')
+        self.experiments.save_draft.assert_not_called()
+
+    def test_persistence_failure_propagates(self):
+        self.experiments.save_draft.side_effect = RuntimeError('write failed')
+        with self.assertRaisesRegex(RuntimeError, 'write failed'):
+            self.submit()
+        self.experiments.save_draft.assert_called_once()
+        self.snake.submit_simulation.assert_not_called()

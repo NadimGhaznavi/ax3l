@@ -1,0 +1,24 @@
+"""The durable choices for one complete simulation configuration."""
+
+from dataclasses import dataclass, field
+
+from ax3l.app.snakelab.SingleParameters import SINGLE_PARAMETERS
+from ax3l.app.snakelab.PairParameters import PAIR_PARAMETERS
+
+
+PARAMETER_ORDER = list(SINGLE_PARAMETERS) + list(PAIR_PARAMETERS)
+
+
+@dataclass
+class ConfigurationDraft:
+    draft_id: str
+    golden_run_id: str
+    references: dict[str, str]
+    config: dict
+    selections: list[str] = field(default_factory=list)
+    phase: str = "choosing"
+    run_id: str | None = None
+
+    @property
+    def next_parameter(self) -> str | None:
+        return PARAMETER_ORDER[len(self.selections)] if self.phase == "choosing" else None

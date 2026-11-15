@@ -15,5 +15,7 @@ class ProjectContext(Prompt):
             "Distance shaping uses Manhattan progress. EpsilonNice is required and "
             "its probability and duration are tunable after ordinary epsilon ends. "
             "Nice safety covers immediate collisions; detours can still enter traps. "
-            "Propose only the assigned parameter or pair to improve the high score."
+            "All tunable parameters are chosen in a draft before Ax3l executes one simulation. "
+            "During parameter selection, choose only the assigned parameter or pair and account for "
+            "choices already made in the draft. During run analysis, submit a short evidence-based description."
         )

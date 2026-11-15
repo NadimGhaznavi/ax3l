@@ -23,6 +23,8 @@ class DLabel:
 
 
 FIELD_TO_LABEL_MAP: Final[dict[str, str]] = {
+    "configuration": "Complete configuration",
+    "simulation_summary": "Simulation analysis",
     "hidden_size": DLabel.HIDDEN_SIZE,
     "model.hidden_size": DLabel.HIDDEN_SIZE,
     "sequence_length": DLabel.SEQUENCE_LENGTH,

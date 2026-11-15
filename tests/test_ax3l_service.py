@@ -53,12 +53,15 @@ class Ax3lServiceTests(unittest.TestCase):
                         "from ax3l.app.snakelab.GenerateDefaultConfig import GenerateDefaultConfig; "
                         "golden = Prompt('Golden configuration'); "
                         "golden.run_id = 'f6e72cb3-9bcf-4669-b368-a17c656bad79'; "
-                        "patch.object(import_module('ax3l.app.snakelab.SnakeLabLoop'), 'GoldenConfig', return_value=golden).start(); "
                         "patch('ax3l.interface.SnakeLab.SnakeLab.is_simulation_running', return_value=False).start(); "
-                        "patch('ax3l.app.EventLogDb.EventLogDb.latest_snakelab_proposal', return_value=None).start(); "
+                        "patch('ax3l.app.EventLogDb.EventLogDb.pending_seed_rotation', return_value=None).start(); "
+                        "patch('ax3l.app.EventLogDb.EventLogDb.stagnant_rounds', return_value=0).start(); "
                         "patch('ax3l.app.EventLogDb.EventLogDb.current_golden_config', return_value={'process_id': golden.run_id}).start(); "
                         "patch('ax3l.interface.SnakeLab.SnakeLab.get_run_result', return_value={'status': 'completed', 'high_score': 10, 'config': GenerateDefaultConfig().run()}).start(); "
-                        "patch('ax3l.interface.SnakeLab.SnakeLab.get_parameter_report', return_value=[]).start(); "
+                        "patch('ax3l.interface.SnakeLab.SnakeLab.get_latest_completed_run_id', return_value=golden.run_id).start(); "
+                        "patch('ax3l.interface.SnakeLab.SnakeLab.get_all_time_best_run_id', return_value=golden.run_id).start(); "
+                        "patch('ax3l.interface.SnakeLab.SnakeLab.get_analysis_episodes', return_value=[]).start(); "
+                        "patch('ax3l.app.snakelab.AnalyzeRun.render_analysis', return_value=b'png').start(); "
                         "patch('ax3l.interface.SnakeLab.SnakeLab.get_num_sims', return_value=1).start(); "
                         "raise SystemExit(main())",
                         "--zmq-endpoint", "tcp://127.0.0.1:*",

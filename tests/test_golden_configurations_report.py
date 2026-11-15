@@ -42,7 +42,7 @@ class GoldenHistoryTests(unittest.TestCase):
         response = json.dumps({'choices': [{'message': {'reasoning_content': 'winning reason'}}]})
         event(6, 'Conversation', 'reply_received', 'conversation', response)
         event(7, 'Conversation', 'reply_received', 'unrelated', 'wrong response')
-        event(8, 'Tool', 'tool_execution_completed', 'conversation', '{"status":"ok","run_id":"winner"}')
+        event(8, 'Configuration', 'proposal_accepted', 'winner', '{"draft_id":"conversation"}')
         event(9, 'Configuration', 'golden_config_created', 'winner', 'High score: 55 > 0; network.size: 4 -> 6.')
         event(10, 'Configuration', 'golden_config_retained', 'winner')
         event(11, 'Configuration', 'golden_config_created', 'seed-baseline')
@@ -60,11 +60,11 @@ class GoldenHistoryTests(unittest.TestCase):
         self.assertEqual(parameter_change(rows[1]['decision']), '4 > 6')
         self.assertEqual(parameter_change(rows[2]['decision']), '')
         self.assertEqual(rows[1]['reply_id'], 6)
-        self.assertEqual(rows[1]['parameter'], 'learning_rate')
+        self.assertEqual(rows[1]['parameter'], 'configuration')
         self.assertEqual(reasoning_content(rows[1]['response']), 'winning reason')
         for row in (rows[0], rows[2]):
             self.assertIsNone(row['reply_id'])
-            self.assertIsNone(row['parameter'])
+            self.assertEqual(row['parameter'], 'configuration')
 
     def test_missing_reasoning(self):
         for content in (None, '', 'invalid', 'null', '{}', '{"choices":[]}',
@@ -123,7 +123,7 @@ class GoldenReportTests(unittest.TestCase):
         for value in ('Date', 'Time', 'Configuration', 'Simulation', 'High Score', '<td>55</td>', '<td>0</td>', 'Parameter', 'Change', '<td>4 &gt; 6</td>', 'Reason', '2026-09-15',
                       '12:30:45', '&lt;parameter&gt;', f'href="/simulations/{run_id}/config"'):
             self.assertIn(value, page)
-        self.assertIn(f'href="/simulations/{run_id}/config">{run_id[:13]}</a>', page)
+        self.assertIn(f'href="/simulations/{run_id}/config">{run_id[:8]}</a>', page)
         self.assertIn(f'href="/simulations/{run_id}">Details</a>', page)
         self.assertEqual(page.count('>Details</a>'), 1)
         self.assertEqual(page.count('>Reason</a>'), 1)

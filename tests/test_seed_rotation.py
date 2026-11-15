@@ -80,29 +80,3 @@ class SeedRotationTests(unittest.IsolatedAsyncioTestCase):
             self.assertIsNone(await rotate_if_needed(snake, Mock(), AsyncMock(), resume_only=True))
             events.stagnant_rounds.assert_not_called()
             snake.submit_simulation.assert_not_called()
-
-    async def test_loop_uses_rotated_baseline_before_next_llm_request(self):
-        import asyncio
-        from pathlib import Path
-        from ax3l.app.Prompt import Prompt
-        from ax3l.app.snakelab.SnakeLabLoop import optimize
-        module = 'ax3l.app.snakelab.SnakeLabLoop.'
-        snake, events = Mock(), Mock()
-        snake.is_simulation_running.return_value = False
-        snake.parameter_space_exhausted.return_value = False
-        snake.get_run_result.return_value = {'status': 'completed', 'high_score': 100}
-        events.latest_snakelab_proposal.return_value = None
-        events.latest_seed_baseline.return_value = None
-        golden = Prompt('gold')
-        golden.run_id = 'old'
-        rotation = AsyncMock(side_effect=[None, 'rotated'])
-        conversation = AsyncMock(side_effect=asyncio.CancelledError())
-        with patch(module + 'RoundRobinState') as selector, patch(module + 'SnakeLab', return_value=snake), patch(module + 'EventLogDb', return_value=events), patch(module + 'GoldenConfig', return_value=golden), patch(module + 'rotate_if_needed', rotation), patch(module + 'SnakeLabTools', return_value=AsyncMock()), patch(module + 'converse', conversation), patch(module + 'Comparison', return_value=Prompt('new baseline')) as comparison:
-            selector.return_value.begin.return_value = 'hidden_size'
-            with self.assertRaises(asyncio.CancelledError):
-                await optimize(Mock(), Path('/tmp'), Mock(), 'endpoint')
-            comparison.assert_called_once_with('rotated', 'hidden_size')
-            prompts = conversation.call_args.args[4]
-            self.assertEqual(len(prompts), 3)
-            self.assertTrue(all(isinstance(json.loads(p.to_json())['content'], str) for p in prompts))
-            self.assertEqual(conversation.call_args.args[4][1].to_md(), 'new baseline')

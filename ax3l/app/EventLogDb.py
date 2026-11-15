@@ -54,33 +54,27 @@ class EventLogDb:
         return rows[0] if rows else None
 
     def golden_configurations(self) -> list[dict[str, Any]]:
-        """Include every baseline/promotion and the response that proposed its run."""
+        """Link promotions to the draft's final parameter reply."""
         return self._db.query("""
-            WITH successful_tools AS (
-                SELECT e.event_id, e.process_id,
-                       JSON_UNQUOTE(JSON_EXTRACT(CASE WHEN JSON_VALID(m.content) THEN m.content ELSE '{}' END,
-                                                 '$.run_id')) AS run_id
+            WITH proposals AS (
+                SELECT e.event_id, e.process_id AS run_id,
+                       JSON_UNQUOTE(JSON_EXTRACT(m.content, '$.draft_id')) AS draft_id
                 FROM events e JOIN event_messages m USING (event_id)
-                WHERE e.category = 'Tool' AND e.name = 'tool_execution_completed'
-                  AND JSON_UNQUOTE(JSON_EXTRACT(CASE WHEN JSON_VALID(m.content) THEN m.content ELSE '{}' END,
-                                               '$.status')) = 'ok'
+                WHERE e.category = 'Configuration' AND e.name = 'proposal_accepted'
             )
-            SELECT g.event_id, g.occurred_at, g.process_id, p.parameter, h.score AS high_score,
-                   r.event_id AS reply_id, rm.content AS response, gm.content AS decision
+            SELECT g.event_id, g.occurred_at, g.process_id, 'configuration' AS parameter,
+                   h.score AS high_score, r.event_id AS reply_id,
+                   rm.content AS response, gm.content AS decision
             FROM events g
             LEFT JOIN event_messages gm ON gm.event_id = g.event_id
             LEFT JOIN experiment_highscores h ON h.event_id = g.event_id
-            LEFT JOIN successful_tools t ON t.event_id = (
-                SELECT MIN(event_id) FROM successful_tools WHERE run_id = g.process_id)
+            LEFT JOIN proposals t ON t.event_id = (
+                SELECT MIN(event_id) FROM proposals WHERE run_id = g.process_id)
             LEFT JOIN events r ON r.event_id = (
                 SELECT MAX(event_id) FROM events
-                WHERE process_id = t.process_id AND event_id < t.event_id
+                WHERE process_id = t.draft_id AND event_id < t.event_id
                   AND category = 'Conversation' AND name = 'reply_received')
             LEFT JOIN event_messages rm ON rm.event_id = r.event_id
-            LEFT JOIN events p ON p.event_id = (
-                SELECT MAX(event_id) FROM events
-                WHERE process_id = r.process_id AND event_id < r.event_id
-                  AND category = 'Conversation' AND name = 'prompt_sent')
             WHERE g.category = %s AND g.name = %s
             ORDER BY g.occurred_at DESC, g.event_id DESC
         """, (DEventCategory.Configuration.CATEGORY, DEventCategory.Configuration.GOLDEN_CREATED))
@@ -105,72 +99,22 @@ class EventLogDb:
         return rows[0] if rows else None
 
     def stagnant_rounds(self) -> int:
-        """Count complete ordered passes since the last golden creation.
-
-        An improvement in the middle of a pass discards that partial pass.
-        Count comparisons and exhausted steps, not acceptances, so pending runs
-        and retries cannot trigger rotation. Durable events survive restarts.
-        """
+        """Count complete configuration comparisons since the latest golden."""
         return self._completed_rounds(since_golden=True)
 
     def experiment_cycles(self) -> int:
-        """Count completed round robins across all golden configs and seeds."""
+        """Count compared complete configurations across seeds."""
         return self._completed_rounds(since_golden=False)
 
     def _completed_rounds(self, *, since_golden: bool) -> int:
-        from ax3l.app.snakelab.RoundRobinState import ROUND_ROBIN_ORDER
-
         category = DEventCategory.Configuration
-        rows = self._db.query("""
-            SELECT c.event_id AS completion_id, c.process_id, m.content
-            FROM events c
-            JOIN events p ON p.event_id = (
-                SELECT MIN(event_id) FROM events
-                WHERE process_id = c.process_id AND category = %s AND name = %s)
-            JOIN events checkpoint ON checkpoint.event_id = (
-                SELECT MAX(event_id) FROM events
-                WHERE event_id < p.event_id AND category = %s AND name = %s)
-            JOIN event_messages m ON m.event_id = checkpoint.event_id
-            WHERE c.category = %s AND c.name = %s AND (%s = 0 OR c.event_id > COALESCE(
-                (SELECT MAX(event_id) FROM events WHERE category = %s AND name = %s), 0))
-            UNION ALL
-            SELECT c.event_id AS completion_id, NULL AS process_id, m.content
-            FROM events c
-            JOIN events checkpoint ON checkpoint.event_id = (
-                SELECT MAX(event_id) FROM events
-                WHERE event_id < c.event_id AND category = %s AND name = %s)
-            JOIN event_messages m ON m.event_id = checkpoint.event_id
-            WHERE c.category = %s AND c.name = %s AND (%s = 0 OR c.event_id > COALESCE(
-                (SELECT MAX(event_id) FROM events WHERE category = %s AND name = %s), 0))
-            ORDER BY completion_id
-        """, (category.CATEGORY, category.PROPOSAL_ACCEPTED,
-               category.CATEGORY, "round_robin_checkpoint",
-               category.CATEGORY, category.COMPARED, int(since_golden),
-               category.CATEGORY, category.GOLDEN_CREATED,
-               category.CATEGORY, "round_robin_checkpoint",
-               category.CATEGORY, category.PARAMETER_SPACE_EXHAUSTED, int(since_golden),
-               category.CATEGORY, category.GOLDEN_CREATED))
-        order = ROUND_ROBIN_ORDER
-        rounds, expected = 0, 0
-        seen = set()
-        for row in rows:
-            identity = row["process_id"] if row["process_id"] is not None else row["completion_id"]
-            if identity in seen:
-                continue
-            seen.add(identity)
-            checkpoint = json.loads(row["content"])
-            if checkpoint["parameter_order"] != order:
-                raise ValueError("Search parameter order changed; reset experiment events before resuming")
-            index = checkpoint["index"]
-            if index != expected:
-                expected = 0
-                if index != 0:
-                    continue
-            expected += 1
-            if expected == len(order):
-                rounds += 1
-                expected = 0
-        return rounds
+        return self._db.query("""
+            SELECT COUNT(DISTINCT c.process_id) AS rounds FROM events c
+            WHERE c.category = %s AND c.name = %s AND
+                (%s = 0 OR c.event_id > COALESCE((SELECT MAX(event_id) FROM events
+                    WHERE category = %s AND name = %s), 0))
+        """, (category.CATEGORY, category.COMPARED, int(since_golden),
+               category.CATEGORY, category.GOLDEN_CREATED))[0]["rounds"]
 
     def pending_seed_rotation(self) -> dict[str, Any] | None:
         category = DEventCategory.Configuration
@@ -207,27 +151,20 @@ class EventLogDb:
         """)
 
     def simulation_metrics(self) -> list[dict[str, Any]]:
-        """Read completed run times and prompt/response time for their conversations.
-
-        Initial context messages share one request, so pair each reply with only
-        the last preceding prompt. Tool processing between requests is excluded.
-        """
+        """Include every draft conversation and the run's vision analysis time."""
         return self._db.query(f"""
-            WITH submissions AS (
-                SELECT e.event_id, e.process_id,
-                       JSON_UNQUOTE(JSON_EXTRACT(m.content, '$.run_id')) AS run_id
+            WITH proposals AS (
+                SELECT e.event_id, e.process_id AS run_id,
+                       JSON_UNQUOTE(JSON_EXTRACT(m.content, '$.draft_id')) AS draft_id
                 FROM events e JOIN event_messages m USING (event_id)
-                WHERE e.category = 'Tool' AND e.name = 'tool_execution_completed'
-                  AND JSON_UNQUOTE(JSON_EXTRACT(
-                      CASE WHEN JSON_VALID(m.content) THEN m.content ELSE '{{}}' END,
-                      '$.status')) = 'ok'
+                WHERE e.category = 'Configuration' AND e.name = 'proposal_accepted'
             ), requests AS (
                 SELECT r.event_id, r.process_id,
                        TIMESTAMPDIFF(MICROSECOND, p.occurred_at, r.occurred_at) / 1000000.0 AS seconds
                 FROM events r
                 LEFT JOIN events p ON p.event_id = (
                     SELECT MAX(event_id) FROM events
-                    WHERE process_id = r.process_id AND event_id < r.event_id
+                    WHERE parent_event_id = r.parent_event_id AND event_id < r.event_id
                       AND category = 'Conversation' AND name IN ('prompt_sent', 'reply_received'))
                     AND p.name = 'prompt_sent'
                 WHERE r.category = 'Conversation' AND r.name = 'reply_received'
@@ -235,19 +172,20 @@ class EventLogDb:
             SELECT s.run_id, s.high_score,
                    ep.total_steps, ep.total_steps / NULLIF(ep.episodes, 0) AS steps_per_episode,
                    TIMESTAMPDIFF(MICROSECOND, s.started_at, s.completed_at) / 1000000.0 AS runtime_seconds,
-                   CASE WHEN t.event_id IS NULL THEN 0
-                        WHEN COUNT(q.event_id) = 0 OR COUNT(q.seconds) < COUNT(q.event_id) THEN NULL
+                   CASE WHEN COUNT(q.event_id) = 0 THEN 0
+                        WHEN COUNT(q.seconds) < COUNT(q.event_id) THEN NULL
                         ELSE SUM(q.seconds) END AS llm_seconds
             FROM `{DSnakeLab.DATABASE}`.simulation_runs s
             LEFT JOIN (
                 SELECT run_id, SUM(steps) AS total_steps, COUNT(*) AS episodes
                 FROM `{DSnakeLab.DATABASE}`.simulation_episodes GROUP BY run_id
             ) ep ON ep.run_id = s.run_id
-            LEFT JOIN submissions t ON t.event_id = (
-                SELECT MIN(event_id) FROM submissions
+            LEFT JOIN proposals t ON t.event_id = (
+                SELECT MIN(event_id) FROM proposals
                 WHERE run_id COLLATE utf8mb4_unicode_ci = s.run_id)
-            LEFT JOIN requests q ON q.process_id = t.process_id AND q.event_id < t.event_id
+            LEFT JOIN requests q ON (q.process_id = t.draft_id AND q.event_id < t.event_id)
+                OR q.process_id COLLATE utf8mb4_unicode_ci = s.run_id
             WHERE s.status = 'completed'
-            GROUP BY s.id, s.run_id, s.started_at, s.completed_at, s.high_score, ep.total_steps, ep.episodes, t.event_id
+            GROUP BY s.id, s.run_id, s.started_at, s.completed_at, s.high_score, ep.total_steps, ep.episodes
             ORDER BY s.id
         """)

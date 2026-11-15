@@ -1,4 +1,4 @@
-"""Validate one proposed change to the golden config and submit unique candidates."""
+"""Validate and durably stage one parameter choice without running a simulation."""
 
 from copy import deepcopy
 import json
@@ -6,11 +6,11 @@ from jsonschema import ValidationError
 
 from ax3l.app.snakelab.SingleParameters import SINGLE_PARAMETERS
 from ax3l.app.DbMgr import DbMgr
-from ax3l.app.EventLogDb import EventLogDb
+from ax3l.app.snakelab.ExperimentDb import ExperimentDb
 from ax3l.app.snakelab.prompts.InvalidValue import InvalidValue
 from ax3l.app.snakelab.prompts.NoDupes import NoDupes
 from ax3l.constants.DEventCategory import DEventCategory
-from ax3l.constants.DAx3l import DAx3l
+from ax3l.entities.ConfigurationDraft import PARAMETER_ORDER
 from ax3l.interface.SnakeLab import SnakeLab
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 
@@ -32,8 +32,8 @@ class SubmitSingleValueHandler:
                 "prompt": json.loads(prompt.to_json()), "source_name": prompt.source_name}
 
     def submit(self, payload: dict) -> dict:
-        if set(payload) != {"parameter", "value"}:
-            return self._reject("Supply exactly parameter and value.")
+        if not isinstance(payload, dict) or set(payload) != {"draft_id", "parameter", "value"}:
+            return self._reject("Supply exactly draft_id, parameter, and value.")
         parameter, value = payload["parameter"], payload["value"]
         if not isinstance(parameter, str) or not parameter:
             return self._reject("parameter must be a JSON spec key.")
@@ -48,34 +48,31 @@ class SubmitSingleValueHandler:
         except ValidationError as error:
             return self._reject(f"{parameter}: {error.message}")
 
-        return self._submit_changes([(path, value)], f"{parameter}: {value}")
+        return self._stage_changes(payload["draft_id"], parameter, [(path, value)])
 
-    def _submit_changes(self, changes: list, description: str) -> dict:
-        """Apply validated values together and submit one unique configuration."""
-        golden = EventLogDb(self._db).current_golden_config()
-        if golden is None:
-            raise RuntimeError("No golden configuration has been created")
-        baseline = self._snake.get_config(golden["process_id"])
-        if baseline is None:
-            raise RuntimeError("The golden configuration's run was not found")
-        candidate = deepcopy(baseline)
+    def _stage_changes(self, draft_id: str, parameter: str, changes: list) -> dict:
+        """Save a choice; only a complete candidate is checked for duplicates."""
+        if not isinstance(draft_id, str) or not draft_id:
+            return self._reject("draft_id must identify the active configuration draft.")
+        experiments = ExperimentDb(self._db)
+        draft = experiments.draft()
+        if draft is None or draft.draft_id != draft_id or draft.next_parameter != parameter:
+            return self._reject("This choice does not match the active draft's next parameter.")
+        candidate = deepcopy(draft.config)
         for path, value in changes:
             node = candidate
             for key in path[:-1]:
                 node = node[key]
             node[path[-1]] = value
-        # A broken stored baseline is a server/data error, not a bad proposal.
         SimulationConfiguration.validate(candidate)
-        if candidate == baseline:
-            return self._reject("The proposed configuration is identical to the golden configuration.", duplicate=True)
-        if not self._snake.is_config_unique(candidate):
-            return self._reject("The proposed configuration already exists in the simulation database.", duplicate=True)
-
-        run_id = self._snake.submit_simulation(candidate)
-        category = DEventCategory.Configuration
-        accepted_id = self._db.log(category.PROPOSAL_ACCEPTED, category.CATEGORY, "INFO",
-                                   description, process_id=run_id)
-        category = DEventCategory.SnakeLab
-        self._db.log(category.SUBMITTED, category.CATEGORY, "INFO", "Submitted config.",
-                     process_id=run_id, parent_event_id=accepted_id, ax3l_version=DAx3l.VERSION)
-        return {"status": "ok", "run_id": run_id}
+        selections = draft.selections + [parameter]
+        if len(selections) == len(PARAMETER_ORDER):
+            if not self._snake.is_config_unique(candidate):
+                return self._reject(
+                    "The complete draft already exists in the simulation database. "
+                    "Choose different values for this final pair.", duplicate=True)
+            draft.phase = "ready"
+        draft.config = candidate
+        draft.selections = selections
+        experiments.save_draft(draft)
+        return {"status": "ok", "draft_id": draft.draft_id, "phase": draft.phase}

@@ -1,30 +1,25 @@
-"""Alternate MCP submissions, completed simulations, and fresh comparisons."""
+"""Choose every setting in a durable draft, run once, and analyze the result."""
 
 import asyncio
+from copy import deepcopy
 import json
+from uuid import uuid4
 
 from ax3l.app.ConfigurationLog import ConfigurationLog
 from ax3l.app.EventLogDb import EventLogDb
 from ax3l.app.snakelab.ToolConversation import converse
 from ax3l.app.snakelab.SeedRotation import rotate_if_needed
-from ax3l.app.snakelab.RoundRobinState import RoundRobinState
-from ax3l.app.snakelab.ParameterSpace import finite_choices
-from ax3l.app.snakelab.prompts.Comparison import Comparison
-from ax3l.app.snakelab.prompts.ComparisonSingle import ComparisonSingle
-from ax3l.app.snakelab.prompts.FirstContact import FirstContact
+from ax3l.app.snakelab.AnalyzeRun import analyze_run
+from ax3l.app.snakelab.ExperimentDb import ExperimentDb
+from ax3l.app.snakelab.prompts.ConfigurationChoice import ConfigurationChoice
 from ax3l.app.snakelab.prompts.ProjectContext import ProjectContext
-from ax3l.app.snakelab.prompts.FirstContactSingle import FirstContactSingle
-from ax3l.app.snakelab.prompts.FirstContactEpsilonPair import FirstContactEpsilonPair
-from ax3l.app.snakelab.prompts.FirstContactRewardPair import FirstContactRewardPair
-from ax3l.app.snakelab.prompts.ComparisonEpsilonPair import ComparisonEpsilonPair
-from ax3l.app.snakelab.prompts.ComparisonRewardPair import ComparisonRewardPair
-from ax3l.app.snakelab.prompts.ComparisonEpsilonNicePair import ComparisonEpsilonNicePair
-from ax3l.app.snakelab.prompts.FirstContactEpsilonNicePair import FirstContactEpsilonNicePair
-from ax3l.app.snakelab.prompts.GoldenConfig import GoldenConfig
+from ax3l.constants.DAx3l import DAx3l
 from ax3l.constants.DEventCategory import DEventCategory as Events
 from ax3l.constants.DSnakeLab import DSnakeLab
+from ax3l.entities.ConfigurationDraft import ConfigurationDraft
 from ax3l.interface.SnakeLab import SnakeLab, SimulationUnavailable
 from ax3l.interface.SnakeLabTools import SnakeLabTools
+from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 
 
 class SimulationUnsuccessful(RuntimeError):
@@ -86,70 +81,89 @@ def compare(snake, db, golden_id, latest_id):
     return current_id
 
 
+def submit_draft(snake, db, experiments: ExperimentDb, draft: ConfigurationDraft) -> None:
+    """Persist submission intent; reconcile an interrupted send without retrying it."""
+    if draft.phase == "ready":
+        SimulationConfiguration.validate(draft.config)
+        draft.phase = "submitting"
+        experiments.save_draft(draft)
+        draft.run_id = snake.submit_simulation(draft.config)
+        draft.phase = "submitted"
+        experiments.save_draft(draft)
+    elif draft.phase == "submitting":
+        draft.run_id = snake.find_config_run(draft.config)
+        if draft.run_id is None:
+            raise RuntimeError("Configuration submission is unresolved; no matching run was found. "
+                               "The submission will not be retried automatically.")
+        draft.phase = "submitted"
+        experiments.save_draft(draft)
+    recorded = experiments.submission_events(draft.run_id)
+    category = Events.Configuration
+    accepted_id = recorded.get(category.PROPOSAL_ACCEPTED)
+    if accepted_id is None:
+        accepted_id = db.log(category.PROPOSAL_ACCEPTED, category.CATEGORY, "INFO",
+                             json.dumps({"draft_id": draft.draft_id, "config": draft.config}, allow_nan=False),
+                             process_id=draft.run_id)
+    if Events.SnakeLab.SUBMITTED not in recorded:
+        db.log(Events.SnakeLab.SUBMITTED, Events.SnakeLab.CATEGORY, "INFO", "Submitted complete configuration.",
+               process_id=draft.run_id, parent_event_id=accepted_id, ax3l_version=DAx3l.VERSION)
+
+
+def complete_comparison(snake, db, experiments: ExperimentDb, draft: ConfigurationDraft) -> str:
+    saved = experiments.comparison(draft.run_id)
+    if saved is None:
+        return compare(snake, db, draft.golden_run_id, draft.run_id)
+    selected_id = saved["current_golden_run_id"]
+    if EventLogDb(db).current_golden_config()["process_id"] != selected_id:
+        selected = snake.get_run_result(selected_id)
+        ConfigurationLog(db).golden_config_created(
+            selected_id, reason=saved["reason"], parent_event_id=saved["event_id"],
+            experiment_score={"simulations": snake.get_num_sims(), "score": selected["high_score"],
+                              "seed": selected["config"]["seed"]})
+    return selected_id
+
+
 async def optimize(llm, output, db, endpoint):
     snake = SnakeLab()
+    experiments = ExperimentDb(db)
     while snake.is_simulation_running():
         await asyncio.sleep(DSnakeLab.STATUS_POLL_SECONDS)
     await rotate_if_needed(snake, db, wait_for_run, resume_only=True)
-    golden = GoldenConfig(db)
-    golden_id = golden.run_id
-    baseline = snake.get_run_result(golden_id)
-    if baseline is None or baseline["status"] != "completed" or baseline["high_score"] is None:
-        raise ValueError("The initial golden simulation must have completed with a high score")
-    proposal = EventLogDb(db).latest_snakelab_proposal()
-    if proposal:
-        latest_id = proposal["process_id"]
-        if proposal["comparison"]:
-            snapshot = json.loads(proposal["comparison"])
-            selected_id = snapshot["current_golden_run_id"]
-            # Finish a promotion interrupted between the comparison and creation events.
-            if selected_id != golden_id:
-                ConfigurationLog(db).golden_config_created(
-                    selected_id, reason=snapshot["reason"], parent_event_id=proposal["comparison_id"],
-                    experiment_score={"simulations": snake.get_num_sims(),
-                                      "score": snake.get_run_result(selected_id)["high_score"],
-                                      "seed": snake.get_config(selected_id).get("seed")})
-            golden_id = selected_id
-        else:
-            try:
-                await wait_for_run(snake, db, latest_id)
-            except (SimulationUnavailable, SimulationUnsuccessful):
-                db.log(Events.Configuration.GOLDEN_RETAINED, Events.Configuration.CATEGORY,
-                       "WARNING", f"Skipping interrupted proposal {latest_id}; retaining the golden configuration.",
-                       process_id=golden_id)
-            else:
-                golden_id = compare(snake, db, golden_id, latest_id)
-    first_contact = proposal is None and EventLogDb(db).latest_seed_baseline() is None
-    selector = RoundRobinState(db)
     while True:
-        rotated_id = await rotate_if_needed(snake, db, wait_for_run)
-        if rotated_id is not None:
-            golden_id = rotated_id
-            first_contact = False
-        parameter = selector.begin()
-        if (finite_choices(parameter) is not None
-                and snake.parameter_space_exhausted(golden_id, parameter)):
-            selector.skip_exhausted(parameter)
-            continue
-        if parameter == "epsilon_pair":
-            prompts = [ComparisonEpsilonPair(golden_id), FirstContactEpsilonPair()]
-        elif parameter == "reward_pair":
-            prompts = [ComparisonRewardPair(golden_id), FirstContactRewardPair()]
-        elif parameter == "epsilon_nice_pair":
-            prompts = [ComparisonEpsilonNicePair(golden_id), FirstContactEpsilonNicePair()]
-        else:
-            prompts = [Comparison(golden_id, parameter),
-                       FirstContactSingle(parameter) if first_contact else ComparisonSingle(parameter)]
-        if first_contact:
-            prompts.insert(0, FirstContact())
-        prompts.insert(0, ProjectContext())
-        async with SnakeLabTools(endpoint, parameter) as tools:
-            latest_id = await converse(llm, output, db, tools, prompts, parameter=parameter)
-        await wait_for_run(snake, db, latest_id)
-        while snake.is_simulation_running():
-            await asyncio.sleep(DSnakeLab.STATUS_POLL_SECONDS)
-        golden_id = compare(snake, db, golden_id, latest_id)
-        first_contact = False
+        draft = experiments.draft()
+        if draft is None or draft.phase in ("completed", "failed"):
+            await rotate_if_needed(snake, db, wait_for_run)
+            golden_id = EventLogDb(db).current_golden_config()["process_id"]
+            baseline = snake.get_run_result(golden_id)
+            if baseline is None or baseline["status"] != "completed" or baseline["high_score"] is None:
+                raise ValueError("The golden simulation must have completed with a high score")
+            references = {"latest": snake.get_latest_completed_run_id(), "golden": golden_id,
+                          "all_time_best": snake.get_all_time_best_run_id()}
+            for run_id in dict.fromkeys(references.values()):
+                await analyze_run(snake, llm, output, db, endpoint, run_id, baseline["high_score"])
+            draft = ConfigurationDraft(str(uuid4()), golden_id, references, deepcopy(baseline["config"]))
+            experiments.save_draft(draft)
+        if draft.phase == "choosing":
+            analyses = {run_id: experiments.analysis(run_id) for run_id in set(draft.references.values())}
+            while draft.phase == "choosing":
+                parameter = draft.next_parameter
+                prompts = [ProjectContext(), ConfigurationChoice(draft, analyses)]
+                async with SnakeLabTools(endpoint, parameter, draft_id=draft.draft_id) as tools:
+                    await converse(llm, output, db, tools, prompts,
+                                   parameter=parameter, process_id=draft.draft_id)
+                draft = experiments.draft(draft.draft_id)
+        submit_draft(snake, db, experiments, draft)
+        try:
+            await wait_for_run(snake, db, draft.run_id)
+        except SimulationUnsuccessful:
+            draft.phase = "failed"
+            experiments.save_draft(draft)
+            raise
+        golden_id = complete_comparison(snake, db, experiments, draft)
+        target = snake.get_run_result(golden_id)["high_score"]
+        await analyze_run(snake, llm, output, db, endpoint, draft.run_id, target)
+        draft.phase = "completed"
+        experiments.save_draft(draft)
 
 
 def run_optimization(llm, output, db, endpoint):

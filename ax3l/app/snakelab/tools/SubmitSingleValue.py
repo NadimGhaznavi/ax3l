@@ -12,10 +12,10 @@ class SubmitSingleValue:
     def __init__(self, endpoint: str | None = None):
         self._client = ZMQClient(endpoint if endpoint is not None else Network.endpoint(destination=True))
 
-    async def submit(self, parameter: str, value: int | float) -> str:
+    async def submit(self, draft_id: str, parameter: str, value: int | float) -> str:
         response = await asyncio.to_thread(
             self._client.request,
             ZMQMsg(sender="mcp-snakelab", target="snakelab", method="submit_single_value",
-                   payload={"parameter": parameter, "value": value}),
+                   payload={"draft_id": draft_id, "parameter": parameter, "value": value}),
         )
         return json.dumps(response.payload, ensure_ascii=False, allow_nan=False)

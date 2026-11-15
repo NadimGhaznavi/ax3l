@@ -73,7 +73,7 @@ def initialize_simulation(db: DbMgr) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run the Snake Lab single-parameter optimization loop.")
+    parser = argparse.ArgumentParser(description="Choose complete Snake Lab configurations and analyze each run.")
     parser.add_argument("--url", type=Configuration.validate_llamasrv_url,
                         help="Override the configured LlamaSrv base URL")
     parser.add_argument("--output", type=Path, default=Path("tmp/snakelab"))

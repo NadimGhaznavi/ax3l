@@ -1,9 +1,7 @@
 """Ax3l-owned reporting projections; source tables are read only."""
 
-import json
 
 from ax3l.app.DbMgr import DbMgr
-from ax3l.app.snakelab.RoundRobinState import ROUND_ROBIN_ORDER
 from ax3l.constants.DEventCategory import DEventCategory
 from ax3l.constants.DSnakeLab import DSnakeLab
 
@@ -122,38 +120,20 @@ class ReportingDb:
             "SELECT COALESCE(MAX(event_id), 0) AS id FROM report_events")[0]["id"]
 
     def pending_events(self) -> list[dict]:
-        """Find unseen IDs in one pass, revisiting late commits too."""
         category = DEventCategory.Configuration
         return self._db.query("""
             SELECT e.event_id FROM events e
             LEFT JOIN report_events r ON r.event_id = e.event_id
-            WHERE e.category = %s AND e.name IN (%s, %s, %s, %s) AND r.event_id IS NULL
+            WHERE e.category = %s AND e.name = %s AND r.event_id IS NULL
             ORDER BY e.event_id
-        """, (category.CATEGORY, "round_robin_checkpoint", category.PROPOSAL_ACCEPTED,
-               category.COMPARED, category.PARAMETER_SPACE_EXHAUSTED))
+        """, (category.CATEGORY, category.COMPARED))
 
     def events(self, event_ids: list[int]) -> list[dict]:
-        """Read checkpoint payloads only for a bounded batch of unseen events."""
         placeholders = ', '.join(['%s'] * len(event_ids))
-        rows = self._db.query(f"""
-            SELECT e.event_id, e.name, e.process_id,
-                   CASE WHEN e.name = 'round_robin_checkpoint' THEN m.content END AS checkpoint
-            FROM events e JOIN event_messages m USING (event_id)
-            WHERE e.event_id IN ({placeholders}) ORDER BY e.event_id
+        return self._db.query(f"""
+            SELECT event_id, name, process_id, 0 AS parameter_index
+            FROM events WHERE event_id IN ({placeholders}) ORDER BY event_id
         """, event_ids)
-        for row in rows:
-            content = row.pop("checkpoint")
-            row["parameter_index"] = None
-            if row["name"] != "round_robin_checkpoint":
-                continue
-            checkpoint = json.loads(content)
-            if checkpoint["parameter_order"] != ROUND_ROBIN_ORDER:
-                raise ValueError("Search parameter order changed; reset experiment events before resuming")
-            index = checkpoint["index"]
-            if type(index) is not int or not 0 <= index < len(ROUND_ROBIN_ORDER):
-                raise ValueError("Invalid round-robin checkpoint index")
-            row["parameter_index"] = index
-        return rows
 
     def save_event(self, event: dict) -> None:
         self._db.execute("""INSERT INTO report_events (event_id, name, process_id, parameter_index)
@@ -164,35 +144,14 @@ class ReportingDb:
         self._db.execute("DELETE FROM report_turns")
 
     def pending_turns(self, after_completion: int) -> list[dict]:
-        """Resolve the existing round-count semantics entirely in reporting tables."""
-        category = DEventCategory.Configuration
-        rows = self._db.query("""
-            SELECT c.event_id AS completion_id, c.name, c.process_id
+        """Each compared complete configuration finishes one experiment cycle."""
+        return self._db.query("""
+            SELECT c.event_id AS completion_id, c.process_id, 0 AS parameter_index
             FROM report_events c
             LEFT JOIN report_turns t ON t.completion_id = c.event_id
-            WHERE c.event_id > %s AND c.name IN (%s, %s)
-              AND (t.completion_id IS NULL OR t.parameter_index IS NULL)
+            WHERE c.event_id > %s AND c.name = %s AND t.completion_id IS NULL
             ORDER BY c.event_id LIMIT 512
-        """, (after_completion, category.COMPARED, category.PARAMETER_SPACE_EXHAUSTED))
-        for row in rows:
-            name = row.pop("name")
-            row["parameter_index"] = None
-            before = row["completion_id"]
-            if name == category.COMPARED:
-                proposals = self._db.query("""SELECT event_id FROM report_events
-                    WHERE process_id = %s AND name = %s ORDER BY event_id LIMIT 1""",
-                    (row["process_id"], category.PROPOSAL_ACCEPTED))
-                if not proposals:
-                    continue
-                before = proposals[0]["event_id"]
-            else:
-                row["process_id"] = None
-            checkpoints = self._db.query("""SELECT parameter_index FROM report_events
-                WHERE name = 'round_robin_checkpoint' AND event_id < %s
-                ORDER BY event_id DESC LIMIT 1""", (before,))
-            if checkpoints:
-                row["parameter_index"] = checkpoints[0]["parameter_index"]
-        return rows
+        """, (after_completion, DEventCategory.Configuration.COMPARED))
 
     def save_turn(self, turn: dict) -> None:
         self._db.execute("""INSERT INTO report_turns (completion_id, process_id, parameter_index)

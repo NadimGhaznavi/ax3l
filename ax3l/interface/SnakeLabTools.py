@@ -14,17 +14,22 @@ from mcp.client.stdio import StdioServerParameters
 
 
 class SnakeLabTools:
-    def __init__(self, endpoint: str, parameter: str):
-        if parameter not in SINGLE_PARAMETERS and parameter not in PAIR_PARAMETERS:
+    def __init__(self, endpoint: str, parameter: str, *, draft_id: str | None = None,
+                 run_id: str | None = None):
+        if parameter not in SINGLE_PARAMETERS and parameter not in PAIR_PARAMETERS and parameter != "simulation_summary":
             raise ValueError(f"Unknown conversation parameter: {parameter}")
-        self._tool_name = ("submit_pair_values" if parameter in PAIR_PARAMETERS
-                           else "submit_single_value")
+        self._tool_name = ("submit_simulation_summary" if parameter == "simulation_summary" else
+                           "submit_pair_values" if parameter in PAIR_PARAMETERS else "submit_single_value")
         root = Path(__file__).resolve().parents[2]
+        environment = {"PYTHONPATH": str(root), "AX3L_ZMQ_ENDPOINT": endpoint,
+                       "AX3L_CONVERSATION_PARAMETER": parameter, "PYTHONDONTWRITEBYTECODE": "1"}
+        if draft_id is not None:
+            environment["AX3L_CONFIGURATION_DRAFT"] = draft_id
+        if run_id is not None:
+            environment["AX3L_ANALYSIS_RUN"] = run_id
         self._client = Client(StdioServerParameters(
             command=sys.executable, args=["-m", "ax3l.app.snakelab.tools"], cwd=str(root),
-            env={"PYTHONPATH": str(root), "AX3L_ZMQ_ENDPOINT": endpoint,
-                 "AX3L_CONVERSATION_PARAMETER": parameter,
-                 "PYTHONDONTWRITEBYTECODE": "1"},
+            env=environment,
         ), read_timeout_seconds=DSnakeLab.MCP_TIMEOUT_SECONDS)
 
     async def __aenter__(self):

@@ -22,8 +22,22 @@
     <table aria-label="Simulation run">
       <tr><th scope="row">Run ID</th><td>{{ run.run_id }}</td></tr>
       <tr><th scope="row">Project Version</th><td>{{ run.project_version }}</td></tr>
+      <tr><th scope="row">Model</th><td>{{ config.model.type }} ({{ config.model.heads }} attention heads)</td></tr>
+      <tr><th scope="row">EpsilonNice Settings</th><td>Probability {{ config.epsilon_nice.probability }}, {{ config.epsilon_nice.steps }} steps</td></tr>
       <tr><th scope="row">High Score</th><td>{{ run.high_score if run.high_score is not none else '—' }}</td></tr>
       <tr><th scope="row">Completed At</th><td>{{ run.completed_at.strftime('%Y-%m-%d %H:%M:%S') if run.completed_at is not none else '—' }}</td></tr>
+    </table>
+    <h2>Training and Exploration</h2>
+    <table aria-label="Episode diagnostics">
+      <tr><th scope="row">Recorded Episodes</th><td>{{ diagnostics.episodes }}</td></tr>
+      <tr><th scope="row">Episodes After Epsilon Ended</th><td>{{ diagnostics.post_epsilon_episodes }}</td></tr>
+      <tr><th scope="row">Epsilon Random Actions</th><td>{{ diagnostics.epsilon_injections }}</td></tr>
+      <tr><th scope="row">EpsilonNice Overrides</th><td>{{ diagnostics.epsilon_nice_injections }}</td></tr>
+      <tr><th scope="row">Total Training Reward</th><td>{{ diagnostics.total_reward if diagnostics.total_reward is not none else '—' }}</td></tr>
+      <tr><th scope="row">Wall Endings</th><td>{{ diagnostics.wall }}</td></tr>
+      <tr><th scope="row">Body Endings</th><td>{{ diagnostics.snake }}</td></tr>
+      <tr><th scope="row">Move-limit Endings</th><td>{{ diagnostics.max_moves }}</td></tr>
+      <tr><th scope="row">Board Completions</th><td>{{ diagnostics.board_filled }}</td></tr>
     </table>
   </main>
 </body>

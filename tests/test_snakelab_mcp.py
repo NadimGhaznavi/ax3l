@@ -63,7 +63,8 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
         with ZMQServer("tcp://127.0.0.1:*", handle) as server:
             for pair, names, values in (
                 ("epsilon_pair", ("epsilon.initial", "epsilon.decay"), (.96, .97)),
-                ("reward_pair", ("game.rewards.closer_to_food", "game.rewards.further_from_food"), (2, -2)),
+                ("reward_pair", ("game.rewards.closer_to_food", "game.rewards.further_from_food"), (.25, -.5)),
+                ("epsilon_nice_pair", ("epsilon_nice.probability", "epsilon_nice.steps"), (.005, 20)),
             ):
                 async with SnakeLabTools(server.endpoint, pair) as tools:
                     definition = tools.definition["function"]
@@ -172,6 +173,7 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
                 for pair, values, invalid in (
                     ('epsilon_pair', (.91, .95), (.91, 1.5)),
                     ('reward_pair', (3, -3), (3, -3.5)),
+                    ('epsilon_nice_pair', (.01, 40), (0, 20)),
                 ):
                     async with SnakeLabTools(server.endpoint, pair) as tools:
                         snake.return_value.reset_mock()
@@ -186,6 +188,8 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
                         expected = deepcopy(baseline)
                         if pair == 'epsilon_pair':
                             expected['epsilon'].update(initial=values[0], decay=values[1])
+                        elif pair == 'epsilon_nice_pair':
+                            expected['epsilon_nice'].update(probability=values[0], steps=values[1])
                         else:
                             expected['game']['rewards'].update(closer_to_food=values[0], further_from_food=values[1])
                         snake.return_value.submit_simulation.assert_called_once_with(expected)

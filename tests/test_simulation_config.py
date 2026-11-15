@@ -67,9 +67,13 @@ class SimulationControlTests(unittest.TestCase):
 
 class ConfigPageTests(unittest.TestCase):
     def setUp(self):
-        with patch("ax3l.server.ReportingServer.HTTPServer") as server:
-            make_server("127.0.0.1", 0)
-        self.handler_class = server.call_args.args[1]
+        background = self.enterContext(patch("ax3l.server.ReportingServer.ReportBackground")).return_value
+        background.status.return_value = dict(snake_lab_status="Idle", all_time_high_score=None,
+                                             experiment_cycles=0, simulations_submitted=0)
+        background.episode_totals.return_value = dict(games_played=0, moves_made=0)
+        server = make_server("127.0.0.1", 0)
+        self.addCleanup(server.server_close)
+        self.handler_class = server.RequestHandlerClass
 
     def request(self, path):
         handler = object.__new__(self.handler_class)
@@ -110,6 +114,7 @@ class ConfigPageTests(unittest.TestCase):
             snake.return_value.is_simulation_running.return_value = True
             snake.return_value.get_high_score.return_value = 37
             snake.return_value.get_num_sims.return_value = 1
+            log.return_value.current_golden_config.return_value = None
             log.return_value.experiment_cycles.return_value = 0
             log.return_value.recent.return_value = [event]
             _, page = self.request("/")

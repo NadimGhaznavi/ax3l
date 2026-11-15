@@ -18,6 +18,8 @@ from ax3l.app.snakelab.prompts.FirstContactEpsilonPair import FirstContactEpsilo
 from ax3l.app.snakelab.prompts.FirstContactRewardPair import FirstContactRewardPair
 from ax3l.app.snakelab.prompts.ComparisonEpsilonPair import ComparisonEpsilonPair
 from ax3l.app.snakelab.prompts.ComparisonRewardPair import ComparisonRewardPair
+from ax3l.app.snakelab.prompts.ComparisonEpsilonNicePair import ComparisonEpsilonNicePair
+from ax3l.app.snakelab.prompts.FirstContactEpsilonNicePair import FirstContactEpsilonNicePair
 from ax3l.app.snakelab.prompts.GoldenConfig import GoldenConfig
 from ax3l.constants.DEventCategory import DEventCategory as Events
 from ax3l.constants.DSnakeLab import DSnakeLab
@@ -133,6 +135,8 @@ async def optimize(llm, output, db, endpoint):
             prompts = [ComparisonEpsilonPair(golden_id), FirstContactEpsilonPair()]
         elif parameter == "reward_pair":
             prompts = [ComparisonRewardPair(golden_id), FirstContactRewardPair()]
+        elif parameter == "epsilon_nice_pair":
+            prompts = [ComparisonEpsilonNicePair(golden_id), FirstContactEpsilonNicePair()]
         else:
             prompts = [Comparison(golden_id, parameter),
                        FirstContactSingle(parameter) if first_contact else ComparisonSingle(parameter)]

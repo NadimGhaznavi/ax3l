@@ -1,12 +1,9 @@
 """Schema-backed search space for single-parameter proposals."""
 
 import json
-from pathlib import Path
+from ax3l.interface.SimulationConfiguration import SCHEMA
 
-SCHEMA = json.loads(
-    Path(__file__).with_name("simulation-config-v2.schema.json").read_text()
-)
-EXCLUDED = {"seed", "closer_to_food", "further_from_food", "initial", "decay"}
+EXCLUDED = {"seed", "closer_to_food", "further_from_food", "initial", "decay", "probability", "steps"}
 
 
 def _fields(node, path=()):

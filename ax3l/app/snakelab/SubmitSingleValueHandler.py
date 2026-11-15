@@ -2,10 +2,7 @@
 
 from copy import deepcopy
 import json
-import math
-from pathlib import Path
-
-from jsonschema import Draft202012Validator, ValidationError
+from jsonschema import ValidationError
 
 from ax3l.app.snakelab.SingleParameters import SINGLE_PARAMETERS
 from ax3l.app.DbMgr import DbMgr
@@ -15,13 +12,13 @@ from ax3l.app.snakelab.prompts.NoDupes import NoDupes
 from ax3l.constants.DEventCategory import DEventCategory
 from ax3l.constants.DAx3l import DAx3l
 from ax3l.interface.SnakeLab import SnakeLab
+from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 
 
 class SubmitSingleValueHandler:
     def __init__(self, db: DbMgr):
         self._db = db
         self._snake = SnakeLab()
-        self._schema = json.loads(Path(__file__).with_name("simulation-config-v2.schema.json").read_text())
 
     def _reject(self, reason: str, *, duplicate: bool = False) -> dict:
         category = DEventCategory.Configuration
@@ -40,20 +37,16 @@ class SubmitSingleValueHandler:
         parameter, value = payload["parameter"], payload["value"]
         if not isinstance(parameter, str) or not parameter:
             return self._reject("parameter must be a JSON spec key.")
-        if type(value) not in (int, float) or (isinstance(value, float) and not math.isfinite(value)):
-            return self._reject("value must be a finite JSON number.")
 
         if parameter == "seed":
             return self._reject("Seed is managed by Ax3l and cannot be proposed.")
         if parameter not in SINGLE_PARAMETERS:
             return self._reject(f"Parameter is not in the single-parameter search space: {parameter}.")
-        path, definition = SINGLE_PARAMETERS[parameter]
+        path, _ = SINGLE_PARAMETERS[parameter]
         try:
-            Draft202012Validator(definition).validate(value)
+            value = SimulationConfiguration.value(path, value)
         except ValidationError as error:
             return self._reject(f"{parameter}: {error.message}")
-        if definition["type"] == "integer":
-            value = int(value)
 
         return self._submit_changes([(path, value)], f"{parameter}: {value}")
 
@@ -72,7 +65,7 @@ class SubmitSingleValueHandler:
                 node = node[key]
             node[path[-1]] = value
         # A broken stored baseline is a server/data error, not a bad proposal.
-        Draft202012Validator(self._schema).validate(candidate)
+        SimulationConfiguration.validate(candidate)
         if candidate == baseline:
             return self._reject("The proposed configuration is identical to the golden configuration.", duplicate=True)
         if not self._snake.is_config_unique(candidate):

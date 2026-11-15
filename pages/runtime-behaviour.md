@@ -10,13 +10,15 @@ The runtime behaviour has two phases: an initial phase, which runs once and fini
 
 ## Initial Experiment Startup
 
-When the Ax3l system is started for the first time, there must be no simulation records in the [Snake Server](https://snakelabserver.osoyalce.com) database. The [Snake Lab Server](https://snakelabserver.osoyalce.com) simulation configuration is defined as a JSON document that enforces data type choices (e.g. the **seed** must be a non-zero integer). That document also defines default values. 
+When the Ax3l system is started for the first time, there must be no simulation records in the [Snake Server](https://snakelabserver.osoyalce.com) database. The [Snake Lab Server](https://snakelabserver.osoyalce.com) simulation configuration is defined as a JSON document that enforces data type choices (e.g. the **seed** must be a non-negative integer). That document also defines default values.
 
 The initial startup executes the following steps.
 
 1. The Ax3l server queries the Snake Lab database and sees that there are no simulations present.
 2. The Ax3l server generates a configuration using the defaults in the JSON configuration document.
 3. The Ax3l server submits the simulation run request to the Snake Lab server.
+
+The baseline uses Snake Lab 3.0.1, a Transformer with four attention heads, 500 episodes, and required EpsilonNice (probability 0.005, 20 steps). Ordinary epsilon starts at 0.96 and decays by 0.97, making Nice eligible at episode 227. The full decay range remains available, including schedules that never enable Nice within 500 episodes. Food gives +10, wall/body/move-limit endings give -10, and distance shaping defaults to +1/-1.
 
 After this, the system enters the **Round Robin Phase**.
 
@@ -29,19 +31,21 @@ The system currently allows the LLM to configure the following parameters:
 
 | Parameter | Purpose | Allowed values | Tuned with |
 | --- | --- | --- | --- |
-| Hidden Size | Number of neurons in each recurrent hidden layer. | Integers from 64 to 384, in multiples of 16. | Individually |
+| Hidden Size | Number of neurons in each Transformer hidden layer. | Integers from 64 to 384, in multiples of 16. | Individually |
 | Sequence Length | Number of consecutive frames in each training sequence. | Integers from 4 to 48, in multiples of 4. | Individually |
 | Batch Size | Number of sequences sampled for each training update. | Integers from 8 to 64, in multiples of 2. | Individually |
 | Learning Rate | Size of gradient updates during training. | Numbers from 0.0005 to 0.005. | Individually |
 | Gamma | Discount factor controlling the value of future rewards. | Numbers from 0.9 to 0.99. | Individually |
 | Epsilon: initial | Starting probability of choosing a random action. | Numbers from 0.85 to 0.999. | Epsilon: decay |
 | Epsilon: decay | Multiplier applied to epsilon after each episode. | Numbers from 0.9 to 0.999. | Epsilon: initial |
-| Food Reward: closer | Reward for moving closer to the food. | Integers from 0 to 6. | Food Reward: further |
-| Food Reward: further | Penalty for moving farther from the food. | Integers from -6 to 0. | Food Reward: closer |
+| Food Reward: closer | Reward for moving closer to the food. | 0, 0.1, 0.25, 0.5, 1, 2, 3, 4, 5, 6. | Food Reward: further |
+| Food Reward: further | Penalty for moving farther from the food. | -6, -5, -4, -3, -2, -1, -0.5, -0.25, -0.1, 0. | Food Reward: closer |
+| EpsilonNice: probability | Chance per eligible move of starting a safe detour. | Numbers greater than 0 and at most 1. | EpsilonNice: steps |
+| EpsilonNice: steps | Duration of each detour, reset each episode. | Integers from 1 to 1000. | EpsilonNice: probability |
 
-The *initial epsilon* and *epsilon decay* are tuned together; i.e., the LLM submits values for both parameters in a single submission. The two *food reward* parameters are also tuned together.
+The *initial epsilon* and *epsilon decay* are tuned together; i.e., the LLM submits values for both parameters in a single submission. The two *food reward* parameters are also tuned together; their sum must be non-positive. EpsilonNice probability and duration form a third pair.
 
-One Ax3l experiment cycle visits all seven parameter steps, with up to seven
+One Ax3l experiment cycle visits all eight parameter steps, with up to eight
 submissions of one or two values before the cycle repeats.
 
 An exhausted parameter is skipped and still counts as a completed step in the
@@ -53,7 +57,7 @@ A new golden configuration resets the stagnation count.
 
 ### For Each Tunable Parameter or Parameter Pair
 
-The **Ax3l Server** executes the following steps 7 times for one complete experiment cycle:
+The **Ax3l Server** executes the following steps 8 times for one complete experiment cycle:
 
 1. Communicate with the `llama-server` that houses the LLM.
   1(a). Present the LLM with simulation run data.

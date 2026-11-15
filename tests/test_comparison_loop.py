@@ -96,6 +96,31 @@ class ComparisonTests(unittest.TestCase):
 
 
 class LoopTests(unittest.IsolatedAsyncioTestCase):
+    async def test_nice_turn_uses_pair_prompts_and_the_pair_tool(self):
+        from ax3l.app.snakelab.GenerateDefaultConfig import GenerateDefaultConfig
+        snake = Mock()
+        snake.is_simulation_running.return_value = False
+        snake.get_run_result.return_value = dict(status='completed', high_score=10,
+                                                config=GenerateDefaultConfig().run())
+        snake.get_epsilon_nice_report.return_value = []
+        with patch(MODULE + 'SnakeLab', return_value=snake), \
+                patch('ax3l.app.snakelab.prompts.ComparisonEpsilonNicePair.SnakeLab', return_value=snake), \
+                patch(MODULE + 'GoldenConfig', return_value=Mock(run_id='gold')), \
+                patch(MODULE + 'EventLogDb') as events, \
+                patch(MODULE + 'RoundRobinState') as selector, \
+                patch(MODULE + 'SnakeLabTools') as tools, \
+                patch(MODULE + 'converse', new_callable=AsyncMock) as conversation:
+            events.return_value.latest_snakelab_proposal.return_value = None
+            events.return_value.latest_seed_baseline.return_value = None
+            selector.return_value.begin.return_value = 'epsilon_nice_pair'
+            conversation.side_effect = asyncio.CancelledError()
+            with self.assertRaises(asyncio.CancelledError):
+                await optimize(Mock(), Path('/tmp'), Mock(), 'endpoint')
+            tools.assert_called_once_with('endpoint', 'epsilon_nice_pair')
+            names = [type(prompt).__name__ for prompt in conversation.call_args.args[4]]
+            self.assertIn('ComparisonEpsilonNicePair', names)
+            self.assertIn('FirstContactEpsilonNicePair', names)
+
     async def test_exhausted_sequence_skips_without_prompt_or_submission(self):
         snake = Mock()
         snake.is_simulation_running.return_value = False

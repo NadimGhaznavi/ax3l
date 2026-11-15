@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Use Snake Lab 3.0.1 for fresh experiments with a required Transformer, tunable
+EpsilonNice, and 500-episode runs.
+
+- Fix the model to Transformer with four attention heads; retain the existing
+  five single-parameter turns and add a joint Nice probability/duration turn.
+  Keep the full ordinary epsilon decay range and defaults that make Nice
+  eligible at episode 227.
+- Centralize simulation defaults and validation behind `SimulationConfiguration`;
+  include every new setting in configuration reads, uniqueness checks, and
+  comparable histories, preserving the string model type.
+- Add fractional distance-reward choices and reject positive-sum pairs; keep
+  validation, finite-space exhaustion, and the 55-cell report consistent.
+- Explain the 24-feature vector and exploration behavior in prompts; report
+  model settings, exploration counts, training rewards, and termination outcomes.
+- Update bundled contract snapshots, documentation, and fresh-install tests;
+  remove the unused incomplete v3 configuration schema.
+
 ## [3.2.1] - 2026-11-05 @ 03:54
 
 - Website correction.

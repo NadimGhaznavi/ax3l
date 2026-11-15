@@ -13,6 +13,7 @@ from urllib.request import urlopen
 from uuid import uuid4
 
 from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb
+from ax3l.app.snakelab.GenerateDefaultConfig import GenerateDefaultConfig
 from ax3l.app.EventLogDb import EventLogDb
 from ax3l.app.DbMgr import DbMgr
 from ax3l.constants.DSnakeLab import DSnakeLab
@@ -147,6 +148,10 @@ class SimulationRunReportTests(unittest.TestCase):
         self.enterContext(patch('ax3l.server.ReportingServer.DbMgr'))
         log = self.enterContext(patch('ax3l.server.ReportingServer.EventLogDb')).return_value
         snake = self.enterContext(patch('ax3l.server.ReportingServer.SnakeLab')).return_value
+        snake.get_config.return_value = GenerateDefaultConfig().run()
+        snake.get_episode_diagnostics.return_value = dict(episodes=500, post_epsilon_episodes=274,
+            epsilon_injections=100, epsilon_nice_injections=42, total_reward=7.5,
+            wall=200, snake=250, max_moves=49, board_filled=1)
         snake.get_highscore_frames.return_value = None
         self.enterContext(patch('ax3l.app.ReportBackground.SnakeLab', return_value=snake))
         self.enterContext(patch('ax3l.app.ReportBackground.DbMgr'))
@@ -190,6 +195,8 @@ class SimulationRunReportTests(unittest.TestCase):
                          '2026-09-15 12:30:45', 'Back to event log'):
             self.assertIn(expected, page)
         self.assertNotIn('<version>', page)
+        for text in ('transformer (4 attention heads)', 'EpsilonNice Overrides', '<td>42</td>', 'Move-limit Endings', '<td>49</td>', 'Total Training Reward'):
+            self.assertIn(text, page)
         self.assertIn('No saved board is available', page)
         snake.get_run_summary.return_value['high_score_snapshot'] = json.dumps(SNAPSHOT)
         board_page = get(path)

@@ -24,6 +24,9 @@ class EventDb:
             CREATE TABLE IF NOT EXISTS events (
                 event_id INTEGER PRIMARY KEY, name TEXT, category TEXT, process_id TEXT);
             CREATE TABLE IF NOT EXISTS event_messages (event_id INTEGER, content TEXT);
+            CREATE INDEX IF NOT EXISTS event_process ON events(process_id, event_id);
+            CREATE INDEX IF NOT EXISTS event_name ON events(category, name, event_id);
+            CREATE INDEX IF NOT EXISTS message_event ON event_messages(event_id);
         ''')
 
     def query(self, sql, params):
@@ -144,29 +147,29 @@ class RoundRobinTests(unittest.TestCase):
 
     def test_stagnation_counts_three_complete_cycles_across_restart(self):
         self.db.log('golden_config_created')
-        for turn in range(21):
-            self.assertEqual(EventLogDb(self.db).stagnant_rounds(), turn // 7)
+        for turn in range(3 * len(self.order)):
+            self.assertEqual(EventLogDb(self.db).stagnant_rounds(), turn // len(self.order))
             self.complete_turn(str(turn))
             # Replayed comparison events must not count the run twice.
             self.db.log('configuration_compared', process_id=str(turn))
             self.db.connection.close()
             self.db = EventDb(self.path)
-            self.assertEqual(EventLogDb(self.db).stagnant_rounds(), (turn + 1) // 7)
+            self.assertEqual(EventLogDb(self.db).stagnant_rounds(), (turn + 1) // len(self.order))
 
     def test_improvement_discards_partial_cycle_and_resets_stagnation(self):
-        for turn in range(8):
-            self.complete_turn(str(turn), improved=turn == 7)
+        for turn in range(len(self.order) + 1):
+            self.complete_turn(str(turn), improved=turn == len(self.order))
         self.assertEqual(EventLogDb(self.db).stagnant_rounds(), 0)
-        for turn in range(8, 20):
+        for turn in range(len(self.order) + 1, 3 * len(self.order) - 1):
             self.complete_turn(str(turn))
             self.assertEqual(EventLogDb(self.db).stagnant_rounds(), 0)
-        self.complete_turn('20')
+        self.complete_turn(str(3 * len(self.order) - 1))
         self.assertEqual(EventLogDb(self.db).stagnant_rounds(), 1)
         self.db.log('golden_config_created')  # Fresh seed baseline.
         self.assertEqual(EventLogDb(self.db).stagnant_rounds(), 0)
 
     def test_pending_last_run_does_not_finish_cycle(self):
-        for turn in range(6):
+        for turn in range(len(self.order) - 1):
             self.complete_turn(str(turn))
         self.restart()
         self.db.log('proposal_invalid')
@@ -191,9 +194,9 @@ class RoundRobinTests(unittest.TestCase):
             self.assertEqual(EventLogDb(self.db).experiment_cycles(), (turn + 1) // len(self.order))
 
     def test_improvement_on_last_parameter_does_not_count_that_cycle(self):
-        for turn in range(14):
-            self.complete_turn(str(turn), improved=turn == 6)
-            self.assertEqual(EventLogDb(self.db).stagnant_rounds(), 1 if turn == 13 else 0)
+        for turn in range(2 * len(self.order)):
+            self.complete_turn(str(turn), improved=turn == len(self.order) - 1)
+            self.assertEqual(EventLogDb(self.db).stagnant_rounds(), 1 if turn == 2 * len(self.order) - 1 else 0)
 
 
 class ConversationParameterTests(unittest.IsolatedAsyncioTestCase):

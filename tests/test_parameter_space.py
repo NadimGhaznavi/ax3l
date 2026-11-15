@@ -13,8 +13,11 @@ class ParameterSpaceTests(unittest.TestCase):
         self.assertEqual(finite_choices('sequence_length'), {(n,) for n in range(4, 49, 4)})
         self.assertEqual(len(finite_choices('hidden_size')), 21)
         self.assertEqual(len(finite_choices('batch_size')), 29)
-        self.assertEqual(finite_choices('reward_pair'), {(a, b) for a in range(7) for b in range(-6, 1)})
-        for parameter in ('learning_rate', 'gamma', 'epsilon_pair'):
+        self.assertEqual(len(finite_choices('reward_pair')), 55)
+        self.assertIn((Fraction(1, 10), Fraction(-1, 10)), finite_choices('reward_pair'))
+        self.assertIn((0, 0), finite_choices('reward_pair'))
+        self.assertNotIn((6, 0), finite_choices('reward_pair'))
+        for parameter in ('learning_rate', 'gamma', 'epsilon_pair', 'epsilon_nice_pair'):
             self.assertIsNone(finite_choices(parameter))
 
     def test_exclusive_bounds_decimal_steps_and_enum(self):
@@ -66,14 +69,15 @@ class ExhaustionDbTests(unittest.TestCase):
         self.assertFalse(self.snake.parameter_space_exhausted('gold', 'sequence_length'))
 
     def test_reward_grid_requires_every_pair(self):
-        for a in range(7):
-            for b in range(-6, 1):
-                if (a, b) == (6, 0):
-                    continue
-                config = copy.deepcopy(self.base)
-                config['game']['rewards'].update(closer_to_food=a, further_from_food=b)
-                self.insert(f'{a}:{b}', config)
+        missing = (Fraction(1, 10), Fraction(-1, 10))
+        for a, b in finite_choices('reward_pair') - {missing}:
+            config = copy.deepcopy(self.base)
+            config['game']['rewards'].update(closer_to_food=float(a), further_from_food=float(b))
+            self.insert(f'{a}:{b}', config)
         self.assertFalse(self.snake.parameter_space_exhausted('gold', 'reward_pair'))
         config['game']['rewards'].update(closer_to_food=6, further_from_food=0)
+        self.insert('illegal-pair', config)
+        self.assertFalse(self.snake.parameter_space_exhausted('gold', 'reward_pair'))
+        config['game']['rewards'].update(closer_to_food=.1, further_from_food=-.1)
         self.insert('last', config)
         self.assertTrue(self.snake.parameter_space_exhausted('gold', 'reward_pair'))

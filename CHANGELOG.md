@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.4.0] - 2026-11-15 @ 12:17
+
 ### Summary
 
 Deliver experiment data to Qwen as JSON while preserving linked tool navigation.

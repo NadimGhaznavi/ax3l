@@ -95,6 +95,34 @@ class ExperimentDb:
         """, (Events.Configuration.CATEGORY, Events.Configuration.COMPARED, run_id))
         return {**json.loads(rows[0]["content"]), "event_id": rows[0]["event_id"]} if rows else None
 
+    def activity_events(self, process_ids: list[str]) -> list[dict]:
+        """Read work metadata without transferring the embedded chart images."""
+        if not process_ids:
+            return []
+        placeholders = ", ".join("%s" for _ in process_ids)
+        rows = self._db.query(f"""
+            SELECT e.event_id, e.occurred_at, CURRENT_TIMESTAMP(6) AS observed_at,
+                   e.process_id, e.parent_event_id,
+                   e.name, e.parameter, e.source_name,
+                   CASE WHEN e.name = %s THEN m.content END AS task,
+                   CASE WHEN e.name = %s AND JSON_VALID(m.content)
+                        THEN JSON_EXTRACT(m.content, '$.usage.total_tokens') END AS tokens
+            FROM events e JOIN event_messages m USING (event_id)
+            WHERE e.process_id IN ({placeholders}) AND
+                ((e.category = %s AND e.name = %s) OR
+                 (e.category = %s AND e.name IN (%s, %s, %s, %s)))
+            ORDER BY e.event_id
+        """, (Events.SnakeLab.ANALYSIS_TASK, Events.Conversation.RESPONSE, *process_ids,
+              Events.SnakeLab.CATEGORY, Events.SnakeLab.ANALYSIS_TASK,
+              Events.Conversation.CATEGORY, Events.Conversation.STARTED, Events.Conversation.PROMPT,
+              Events.Conversation.RESPONSE, Events.Conversation.ENDED))
+        for row in rows:
+            row["task"] = json.loads(row["task"]) if row["task"] is not None else None
+            row["tokens"] = json.loads(row["tokens"]) if row["tokens"] is not None else None
+            if row["tokens"] is not None and (type(row["tokens"]) is not int or row["tokens"] < 0):
+                raise ValueError(f"Invalid token usage in reply event {row['event_id']}")
+        return rows
+
     def submission_events(self, run_id: str) -> dict[str, int]:
         rows = self._db.query("""
             SELECT name, event_id FROM events WHERE process_id = %s AND

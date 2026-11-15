@@ -1,4 +1,5 @@
 import argparse
+import base64
 import json
 import logging
 import re
@@ -23,6 +24,7 @@ from ax3l.activity.PromptReport import parts, summary
 from ax3l.activity.ScoreDistribution import distribution
 from ax3l.activity.ExperimentHighscores import highscores
 from ax3l.activity.ExperimentStatus import experiment_status
+from ax3l.activity.ExperimentActivity import item_activity
 from ax3l.activity.GoldenConfigurations import parameter_change
 from ax3l.activity.SimulationBoard import board_svg
 from ax3l.activity.SimulationAnimation import SimulationAnimation
@@ -135,6 +137,30 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
                     traceback.print_exc()
                     self.send_error(500, "Unable to load golden configurations")
                     return
+            elif re.fullmatch(
+                r"/analysis-images/[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}/(?:scores|distribution|loss)\.png",
+                self.path,
+            ):
+                _, _, run_id, filename = self.path.split("/")
+                section = filename[:-4]
+                try:
+                    db = DbMgr(initialize_event_tables=False)
+                    try:
+                        activity = item_activity(ExperimentDb(db).activity_events([run_id]))
+                        image_id = activity.get((run_id, section), {}).get("image_event_id")
+                        prompt = EventLogDb(db).get(image_id) if image_id is not None else None
+                    finally:
+                        db.close()
+                    if prompt is None:
+                        self.send_error(404, "Analysis image not available")
+                        return
+                    image = next(part for part in parts(json.loads(prompt["content"])) if part["type"] == "image")
+                    body = base64.b64decode(image["url"].split(",", 1)[1], validate=True)
+                    content_type = "image/png"
+                except Exception:
+                    traceback.print_exc()
+                    self.send_error(500, "Unable to load analysis image")
+                    return
             elif urlsplit(self.path).path == "/experiment-status":
                 views = parse_qs(urlsplit(self.path).query, keep_blank_values=True).get("view", ["current"])
                 if len(views) != 1 or views[0] not in ("current", "completed"):
@@ -151,6 +177,8 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
                         if draft and draft.run_id and draft.run_id not in run_ids:
                             run_ids.append(draft.run_id)
                         states = experiments.analysis_states(run_ids)
+                        activity = item_activity(
+                            experiments.activity_events(([draft.draft_id] if draft else []) + run_ids))
                     finally:
                         db.close()
                     snake = SnakeLab()
@@ -159,7 +187,8 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
                     state = states[draft.run_id] if draft and draft.run_id else dict(analysis=None, sections={}, task=None)
                     body = templates.get_template("experiment_status.html").render(
                         view=view, **experiment_status(
-                            draft, run, golden, comparison, state["analysis"], state["sections"], states, state["task"])
+                            draft, run, golden, comparison, state["analysis"], state["sections"], states,
+                            state["task"], activity)
                     ).encode("utf-8")
                     content_type = "text/html; charset=utf-8"
                 except Exception:

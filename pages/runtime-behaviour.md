@@ -83,6 +83,14 @@ finished tasks. The final submission combines the three labeled observations
 into one run analysis, without another inference call. Observations describe
 behavior without assuming that an individual parameter caused it.
 
+The Experiment Status checklist shows all three image jobs for the submitted
+simulation alongside its reference-image prerequisites. Each image label links
+to the latest PNG sent to Qwen when available. Every image and configuration
+row shows elapsed work time and reported input/output tokens; active times
+advance with the report refresh. The final row totals the displayed work,
+counting paired settings' shared conversation once. Tokens from an in-flight
+request appear when its response arrives; missing usage is shown as unavailable.
+
 General background lives in short local knowledge-base pages. `kb_tool(url)`
 reads one page at a time, starting at `/` or the direct guide URL in the prompt.
 Qwen follows relevant links to drill down. These reads continue the conversation;

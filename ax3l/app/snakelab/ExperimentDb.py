@@ -25,6 +25,16 @@ class ExperimentDb:
         data = self._latest(Events.Configuration.CATEGORY, Events.Configuration.DRAFT_SAVED, draft_id)
         return ConfigurationDraft(**data) if data is not None else None
 
+    def last_completed_draft(self) -> ConfigurationDraft | None:
+        """Keep the last finished proposal available after a new draft starts."""
+        rows = self._db.query("""
+            SELECT m.content FROM events e JOIN event_messages m USING (event_id)
+            WHERE e.category = %s AND e.name = %s
+              AND JSON_UNQUOTE(JSON_EXTRACT(m.content, '$.phase')) = 'completed'
+            ORDER BY e.event_id DESC LIMIT 1
+        """, (Events.Configuration.CATEGORY, Events.Configuration.DRAFT_SAVED))
+        return ConfigurationDraft(**json.loads(rows[0]["content"])) if rows else None
+
     def save_draft(self, draft: ConfigurationDraft) -> None:
         self._db.log(Events.Configuration.DRAFT_SAVED, Events.Configuration.CATEGORY,
                      "INFO", json.dumps(asdict(draft), allow_nan=False), process_id=draft.draft_id)

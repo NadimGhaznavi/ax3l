@@ -6,9 +6,9 @@ layout: single
 
 # Complete-configuration experiments
 
-Ax3l chooses every tunable setting before running one 500-episode SnakeLab
-simulation. Qwen receives the assigned setting, measured data, and a chart
-when it can inform that choice.
+Qwen chooses which settings to adjust and when to run one 500-episode SnakeLab
+simulation. It can research measured data before selecting a setting, then
+receives a chart when it can inform the value choice.
 
 ## Initial startup
 
@@ -35,8 +35,8 @@ submission.
 A new draft starts from the current golden configuration. It freezes the latest,
 golden, and all-time best reference runs for the entire selection pass. The
 draft is saved while Ax3l records any missing measurements. A restart uses
-the same frozen references and resumes the first unselected parameter. Qwen
-chooses the following settings in order:
+the same frozen references and resumes the saved parameter or next-step decision.
+Qwen can choose any of the following settings, including the same setting again:
 
 | Parameter | Purpose | Allowed values | Tuned with |
 | --- | --- | --- | --- |
@@ -78,16 +78,16 @@ Qwen needs more detail. The tool menu at `/` links to `draft`, `latest`,
 `golden`, and `best`. Navigation uses English and experiment values use
 JSON. `kb_tool` serves optional background. Choice rules appear in the
 submission tool description. Accepted choices are saved without starting a
-simulation. A value can remain unchanged. After all ten choices, Ax3l
-checks the complete draft for duplicates and submits one simulation.
+simulation. A value can remain unchanged. After every submitted change, Ax3l
+checks the complete draft for duplicates.
 
-If the complete draft is a duplicate, Ax3l saves every choice and asks Qwen
-which setting to revise. Qwen can choose any single setting or paired setting
-using `select_parameter`. Ax3l then opens that setting's value conversation
-with the usual evidence and tools. The other choices stay saved. After the
-revision, Ax3l checks the complete configuration again. Each further duplicate
-returns to parameter selection; only a unique configuration reaches Snake Lab.
-Both the selection step and the reopened value conversation resume after a restart.
+At startup and after a duplicate, Qwen uses `select_parameter` to choose a single
+or paired setting. `data_tool` and `kb_tool` are available while making that
+decision. Ax3l opens the selected setting's value conversation with the usual
+evidence and tools; other values stay saved. After a unique change, Qwen can
+use `run_simulation` or select any setting again. Unselected settings keep their
+baseline values. Only Qwen's explicit run decision submits the unique draft.
+Each selection, value choice, and run decision resumes after a restart.
 
 Experiment Status shows the settings to be chosen and the saved selections.
 It lists chart rendering, each Qwen request, each data or guide lookup, and
@@ -110,8 +110,8 @@ separate historical reference and can come from an earlier seed.
 ## Restart behavior
 
 Drafts, choices, submission intent, comparisons, and measurements are stored in
-MariaDB's shared event log. Restarting during selection resumes the first
-unselected parameter. An interrupted submission is reconciled by its full
+MariaDB's shared event log. Restarting during selection resumes the saved
+parameter or next-step decision. An interrupted submission is reconciled by its full
 configuration; an ambiguous send is never retried automatically. A saved
 comparison or promotion is completed before another proposal begins.
 

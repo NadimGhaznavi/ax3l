@@ -1,4 +1,4 @@
-"""Choose every setting in a durable draft, run once, and record the result."""
+"""Let Qwen refine a durable draft and choose when to run a unique configuration."""
 
 import asyncio
 from copy import deepcopy
@@ -13,13 +13,13 @@ from ax3l.app.snakelab.SeedRotation import rotate_if_needed
 from ax3l.app.snakelab.AnalyzeRun import record_run_metrics
 from ax3l.app.snakelab.ExperimentDb import ExperimentDb
 from ax3l.app.snakelab.prompts.ConfigurationChoice import ConfigurationChoice
-from ax3l.app.snakelab.prompts.NoDupes import NoDupes
+from ax3l.app.snakelab.prompts.ConfigurationNextStep import ConfigurationNextStep
 from ax3l.constants.DAx3l import DAx3l
 from ax3l.constants.DChoice import CHOICE_CHARTS, REVISION_PARAMETER
 from ax3l.constants.DEventCategory import DEventCategory as Events
 from ax3l.constants.DSimulationAnalysis import DSimulationAnalysis
 from ax3l.constants.DSnakeLab import DSnakeLab
-from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
+from ax3l.entities.ConfigurationDraft import ConfigurationDraft
 from ax3l.interface.SnakeLab import SnakeLab, SimulationUnavailable
 from ax3l.interface.SnakeLabTools import SnakeLabTools
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
@@ -160,10 +160,7 @@ async def optimize(llm, output, db, endpoint):
             draft = ConfigurationDraft(str(uuid4()), golden_id, references,
                                        deepcopy(baseline["config"]), phase="preparing")
             experiments.save_draft(draft)
-        if draft.phase in ("preparing", "choosing", "selecting_parameter"):
-            if draft.phase != "preparing":
-                draft.phase = "preparing"
-                experiments.save_draft(draft)
+        if draft.phase in ("preparing", "choosing", "selecting_parameter", "reviewing"):
             references = {run_id: record_run_metrics(snake, experiments, run_id)
                           for run_id in dict.fromkeys(draft.references.values())}
             golden = references[draft.golden_run_id]
@@ -172,10 +169,11 @@ async def optimize(llm, output, db, endpoint):
                            else "golden")
             chart_run = latest if chart_scope == "latest" else golden
             chart_episodes = None
-            draft.phase = "selecting_parameter" if len(draft.selections) == len(PARAMETER_ORDER) else "choosing"
-            experiments.save_draft(draft)
-            while draft.phase in ("choosing", "selecting_parameter"):
-                parameter = REVISION_PARAMETER if draft.phase == "selecting_parameter" else draft.next_parameter
+            if draft.phase == "preparing":
+                draft.phase = "selecting_parameter"
+                experiments.save_draft(draft)
+            while draft.phase in ("choosing", "selecting_parameter", "reviewing"):
+                parameter = draft.next_parameter if draft.phase == "choosing" else REVISION_PARAMETER
                 section = CHOICE_CHARTS.get(parameter)
                 png = None
                 if section and (section != "loss" or chart_run.metrics["episodes_with_loss"]):
@@ -183,9 +181,10 @@ async def optimize(llm, output, db, endpoint):
                         chart_episodes = snake.get_analysis_episodes(chart_run.run_id)
                     png = await prepare_chart(db, draft.draft_id, parameter, section, chart_run,
                                               chart_episodes, golden.metrics["high_score"])
-                prompt = (NoDupes(draft) if parameter == REVISION_PARAMETER else
+                prompt = (ConfigurationNextStep(draft) if parameter == REVISION_PARAMETER else
                           ConfigurationChoice(draft, latest, golden, chart_scope, png))
-                async with SnakeLabTools(endpoint, parameter, draft_id=draft.draft_id) as tools:
+                async with SnakeLabTools(endpoint, parameter, draft_id=draft.draft_id,
+                                         allow_run=draft.phase == "reviewing") as tools:
                     await converse(llm, output, db, tools, [prompt],
                                    parameter=parameter, process_id=draft.draft_id)
                 draft = experiments.draft(draft.draft_id)

@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Let Qwen choose which settings to adjust and when to run each experiment.
+
+### Changed
+
+- Start from the golden baseline and let Qwen research with the data tool before
+  choosing any single or paired setting. Check the whole configuration after
+  every submitted change instead of requiring a fixed pass through all settings.
+- For unique configurations, offer a run action or another parameter change,
+  including the same parameter again. Duplicate configurations require another
+  change. Submit only after Qwen explicitly chooses to run.
+- Preserve the selected parameter and next-step decision across restarts, and
+  resume older drafts without discarding their saved choices. Update Experiment
+  Status to show the decision stage and settings left at baseline.
+
 ## [4.4.6] - 2026-11-15 @ 21:36
 
 ### Summary

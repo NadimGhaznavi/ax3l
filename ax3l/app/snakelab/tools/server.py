@@ -8,6 +8,7 @@ from pydantic import StrictFloat, StrictInt, StrictStr
 from ax3l.app.snakelab.tools.SubmitSingleValue import SubmitSingleValue
 from ax3l.app.snakelab.tools.SubmitPairValues import SubmitPairValues
 from ax3l.app.snakelab.tools.SelectParameter import SelectParameter
+from ax3l.app.snakelab.tools.RunSimulation import RunSimulation
 from ax3l.app.snakelab.tools.SubmitSimulationSummary import SubmitSimulationSummary
 from ax3l.app.snakelab.tools.ReadSimulationData import ReadSimulationData
 from ax3l.app.snakelab.PairParameters import PAIR_PARAMETERS, pair_instructions
@@ -50,12 +51,19 @@ async def submit_pair_values(value_1: StrictInt | StrictFloat,
     return await SubmitPairValues(endpoint).submit(draft_id, assigned_parameter, value_1, value_2)
 
 
-@mcp.tool(description="Choose which setting to revise after a duplicate configuration. "
+@mcp.tool(description="Choose any setting to change, including one already changed in this draft. "
           "Use one parameter key: " + ", ".join(PARAMETER_ORDER) + ". Paired settings are revised together.")
 async def select_parameter(parameter: StrictStr) -> str:
     if assigned_parameter != REVISION_PARAMETER or not draft_id:
-        raise ValueError("Ax3l must bind a duplicate configuration before selecting a parameter to revise")
+        raise ValueError("Ax3l must bind a parameter-selection conversation before choosing a setting")
     return await SelectParameter(os.environ.get("AX3L_ZMQ_ENDPOINT")).submit(draft_id, parameter)
+
+
+@mcp.tool(description="Run the current unique configuration instead of making another change. No arguments.")
+async def run_simulation() -> str:
+    if assigned_parameter != REVISION_PARAMETER or not draft_id or os.environ.get("AX3L_ALLOW_RUN") != "1":
+        raise ValueError("Ax3l must bind a unique configuration before Qwen can choose to run it")
+    return await RunSimulation(os.environ.get("AX3L_ZMQ_ENDPOINT")).submit(draft_id)
 
 
 @mcp.tool(description="Save this chart's observation and optional concrete value to try next: 1–2 sentences, at most 40 words, no theory. Supply summary only, then stop.")

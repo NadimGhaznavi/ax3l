@@ -34,8 +34,7 @@
       </div>
     </div>
     <div class="status-progress">
-      <label for="choice-progress">{{ choices_selected }} / {{ choices_total }} choices saved</label>
-      <progress id="choice-progress" value="{{ choices_selected }}" max="{{ choices_total }}"></progress>
+      <span>{{ choices_selected }} setting{{ 's' if choices_selected != 1 else '' }} saved · Other settings use baseline values.</span>
     </div>
     <p class="status-detail">{{ detail }}</p>
     <p class="status-usage-note">Baseline values come from this experiment's starting golden configuration. Changed choices are highlighted.</p>
@@ -49,7 +48,7 @@
           <th scope="row"><span class="parameter-label">{{ row.label }}</span><span class="parameter-description">{{ row.description }}</span>{% if row.image_url %}<a class="choice-chart" href="{{ row.image_url }}" target="_blank" rel="noopener">View chart prompt</a>{% endif %}</th>
           <td class="inherited-value">{{ row.inherited_value if row.inherited_value is not none else '—' }}</td>
           <td{% if row.selected and row.changed %} class="changed-value"{% endif %}>
-            {% if row.selected is false %}<span class="pending-label">Pending</span>
+            {% if row.selected is false %}<span class="pending-label">{{ 'Pending' if row.current else '—' }}</span>
             {% else %}<span class="parameter-value">{{ row.value }}</span>{% endif %}
           </td>
           <td></td><td></td><td></td>

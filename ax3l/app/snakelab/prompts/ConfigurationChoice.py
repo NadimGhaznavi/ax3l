@@ -7,7 +7,7 @@ from ax3l.app.Prompt import Prompt
 from ax3l.app.snakelab.PairParameters import PAIR_PARAMETERS
 from ax3l.app.snakelab.ParameterSpace import parameter_values
 from ax3l.constants.DChoice import CHOICE_CHARTS, CHOICE_LABELS
-from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
+from ax3l.entities.ConfigurationDraft import ConfigurationDraft
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
 from ax3l.interface.KnowledgeBase import KnowledgeBase
 
@@ -51,8 +51,8 @@ class ConfigurationChoice(Prompt):
                 text.append(f"The chart shows the {chart_scope} run. {focus}")
             text.append(f"See {label} at /{chart_scope}/{page} in data_tool.")
         text.append("Use data_tool at /draft for saved choices or / for other runs.")
-        if len(draft.selections) == len(PARAMETER_ORDER) - 1:
-            text.append("The complete configuration must differ from every earlier run.")
+        text.append("Ax3l checks the complete draft for uniqueness after this choice. "
+                    "You can then change another setting or run a unique configuration.")
         text.append(f"Submit using {tool}.")
         text.append(f"Measured data and current values:\n```json\n{json.dumps(evidence, allow_nan=False)}\n```")
         super().__init__("\n\n".join(text))

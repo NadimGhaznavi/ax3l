@@ -1,4 +1,4 @@
-"""Forward the setting selected for revision to Ax3l."""
+"""Forward Qwen's selected setting to Ax3l."""
 
 import asyncio
 import json

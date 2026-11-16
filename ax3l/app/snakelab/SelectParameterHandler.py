@@ -1,4 +1,4 @@
-"""Reopen one saved choice after the complete configuration is a duplicate."""
+"""Let Qwen choose any setting to change in the current draft."""
 
 from ax3l.app.snakelab.ExperimentDb import ExperimentDb
 from ax3l.app.snakelab.SubmitSingleValueHandler import SubmitSingleValueHandler
@@ -16,9 +16,11 @@ class SelectParameterHandler(SubmitSingleValueHandler):
             return self._reject("draft_id must identify the active configuration draft.")
         experiments = ExperimentDb(self._db)
         draft = experiments.draft()
-        if draft is None or draft.draft_id != draft_id or draft.phase != "selecting_parameter":
-            return self._reject("This draft is not waiting for a parameter to revise.")
-        draft.selections.remove(parameter)
+        if draft is None or draft.draft_id != draft_id or draft.phase not in ("selecting_parameter", "reviewing"):
+            return self._reject("This draft is not waiting for a parameter selection.")
+        if parameter in draft.selections:
+            draft.selections.remove(parameter)
+        draft.parameter = parameter
         draft.phase = "choosing"
         experiments.save_draft(draft)
         return {"status": "ok", "draft_id": draft.draft_id, "phase": draft.phase}

@@ -16,11 +16,12 @@ class ConfigurationDraft:
     references: dict[str, str]
     config: dict
     selections: list[str] = field(default_factory=list)
-    phase: str = "choosing"
+    phase: str = "selecting_parameter"
     run_id: str | None = None
+    parameter: str | None = None
 
     @property
     def next_parameter(self) -> str | None:
         if self.phase != "choosing":
             return None
-        return next(parameter for parameter in PARAMETER_ORDER if parameter not in self.selections)
+        return self.parameter

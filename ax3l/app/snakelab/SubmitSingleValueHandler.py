@@ -8,10 +8,9 @@ from ax3l.app.snakelab.SingleParameters import SINGLE_PARAMETERS
 from ax3l.app.DbMgr import DbMgr
 from ax3l.app.snakelab.ExperimentDb import ExperimentDb
 from ax3l.app.snakelab.prompts.InvalidValue import InvalidValue
-from ax3l.app.snakelab.prompts.NoDupes import NoDupes
+from ax3l.app.snakelab.prompts.ConfigurationNextStep import ConfigurationNextStep
 from ax3l.constants.DEventCategory import DEventCategory
 from ax3l.constants.DChoice import CHOICE_LABELS
-from ax3l.entities.ConfigurationDraft import PARAMETER_ORDER
 from ax3l.interface.SnakeLab import SnakeLab
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 
@@ -51,7 +50,7 @@ class SubmitSingleValueHandler:
         return self._stage_changes(payload["draft_id"], parameter, [(path, value)])
 
     def _stage_changes(self, draft_id: str, parameter: str, changes: list) -> dict:
-        """Save a choice; only a complete candidate is checked for duplicates."""
+        """Check the complete candidate after every choice and return control to Qwen."""
         if not isinstance(draft_id, str) or not draft_id:
             return self._reject("draft_id must identify the active configuration draft.")
         experiments = ExperimentDb(self._db)
@@ -65,14 +64,14 @@ class SubmitSingleValueHandler:
                 node = node[key]
             node[path[-1]] = value
         SimulationConfiguration.validate(candidate)
-        selections = draft.selections + [parameter]
-        if len(selections) == len(PARAMETER_ORDER):
-            draft.phase = "ready" if self._snake.is_config_unique(candidate) else "selecting_parameter"
+        unique = self._snake.is_config_unique(candidate)
+        draft.phase = "reviewing" if unique else "selecting_parameter"
         draft.config = candidate
-        draft.selections = selections
+        draft.selections.append(parameter)
+        draft.parameter = None
         experiments.save_draft(draft)
         if draft.phase == "selecting_parameter":
             category = DEventCategory.Configuration
-            self._db.log(category.PROPOSAL_DUPLICATE, category.CATEGORY, "INFO", NoDupes(draft).to_md(),
+            self._db.log(category.PROPOSAL_DUPLICATE, category.CATEGORY, "INFO", ConfigurationNextStep(draft).to_md(),
                          process_id=draft.draft_id)
         return {"status": "ok", "draft_id": draft.draft_id, "phase": draft.phase}

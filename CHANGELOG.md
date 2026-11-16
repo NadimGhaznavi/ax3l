@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.7.0] - 2026-11-15 @ 21:22
+
 ### Summary
 
 Compare inherited and LLM-chosen settings side by side in Experiment Status.

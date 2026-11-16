@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from ax3l.app.snakelab.SubmitPairValuesHandler import SubmitPairValuesHandler
-from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
+from ax3l.entities.ConfigurationDraft import ConfigurationDraft
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 
 
@@ -20,7 +20,7 @@ class SubmitPairValuesHandlerTests(unittest.TestCase):
 
     def bind(self, pair):
         self.draft = ConfigurationDraft('draft', 'gold', {'golden': 'gold'}, SimulationConfiguration.defaults(),
-                                        PARAMETER_ORDER[:PARAMETER_ORDER.index(pair)])
+                                        phase='choosing', parameter=pair)
         self.experiments.draft.return_value = self.draft
 
     def submit(self, pair='epsilon_pair', first=.91, second=.95):
@@ -55,18 +55,19 @@ class SubmitPairValuesHandlerTests(unittest.TestCase):
                 else:
                     self.assertEqual(self.draft.config['game']['rewards']['closer_to_food'], .25)
                     self.assertEqual(self.draft.config['game']['rewards']['further_from_food'], -.5)
-        self.assertEqual(self.draft.phase, 'ready')
+        self.assertEqual(self.draft.phase, 'reviewing')
         self.assertIsNone(self.draft.next_parameter)
-        self.snake.is_config_unique.assert_called_once_with(self.draft.config)
+        self.assertEqual(self.snake.is_config_unique.call_count, 3)
+        self.snake.is_config_unique.assert_called_with(self.draft.config)
         self.snake.submit_simulation.assert_not_called()
 
-    def test_duplicate_final_configuration_saves_every_choice_and_requests_a_revision(self):
+    def test_duplicate_configuration_saves_the_pair_and_requests_a_revision(self):
         self.bind('epsilon_nice_pair')
         original = deepcopy(self.draft)
         self.snake.is_config_unique.return_value = False
         result = self.submit('epsilon_nice_pair', .005, 20)
         self.assertEqual(result, dict(status='ok', draft_id='draft', phase='selecting_parameter'))
-        self.assertEqual(self.draft.selections, PARAMETER_ORDER)
+        self.assertEqual(self.draft.selections, ['epsilon_nice_pair'])
         self.assertEqual(self.draft.config['model'], original.config['model'])
         self.assertEqual(self.draft.config['epsilon_nice'], dict(probability=.005, steps=20))
         self.assertIsNone(self.draft.next_parameter)
@@ -90,5 +91,5 @@ class SubmitPairValuesHandlerTests(unittest.TestCase):
         self.snake.submit_simulation.assert_not_called()
         self.assertEqual(self.submit('epsilon_nice_pair', .1, 40)['status'], 'ok')
         self.assertEqual(self.draft.config['epsilon_nice'], dict(probability=.1, steps=40))
-        self.assertEqual(self.draft.phase, 'ready')
+        self.assertEqual(self.draft.phase, 'reviewing')
         self.experiments.save_draft.assert_called_once_with(self.draft)

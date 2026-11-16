@@ -89,9 +89,9 @@ class SimulationDataTests(unittest.TestCase):
         self.draft.selections = ['hidden_size']
         choices = self.payload('/draft')['choices']
         self.assertEqual(choices['hidden_size'], dict(state='chosen', values=dict(hidden_size=104)))
-        self.assertEqual(choices['layers'], dict(state='pending', values=dict(layers=1)))
-        self.assertEqual(choices['dropout'], dict(state='pending', values=dict(dropout=.05)))
-        self.assertEqual(choices['sequence_length'], dict(state='pending', values=dict(sequence_length=4)))
+        self.assertEqual(choices['layers'], dict(state='baseline', values=dict(layers=1)))
+        self.assertEqual(choices['dropout'], dict(state='baseline', values=dict(dropout=.05)))
+        self.assertEqual(choices['sequence_length'], dict(state='baseline', values=dict(sequence_length=4)))
         self.assertEqual(choices['epsilon_nice_pair']['values'], dict(probability=.05, steps=20))
         self.assertEqual(self.payload('/draft/model')['model']['hidden_size'], 104)
         self.assertEqual(self.payload('/golden/model')['model']['hidden_size'], 64)

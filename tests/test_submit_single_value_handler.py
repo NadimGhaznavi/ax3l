@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from ax3l.app.snakelab.SubmitSingleValueHandler import SubmitSingleValueHandler
-from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
+from ax3l.entities.ConfigurationDraft import ConfigurationDraft
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 
 
@@ -13,6 +13,7 @@ class SubmitSingleValueHandlerTests(unittest.TestCase):
     def setUp(self):
         module = 'ax3l.app.snakelab.SubmitSingleValueHandler.'
         self.snake = self.enterContext(patch(module + 'SnakeLab')).return_value
+        self.snake.is_config_unique.return_value = True
         self.experiments = self.enterContext(patch(module + 'ExperimentDb')).return_value
         self.handler = SubmitSingleValueHandler(Mock())
         self.baseline = SimulationConfiguration.defaults()
@@ -20,7 +21,7 @@ class SubmitSingleValueHandlerTests(unittest.TestCase):
 
     def bind(self, parameter):
         self.draft = ConfigurationDraft('draft', 'gold', {'golden': 'gold'}, deepcopy(self.baseline),
-                                        PARAMETER_ORDER[:PARAMETER_ORDER.index(parameter)])
+                                        phase='choosing', parameter=parameter)
         self.experiments.draft.return_value = self.draft
 
     def submit(self, parameter='learning_rate', value=.003, **extra):
@@ -41,17 +42,18 @@ class SubmitSingleValueHandlerTests(unittest.TestCase):
         self.experiments.save_draft.assert_not_called()
         self.snake.submit_simulation.assert_not_called()
 
-    def test_choice_preserves_earlier_choices_and_does_not_submit_or_check_duplicates(self):
+    def test_choice_preserves_other_values_and_checks_uniqueness_without_submitting(self):
         self.draft.config['model']['hidden_size'] = 96
         original = deepcopy(self.baseline)
         result = self.submit()
-        self.assertEqual(result, {'status': 'ok', 'draft_id': 'draft', 'phase': 'choosing'})
+        self.assertEqual(result, {'status': 'ok', 'draft_id': 'draft', 'phase': 'reviewing'})
         saved = self.experiments.save_draft.call_args.args[0]
         self.assertEqual(saved.config['model']['hidden_size'], 96)
         self.assertEqual(saved.config['training']['learning_rate'], .003)
-        self.assertEqual(saved.next_parameter, 'gamma')
+        self.assertIsNone(saved.next_parameter)
+        self.assertEqual(saved.selections, ['learning_rate'])
         self.assertEqual(self.baseline, original)
-        self.snake.is_config_unique.assert_not_called()
+        self.snake.is_config_unique.assert_called_once_with(saved.config)
         self.snake.submit_simulation.assert_not_called()
 
     def test_unchanged_value_is_an_explicit_accepted_choice(self):
@@ -80,3 +82,11 @@ class SubmitSingleValueHandlerTests(unittest.TestCase):
             self.submit()
         self.experiments.save_draft.assert_called_once()
         self.snake.submit_simulation.assert_not_called()
+
+    def test_uniqueness_failure_does_not_mutate_or_save_the_draft(self):
+        original = deepcopy(self.draft)
+        self.snake.is_config_unique.side_effect = RuntimeError('database unavailable')
+        with self.assertRaisesRegex(RuntimeError, 'database unavailable'):
+            self.submit()
+        self.assertEqual(self.draft, original)
+        self.experiments.save_draft.assert_not_called()

@@ -7,6 +7,7 @@ from ax3l.constants.DEventCategory import DEventCategory
 from ax3l.app.snakelab.SubmitSingleValueHandler import SubmitSingleValueHandler
 from ax3l.app.snakelab.SubmitPairValuesHandler import SubmitPairValuesHandler
 from ax3l.app.snakelab.SelectParameterHandler import SelectParameterHandler
+from ax3l.app.snakelab.RunSimulationHandler import RunSimulationHandler
 from ax3l.app.snakelab.SubmitSimulationSummaryHandler import SubmitSimulationSummaryHandler
 from ax3l.interface.SimulationData import SimulationData
 from ax3l.zmq.ZMQMsg import ZMQMsg
@@ -21,6 +22,7 @@ def handle_tool(request: ZMQMsg) -> dict:
         handlers = {"submit_single_value": SubmitSingleValueHandler,
                     "submit_pair_values": SubmitPairValuesHandler,
                     "select_parameter": SelectParameterHandler,
+                    "run_simulation": RunSimulationHandler,
                     "submit_simulation_summary": SubmitSimulationSummaryHandler}
         if request.target == "snakelab" and request.method == "read_simulation_data":
             return SimulationData(db).read(request.payload)

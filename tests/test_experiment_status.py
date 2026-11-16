@@ -56,9 +56,10 @@ class ExperimentStatusTests(unittest.TestCase):
         self.assertEqual(self.report(activity=activity)['totals'], dict(
             elapsed='01:00:01', input_tokens=2584, output_tokens=371, tokens=2955))
 
-    def test_saved_unchanged_values_count_and_paired_rows_advance_together(self):
-        self.assertEqual(self.report()['phase'], 'Choosing Hidden Size')
+    def test_saved_values_and_current_pair_follow_qwens_explicit_selection(self):
+        self.assertEqual(self.report()['phase'], 'Choosing a setting')
         self.draft.selections = PARAMETER_ORDER[:7]
+        self.draft.phase, self.draft.parameter = 'choosing', 'epsilon_pair'
         report = self.report()
         self.assertEqual(report['choices_selected'], 7)
         self.assertEqual(report['choices_total'], 10)
@@ -75,6 +76,7 @@ class ExperimentStatusTests(unittest.TestCase):
         self.assertEqual(rows[7]['value'], str(self.golden['config']['epsilon']['initial']))
         self.assertEqual(self.draft.config, self.golden['config'])
         self.draft.selections.append('epsilon_pair')
+        self.draft.parameter = 'reward_pair'
         report = self.report()
         self.assertTrue(all(row['selected'] for row in report['rows'][:9]))
         self.assertEqual([row['path'] for row in report['rows'] if row['current']],
@@ -135,10 +137,20 @@ class ExperimentStatusTests(unittest.TestCase):
         self.assertEqual(report['totals'], dict(elapsed='00:12', input_tokens=100, output_tokens=20, tokens=120))
         self.draft.selections.remove('layers')
         self.draft.phase = 'choosing'
+        self.draft.parameter = 'layers'
         report = self.report(activity=work)
         self.assertEqual(report['phase'], 'Choosing Encoder Layers')
         self.assertEqual([row['path'] for row in report['rows'] if row['current']], ['model.layers'])
         self.assertEqual(report['totals']['tokens'], 120)
+
+    def test_unique_draft_waits_for_qwens_next_step_after_only_one_choice(self):
+        self.draft.selections = ['gamma']
+        self.draft.phase = 'reviewing'
+        report = self.report()
+        self.assertEqual(report['phase'], 'Choosing next step')
+        self.assertIn('run it or change any setting again', report['detail'])
+        self.assertEqual(report['choices_selected'], 1)
+        self.assertEqual([row['path'] for row in report['rows'] if row['current']], [REVISION_PARAMETER])
 
     def test_finished_run_is_distinct_from_comparison_and_analysis(self):
         self.draft.selections = PARAMETER_ORDER.copy()
@@ -211,10 +223,10 @@ class ExperimentStatusHttpTests(unittest.TestCase):
 
     def test_live_checklist_refresh_and_preserved_completed_view(self):
         page = self.get()
-        self.assertIn('Choosing Hidden Size', page)
-        self.assertIn('0 / 10 choices saved', page)
+        self.assertIn('Choosing a setting', page)
+        self.assertIn('0 settings saved', page)
         self.assertEqual(page.count('type="checkbox" disabled'), 13)
-        self.assertEqual(page.count('>Pending</span>'), 13)
+        self.assertNotIn('>Pending</span>', page)
         self.assertNotIn('<td class="changed-value">', page)
         self.assertIn('window.setTimeout(refreshStatus, 5000)', page)
         self.assertIn('Showing the last successful report', page)
@@ -230,7 +242,7 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         self.experiments.last_completed_draft.return_value = completed
         self.experiments.draft.return_value = ConfigurationDraft(
             str(uuid4()), self.draft.golden_run_id, {}, SimulationConfiguration.defaults())
-        self.assertIn('Choosing Hidden Size', self.get())
+        self.assertIn('Choosing a setting', self.get())
         page = self.get('/experiment-status?view=completed')
         self.assertIn('aria-current="page">Last completed</a>', page)
         self.assertIn('id="experiment-phase" role="status">Complete</h2>', page)
@@ -269,7 +281,7 @@ class ExperimentStatusHttpTests(unittest.TestCase):
                     self.assertEqual('class="changed-value"' in row, changed)
                     self.assertNotIn('class="comparison-label"', row)
                 pending = page.split('data-parameter="epsilon_nice.probability"', 1)[1].split('</tr>', 1)[0]
-                self.assertIn('>Pending</span>', pending)
+                self.assertIn('>—</span>', pending)
                 self.assertNotIn('class="parameter-value"', pending)
 
     def test_empty_invalid_view_and_database_failure_cleanup(self):
@@ -292,8 +304,8 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         self.draft.selections = PARAMETER_ORDER.copy()
         page = self.get()
         self.assertIn('Choosing a setting to revise', page)
-        self.assertIn('Setting to revise', page)
-        self.assertIn('10 / 10 choices saved', page)
+        self.assertIn('Experiment decision', page)
+        self.assertIn('10 settings saved', page)
         self.assertEqual(page.count('disabled checked'), 13)
         self.assertNotIn('>Pending</span>', page)
 

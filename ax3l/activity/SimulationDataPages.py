@@ -66,10 +66,11 @@ def index_page(draft: ConfigurationDraft) -> str:
 def draft_page(draft: ConfigurationDraft) -> str:
     choices = {}
     for parameter in PARAMETER_ORDER:
-        choices[parameter] = dict(state="chosen" if parameter in draft.selections else "pending",
+        state = "choosing" if parameter == draft.next_parameter else "chosen" if parameter in draft.selections else "baseline"
+        choices[parameter] = dict(state=state,
                                   values=parameter_values(draft.config, parameter))
     data = data_json("draft", draft.config["seed"], dict(choices=choices))
-    return (f"The draft shows saved and inherited values.\n```json\n{data}\n```\n"
+    return (f"The draft shows chosen and baseline values; settings can be left at baseline.\n```json\n{data}\n```\n"
             + links("draft", CONFIG_PAGES))
 
 

@@ -1,11 +1,12 @@
 """Draft recovery and analysis queries against disposable MariaDB fixtures."""
 
 from copy import deepcopy
+from dataclasses import asdict
 from datetime import timedelta
 import json
 import os
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from uuid import uuid4
 
 from ax3l.app.DbMgr import DbMgr
@@ -18,6 +19,38 @@ from ax3l.entities.ConfigurationDraft import ConfigurationDraft
 from ax3l.entities.AnalysisTask import AnalysisTask
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
+
+
+class DraftRecoveryTests(unittest.TestCase):
+    def setUp(self):
+        self.db = Mock()
+        self.store = ExperimentDb(self.db)
+        self.draft = ConfigurationDraft('draft', 'gold', {}, SimulationConfiguration.defaults())
+
+    def restore(self, data):
+        self.db.query.return_value = [dict(content=json.dumps(data))]
+        return self.store.draft()
+
+    def test_current_snapshots_preserve_parameter_selection_and_run_decisions(self):
+        for phase, parameter in (('selecting_parameter', None), ('choosing', 'gamma'),
+                                 ('reviewing', None), ('ready', None)):
+            self.draft.phase, self.draft.parameter = phase, parameter
+            self.assertEqual(self.restore(asdict(self.draft)), self.draft)
+
+    def test_legacy_drafts_keep_the_in_progress_choice_then_use_qwens_next_decision(self):
+        data = asdict(self.draft)
+        del data['parameter']
+        data.update(phase='choosing', selections=['hidden_size', 'layers', 'dropout'])
+        self.assertEqual(self.restore(data).next_parameter, 'sequence_length')
+        data['phase'] = 'preparing'
+        restored = self.restore(data)
+        self.assertEqual(restored.phase, 'choosing')
+        self.assertEqual(restored.next_parameter, 'sequence_length')
+        data['phase'] = 'ready'
+        self.assertEqual(self.restore(data).phase, 'reviewing')
+        for phase in ('submitting', 'submitted', 'completed'):
+            data['phase'] = phase
+            self.assertEqual(self.restore(data).phase, phase)
 
 
 @unittest.skipUnless(os.environ.get('AX3L_TEST_DB') == '1', 'requires disposable MariaDB test database')
@@ -39,6 +72,7 @@ class ExperimentDatabaseTests(unittest.TestCase):
         experiments = ExperimentDb(self.db)
         experiments.save_draft(draft)
         draft.selections = ['hidden_size']
+        draft.phase, draft.parameter = 'choosing', 'sequence_length'
         draft.config['model']['hidden_size'] = 240
         experiments.save_draft(draft)
         other = DbMgr(initialize_event_tables=False)

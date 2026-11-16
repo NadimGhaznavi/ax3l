@@ -10,7 +10,7 @@ from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 
 RUN_PHASES = {
     "queued": ("Simulation queued", "Waiting for Snake Lab to start the simulation."),
-    "running": ("Simulation running", "All configuration choices are saved. Snake Lab is running the simulation."),
+    "running": ("Simulation running", "Qwen chose to run the saved configuration. Snake Lab is running the simulation."),
     "paused": ("Simulation paused", "Snake Lab has paused the simulation."),
     "cancelling": ("Simulation cancelling", "Snake Lab is stopping the simulation."),
     "cancelled": ("Simulation cancelled", "The simulation was cancelled."),
@@ -47,14 +47,15 @@ def _rows(draft: ConfigurationDraft, inherited_config: dict, activity: dict[str,
             rows[-1]["steps"] = [dict(step, elapsed=_elapsed(step["seconds"])) for step in work["steps"]]
             image = work["image_event_id"]
             rows[-len(paths)]["image_url"] = f"/events/{image}" if image is not None else None
-    if draft.phase == "selecting_parameter" or REVISION_PARAMETER in activity:
+    deciding = draft.phase in ("selecting_parameter", "reviewing")
+    if deciding or REVISION_PARAMETER in activity:
         work = activity.get(REVISION_PARAMETER)
         rows.append(dict(
             path=REVISION_PARAMETER, label=FIELD_TO_LABEL_MAP[REVISION_PARAMETER],
-            description="Choose which saved setting to change after a duplicate configuration.",
-            value="Choosing" if draft.phase == "selecting_parameter" else "Selected",
+            description="Choose a setting to change or run a unique configuration.",
+            value="Choosing" if deciding else "Selected",
             inherited_value=None, changed=False,
-            selected=None, current=draft.phase == "selecting_parameter", image_url=None,
+            selected=None, current=deciding, image_url=None,
             steps=[dict(step, elapsed=_elapsed(step["seconds"])) for step in work["steps"]] if work else [],
         ))
     return rows
@@ -68,10 +69,14 @@ def _phase(draft: ConfigurationDraft, run: dict | None, comparison: dict | None,
         return (f"Choosing {FIELD_TO_LABEL_MAP[draft.next_parameter]}",
                 "A checkmark indicates that Ax3l accepted and saved the choice.")
     if draft.phase == "selecting_parameter":
+        if not draft.selections:
+            return "Choosing a setting", "Qwen can research the baseline and choose any setting to change."
         return ("Choosing a setting to revise",
-                "The complete configuration is a duplicate. Qwen will choose which setting to change.")
+                "The configuration is a duplicate. Qwen will choose which setting to change.")
+    if draft.phase == "reviewing":
+        return "Choosing next step", "The configuration is unique. Qwen can run it or change any setting again."
     if draft.phase == "ready":
-        return "Ready to submit", "All configuration choices are saved."
+        return "Ready to submit", "Qwen chose to run the saved configuration."
     if draft.phase == "submitting":
         return "Submission pending", "Waiting for Snake Lab to confirm the simulation."
     if run is None:

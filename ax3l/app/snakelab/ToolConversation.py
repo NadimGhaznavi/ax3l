@@ -79,14 +79,15 @@ async def converse(llm, output, db, tools, prompts, *, parameter: str | None = N
                     elif called_name == "data_tool":
                         result = await tools.data(arguments)
                     else:
-                        result = await tools.submit(arguments)
+                        result = (await tools.submit(arguments) if called_name == tool_name else
+                                  await tools.submit(arguments, name=called_name))
                 if result["status"] not in ("ok", "rejected"):
                     raise RuntimeError(f"Tool submission failed: {result}")
             except Exception as error:
                 log(Events.Tool, Events.Tool.FAILED, str(error), "ERROR")
                 raise
             log(Events.Tool, Events.Tool.COMPLETED, json.dumps(result))
-            if result["status"] == "ok" and called_name == tool_name:
+            if result["status"] == "ok" and called_name not in ("kb_tool", "data_tool"):
                 return result
             # Explicit validation rejections are safe to correct. Transport failures are not retried.
             messages.append({"role": "tool", "tool_call_id": call["id"],

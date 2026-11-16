@@ -13,10 +13,22 @@ when it can inform that choice.
 ## Initial startup
 
 With an empty experiment, Ax3l submits the schema defaults once. The baseline
-uses SnakeLab 3.0.1, a four-head Transformer, required EpsilonNice, and 500
-episodes. On completion, it becomes the initial golden configuration and
-has its measurements saved before the first choice. Interrupted initial seeding resumes
-its recorded submission.
+builds on SnakeLab 3.0.4's `transformer-epsilon-nice.json` sample and runs 500
+episodes with required EpsilonNice:
+
+| Setting | Initial value |
+| --- | --- |
+| Hidden size / encoder layers / attention heads | 64 / 1 / 4 |
+| Dropout | 0.05 |
+| Sequence length / batch size | 4 / 64 |
+| Learning rate | 0.001 |
+| Gamma / target update rate (`tau`) | 0.96 / 0.05 |
+| EpsilonNice probability / steps | 0.05 / 20 |
+
+Tau remains fixed during optimization. On completion,
+the baseline becomes the initial golden configuration and has its measurements
+saved before the first choice. Interrupted initial seeding resumes its recorded
+submission.
 
 ## Choosing a complete configuration
 
@@ -28,17 +40,19 @@ chooses the following settings in order:
 
 | Parameter | Purpose | Allowed values | Tuned with |
 | --- | --- | --- | --- |
-| Hidden Size | Number of neurons in each Transformer hidden layer. | Integers from 64 to 384, in multiples of 16. | Individually |
+| Hidden Size | Number of neurons in each Transformer hidden layer. | Integers from 32 to 128, in multiples of 8. | Individually |
+| Encoder Layers | Number of Transformer encoder layers. | 1, 2, or 3. | Individually |
+| Dropout | Dropout probability in the Transformer. | Numbers from 0 to 0.1, in steps of 0.01. | Individually |
 | Sequence Length | Number of consecutive frames in each training sequence. | Integers from 4 to 48, in multiples of 4. | Individually |
 | Batch Size | Number of sequences sampled for each training update. | Integers from 8 to 64, in multiples of 2. | Individually |
 | Learning Rate | Size of gradient updates during training. | Numbers from 0.0005 to 0.005. | Individually |
 | Gamma | Discount factor controlling the value of future rewards. | Numbers from 0.9 to 0.99. | Individually |
 | Epsilon: initial | Starting probability of choosing a random action. | Numbers from 0.85 to 0.999. | Epsilon: decay |
 | Epsilon: decay | Multiplier applied to epsilon after each episode. | Numbers from 0.9 to 0.999. | Epsilon: initial |
-| Food Reward: closer | Reward for moving closer to the food. | 0, 0.1, 0.25, 0.5, 1, 2, 3, 4, 5, 6. | Food Reward: further |
-| Food Reward: further | Penalty for moving farther from the food. | -6, -5, -4, -3, -2, -1, -0.5, -0.25, -0.1, 0. | Food Reward: closer |
+| Food Reward: closer | Reward for moving closer to the food. | 0, 0.1, 0.25, 0.5, 1, 2, 3, 4, 5. | Food Reward: further |
+| Food Reward: further | Penalty for moving farther from the food. | -5, -4, -3, -2, -1, -0.5, -0.25, -0.1, 0. | Food Reward: closer |
 | EpsilonNice: probability | Chance per eligible move of starting a safe detour. | Numbers greater than 0 and at most 0.1 (10%). | EpsilonNice: steps |
-| EpsilonNice: steps | Duration of each detour, reset each episode. | Integers from 1 to 50. | EpsilonNice: probability |
+| EpsilonNice: steps | Duration of each detour, reset each episode. | Integers from 1 to 40. | EpsilonNice: probability |
 
 The epsilon settings, distance rewards, and EpsilonNice settings are chosen in
 pairs. The sum of the two distance rewards must be non-positive. Seeds and
@@ -64,7 +78,7 @@ Qwen needs more detail. The tool menu at `/` links to `draft`, `latest`,
 `golden`, and `best`. Navigation uses English and experiment values use
 JSON. `kb_tool` serves optional background. Choice rules appear in the
 submission tool description. Accepted choices are saved without starting a
-simulation. A value can remain unchanged. After all eight choices, Ax3l
+simulation. A value can remain unchanged. After all ten choices, Ax3l
 checks the complete draft for duplicates and submits one simulation.
 
 Experiment Status shows the settings to be chosen and the saved selections.

@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.5.0] - 2026-11-15 @ 20:44
+
+### Summary
+
+Start fresh experiments from a smaller Transformer and let the LLM tune its
+width, encoder depth, and dropout.
+
+### Changed
+
+- Use a baseline with hidden size 64, one encoder layer, dropout 0.05,
+  four-frame sequences, batch size 64, learning rate 0.001, target update rate
+  0.05, and EpsilonNice probability 0.05. Keep the target update rate fixed.
+- Allow hidden widths from 32 to 128 in multiples of 8. Add encoder layers
+  (1–3) and dropout (0–0.1 in steps of 0.01) to the LLM's choices, including
+  tool rules, saved drafts, and experiment status reports. Each pass now makes
+  seven single choices and three paired choices before submitting one run.
+- Limit distance reward choices to +/-5 and safe detours to 40 moves.
+- Refresh the bundled Snake Lab schema and model guidance for the new baseline.
+
 ## [4.4.5] - 2026-11-15 @ 19:12
 ### Changed
 

@@ -69,7 +69,7 @@ class SimulationDataTests(unittest.TestCase):
         self.assertEqual(json.loads(pages['/golden/training'])['training']['replay_max_frames'], 100000)
         self.assertIn('Different seed: historical context', pages['/best'])
         self.assertEqual(json.loads(pages['/draft/game'])['epochs'], 500)
-        self.assertEqual(json.loads(pages['/draft/exploration'])['epsilon_nice'], dict(probability=.005, steps=20))
+        self.assertEqual(json.loads(pages['/draft/exploration'])['epsilon_nice'], dict(probability=.05, steps=20))
         self.store.save_draft.assert_not_called()
         self.store.save_analysis.assert_not_called()
 
@@ -85,14 +85,16 @@ class SimulationDataTests(unittest.TestCase):
                          [self.latest, self.latest, self.gold])
 
     def test_draft_reads_include_saved_earlier_choices_after_restart(self):
-        self.draft.config['model']['hidden_size'] = 272
+        self.draft.config['model']['hidden_size'] = 104
         self.draft.selections = ['hidden_size']
         choices = self.payload('/draft')['choices']
-        self.assertEqual(choices['hidden_size'], dict(state='chosen', values=dict(hidden_size=272)))
-        self.assertEqual(choices['sequence_length'], dict(state='pending', values=dict(sequence_length=8)))
-        self.assertEqual(choices['epsilon_nice_pair']['values'], dict(probability=.005, steps=20))
-        self.assertEqual(self.payload('/draft/model')['model']['hidden_size'], 272)
-        self.assertEqual(self.payload('/golden/model')['model']['hidden_size'], 224)
+        self.assertEqual(choices['hidden_size'], dict(state='chosen', values=dict(hidden_size=104)))
+        self.assertEqual(choices['layers'], dict(state='pending', values=dict(layers=1)))
+        self.assertEqual(choices['dropout'], dict(state='pending', values=dict(dropout=.05)))
+        self.assertEqual(choices['sequence_length'], dict(state='pending', values=dict(sequence_length=4)))
+        self.assertEqual(choices['epsilon_nice_pair']['values'], dict(probability=.05, steps=20))
+        self.assertEqual(self.payload('/draft/model')['model']['hidden_size'], 104)
+        self.assertEqual(self.payload('/golden/model')['model']['hidden_size'], 64)
 
     def test_shared_reference_runs_have_one_index_entry_and_all_aliases_work(self):
         self.draft.references = dict.fromkeys(self.draft.references, self.gold)
@@ -193,8 +195,12 @@ class AnalysisRunDataTests(unittest.TestCase):
         parameters = data['parameters']
         self.assertEqual(parameters['training.learning_rate']['maximum'], .005)
         self.assertEqual(parameters['epsilon_nice.probability']['maximum'], .1)
-        self.assertEqual(parameters['epsilon_nice.steps']['maximum'], 50)
-        self.assertEqual(parameters['model.hidden_size']['multipleOf'], 16)
+        self.assertEqual(parameters['epsilon_nice.steps']['maximum'], 40)
+        self.assertEqual(parameters['model.hidden_size']['minimum'], 32)
+        self.assertEqual(parameters['model.hidden_size']['maximum'], 128)
+        self.assertEqual(parameters['model.hidden_size']['multipleOf'], 8)
+        self.assertEqual(parameters['model.layers']['enum'], [1, 2, 3])
+        self.assertEqual(parameters['model.dropout']['enum'], [n / 100 for n in range(11)])
         self.assertNotIn('seed', parameters)
         self.assertNotIn('epochs', parameters)
         self.assertNotIn('model.heads', parameters)

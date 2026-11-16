@@ -39,16 +39,23 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
             requests.append(message)
             return {'status': 'ok', 'draft_id': 'draft', 'phase': 'choosing'}
         with ZMQServer('tcp://127.0.0.1:*', handle) as server:
-            async with SnakeLabTools(server.endpoint, 'hidden_size', draft_id='draft') as tools:
-                self.assertEqual(set(tools.definition['function']['parameters']['properties']), {'value'})
-                self.assertIn('without running a simulation', tools.definition['function']['description'])
-                self.assertEqual((await tools.submit({'value': 240}))['draft_id'], 'draft')
-                self.assertEqual(requests[-1].payload, {'draft_id': 'draft', 'parameter': 'hidden_size', 'value': 240})
-                for value in ('240', True):
-                    with self.assertRaises(RuntimeError):
-                        await tools.submit({'value': value})
-                self.assertEqual(len(requests), 1)
-                self.assertTrue((await tools._client.call_tool('submit_simulation_summary', {'summary': 'A. B.'})).is_error)
+            for parameter, value, rule in (
+                ('hidden_size', 96, 'at least 32; at most 128; multiple of 8'),
+                ('layers', 3, 'one of 1, 2, 3'),
+                ('dropout', .02, 'one of 0.0, 0.01, 0.02'),
+            ):
+                async with SnakeLabTools(server.endpoint, parameter, draft_id='draft') as tools:
+                    self.assertEqual(set(tools.definition['function']['parameters']['properties']), {'value'})
+                    self.assertIn('without running a simulation', tools.definition['function']['description'])
+                    self.assertIn(rule, tools.definition['function']['description'])
+                    self.assertEqual((await tools.submit({'value': value}))['draft_id'], 'draft')
+                    self.assertEqual(requests[-1].payload, {'draft_id': 'draft', 'parameter': parameter, 'value': value})
+                    count = len(requests)
+                    for invalid in (str(value), True):
+                        with self.assertRaises(RuntimeError):
+                            await tools.submit({'value': invalid})
+                    self.assertEqual(len(requests), count)
+                    self.assertTrue((await tools._client.call_tool('submit_simulation_summary', {'summary': 'A. B.'})).is_error)
 
     async def test_all_pair_assignments_forward_two_values_and_private_draft_id(self):
         requests = []
@@ -64,7 +71,7 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
                     if pair == 'epsilon_nice_pair':
                         description = tools.definition['function']['description']
                         self.assertIn('start chance: number; above 0; at most 0.1.', description)
-                        self.assertIn('moves per detour: whole number; at least 1; at most 50.', description)
+                        self.assertIn('moves per detour: whole number; at least 1; at most 40.', description)
                     arguments = dict(zip(('value_1', 'value_2'), values))
                     self.assertEqual(await tools.submit(arguments), response)
                     self.assertEqual(requests[-1].payload, {'draft_id': 'draft', 'pair': pair, **arguments})

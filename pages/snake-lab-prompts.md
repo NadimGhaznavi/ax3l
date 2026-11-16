@@ -17,8 +17,9 @@ supplies the setting, the chart when applicable, and the tools for the choice.
 | `InvalidValue` | Explains why Ax3l rejected a value. |
 | `NoDupes` | Explains a duplicate completed draft and requests different values for its final pair. |
 
-The five single choices precede the epsilon, distance-reward, and EpsilonNice
-pairs. `submit_single_value` and `submit_pair_values` save one choice. Ax3l
+The seven single choices (hidden size, layers, dropout, sequence length, batch
+size, learning rate, and gamma) precede the epsilon, distance-reward, and
+EpsilonNice pairs. `submit_single_value` and `submit_pair_values` save one choice. Ax3l
 runs the simulation after it accepts the complete configuration. Draft and
 parameter identifiers are bound outside the model's arguments. The tool
 description contains the allowed values.

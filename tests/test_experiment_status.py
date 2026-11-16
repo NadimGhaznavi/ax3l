@@ -57,25 +57,25 @@ class ExperimentStatusTests(unittest.TestCase):
 
     def test_saved_unchanged_values_count_and_paired_rows_advance_together(self):
         self.assertEqual(self.report()['phase'], 'Choosing Hidden Size')
-        self.draft.selections = PARAMETER_ORDER[:5]
+        self.draft.selections = PARAMETER_ORDER[:7]
         report = self.report()
-        self.assertEqual(report['choices_selected'], 5)
-        self.assertEqual(report['choices_total'], 8)
+        self.assertEqual(report['choices_selected'], 7)
+        self.assertEqual(report['choices_total'], 10)
         rows = report['rows']
-        self.assertEqual(len(rows), 11)
+        self.assertEqual(len(rows), 13)
         self.assertEqual([row['path'] for row in rows], [
-            'model.hidden_size', 'training.sequence_length', 'training.batch_size',
+            'model.hidden_size', 'model.layers', 'model.dropout', 'training.sequence_length', 'training.batch_size',
             'training.learning_rate', 'training.gamma', 'epsilon.initial', 'epsilon.decay',
             'game.rewards.closer_to_food', 'game.rewards.further_from_food',
             'epsilon_nice.probability', 'epsilon_nice.steps'])
-        self.assertTrue(all(row['selected'] for row in rows[:5]))
-        self.assertTrue(all(not row['selected'] for row in rows[5:]))
+        self.assertTrue(all(row['selected'] for row in rows[:7]))
+        self.assertTrue(all(not row['selected'] for row in rows[7:]))
         self.assertEqual([row['path'] for row in rows if row['current']], ['epsilon.initial', 'epsilon.decay'])
-        self.assertEqual(rows[5]['value'], str(self.golden['config']['epsilon']['initial']))
+        self.assertEqual(rows[7]['value'], str(self.golden['config']['epsilon']['initial']))
         self.assertEqual(self.draft.config, self.golden['config'])
         self.draft.selections.append('epsilon_pair')
         report = self.report()
-        self.assertTrue(all(row['selected'] for row in report['rows'][:7]))
+        self.assertTrue(all(row['selected'] for row in report['rows'][:9]))
         self.assertEqual([row['path'] for row in report['rows'] if row['current']],
                          ['game.rewards.closer_to_food', 'game.rewards.further_from_food'])
 
@@ -171,8 +171,8 @@ class ExperimentStatusHttpTests(unittest.TestCase):
     def test_live_checklist_refresh_and_preserved_completed_view(self):
         page = self.get()
         self.assertIn('Choosing Hidden Size', page)
-        self.assertIn('0 / 8 choices saved', page)
-        self.assertEqual(page.count('type="checkbox" disabled'), 11)
+        self.assertIn('0 / 10 choices saved', page)
+        self.assertEqual(page.count('type="checkbox" disabled'), 13)
         self.assertIn('>inherited</span>', page)
         self.assertIn('window.setTimeout(refreshStatus, 5000)', page)
         self.assertIn('Showing the last successful report', page)
@@ -192,7 +192,7 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         page = self.get('/experiment-status?view=completed')
         self.assertIn('aria-current="page">Last completed</a>', page)
         self.assertIn('id="experiment-phase" role="status">Complete</h2>', page)
-        self.assertEqual(page.count('disabled checked'), 11)
+        self.assertEqual(page.count('disabled checked'), 13)
         self.assertNotIn('>inherited</span>', page)
         self.assertIn('<dt>High score</dt><dd>0</dd>', page)
         self.assertIn('<dt>Difference</dt><dd>+0</dd>', page)
@@ -224,7 +224,7 @@ class ExperimentStatusHttpTests(unittest.TestCase):
                         observed_at=observed, parent_event_id=parent, parameter=parameter,
                         has_image=image, detail=detail)
 
-        self.draft.selections = PARAMETER_ORDER[:5]
+        self.draft.selections = PARAMETER_ORDER[:7]
         self.experiments.choice_events.return_value = [
             event(1, 'choice_chart_started', 0, parameter='epsilon_pair', detail='Score trends'),
             event(2, 'choice_chart_finished', 1, parameter='epsilon_pair', detail='Complete'),

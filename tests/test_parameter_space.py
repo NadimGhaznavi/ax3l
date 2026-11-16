@@ -11,9 +11,11 @@ from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb, CONFIGURATION_FIELDS, _conf
 class ParameterSpaceTests(unittest.TestCase):
     def test_schema_domains(self):
         self.assertEqual(finite_choices('sequence_length'), {(n,) for n in range(4, 49, 4)})
-        self.assertEqual(len(finite_choices('hidden_size')), 21)
+        self.assertEqual(finite_choices('hidden_size'), {(n,) for n in range(32, 129, 8)})
+        self.assertEqual(finite_choices('layers'), {(1,), (2,), (3,)})
+        self.assertEqual(finite_choices('dropout'), {(Fraction(n, 100),) for n in range(11)})
         self.assertEqual(len(finite_choices('batch_size')), 29)
-        self.assertEqual(len(finite_choices('reward_pair')), 55)
+        self.assertEqual(len(finite_choices('reward_pair')), 45)
         self.assertIn((Fraction(1, 10), Fraction(-1, 10)), finite_choices('reward_pair'))
         self.assertIn((0, 0), finite_choices('reward_pair'))
         self.assertNotIn((6, 0), finite_choices('reward_pair'))

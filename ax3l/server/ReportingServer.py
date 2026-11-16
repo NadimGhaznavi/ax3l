@@ -30,6 +30,7 @@ from ax3l.activity.SimulationBoard import board_svg
 from ax3l.activity.SimulationAnimation import SimulationAnimation
 from ax3l.interface.SimulationGifStore import SimulationGifStore
 from ax3l.activity.SimulationMetrics import metrics
+from ax3l.activity.ToolResult import tool_result_html
 from ax3l.constants.DReportMgr import DReportMgr
 from ax3l.constants.DAx3l import DAx3l
 from ax3l.constants.DLabel import FIELD_TO_LABEL_MAP
@@ -108,6 +109,24 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
             if self.path == "/health":
                 body = b'{"status":"ok","service":"reporting-server","mode":"events"}'
                 content_type = "application/json"
+            elif re.fullmatch(r"/tool-results/[0-9]{1,20}", self.path):
+                try:
+                    db = DbMgr(initialize_event_tables=False)
+                    try:
+                        event = EventLogDb(db).get(int(self.path.split("/")[2]))
+                    finally:
+                        db.close()
+                    if event is None or event["category"] != DEventCategory.Tool.CATEGORY or event["name"] not in (
+                            DEventCategory.Tool.COMPLETED, DEventCategory.Tool.FAILED):
+                        self.send_error(404, "Tool result not found")
+                        return
+                    body = templates.get_template("tool_result.html").render(
+                        event=event, result_html=tool_result_html(event)).encode("utf-8")
+                    content_type = "text/html; charset=utf-8"
+                except Exception:
+                    traceback.print_exc()
+                    self.send_error(500, "Unable to load tool result")
+                    return
             elif re.fullmatch(
                 r"/simulation-gifs/v[0-9]+-[0-9]+ms/[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\.gif",
                 self.path,

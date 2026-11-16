@@ -70,20 +70,22 @@ def choice_activity(events: list[dict]) -> dict[str, dict]:
     def choice(parameter):
         return choices.setdefault(parameter, dict(steps=[], image_event_id=None))
 
-    def start(parameter, label, at):
+    def start(parameter, label, at, target=None):
         if parameter in active:
             active[parameter].update(state="Interrupted", seconds=None)
         step = dict(label=label, started=at, seconds=None, state="Running",
-                    input_tokens=None, output_tokens=None)
+                    input_tokens=None, output_tokens=None, target=target, result_url=None)
         choice(parameter)["steps"].append(step)
         active[parameter] = step
 
-    def finish(parameter, state, at, usage=None):
+    def finish(parameter, state, at, usage=None, result_event_id=None):
         step = active.pop(parameter, None)
         if step is not None:
             usage = usage or {}
             step.update(state=state, seconds=(at - step["started"]).total_seconds(),
                         input_tokens=usage.get("prompt_tokens"), output_tokens=usage.get("completion_tokens"))
+            if step["target"] is not None and result_event_id is not None:
+                step["result_url"] = f"/tool-results/{result_event_id}"
 
     for event in events:
         name, at, detail = event["name"], event["occurred_at"], event["detail"]
@@ -105,16 +107,18 @@ def choice_activity(events: list[dict]) -> dict[str, dict]:
             elif name == tool.STARTED:
                 function = json.loads(detail)["function"]
                 label = {"data_tool": "Read data", "kb_tool": "Read guide"}.get(function["name"], "Submit choice")
+                target = None
                 if function["name"] in ("data_tool", "kb_tool"):
                     arguments = json.loads(function["arguments"])
                     path = arguments.get("url") if isinstance(arguments, dict) else None
-                    if isinstance(path, str) and len(path) <= 60:
-                        label += f" {path}"
-                start(parameter, label, at)
+                    if isinstance(path, str):
+                        target = path
+                start(parameter, label, at, target)
             elif name == tool.COMPLETED:
-                finish(parameter, "Rejected" if detail == "rejected" else "Complete", at)
+                finish(parameter, "Rejected" if detail == "rejected" else "Complete", at,
+                       result_event_id=event["event_id"])
             elif name in (llm.REQUEST_FAILED, tool.FAILED):
-                finish(parameter, "Failed", at)
+                finish(parameter, "Failed", at, result_event_id=event["event_id"])
             elif name == chat.ENDED:
                 finish(parameter, "Stopped", at)
 

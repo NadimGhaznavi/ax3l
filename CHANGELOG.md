@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 
 ## [Unreleased]
+
+## [4.4.5] - 2026-11-15 @ 19:12
 ### Changed
 
 - Reverted HTTP timeout back to 5 minutes. 10 minutes just meant a 10 minute timeout.

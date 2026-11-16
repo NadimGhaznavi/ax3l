@@ -43,11 +43,12 @@
         <p class="status-usage-note">Baseline values come from this experiment's starting golden configuration. Changed choices are highlighted.</p>
       </div>
       <div id="llm-countdown" class="status-countdown" data-countdown='{{ countdown | tojson }}'>
-        <span class="countdown-label">LLM countdown</span>
+        <span id="llm-countdown-label" class="countdown-label">LLM countdown</span>
         <strong id="llm-countdown-value" role="timer" aria-live="off" aria-label="LLM time remaining">—</strong>
         <span id="llm-countdown-state">{{ 'Waiting for timer' if draft.phase in ('choosing', 'selecting_parameter', 'reviewing') else 'Not active' }}</span>
       </div>
     </div>
+    <div class="status-table-scroll" role="region" aria-label="Configuration choices and setup steps" tabindex="0">
     <table class="status-checklist" aria-label="Configuration choices and setup steps">
       <colgroup><col class="check-column"><col><col class="details-column"><col class="value-column"><col class="value-column"><col class="time-column"><col class="token-column"><col class="token-column"></colgroup>
       <thead><tr><th scope="col">Saved</th><th scope="col">Setting or step</th><th scope="col">LLM details</th><th scope="col">Baseline</th><th scope="col">LLM Choice</th><th scope="col">Elapsed</th><th scope="col">Input tokens</th><th scope="col">Output tokens</th></tr></thead>
@@ -90,6 +91,7 @@
         </tr>
       </tfoot>
     </table>
+    </div>
     <p class="status-usage-note">Elapsed time and totals update every 5 seconds, including the running step. Token totals include replies received so far.</p>
     <dl class="status-results" aria-label="Simulation results">
       <div><dt>High score</dt><dd>{{ '{:,}'.format(high_score) if high_score is not none else '—' }}</dd></div>
@@ -213,14 +215,16 @@
       if (countdown === null) return;
       const remaining = countdown.remaining_seconds - (performance.now() - countdownStartedAt) / 1000;
       const expired = remaining <= 0;
-      const hasGrace = countdown.grace_seconds > 0;
-      const signedSeconds = Math.ceil(remaining);
+      const simulationCountdown = expired && countdown.grace_seconds > 0;
+      const signedSeconds = Math.ceil(simulationCountdown ? Math.max(0, remaining + countdown.grace_seconds) : remaining);
       const seconds = Math.abs(signedSeconds);
       const minutes = String(Math.floor(seconds / 60)).padStart(2, '0');
       const remainder = String(seconds % 60).padStart(2, '0');
-      card.querySelector('#llm-countdown-value').textContent = `${signedSeconds < 0 ? '-' : ''}${minutes}:${remainder}`;
-      card.querySelector('#llm-countdown-state').textContent = !expired ? 'Decision time remaining' :
-        !hasGrace ? 'Advisory time elapsed' : remaining + countdown.grace_seconds > 0 ? 'Grace period' : 'Submitting saved configuration';
+      card.querySelector('#llm-countdown-label').textContent = simulationCountdown ? 'Simulation Start Countdown' : 'LLM countdown';
+      const value = card.querySelector('#llm-countdown-value');
+      value.textContent = `${signedSeconds < 0 ? '-' : ''}${minutes}:${remainder}`;
+      value.setAttribute('aria-label', simulationCountdown ? 'Time until simulation starts' : 'LLM time remaining');
+      card.querySelector('#llm-countdown-state').textContent = expired && !simulationCountdown ? 'Exceeded decision time' : 'Time remaining';
       card.querySelector('#llm-countdown').classList.toggle('countdown-expired', expired);
     }
 
@@ -250,7 +254,10 @@
         const nextCard = page.querySelector('#status-card');
         if (!nextCard) throw new Error('Missing experiment report');
         const readHadFocus = activeRead === document.activeElement;
+        const tableScroll = card.querySelector('.status-table-scroll')?.scrollLeft || 0;
         card.replaceChildren(...nextCard.childNodes);
+        const nextTable = card.querySelector('.status-table-scroll');
+        if (nextTable) nextTable.scrollLeft = tableScroll;
         if (activeRead) {
           const nextLink = Array.from(card.querySelectorAll(previewLinks)).find(link => link.href === activeRead.href);
           if (nextLink) {

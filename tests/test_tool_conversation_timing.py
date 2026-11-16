@@ -162,6 +162,8 @@ class ToolConversationTimingTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn('advisory', text)
             self.assertIn('after each data_tool request', text)
             self.assertIn('accepted unique change starts a fresh', text)
+            self.assertIn('Use data_tool at / for measured reference runs or /draft', text)
+            self.assertNotIn('/golden/notes', text)
 
     def test_next_step_prompt_lists_only_unused_parameters_and_offers_run_when_all_are_used(self):
         draft = ConfigurationDraft('draft', 'gold', {}, SimulationConfiguration.defaults(),

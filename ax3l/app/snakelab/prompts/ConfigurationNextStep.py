@@ -37,7 +37,6 @@ class ConfigurationNextStep(Prompt):
             "After each submitted change, Ax3l checks the complete configuration for uniqueness. "
             "Duplicate values must be revised within the selected setting before you can choose another setting. "
             "You choose which settings to adjust and when to run; there is no required parameter order. "
-            "Use data_tool at / for measured reference runs, /golden/notes for observations, "
-            "or /draft for the current values.\n\n"
+            "Use data_tool at / for measured reference runs or /draft for the current values.\n\n"
             f"Available parameter keys and current values:\n```json\n{json.dumps(choices, allow_nan=False)}\n```"
         )

@@ -11,13 +11,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Summary
 
-Preview captured prompts and Qwen reasoning on hover in Experiment Status.
+Improve Experiment Status layout, countdowns, and captured prompt and reasoning previews.
 
 ### Added
 
 - Extend the existing hover and keyboard-focus popups to Prompt and Reasoning
   links. Reuse the Read preview parser to render Markdown and compact JSON
   tables, including captured chart images in prompts.
+
+### Changed
+
+- Use amber when the decision timer expires. For saved unique configurations,
+  show a three-minute Simulation Start Countdown; otherwise continue into
+  negative time with an Exceeded decision time message.
+
+### Fixed
+
+- Keep the experiment header and countdown in place while the line-item table
+  scrolls horizontally. Stabilize header wrapping and countdown width, and
+  preserve the table's scroll position across refreshes.
+
+### Removed
+
+- Remove the obsolete golden-notes instruction from Qwen's parameter-selection prompt.
 
 ## [4.9.0] - 2026-11-16 @ 05:59
 

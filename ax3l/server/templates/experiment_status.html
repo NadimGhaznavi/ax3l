@@ -38,10 +38,10 @@
       <progress id="choice-progress" value="{{ choices_selected }}" max="{{ choices_total }}"></progress>
     </div>
     <p class="status-detail">{{ detail }}</p>
-    <p class="status-usage-note">Inherited values come from this experiment's starting golden configuration. Changed choices are highlighted.</p>
+    <p class="status-usage-note">Baseline values come from this experiment's starting golden configuration. Changed choices are highlighted.</p>
     <table class="status-checklist" aria-label="Configuration choices and setup steps">
       <colgroup><col class="check-column"><col><col class="value-column"><col class="value-column"><col class="time-column"><col class="token-column"><col class="token-column"></colgroup>
-      <thead><tr><th scope="col">Saved</th><th scope="col">Setting or step</th><th scope="col">Inherited</th><th scope="col">LLM chosen / state</th><th scope="col">Elapsed</th><th scope="col">Input tokens</th><th scope="col">Output tokens</th></tr></thead>
+      <thead><tr><th scope="col">Saved</th><th scope="col">Setting or step</th><th scope="col">Baseline</th><th scope="col">LLM Choice</th><th scope="col">Elapsed</th><th scope="col">Input tokens</th><th scope="col">Output tokens</th></tr></thead>
       <tbody class="status-configuration">
         {% for row in rows %}
         <tr data-parameter="{{ row.path }}" class="{{ 'selected' if row.selected else 'pending' }}{% if row.current %} current-choice{% endif %}">
@@ -50,7 +50,7 @@
           <td class="inherited-value">{{ row.inherited_value if row.inherited_value is not none else '—' }}</td>
           <td{% if row.selected and row.changed %} class="changed-value"{% endif %}>
             {% if row.selected is false %}<span class="pending-label">Pending</span>
-            {% else %}<span class="parameter-value">{{ row.value }}</span>{% if row.selected %}<span class="comparison-label">{{ 'Changed' if row.changed else 'No change' }}</span>{% endif %}{% endif %}
+            {% else %}<span class="parameter-value">{{ row.value }}</span>{% if row.selected and row.changed %}<span class="comparison-label">Changed</span>{% endif %}{% endif %}
           </td>
           <td></td><td></td><td></td>
         </tr>

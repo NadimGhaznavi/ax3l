@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.8.2] - 2026-11-16 @ 00:24
+
 ### Summary
 
 Keep the LLM countdown running past zero and tighten the Experiment Status layout.

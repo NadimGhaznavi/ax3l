@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.6.0] - 2026-11-15 @ 21:14
+
 ### Summary
 
 Let Qwen choose which setting to revise when a complete configuration is a duplicate.

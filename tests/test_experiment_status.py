@@ -351,10 +351,10 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         stamp = datetime(2026, 11, 15, 12)
         observed = stamp + timedelta(seconds=400)
 
-        def event(event_id, name, seconds, *, parent=None, parameter=None, image=False, detail=None):
+        def event(event_id, name, seconds, *, parent=None, parameter=None, image=False, detail=None, reasoning=False):
             return dict(event_id=event_id, name=name, occurred_at=stamp + timedelta(seconds=seconds),
                         observed_at=observed, parent_event_id=parent, parameter=parameter,
-                        has_image=image, detail=detail)
+                        has_image=image, has_reasoning=reasoning, detail=detail)
 
         self.draft.selections = PARAMETER_ORDER[:7]
         self.experiments.choice_events.return_value = [
@@ -362,7 +362,7 @@ class ExperimentStatusHttpTests(unittest.TestCase):
             event(2, 'choice_chart_finished', 1, parameter='epsilon_pair', detail='Complete'),
             event(4, 'prompt_sent', 2, parent=3, parameter='epsilon_pair', image=True),
             event(5, 'llm_request_started', 3, parent=3),
-            event(6, 'reply_received', 73, parent=3,
+            event(6, 'reply_received', 73, parent=3, reasoning=True,
                   detail=json.dumps(dict(prompt_tokens=1234, completion_tokens=321))),
             event(7, 'tool_execution_started', 74, parent=3, detail=json.dumps(dict(
                 function=dict(name='data_tool', arguments=json.dumps(dict(url='/latest/scores')))))),
@@ -375,6 +375,10 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         page = self.get()
         self.assertIn('class="choice-chart" href="/events/4"', page)
         self.assertIn('Render score trends chart', page)
+        self.assertIn('<th scope="col">LLM details</th>', page)
+        self.assertIn('href="/events/4" target="_blank" rel="noopener">Prompt</a>', page)
+        self.assertIn('href="/events/6/reason" target="_blank" rel="noopener">Reasoning</a>', page)
+        self.assertNotIn('href="/events/10/reason"', page)
         self.assertIn('Read data <a class="read-target" href="/tool-results/8">/latest/scores</a>', page)
         self.assertIn('class="item-elapsed">00:00</td>', page)
         self.assertIn('class="item-elapsed">01:10</td>', page)
@@ -409,12 +413,46 @@ class ExperimentStatusHttpTests(unittest.TestCase):
             recorded['observed_at'] += timedelta(seconds=5)
         self.assertIn('class="item-elapsed">06:31</td>', self.get())
 
+    def test_followup_prompts_and_reasoning_are_linked_to_their_exact_events(self):
+        stamp = datetime(2026, 11, 16, 12)
+
+        def event(event_id, name, parameter=None, reasoning=False, detail=None):
+            return dict(event_id=event_id, name=name, occurred_at=stamp, observed_at=stamp,
+                        parent_event_id=1, parameter=parameter, has_image=False,
+                        has_reasoning=reasoning, detail=detail)
+
+        self.experiments.choice_events.return_value = [
+            event(2, 'prompt_sent', parameter='revision'),
+            event(3, 'llm_request_started'),
+            event(4, 'reply_received', reasoning=True, detail='{"prompt_tokens":10,"completion_tokens":2}'),
+            event(5, 'prompt_sent'),
+            event(6, 'llm_request_started'),
+            event(7, 'reply_received', detail='{"prompt_tokens":12,"completion_tokens":3}'),
+            event(8, 'prompt_sent'),
+            event(9, 'llm_request_started'),
+        ]
+        page = self.get()
+        for prompt in (2, 5, 8):
+            self.assertIn(f'href="/events/{prompt}" target="_blank" rel="noopener">Prompt</a>', page)
+        self.assertEqual(page.count('>Prompt sent</th>'), 3)
+        self.assertEqual(page.count('>Reasoning</a>'), 1)
+        self.assertIn('href="/events/4/reason"', page)
+        self.assertNotIn('href="/events/7/reason"', page)
+        self.assertNotIn('href="/events/9/reason"', page)
+        self.assertIn('class="item-tokens">22</td>', page)
+        self.assertIn('class="item-tokens">5</td>', page)
+        event_log = self.enterContext(patch('ax3l.server.ReportingServer.EventLogDb')).return_value
+        event_log.get.return_value = dict(event_id=4, category='Conversation', name='reply_received',
+            content=json.dumps(dict(choices=[dict(message=dict(reasoning_content='Compare loss <script>carefully</script>.'))])))
+        reasoning = self.get('/events/4/reason')
+        self.assertIn('Compare loss &lt;script&gt;carefully&lt;/script&gt;.', reasoning)
+
     def test_read_targets_link_each_specific_result_and_include_guides_and_failures(self):
         stamp = datetime(2026, 11, 16, 12)
 
         def event(event_id, name, detail=None, parameter=None):
             return dict(event_id=event_id, name=name, occurred_at=stamp, observed_at=stamp,
-                        parent_event_id=1, parameter=parameter, has_image=False, detail=detail)
+                        parent_event_id=1, parameter=parameter, has_image=False, has_reasoning=False, detail=detail)
 
         events = [event(2, 'prompt_sent', parameter='revision')]
         for start, name, path, end, status in (

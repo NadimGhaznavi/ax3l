@@ -49,13 +49,14 @@
       </div>
     </div>
     <table class="status-checklist" aria-label="Configuration choices and setup steps">
-      <colgroup><col class="check-column"><col><col class="value-column"><col class="value-column"><col class="time-column"><col class="token-column"><col class="token-column"></colgroup>
-      <thead><tr><th scope="col">Saved</th><th scope="col">Setting or step</th><th scope="col">Baseline</th><th scope="col">LLM Choice</th><th scope="col">Elapsed</th><th scope="col">Input tokens</th><th scope="col">Output tokens</th></tr></thead>
+      <colgroup><col class="check-column"><col><col class="details-column"><col class="value-column"><col class="value-column"><col class="time-column"><col class="token-column"><col class="token-column"></colgroup>
+      <thead><tr><th scope="col">Saved</th><th scope="col">Setting or step</th><th scope="col">LLM details</th><th scope="col">Baseline</th><th scope="col">LLM Choice</th><th scope="col">Elapsed</th><th scope="col">Input tokens</th><th scope="col">Output tokens</th></tr></thead>
       <tbody class="status-configuration">
         {% for row in rows %}
         <tr data-parameter="{{ row.path }}" class="{{ 'selected' if row.selected else 'pending' }}{% if row.current %} current-choice{% endif %}">
           <td>{% if row.selected is not none %}<input type="checkbox" disabled {% if row.selected %}checked{% endif %} aria-label="{{ row.label }} choice saved">{% endif %}</td>
           <th scope="row"><span class="parameter-label">{{ row.label }}</span><span class="parameter-description">{{ row.description }}</span>{% if row.image_url %}<a class="choice-chart" href="{{ row.image_url }}" target="_blank" rel="noopener">View chart prompt</a>{% endif %}</th>
+          <td></td>
           <td class="inherited-value">{{ row.inherited_value if row.inherited_value is not none else '—' }}</td>
           <td{% if row.selected and row.changed %} class="changed-value"{% endif %}>
             {% if row.selected is false %}<span class="pending-label">{{ 'Pending' if row.current else '—' }}</span>
@@ -65,7 +66,9 @@
         </tr>
         {% for step in row.steps %}
         <tr class="setup-step{% if step.state == 'Running' %} current-choice{% endif %}"{% if step.state == 'Running' %} aria-current="step"{% endif %}>
-          <td></td><th scope="row">{{ step.label }}{% if step.target %} {% if step.result_url %}<a class="read-target" href="{{ step.result_url }}">{{ step.target }}</a>{% else %} {{ step.target }}{% endif %}{% endif %}</th><td></td>
+          <td></td><th scope="row">{{ step.label }}{% if step.target %} {% if step.result_url %}<a class="read-target" href="{{ step.result_url }}">{{ step.target }}</a>{% else %} {{ step.target }}{% endif %}{% endif %}</th>
+          <td class="item-details">{% if step.detail_url %}<a href="{{ step.detail_url }}" target="_blank" rel="noopener">{{ step.detail_label }}</a>{% endif %}</td>
+          <td></td>
           <td>{{ step.state }}</td>
           <td class="item-elapsed">{{ step.elapsed }}</td>
           <td class="item-tokens">{{ '{:,}'.format(step.input_tokens) if step.input_tokens is not none else '—' }}</td>
@@ -76,13 +79,13 @@
       </tbody>
       <tfoot>
         <tr class="status-total">
-          <td></td><th scope="row" colspan="3">Totals</th>
+          <td></td><th scope="row" colspan="4">Totals</th>
           <td class="item-elapsed">{{ totals.elapsed }}</td>
           <td class="item-tokens">{{ '{:,}'.format(totals.input_tokens) }}</td>
           <td class="item-tokens">{{ '{:,}'.format(totals.output_tokens) }}</td>
         </tr>
         <tr class="status-total">
-          <td></td><th scope="row" colspan="4">Total tokens</th>
+          <td></td><th scope="row" colspan="5">Total tokens</th>
           <td class="item-tokens" colspan="2">{{ '{:,}'.format(totals.tokens) }}</td>
         </tr>
       </tfoot>

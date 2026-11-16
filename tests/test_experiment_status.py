@@ -38,6 +38,26 @@ class ExperimentStatusTests(unittest.TestCase):
             with self.subTest(seconds=seconds):
                 self.assertEqual(_elapsed(seconds), expected)
 
+    def test_countdown_follows_the_saved_deadline_across_decision_stages_and_grace(self):
+        self.draft.decision_expires_at = 1000
+        for phase in ('selecting_parameter', 'choosing', 'reviewing'):
+            with self.subTest(phase=phase):
+                self.draft.phase, self.draft.parameter = phase, 'gamma'
+                with patch('ax3l.activity.ExperimentStatus.time', return_value=850.5):
+                    self.assertEqual(self.report()['countdown'], dict(remaining_seconds=149.5, grace_seconds=0))
+        self.draft.selections = ['layers']
+        for now, remaining in ((850, 150), (1030, -30), (1180, -180)):
+            with self.subTest(now=now), patch('ax3l.activity.ExperimentStatus.time', return_value=now):
+                self.assertEqual(self.report()['countdown'], dict(remaining_seconds=remaining, grace_seconds=180))
+
+    def test_countdown_is_inactive_outside_decisions_or_without_a_saved_deadline(self):
+        self.assertIsNone(self.report()['countdown'])
+        self.draft.decision_expires_at = 1000
+        for phase in ('preparing', 'ready', 'submitting', 'submitted', 'completed', 'failed'):
+            with self.subTest(phase=phase):
+                self.draft.phase = phase
+                self.assertIsNone(self.report()['countdown'])
+
     def test_totals_sum_recorded_steps_and_count_paired_choices_once(self):
         self.assertEqual(self.report()['totals'], dict(
             elapsed='00:00', input_tokens=0, output_tokens=0, tokens=0))
@@ -283,6 +303,24 @@ class ExperimentStatusHttpTests(unittest.TestCase):
                 pending = page.split('data-parameter="epsilon_nice.probability"', 1)[1].split('</tr>', 1)[0]
                 self.assertIn('>—</span>', pending)
                 self.assertNotIn('class="parameter-value"', pending)
+
+    def test_countdown_box_precedes_the_table_and_refreshes_with_the_saved_timer(self):
+        self.draft.decision_expires_at = 1000.5
+        with patch('ax3l.activity.ExperimentStatus.time', return_value=900):
+            page = self.get()
+        self.assertLess(page.index('id="llm-countdown"'), page.index('<table class="status-checklist"'))
+        self.assertIn('LLM countdown', page)
+        self.assertEqual(json.loads(page.split("data-countdown='", 1)[1].split("'", 1)[0]),
+                         dict(remaining_seconds=100.5, grace_seconds=0))
+        self.draft.phase, self.draft.selections = 'reviewing', ['layers']
+        with patch('ax3l.activity.ExperimentStatus.time', return_value=1030.5):
+            page = self.get()
+        self.assertEqual(json.loads(page.split("data-countdown='", 1)[1].split("'", 1)[0]),
+                         dict(remaining_seconds=-30, grace_seconds=180))
+        self.draft.phase = 'ready'
+        page = self.get()
+        self.assertIn("data-countdown='null'", page)
+        self.assertIn('>Not active</span>', page)
 
     def test_empty_invalid_view_and_database_failure_cleanup(self):
         self.experiments.draft.return_value = None

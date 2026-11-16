@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Show changed Experiment Status values on one line.
+
+### Changed
+
+- Remove the "Changed" label beneath LLM choices and keep the color highlight.
+
 ## [4.7.1] - 2026-11-15 @ 21:29
 
 ### Summary

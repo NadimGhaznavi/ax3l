@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.5.2] - 2026-11-15 @ 22:57
+
+### Summary
+
+Require meaningful parameter changes, prevent repeated selections, and run unique drafts after a decision timeout.
+
+### Added
+
+- Give an expired decision budget a three-minute grace period when a unique draft
+  is saved. At grace expiry, submit that configuration through the normal simulation,
+  comparison, and measurement cycle, then start the next experiment. Pending edits
+  are excluded until their changed values are accepted.
+
+### Changed
+
+- Reject a selected parameter's current value, or a pair with both values
+  unchanged, without saving it or checking configuration uniqueness.
+- Allow each single or paired parameter to be chosen only once per experiment,
+  preserving that restriction after restart. Show only unused parameters in the
+  selection prompt and direct Qwen to run when every eligible setting is used.
+
 ## [4.5.1] - 2026-11-15 @ 22:24
 
 ### Summary

@@ -1,14 +1,17 @@
-"""Advisory countdowns follow elapsed time without blocking data or decisions."""
+"""Decision countdowns stay advisory until a saved unique draft's grace period expires."""
 
+import asyncio
 import json
 from pathlib import Path
+from threading import Event
+from time import monotonic
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
 from ax3l.app.Prompt import Prompt
-from ax3l.app.snakelab.ToolConversation import converse
+from ax3l.app.snakelab.ToolConversation import converse, DecisionTimeExpired, _time_reminder
 from ax3l.app.snakelab.prompts.ConfigurationNextStep import ConfigurationNextStep
-from ax3l.entities.ConfigurationDraft import ConfigurationDraft
+from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 
 
@@ -71,6 +74,85 @@ class ToolConversationTimingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([message['content'] for message in messages if message['role'] == 'user'],
                          ['Initial prompt.'])
 
+    def test_unique_draft_reminders_show_the_three_minute_grace_period(self):
+        with patch('ax3l.app.snakelab.ToolConversation.monotonic', side_effect=[250, 400, 450, 600]):
+            reminders = [_time_reminder(400, 580)['content'] for _ in range(4)]
+        self.assertIn('Decision time remaining: 02:30', reminders[0])
+        self.assertIn('3-minute grace period', reminders[0])
+        self.assertIn('Grace time remaining: 03:00', reminders[1])
+        self.assertIn('Grace time remaining: 02:10', reminders[2])
+        self.assertIn('Grace time remaining: 00:00', reminders[3])
+        self.assertIn('continue the normal experiment cycle', reminders[3])
+
+    async def test_expired_grace_stops_before_requesting_or_submitting_another_choice(self):
+        tools, llm, db = self.tools(), Mock(url='fixture'), Mock()
+        with self.assertRaises(DecisionTimeExpired):
+            await converse(llm, Path('/tmp'), db, tools, [Prompt('Decide.')],
+                           decision_deadline=0, run_deadline=0)
+        llm.complete.assert_not_called()
+        tools.submit.assert_not_awaited()
+        self.assertEqual(db.log.call_args.args[2], 'INFO')
+        self.assertIn('grace period expired', db.log.call_args.args[3])
+
+    async def test_expiry_discards_a_late_inference_reply_without_submitting_it(self):
+        tools, llm = self.tools(), Mock(url='fixture')
+        release = Event()
+
+        def complete(payload, *, timeout_seconds):
+            release.wait()
+            return reply('select_parameter', dict(parameter='gamma'))
+
+        llm.complete.side_effect = complete
+        now = monotonic()
+        try:
+            with self.assertRaises(DecisionTimeExpired):
+                await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('Decide.')],
+                               decision_deadline=now - 180, run_deadline=now + .03)
+        finally:
+            release.set()
+        tools.submit.assert_not_awaited()
+
+    async def test_expiry_can_interrupt_data_reads(self):
+        tools, llm = self.tools(), Mock(url='fixture')
+        llm.complete.return_value = reply('data_tool', dict(url='/draft'))
+
+        async def read(arguments):
+            await asyncio.Event().wait()
+
+        tools.data.side_effect = read
+        now = monotonic()
+        with self.assertRaises(DecisionTimeExpired):
+            await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('Decide.')],
+                           decision_deadline=now - 180, run_deadline=now + .03)
+        tools.data.assert_awaited_once()
+        tools.submit.assert_not_awaited()
+
+    async def test_transport_timeouts_remain_failures_before_the_grace_deadline(self):
+        tools, llm = self.tools(), Mock(url='fixture')
+        llm.complete.side_effect = TimeoutError('transport failed')
+        now = monotonic()
+        with self.assertRaisesRegex(TimeoutError, 'transport failed'):
+            await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('Decide.')],
+                           decision_deadline=now + 300, run_deadline=now + 480)
+        tools.submit.assert_not_awaited()
+
+    async def test_an_accepted_submission_finishes_without_cancellation_if_grace_expires_during_the_write(self):
+        tools, llm = self.tools(), Mock(url='fixture')
+        llm.complete.return_value = reply('select_parameter', dict(parameter='gamma'))
+        current = [0]
+
+        async def submit(arguments):
+            current[0] = 600
+            await asyncio.sleep(0)
+            return dict(status='ok', phase='choosing')
+
+        tools.submit.side_effect = submit
+        with patch('ax3l.app.snakelab.ToolConversation.monotonic', side_effect=lambda: current[0]):
+            result = await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('Decide.')],
+                                    decision_deadline=300, run_deadline=480)
+        self.assertEqual(result['status'], 'ok')
+        tools.submit.assert_awaited_once()
+
     def test_next_step_prompts_explain_the_advisory_budget_and_unique_change_reset(self):
         draft = ConfigurationDraft('draft', 'gold', {}, SimulationConfiguration.defaults())
         for phase in ('selecting_parameter', 'reviewing'):
@@ -80,3 +162,16 @@ class ToolConversationTimingTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn('advisory', text)
             self.assertIn('after each data_tool request', text)
             self.assertIn('accepted unique change starts a fresh', text)
+
+    def test_next_step_prompt_lists_only_unused_parameters_and_offers_run_when_all_are_used(self):
+        draft = ConfigurationDraft('draft', 'gold', {}, SimulationConfiguration.defaults(),
+                                    ['learning_rate', 'epsilon_pair'], 'reviewing')
+        text = ConfigurationNextStep(draft).to_md()
+        choices = json.loads(text.split('```json\n')[1].split('\n```')[0])
+        self.assertEqual(set(choices), set(PARAMETER_ORDER) - set(draft.selections))
+        self.assertIn('only once per experiment', text)
+        self.assertIn('keeping the current values is not allowed', text)
+        draft.selections = PARAMETER_ORDER.copy()
+        text = ConfigurationNextStep(draft).to_md()
+        self.assertEqual(json.loads(text.split('```json\n')[1].split('\n```')[0]), {})
+        self.assertIn('Use run_simulation to run it; no unused settings remain', text)

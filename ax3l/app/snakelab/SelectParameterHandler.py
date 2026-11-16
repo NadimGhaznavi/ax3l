@@ -1,4 +1,4 @@
-"""Let Qwen choose any setting to change in the current draft."""
+"""Let Qwen choose a setting that has not yet been changed in the current draft."""
 
 from ax3l.app.snakelab.ExperimentDb import ExperimentDb
 from ax3l.app.snakelab.SubmitSingleValueHandler import SubmitSingleValueHandler
@@ -19,7 +19,8 @@ class SelectParameterHandler(SubmitSingleValueHandler):
         if draft is None or draft.draft_id != draft_id or draft.phase not in ("selecting_parameter", "reviewing"):
             return self._reject("This draft is not waiting for a parameter selection.")
         if parameter in draft.selections:
-            draft.selections.remove(parameter)
+            return self._reject(f"{parameter} has already been chosen in this experiment. "
+                                "Choose an unused parameter or run the unique configuration.")
         draft.parameter = parameter
         draft.phase = "choosing"
         experiments.save_draft(draft)

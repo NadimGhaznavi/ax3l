@@ -23,7 +23,7 @@ from ax3l.zmq.ZMQServer import ZMQServer
 
 @unittest.skipUnless(os.environ.get('AX3L_TEST_DB') == '1', 'requires disposable MariaDB test database')
 class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
-    async def test_qwen_researches_revisits_settings_and_runs_a_unique_subset_once(self):
+    async def test_qwen_researches_retries_duplicates_and_cannot_reselect_a_changed_setting(self):
         self.assertEqual(os.environ['DB_NAME'], 'ax3l_test')
         db = DbMgr()
         self.addCleanup(db.close)
@@ -35,15 +35,19 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
         baseline_id, candidate_id = str(uuid4()), str(uuid4())
         config = SimulationConfiguration.defaults()
         results = {baseline_id: dict(status='completed', high_score=10, config=config)}
+        previous = deepcopy(config)
+        previous['game']['rewards'].update(closer_to_food=.1, further_from_food=-.25)
+        results[str(uuid4())] = dict(status='completed', high_score=9, config=previous)
         calls = []
         selections = []
         chart_choices = []
         duplicate_attempts = []
+        repeated_selections = []
         decisions = ['reward_pair', 'learning_rate', 'epsilon_pair', 'learning_rate', 'run']
-        expected_choices = decisions[:-1]
+        expected_choices = ['reward_pair', 'learning_rate', 'epsilon_pair']
         values = dict(hidden_size=96, layers=3, dropout=.02, sequence_length=12, batch_size=26,
                       learning_rate=.003, gamma=.97, epsilon_pair=(.91, .95),
-                      reward_pair=(1, -1), epsilon_nice_pair=(.01, 40))
+                      reward_pair=(.1, -.25), epsilon_nice_pair=(.01, 40))
 
         class SimulationFixture:
             def is_simulation_running(self):
@@ -78,7 +82,7 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
 
         class InferenceFixture:
             url = 'fixture://local-inference'
-            def complete(self, payload):
+            def complete(self, payload, *, timeout_seconds=None):
                 request = json.loads(payload)
                 tool = request['tools'][0]['function']['name']
                 self_test.assertIn(tool, ('select_parameter', 'submit_single_value', 'submit_pair_values'))
@@ -87,6 +91,8 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
                 text = content[0]['text'] if isinstance(content, list) else content
                 pages = [message['content'] for message in request['messages'] if message['role'] == 'tool']
                 if tool == 'select_parameter':
+                    eligible = json.loads(text.split('```json\n')[1].split('\n```')[0])
+                    self_test.assertTrue(set(eligible).isdisjoint(selections))
                     names = [definition['function']['name'] for definition in request['tools']]
                     self_test.assertEqual('run_simulation' in names, bool(selections))
                     if not pages:
@@ -97,6 +103,8 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
                         if step == 'run':
                             tool, arguments = 'run_simulation', {}
                         else:
+                            if step in selections:
+                                repeated_selections.append(step)
                             arguments = dict(parameter=step)
                 else:
                     parameter = next(name for name in PARAMETER_ORDER if f'Choose {CHOICE_LABELS[name]}.' in text)
@@ -118,8 +126,7 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
                         duplicate_attempts.append(parameter)
                     else:
                         selections.append(parameter)
-                    value = ((.25, -.5) if duplicate_retry else .002
-                             if parameter == 'learning_rate' and selections.count(parameter) == 2 else values[parameter])
+                    value = (.25, -.5) if duplicate_retry else values[parameter]
                     arguments = ({'value_1': value[0], 'value_2': value[1]} if isinstance(value, tuple)
                                  else {'value': value})
                 self_test.assertNotIn(baseline_id.split('-')[0], text)
@@ -150,9 +157,10 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
                 await optimize(InferenceFixture(), Path('/tmp'), db, server.endpoint)
         self.assertEqual(len(calls), 1)
         self.assertEqual(duplicate_attempts, ['reward_pair'])
+        self.assertEqual(repeated_selections, ['learning_rate'])
         self.assertEqual(chart_choices, expected_choices)
         self.assertEqual(calls[0]['model'], config['model'])
-        self.assertEqual(calls[0]['training']['learning_rate'], .002)
+        self.assertEqual(calls[0]['training']['learning_rate'], .003)
         self.assertEqual(calls[0]['epsilon']['initial'], .91)
         self.assertEqual(calls[0]['epsilon_nice'], config['epsilon_nice'])
         self.assertEqual(EventLogDb(db).current_golden_config()['process_id'], candidate_id)
@@ -164,10 +172,10 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(saved.metrics['termination_reasons']['snake'], {'count': 7, 'percent': 70})
         self.assertIsNone(saved.summary)
         events = ExperimentDb(db).choice_events(draft.draft_id)
-        self.assertEqual(sum(event['name'] == 'llm_request_started' for event in events), 17)
-        self.assertEqual(sum(bool(event['has_image']) for event in events), 4)
+        self.assertEqual(sum(event['name'] == 'llm_request_started' for event in events), 14)
+        self.assertEqual(sum(bool(event['has_image']) for event in events), 3)
         replies = [json.loads(event['detail']) for event in events if event['name'] == 'reply_received']
-        self.assertEqual(replies, [{'prompt_tokens': 123, 'completion_tokens': 7}] * 17)
+        self.assertEqual(replies, [{'prompt_tokens': 123, 'completion_tokens': 7}] * 14)
         self.assertNotIn('data:image/png', json.dumps(events, default=str))
         rows = db.query("SELECT name, COUNT(*) AS n FROM events WHERE event_id>%s AND name IN ('simulation_analyzed','simulation_analysis_progress','simulation_submitted','configuration_compared') GROUP BY name", (first_event,))
         self.assertEqual({row['name']: row['n'] for row in rows},

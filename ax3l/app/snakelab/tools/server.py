@@ -26,7 +26,7 @@ assigned_parameter = os.environ.get("AX3L_CONVERSATION_PARAMETER")
 draft_id = os.environ.get("AX3L_CONFIGURATION_DRAFT")
 run_id = os.environ.get("AX3L_ANALYSIS_RUN")
 section = os.environ.get("AX3L_ANALYSIS_SECTION")
-description = (f"Save one choice without running a simulation.\n{parameter_instructions(assigned_parameter)}"
+description = (f"Save one choice without running a simulation. The value must change.\n{parameter_instructions(assigned_parameter)}"
                if assigned_parameter in SINGLE_PARAMETERS else "Submit a value for the Ax3l-assigned parameter.")
 
 
@@ -38,7 +38,7 @@ async def submit_single_value(value: StrictInt | StrictFloat) -> str:
     return await SubmitSingleValue(endpoint).submit(draft_id, assigned_parameter, value)
 
 
-pair_description = ("Save a pair without running a simulation.\n" + pair_instructions(assigned_parameter) if assigned_parameter in PAIR_PARAMETERS
+pair_description = ("Save a pair without running a simulation. At least one value must change.\n" + pair_instructions(assigned_parameter) if assigned_parameter in PAIR_PARAMETERS
                     else "Submit two values for the Ax3l-assigned parameter pair.")
 
 
@@ -51,7 +51,7 @@ async def submit_pair_values(value_1: StrictInt | StrictFloat,
     return await SubmitPairValues(endpoint).submit(draft_id, assigned_parameter, value_1, value_2)
 
 
-@mcp.tool(description="Choose any setting to change, including one already changed in this draft. "
+@mcp.tool(description="Choose a setting that has not already been chosen in this experiment. "
           "Use one parameter key: " + ", ".join(PARAMETER_ORDER) + ". Paired settings are revised together.")
 async def select_parameter(parameter: StrictStr) -> str:
     if assigned_parameter != REVISION_PARAMETER or not draft_id:

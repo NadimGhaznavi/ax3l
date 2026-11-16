@@ -51,7 +51,8 @@ class ConfigurationChoice(Prompt):
                 text.append(f"The chart shows the {chart_scope} run. {focus}")
             text.append(f"See {label} at /{chart_scope}/{page} in data_tool.")
         text.append("Use data_tool at /draft for saved choices or / for other runs.")
-        text.append("This setting must produce a unique complete configuration. "
+        text.append("Change at least one of this setting's current values to produce a unique complete configuration. "
+                    "This setting cannot be selected again in this experiment. "
                     "If a proposal is a duplicate, submit different values for this same setting. "
                     "After a unique choice, you can change another setting or run the configuration.")
         text.append(f"Submit using {tool}.")

@@ -8,7 +8,7 @@ from ax3l.app.snakelab.SingleParameters import SINGLE_PARAMETERS
 from ax3l.app.DbMgr import DbMgr
 from ax3l.app.snakelab.ExperimentDb import ExperimentDb
 from ax3l.app.snakelab.prompts.InvalidValue import InvalidValue
-from ax3l.app.snakelab.prompts.ConfigurationNextStep import ConfigurationNextStep
+from ax3l.app.snakelab.prompts.NoDupes import NoDupes
 from ax3l.constants.DEventCategory import DEventCategory
 from ax3l.constants.DChoice import CHOICE_LABELS
 from ax3l.interface.SnakeLab import SnakeLab
@@ -64,14 +64,17 @@ class SubmitSingleValueHandler:
                 node = node[key]
             node[path[-1]] = value
         SimulationConfiguration.validate(candidate)
-        unique = self._snake.is_config_unique(candidate)
-        draft.phase = "reviewing" if unique else "selecting_parameter"
+        if not self._snake.is_config_unique(candidate):
+            prompt = NoDupes(parameter, candidate)
+            category = DEventCategory.Configuration
+            self._db.log(category.PROPOSAL_DUPLICATE, category.CATEGORY, "INFO", prompt.to_md(),
+                         process_id=draft.draft_id)
+            return {"status": "rejected", "code": "duplicate_configuration",
+                    "reason": prompt.to_md(), "prompt": json.loads(prompt.to_json()),
+                    "source_name": prompt.source_name}
+        draft.phase = "reviewing"
         draft.config = candidate
         draft.selections.append(parameter)
         draft.parameter = None
         experiments.save_draft(draft)
-        if draft.phase == "selecting_parameter":
-            category = DEventCategory.Configuration
-            self._db.log(category.PROPOSAL_DUPLICATE, category.CATEGORY, "INFO", ConfigurationNextStep(draft).to_md(),
-                         process_id=draft.draft_id)
         return {"status": "ok", "draft_id": draft.draft_id, "phase": draft.phase}

@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Keep the LLM countdown running past zero and tighten the Experiment Status layout.
+
+### Changed
+
+- Turn the countdown red at zero and continue downward into negative time,
+  including during the existing grace period.
+- Place the countdown beside the experiment details to remove the extra blank
+  row above the configuration table.
+
 ## [4.8.1] - 2026-11-16 @ 00:08
 
 ## [4.8.0] - 2026-11-16 @ 00:02

@@ -57,6 +57,9 @@ class SubmitSingleValueHandler:
         draft = experiments.draft()
         if draft is None or draft.draft_id != draft_id or draft.next_parameter != parameter:
             return self._reject("This choice does not match the active draft's next parameter.")
+        if all(SimulationConfiguration.value_at(draft.config, path) == value for path, value in changes):
+            return self._reject(f"Change at least one value for {CHOICE_LABELS[parameter]}. "
+                                "Resubmitting the current values is not allowed.")
         candidate = deepcopy(draft.config)
         for path, value in changes:
             node = candidate

@@ -9,14 +9,16 @@ from uuid import uuid4
 from ax3l.activity.RunAnalysis import render_analysis
 from ax3l.app.ConfigurationLog import ConfigurationLog
 from ax3l.app.EventLogDb import EventLogDb
-from ax3l.app.snakelab.ToolConversation import converse
+from ax3l.app.snakelab.ToolConversation import converse, DecisionTimeExpired
 from ax3l.app.snakelab.SeedRotation import rotate_if_needed
 from ax3l.app.snakelab.AnalyzeRun import record_run_metrics
 from ax3l.app.snakelab.ExperimentDb import ExperimentDb
 from ax3l.app.snakelab.prompts.ConfigurationChoice import ConfigurationChoice
 from ax3l.app.snakelab.prompts.ConfigurationNextStep import ConfigurationNextStep
 from ax3l.constants.DAx3l import DAx3l
-from ax3l.constants.DChoice import CHOICE_CHARTS, PARAMETER_SELECTION_SECONDS, REVISION_PARAMETER
+from ax3l.constants.DChoice import (
+    CHOICE_CHARTS, PARAMETER_SELECTION_SECONDS, REVISION_PARAMETER, UNIQUE_CONFIG_GRACE_SECONDS,
+)
 from ax3l.constants.DEventCategory import DEventCategory as Events
 from ax3l.constants.DSimulationAnalysis import DSimulationAnalysis
 from ax3l.constants.DSnakeLab import DSnakeLab
@@ -187,9 +189,19 @@ async def optimize(llm, output, db, endpoint):
                           ConfigurationChoice(draft, latest, golden, chart_scope, png))
                 async with SnakeLabTools(endpoint, parameter, draft_id=draft.draft_id,
                                          allow_run=draft.phase == "reviewing") as tools:
-                    await converse(llm, output, db, tools, [prompt],
-                                   parameter=parameter, process_id=draft.draft_id,
-                                   decision_deadline=decision_deadline)
+                    try:
+                        await converse(llm, output, db, tools, [prompt],
+                                       parameter=parameter, process_id=draft.draft_id,
+                                       decision_deadline=decision_deadline,
+                                       run_deadline=decision_deadline + UNIQUE_CONFIG_GRACE_SECONDS
+                                       if draft.selections else None)
+                    except DecisionTimeExpired:
+                        draft = experiments.draft(draft.draft_id)
+                        if not snake.is_config_unique(draft.config):
+                            raise ValueError("The saved configuration is no longer unique; cannot submit it automatically.")
+                        draft.parameter = None
+                        draft.phase = "ready"
+                        experiments.save_draft(draft)
                 draft = experiments.draft(draft.draft_id)
                 if draft.phase == "reviewing":
                     decision_deadline = monotonic() + PARAMETER_SELECTION_SECONDS

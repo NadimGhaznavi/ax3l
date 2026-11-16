@@ -148,7 +148,7 @@ class ExperimentStatusTests(unittest.TestCase):
         self.draft.phase = 'reviewing'
         report = self.report()
         self.assertEqual(report['phase'], 'Choosing next step')
-        self.assertIn('run it or change any setting again', report['detail'])
+        self.assertIn('run it or change an unused setting', report['detail'])
         self.assertEqual(report['choices_selected'], 1)
         self.assertEqual([row['path'] for row in report['rows'] if row['current']], [REVISION_PARAMETER])
 

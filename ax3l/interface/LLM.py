@@ -10,12 +10,12 @@ class LLM:
     def __init__(self, base_url: str):
         self.url = base_url.rstrip("/") + "/v1/chat/completions"
 
-    def complete(self, payload: bytes) -> tuple[int, str, bytes]:
+    def complete(self, payload: bytes, *, timeout_seconds: float | None = None) -> tuple[int, str, bytes]:
         request = Request(
             self.url, data=payload, headers={"Content-Type": "application/json"}
         )
         try:
-            response = urlopen(request, timeout=DAx3l.HTTP_TIMEOUT_SECONDS)
+            response = urlopen(request, timeout=DAx3l.HTTP_TIMEOUT_SECONDS if timeout_seconds is None else timeout_seconds)
         except HTTPError as error:
             response = error
         with response:

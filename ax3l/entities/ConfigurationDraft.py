@@ -19,6 +19,7 @@ class ConfigurationDraft:
     phase: str = "selecting_parameter"
     run_id: str | None = None
     parameter: str | None = None
+    decision_expires_at: float | None = None  # UTC Unix deadline for status reporting.
 
     @property
     def next_parameter(self) -> str | None:

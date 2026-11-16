@@ -1,8 +1,10 @@
 """Turn a saved configuration draft and its setup steps into a status report."""
 
+from time import time
+
 from ax3l.app.snakelab.ParameterSpace import parameter_paths
 from ax3l.constants.DLabel import FIELD_TO_LABEL_MAP
-from ax3l.constants.DChoice import REVISION_PARAMETER
+from ax3l.constants.DChoice import REVISION_PARAMETER, UNIQUE_CONFIG_GRACE_SECONDS
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
@@ -111,8 +113,12 @@ def experiment_status(draft: ConfigurationDraft | None, run: dict | None = None,
     seconds = sum(step["seconds"] for step in steps if step["seconds"] is not None)
     input_tokens = sum(step["input_tokens"] for step in steps if step["input_tokens"] is not None)
     output_tokens = sum(step["output_tokens"] for step in steps if step["output_tokens"] is not None)
+    countdown = None
+    if draft.phase in ("choosing", "selecting_parameter", "reviewing") and draft.decision_expires_at is not None:
+        countdown = dict(remaining_seconds=draft.decision_expires_at - time(),
+                         grace_seconds=UNIQUE_CONFIG_GRACE_SECONDS if draft.selections else 0)
     return dict(
-        draft=draft, rows=rows, phase=phase, detail=detail,
+        draft=draft, rows=rows, phase=phase, detail=detail, countdown=countdown,
         totals=dict(elapsed=_elapsed(seconds), input_tokens=input_tokens,
                     output_tokens=output_tokens, tokens=input_tokens + output_tokens),
         choices_selected=len(draft.selections), choices_total=len(PARAMETER_ORDER),

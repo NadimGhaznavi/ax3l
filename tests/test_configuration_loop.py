@@ -175,8 +175,10 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.snake.is_config_unique.side_effect = [False, True]
         self.decisions = ['layers', 'run']
         choose = self.conversation.side_effect
+        reported_deadlines = []
 
         async def revise(llm, output, db, tools, prompts, *, parameter, process_id, decision_deadline, run_deadline):
+            reported_deadlines.append(self.store.saved.decision_expires_at)
             if parameter != 'layers':
                 return await choose(llm, output, db, tools, prompts, parameter=parameter,
                                     process_id=process_id, decision_deadline=decision_deadline, run_deadline=run_deadline)
@@ -185,12 +187,15 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
                 if result['status'] == 'rejected':
                     self.assertEqual(self.store.saved.next_parameter, 'layers')
                     self.assertEqual(self.store.saved.config['model']['layers'], 1)
+                    self.assertEqual(self.store.saved.decision_expires_at, 1300)
                     self.snake.submit_simulation.assert_not_called()
             return result
 
         self.conversation.side_effect = revise
-        with patch('ax3l.app.snakelab.SnakeLabLoop.monotonic', side_effect=[100, 450]):
+        with patch('ax3l.app.snakelab.SnakeLabLoop.monotonic', side_effect=[100, 450]), \
+                patch('ax3l.app.snakelab.SnakeLabLoop.time', side_effect=[1000, 1350]):
             await self.cycle()
+        self.assertEqual(reported_deadlines, [1300, 1300, 1650])
         self.assertEqual(self.trace(), [REVISION_PARAMETER, 'layers', REVISION_PARAMETER])
         self.assertEqual([call.kwargs['decision_deadline'] for call in self.conversation.await_args_list],
                          [400, 400, 750])

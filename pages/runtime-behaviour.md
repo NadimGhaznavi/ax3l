@@ -107,6 +107,9 @@ Any pending edit is excluded unless its changed values were accepted. Restarting
 begins a new budget.
 
 Experiment Status shows the settings to be chosen and the saved selections.
+An LLM countdown box above the table on the right ticks every second using the
+current decision deadline. It resets after an accepted unique change, shows grace
+time when applicable, and becomes inactive when the configuration is submitted.
 It lists chart rendering, each Qwen request, each data or guide lookup, and
 each submission under the relevant setting or pair. Each step has its own
 elapsed time. Each returned Qwen request shows its own input and output token

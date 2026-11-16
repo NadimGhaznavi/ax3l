@@ -32,10 +32,16 @@ class DraftRecoveryTests(unittest.TestCase):
         return self.store.draft()
 
     def test_current_snapshots_preserve_parameter_selection_and_run_decisions(self):
+        self.draft.decision_expires_at = 1800000000.5
         for phase, parameter in (('selecting_parameter', None), ('choosing', 'gamma'),
                                  ('reviewing', None), ('ready', None)):
             self.draft.phase, self.draft.parameter = phase, parameter
             self.assertEqual(self.restore(asdict(self.draft)), self.draft)
+
+    def test_snapshots_without_a_reporting_deadline_remain_readable(self):
+        data = asdict(self.draft)
+        del data['decision_expires_at']
+        self.assertIsNone(self.restore(data).decision_expires_at)
 
     def test_legacy_drafts_keep_the_in_progress_choice_then_use_qwens_next_decision(self):
         data = asdict(self.draft)
@@ -74,6 +80,7 @@ class ExperimentDatabaseTests(unittest.TestCase):
         draft.selections = ['hidden_size']
         draft.phase, draft.parameter = 'choosing', 'sequence_length'
         draft.config['model']['hidden_size'] = 240
+        draft.decision_expires_at = 1800000000.5
         experiments.save_draft(draft)
         other = DbMgr(initialize_event_tables=False)
         try:

@@ -60,6 +60,35 @@ class ClientDisconnectTests(unittest.TestCase):
 
 
 class ExperimentStatusTests(unittest.TestCase):
+    def test_all_time_score_includes_the_live_golden_when_reporting_totals_are_stale(self):
+        from ax3l.server.ReportingServer import make_server
+
+        self.enterContext(patch('ax3l.server.ReportingServer.DbMgr'))
+        log = self.enterContext(patch('ax3l.server.ReportingServer.EventLogDb')).return_value
+        log.recent.return_value = []
+        snake = self.enterContext(patch('ax3l.server.ReportingServer.SnakeLab')).return_value
+        background = self.enterContext(patch('ax3l.server.ReportingServer.ReportBackground')).return_value
+        background.animation_ready.return_value = False
+        background.episode_totals.return_value = dict(games_played=4500, moves_made=1300208)
+        server = make_server('127.0.0.1', 0)
+        thread = Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(thread.join)
+        self.addCleanup(server.shutdown)
+        for cached, current, expected in ((34, 38, '38'), (38, 34, '38'), (None, 38, '38'),
+                                          (None, 0, '0'), (0, 0, '0'), (38, None, '38'),
+                                          (None, None, '—')):
+            with self.subTest(cached=cached, current=current):
+                background.status.return_value = dict(snake_lab_status='Idle', simulations_submitted=9,
+                    experiment_cycles=8, all_time_high_score=cached)
+                log.current_golden_config.return_value = dict(process_id=str(uuid4())) if current is not None else None
+                snake.get_run_summary.return_value = dict(id=10, high_score=current, high_score_snapshot=None)
+                with urlopen(f'http://127.0.0.1:{server.server_port}/') as response:
+                    page = response.read().decode()
+                self.assertIn(f'All-Time Highscore: {expected}', page)
+                self.assertIn(f"Current Highscore: {current if current is not None else '—'}", page)
+
     def test_exhausted_parameter_event_is_visible_and_filterable(self):
         from datetime import datetime
         from pathlib import Path

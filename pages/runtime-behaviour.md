@@ -121,7 +121,10 @@ configuration is submitted. The table scrolls horizontally on its own, keeping
 the experiment details and countdown visible; refreshes retain its scroll position.
 It lists chart rendering, each Qwen request, each data or guide lookup, and
 each submission under the relevant setting or pair. Each step has its own
-elapsed time. Saved prompt messages have their own rows with a Prompt link in
+elapsed time. Any item with task rows has a +/− control before its label,
+including Experiment decision. Task rows start collapsed; opening or closing
+one group does not affect the others, and refreshes retain each group's state.
+Saved prompt messages have their own rows with a Prompt link in
 the LLM details column. Completed Qwen requests link to their captured Reasoning
 when Qwen returned nonempty reasoning text. Hovering or focusing either link
 shows a scrollable preview using the same Markdown and JSON-table parser as

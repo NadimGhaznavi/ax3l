@@ -1,4 +1,4 @@
-"""A duplicate draft can reopen any saved setting without losing other values."""
+"""Qwen can select any setting at startup, after duplicates, or after a unique change."""
 
 from copy import deepcopy
 from dataclasses import asdict
@@ -62,7 +62,7 @@ class SelectParameterHandlerTests(unittest.TestCase):
         original = deepcopy(self.draft)
         self.assertEqual(self.select(draft_id='old')['status'], 'rejected')
         self.assertEqual(self.draft, original)
-        for phase in ('choosing', 'ready', 'submitting', 'submitted', 'completed'):
+        for phase in ('choosing', 'preparing', 'ready', 'submitting', 'submitted', 'completed'):
             self.draft.phase = phase
             self.assertEqual(self.select()['status'], 'rejected')
         self.experiments.draft.return_value = None
@@ -81,7 +81,7 @@ class SelectParameterHandlerTests(unittest.TestCase):
         self.assertEqual(result['phase'], 'selecting_parameter')
         self.select('epsilon_pair')
         result = pair.submit(dict(draft_id='draft', pair='epsilon_pair', value_1=.91, value_2=.95))
-        self.assertEqual(result['phase'], 'ready')
+        self.assertEqual(result['phase'], 'reviewing')
         self.assertEqual(self.draft.config['model']['hidden_size'], 96)
         self.assertEqual(self.draft.config['model']['layers'], 3)
         self.assertEqual(self.draft.config['epsilon']['initial'], .91)
@@ -104,3 +104,20 @@ class SelectParameterHandlerTests(unittest.TestCase):
         self.experiments.save_draft.side_effect = RuntimeError('write failed')
         with self.assertRaisesRegex(RuntimeError, 'write failed'):
             self.select()
+
+    def test_baseline_can_select_any_parameter_without_previous_choices(self):
+        self.draft.selections = []
+        self.assertEqual(self.select('gamma')['phase'], 'choosing')
+        self.assertEqual(self.draft.next_parameter, 'gamma')
+        self.assertEqual(self.draft.selections, [])
+
+    def test_unique_candidate_can_revisit_the_same_parameter_repeatedly(self):
+        self.snake.is_config_unique.return_value = True
+        self.draft.selections = []
+        single = SubmitSingleValueHandler(self.db)
+        for value in (2, 3, 1):
+            self.select('layers')
+            self.assertEqual(single.submit(dict(draft_id='draft', parameter='layers', value=value))['phase'],
+                             'reviewing')
+            self.assertEqual(self.draft.selections, ['layers'])
+        self.assertEqual(self.draft.config['model']['layers'], 1)

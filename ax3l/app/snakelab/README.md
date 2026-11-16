@@ -1,11 +1,10 @@
 # Complete-configuration optimization
 
-Ax3l asks Qwen to choose every tunable setting before executing one SnakeLab
-simulation. A pass contains seven single choices—hidden size, encoder layers,
-dropout, sequence length, batch size, learning rate, and gamma—followed by the
-epsilon, distance-reward, and EpsilonNice pairs. Each conversation saves its
-choice in a durable draft.
-It never submits a simulation. Unchanged values are permitted.
+Ax3l starts a draft from the current golden configuration and asks Qwen which
+setting to change. Qwen can choose any of seven single settings—hidden size,
+encoder layers, dropout, sequence length, batch size, learning rate, and gamma—or
+the epsilon, distance-reward, and EpsilonNice pairs. Each value conversation
+saves its choice in the durable draft. Unchanged values are permitted.
 
 The baseline builds on SnakeLab 3.0.4's `transformer-epsilon-nice.json` sample:
 a Transformer with hidden size 64, one encoder layer, four attention heads,
@@ -18,14 +17,14 @@ dropout from 0 to 0.1 in steps of 0.01. Tau remains fixed at 0.05.
 non-positive-sum reward-pair rule. Seeds and fixed fields remain
 application-controlled.
 
-After the last pair is chosen, Ax3l checks the **whole configuration** against
-all stored runs. If it is a duplicate, Ax3l saves all choices and asks Qwen which
-setting to revise. `select_parameter` reopens any single or paired setting;
-the remaining saved values stay in the draft. After Qwen submits the revision,
-Ax3l checks the complete configuration again. Another duplicate returns to
-parameter selection; a unique configuration is submitted once. Restarts resume
-the selection step or the selected revision. Individual parameter domains are
-not skipped as exhausted: other settings can change within the same draft.
+After every submitted value or pair, Ax3l checks the **whole configuration**
+against all stored runs. A duplicate returns to `select_parameter` and cannot
+run. A unique configuration gives Qwen both `select_parameter` and
+`run_simulation`: change any setting, including the same one again, or run now.
+There is no fixed parameter order or requirement to change every setting.
+Other values stay in the draft. Only an explicit run decision submits the
+unique configuration once. Restarts resume the saved selection, value choice,
+or run decision.
 
 ## Selection evidence
 
@@ -51,6 +50,8 @@ the run menu. All-time score ties resolve to the earliest stored run.
 specific result. English labels explain each path. Data is JSON. Run pages
 contain scores, termination counts and percentages, activity counts, and
 settings. Notes from previously analyzed runs remain available.
+The data tool is available before the first parameter selection and during
+every next-step decision, so Qwen can research which setting to tweak.
 
 `kb_tool(url)` opens one short local guide. Use `/` for the guide list.
 Run IDs and draft IDs are bound privately to the conversation.
@@ -70,12 +71,14 @@ JSON data; transport envelopes and full identifiers remain internal.
 | --- | --- | --- |
 | `submit_single_value` | `value` | Draft UUID and assigned parameter |
 | `submit_pair_values` | `value_1`, `value_2` | Draft UUID and assigned pair |
-| `select_parameter` | `parameter` | Duplicate draft UUID |
+| `select_parameter` | `parameter` | Active draft UUID |
+| `run_simulation` | None | Unique draft UUID |
 | `kb_tool` | `url` | Allowlisted local reference pages |
 | `data_tool` | `url` | Selection draft and frozen references |
 
 `AX3L_CONVERSATION_PARAMETER` identifies the single or pair.
-It is `revision` while Qwen chooses which setting to change after a duplicate.
+It is `revision` while Qwen chooses the next step. `AX3L_ALLOW_RUN=1` exposes
+the run action only after the configuration passes its uniqueness check.
 `AX3L_CONFIGURATION_DRAFT` binds the selection session. Numeric inputs reject
 strings, booleans, nonfinite values, and schema violations. The model cannot
 replace the bound identifiers in its tool arguments.
@@ -84,8 +87,8 @@ replace the bound identifiers in its tool arguments.
 Transport errors propagate without automatic retries. Explicit validation
 rejections receive feedback in the same conversation. Missing or unexpected
 tool calls stop the conversation with a logged error. A successful KB lookup
-or data lookup continues the conversation; only the assigned submission tool
-can finish it.
+or data lookup continues the conversation; an accepted parameter selection,
+value submission, or run decision finishes it.
 
 ## Persistence and restart
 
@@ -97,8 +100,9 @@ After resetting source data, rebuild reporting projections with
 `python -m ax3l.app.ReportingRefresh --rebuild` using the installed database
 environment, before using the cached reports.
 
-A restart resumes the first unselected parameter, including when an accepted
-choice's MCP reply was lost. A complete draft records submission intent before
+A restart resumes the explicit parameter or next-step decision, including when
+an accepted choice's MCP reply was lost. Older drafts keep their in-progress
+choice and switch to Qwen's decisions afterward. A draft records submission intent before
 calling SnakeLab. If interrupted during submission, Ax3l reconciles by the full
 configuration and monitors the existing run; it never automatically sends an
 ambiguous submission again. A missing matching run raises an explicit error.

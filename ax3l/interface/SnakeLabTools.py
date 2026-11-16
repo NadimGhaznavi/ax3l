@@ -16,18 +16,21 @@ from mcp.client.stdio import StdioServerParameters
 
 class SnakeLabTools:
     def __init__(self, endpoint: str, parameter: str, *, draft_id: str | None = None,
-                 run_id: str | None = None, section: str | None = None):
+                 run_id: str | None = None, section: str | None = None, allow_run: bool = False):
         if (parameter not in SINGLE_PARAMETERS and parameter not in PAIR_PARAMETERS
                 and parameter not in ("simulation_summary", REVISION_PARAMETER)):
             raise ValueError(f"Unknown conversation parameter: {parameter}")
         self._tool_name = ("submit_simulation_summary" if parameter == "simulation_summary" else
                            "select_parameter" if parameter == REVISION_PARAMETER else
                            "submit_pair_values" if parameter in PAIR_PARAMETERS else "submit_single_value")
+        self._allow_run = allow_run
         root = Path(__file__).resolve().parents[2]
         environment = {"PYTHONPATH": str(root), "AX3L_ZMQ_ENDPOINT": endpoint,
                        "AX3L_CONVERSATION_PARAMETER": parameter, "PYTHONDONTWRITEBYTECODE": "1"}
         if draft_id is not None:
             environment["AX3L_CONFIGURATION_DRAFT"] = draft_id
+        if allow_run:
+            environment["AX3L_ALLOW_RUN"] = "1"
         if run_id is not None:
             environment["AX3L_ANALYSIS_RUN"] = run_id
         if section is not None:
@@ -42,7 +45,10 @@ class SnakeLabTools:
         try:
             tools = await self._client.list_tools()
             by_name = {tool.name: tool for tool in tools.tools}
-            names = [self._tool_name, "kb_tool", "data_tool"]
+            names = [self._tool_name]
+            if self._allow_run:
+                names.append("run_simulation")
+            names.extend(("kb_tool", "data_tool"))
             self.definitions = [{"type": "function", "function": {
                 "name": tool.name, "description": tool.description, "parameters": deepcopy(tool.input_schema),
             }} for tool in (by_name[name] for name in names)]
@@ -55,8 +61,8 @@ class SnakeLabTools:
     async def __aexit__(self, *exc):
         return await self._client.__aexit__(*exc)
 
-    async def submit(self, arguments: dict) -> dict:
-        return await self._call(self._tool_name, arguments)
+    async def submit(self, arguments: dict, *, name: str | None = None) -> dict:
+        return await self._call(name or self._tool_name, arguments)
 
     async def reference(self, arguments: dict) -> dict:
         return await self._call("kb_tool", arguments)

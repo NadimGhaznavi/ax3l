@@ -5,9 +5,23 @@ import json
 
 from ax3l.app.DbMgr import DbMgr
 from ax3l.constants.DEventCategory import DEventCategory as Events
-from ax3l.entities.ConfigurationDraft import ConfigurationDraft
+from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
 from ax3l.entities.AnalysisTask import AnalysisTask
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
+
+
+def _restore_draft(data: dict) -> ConfigurationDraft:
+    """Resume snapshots saved before Qwen chose the parameter order."""
+    if "parameter" not in data:
+        data = dict(data)
+        if data["phase"] == "choosing":
+            data["parameter"] = next(parameter for parameter in PARAMETER_ORDER if parameter not in data["selections"])
+        elif data["phase"] == "preparing" and data["selections"] and len(data["selections"]) < len(PARAMETER_ORDER):
+            data["parameter"] = next(parameter for parameter in PARAMETER_ORDER if parameter not in data["selections"])
+            data["phase"] = "choosing"
+        elif data["phase"] == "ready":
+            data["phase"] = "reviewing"
+    return ConfigurationDraft(**data)
 
 
 class ExperimentDb:
@@ -24,7 +38,7 @@ class ExperimentDb:
 
     def draft(self, draft_id: str | None = None) -> ConfigurationDraft | None:
         data = self._latest(Events.Configuration.CATEGORY, Events.Configuration.DRAFT_SAVED, draft_id)
-        return ConfigurationDraft(**data) if data is not None else None
+        return _restore_draft(data) if data is not None else None
 
     def last_completed_draft(self) -> ConfigurationDraft | None:
         """Keep the last finished proposal available after a new draft starts."""
@@ -34,7 +48,7 @@ class ExperimentDb:
               AND JSON_UNQUOTE(JSON_EXTRACT(m.content, '$.phase')) = 'completed'
             ORDER BY e.event_id DESC LIMIT 1
         """, (Events.Configuration.CATEGORY, Events.Configuration.DRAFT_SAVED))
-        return ConfigurationDraft(**json.loads(rows[0]["content"])) if rows else None
+        return _restore_draft(json.loads(rows[0]["content"])) if rows else None
 
     def save_draft(self, draft: ConfigurationDraft) -> None:
         self._db.log(Events.Configuration.DRAFT_SAVED, Events.Configuration.CATEGORY,

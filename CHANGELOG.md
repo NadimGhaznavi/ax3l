@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.8.0] - 2026-11-16 @ 00:02
+
+### Summary
+
+Show the live LLM countdown and keep the all-time high score consistent with the current golden.
+
+### Added
+
+- Add a countdown box above the configuration table on the right. Update it every
+  second, follow accepted unique-change resets, and show the three-minute grace
+  period when applicable. Show an inactive timer after submission.
+
+### Fixed
+
+- Include the live golden score in the displayed all-time high so a new record
+  appears immediately while the background reporting totals refresh.
+
 ## [4.5.2] - 2026-11-15 @ 22:57
 
 ### Summary

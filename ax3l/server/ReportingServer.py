@@ -319,13 +319,20 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
                                 timed("current run query", lambda: SnakeLab().get_run_summary(golden["process_id"]))
                                 if golden else None
                             )
+                            current_score = current_run["high_score"] if current_run else None
+                            report = background_values()
+                            # The live golden can beat the last background snapshot.
+                            report["all_time_high_score"] = max(
+                                (score for score in (report["all_time_high_score"], current_score) if score is not None),
+                                default=None,
+                            )
                             body = template.render(
                                 hostname=socket.gethostname(),
                                 events=events,
-                                high_score=current_run["high_score"] if current_run else None,
+                                high_score=current_score,
                                 current_board_svg=board_svg(current_run.get("high_score_snapshot")) if current_run else None,
                                 current_board_gif_url=animation_url(golden["process_id"], current_run["id"]) if current_run else None,
-                                **background_values(),
+                                **report,
                             ).encode("utf-8")
                         else:
                             reason_page = self.path.endswith("/reason")

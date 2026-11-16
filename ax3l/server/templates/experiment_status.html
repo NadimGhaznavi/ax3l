@@ -37,7 +37,14 @@
       <span>{{ choices_selected }} setting{{ 's' if choices_selected != 1 else '' }} saved · Other settings use baseline values.</span>
     </div>
     <p class="status-detail">{{ detail }}</p>
-    <p class="status-usage-note">Baseline values come from this experiment's starting golden configuration. Changed choices are highlighted.</p>
+    <div class="status-table-heading">
+      <p class="status-usage-note">Baseline values come from this experiment's starting golden configuration. Changed choices are highlighted.</p>
+      <div id="llm-countdown" class="status-countdown" data-countdown='{{ countdown | tojson }}'>
+        <span class="countdown-label">LLM countdown</span>
+        <strong id="llm-countdown-value" role="timer" aria-live="off" aria-label="LLM time remaining">—</strong>
+        <span id="llm-countdown-state">{{ 'Waiting for timer' if draft.phase in ('choosing', 'selecting_parameter', 'reviewing') else 'Not active' }}</span>
+      </div>
+    </div>
     <table class="status-checklist" aria-label="Configuration choices and setup steps">
       <colgroup><col class="check-column"><col><col class="value-column"><col class="value-column"><col class="time-column"><col class="token-column"><col class="token-column"></colgroup>
       <thead><tr><th scope="col">Saved</th><th scope="col">Setting or step</th><th scope="col">Baseline</th><th scope="col">LLM Choice</th><th scope="col">Elapsed</th><th scope="col">Input tokens</th><th scope="col">Output tokens</th></tr></thead>
@@ -93,12 +100,38 @@
     const refreshed = document.querySelector('#status-refreshed');
     const errorMessage = document.querySelector('#status-refresh-error');
     const card = document.querySelector('#status-card');
+    let countdown = null;
+    let countdownStartedAt = 0;
+
+    function updateCountdown() {
+      if (countdown === null) return;
+      const remaining = countdown.remaining_seconds - (performance.now() - countdownStartedAt) / 1000;
+      const expired = remaining <= 0;
+      const hasGrace = countdown.grace_seconds > 0;
+      const seconds = Math.max(0, Math.ceil(expired && hasGrace ? remaining + countdown.grace_seconds : remaining));
+      const minutes = String(Math.floor(seconds / 60)).padStart(2, '0');
+      const remainder = String(seconds % 60).padStart(2, '0');
+      card.querySelector('#llm-countdown-value').textContent = `${minutes}:${remainder}`;
+      card.querySelector('#llm-countdown-state').textContent = !expired ? 'Decision time remaining' :
+        !hasGrace ? 'Advisory time elapsed' : seconds > 0 ? 'Grace time remaining' : 'Submitting saved configuration';
+      card.querySelector('#llm-countdown').classList.toggle('countdown-expired', expired);
+    }
+
+    function startCountdown() {
+      const box = card.querySelector('#llm-countdown');
+      countdown = box ? JSON.parse(box.dataset.countdown) : null;
+      countdownStartedAt = performance.now();
+      updateCountdown();
+    }
+
     function markRefreshed() {
       const now = new Date().toISOString();
       refreshed.dateTime = now;
       refreshed.textContent = `${now.slice(0, 10)} ${now.slice(11, 19)} UTC`;
     }
     markRefreshed();
+    startCountdown();
+    window.setInterval(updateCountdown, 1000);
 
     async function refreshStatus() {
       const controller = new AbortController();
@@ -110,6 +143,7 @@
         const nextCard = page.querySelector('#status-card');
         if (!nextCard) throw new Error('Missing experiment report');
         card.replaceChildren(...nextCard.childNodes);
+        startCountdown();
         markRefreshed();
         errorMessage.hidden = true;
       } catch (error) {

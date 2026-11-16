@@ -3,7 +3,7 @@
 import asyncio
 from copy import deepcopy
 import json
-from time import monotonic
+from time import monotonic, time
 from uuid import uuid4
 
 from ax3l.activity.RunAnalysis import render_analysis
@@ -174,8 +174,9 @@ async def optimize(llm, output, db, endpoint):
             chart_episodes = None
             if draft.phase == "preparing":
                 draft.phase = "selecting_parameter"
-                experiments.save_draft(draft)
             decision_deadline = monotonic() + PARAMETER_SELECTION_SECONDS
+            draft.decision_expires_at = time() + PARAMETER_SELECTION_SECONDS
+            experiments.save_draft(draft)
             while draft.phase in ("choosing", "selecting_parameter", "reviewing"):
                 parameter = draft.next_parameter if draft.phase == "choosing" else REVISION_PARAMETER
                 section = CHOICE_CHARTS.get(parameter)
@@ -205,6 +206,8 @@ async def optimize(llm, output, db, endpoint):
                 draft = experiments.draft(draft.draft_id)
                 if draft.phase == "reviewing":
                     decision_deadline = monotonic() + PARAMETER_SELECTION_SECONDS
+                    draft.decision_expires_at = time() + PARAMETER_SELECTION_SECONDS
+                    experiments.save_draft(draft)
         submit_draft(snake, db, experiments, draft)
         try:
             await wait_for_run(snake, db, draft.run_id)

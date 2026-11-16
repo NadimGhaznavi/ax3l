@@ -52,11 +52,11 @@
     <table class="status-checklist" aria-label="Configuration choices and setup steps">
       <colgroup><col class="check-column"><col><col class="details-column"><col class="value-column"><col class="value-column"><col class="time-column"><col class="token-column"><col class="token-column"></colgroup>
       <thead><tr><th scope="col">Saved</th><th scope="col">Setting or step</th><th scope="col">LLM details</th><th scope="col">Baseline</th><th scope="col">LLM Choice</th><th scope="col">Elapsed</th><th scope="col">Input tokens</th><th scope="col">Output tokens</th></tr></thead>
-      <tbody class="status-configuration">
-        {% for row in rows %}
+      {% for row in rows %}
+      <tbody class="status-configuration{% if loop.index is even %} alternate-parameter{% endif %}">
         <tr data-parameter="{{ row.path }}" class="{{ 'selected' if row.selected else 'pending' }}{% if row.current %} current-choice{% endif %}">
           <td>{% if row.selected is not none %}<input type="checkbox" disabled {% if row.selected %}checked{% endif %} aria-label="{{ row.label }} choice saved">{% endif %}</td>
-          <th scope="row"><span class="parameter-label">{{ row.label }}</span><span class="parameter-description">{{ row.description }}</span>{% if row.image_url %}<a class="choice-chart" href="{{ row.image_url }}" target="_blank" rel="noopener">View chart prompt</a>{% endif %}</th>
+          <th scope="row">{% if row.steps %}<button type="button" class="task-toggle" data-task="{{ row.path }}" data-task-label="{{ row.label }}" aria-expanded="false" aria-controls="tasks-{{ row.path }}" aria-label="Show tasks for {{ row.label }}">+</button>{% endif %}<span class="parameter-label">{{ row.label }}</span>{% if row.description %}<span class="parameter-description">{{ row.description }}</span>{% endif %}{% if row.image_url %}<a class="choice-chart" href="{{ row.image_url }}" target="_blank" rel="noopener">View chart prompt</a>{% endif %}</th>
           <td></td>
           <td class="inherited-value">{{ row.inherited_value if row.inherited_value is not none else '—' }}</td>
           <td{% if row.selected and row.changed %} class="changed-value"{% endif %}>
@@ -65,6 +65,9 @@
           </td>
           <td></td><td></td><td></td>
         </tr>
+      </tbody>
+      {% if row.steps %}
+      <tbody id="tasks-{{ row.path }}" class="status-subtasks" hidden>
         {% for step in row.steps %}
         <tr class="setup-step{% if step.state == 'Running' %} current-choice{% endif %}"{% if step.state == 'Running' %} aria-current="step"{% endif %}>
           <td></td><th scope="row">{{ step.label }}{% if step.target %} {% if step.result_url %}<a class="read-target" href="{{ step.result_url }}">{{ step.target }}</a>{% else %} {{ step.target }}{% endif %}{% endif %}</th>
@@ -76,8 +79,9 @@
           <td class="item-tokens">{{ '{:,}'.format(step.output_tokens) if step.output_tokens is not none else '—' }}</td>
         </tr>
         {% endfor %}
-        {% endfor %}
       </tbody>
+      {% endif %}
+      {% endfor %}
       <tfoot>
         <tr class="status-total">
           <td></td><th scope="row" colspan="4">Totals</th>
@@ -115,6 +119,7 @@
     const preview = document.querySelector('#read-preview');
     const previewContent = document.querySelector('#read-preview-content');
     const previewLinks = '.read-target, .item-details a';
+    const expandedTasks = new Set();
     const readResults = new Map();
     let activeRead = null;
     let previewRequest = null;
@@ -137,6 +142,30 @@
       activeRead = null;
       preview.hidden = true;
     }
+
+    function setTaskExpanded(button, expanded) {
+      const tasks = document.getElementById(button.getAttribute('aria-controls'));
+      if (!expanded && activeRead && tasks.contains(activeRead)) hideReadPreview();
+      tasks.hidden = !expanded;
+      button.setAttribute('aria-expanded', String(expanded));
+      button.setAttribute('aria-label', `${expanded ? 'Hide' : 'Show'} tasks for ${button.dataset.taskLabel}`);
+      button.textContent = expanded ? '−' : '+';
+    }
+
+    function restoreTaskExpansion() {
+      for (const button of card.querySelectorAll('.task-toggle')) {
+        setTaskExpanded(button, expandedTasks.has(button.dataset.task));
+      }
+    }
+
+    card.addEventListener('click', event => {
+      const button = event.target.closest('.task-toggle');
+      if (!button) return;
+      const expanded = !expandedTasks.has(button.dataset.task);
+      if (expanded) expandedTasks.add(button.dataset.task);
+      else expandedTasks.delete(button.dataset.task);
+      setTaskExpanded(button, expanded);
+    });
 
     function scheduleReadPreviewHide() {
       window.clearTimeout(previewHideTimer);
@@ -254,10 +283,15 @@
         const nextCard = page.querySelector('#status-card');
         if (!nextCard) throw new Error('Missing experiment report');
         const readHadFocus = activeRead === document.activeElement;
+        const focusedTask = document.activeElement.matches('.task-toggle') ? document.activeElement.dataset.task : null;
         const tableScroll = card.querySelector('.status-table-scroll')?.scrollLeft || 0;
         card.replaceChildren(...nextCard.childNodes);
+        restoreTaskExpansion();
         const nextTable = card.querySelector('.status-table-scroll');
         if (nextTable) nextTable.scrollLeft = tableScroll;
+        if (focusedTask !== null) {
+          Array.from(card.querySelectorAll('.task-toggle')).find(button => button.dataset.task === focusedTask)?.focus({preventScroll: true});
+        }
         if (activeRead) {
           const nextLink = Array.from(card.querySelectorAll(previewLinks)).find(link => link.href === activeRead.href);
           if (nextLink) {

@@ -1,4 +1,4 @@
-"""Shared display labels for report parameters."""
+"""Shared display labels and descriptions for report parameters."""
 
 from typing import Final
 
@@ -55,4 +55,21 @@ FIELD_TO_LABEL_MAP: Final[dict[str, str]] = {
     "epsilon_nice.steps": DLabel.EPSILON_NICE_STEPS,
     "model.type": "Model",
     "model.heads": "Attention Heads",
+}
+
+
+FIELD_TO_DESCRIPTION_MAP: Final[dict[str, str]] = {
+    "model.hidden_size": "Hidden width of the Transformer.",
+    "model.layers": "Number of Transformer encoder layers.",
+    "model.dropout": "Model dropout probability.",
+    "training.sequence_length": "Consecutive training frames.",
+    "training.batch_size": "Training batch size",
+    "training.learning_rate": "Optimizer learning rate",
+    "training.gamma": "Discount factor",
+    "epsilon.initial": "Initial probability",
+    "epsilon.decay": "Probability decay rate",
+    "game.rewards.closer_to_food": "",
+    "game.rewards.further_from_food": "",
+    "epsilon_nice.probability": "Invocation probability",
+    "epsilon_nice.steps": "Safe detour steps",
 }

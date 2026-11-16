@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Keep Experiment Status compact with collapsible tasks and concise setting descriptions.
+
+### Added
+
+- Add +/− controls to every setting or experiment decision with task rows.
+  Start tasks collapsed and preserve each group's expansion and keyboard focus
+  across automatic refreshes. Keep configuration values and totals visible.
+
+### Changed
+
+- Shorten the Experiment Status setting descriptions and show food rewards
+  using their labels alone.
+
 ## [4.9.2] - 2026-11-16 @ 06:35
 
 ### Summary

@@ -3,7 +3,7 @@
 from time import time
 
 from ax3l.app.snakelab.ParameterSpace import parameter_paths
-from ax3l.constants.DLabel import FIELD_TO_LABEL_MAP
+from ax3l.constants.DLabel import FIELD_TO_DESCRIPTION_MAP, FIELD_TO_LABEL_MAP
 from ax3l.constants.DChoice import REVISION_PARAMETER, UNIQUE_CONFIG_GRACE_SECONDS
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
@@ -39,7 +39,7 @@ def _rows(draft: ConfigurationDraft, inherited_config: dict, activity: dict[str,
             inherited = SimulationConfiguration.value_at(inherited_config, path)
             rows.append(dict(
                 path=name, label=FIELD_TO_LABEL_MAP[name],
-                description=SimulationConfiguration.field(path)["description"],
+                description=FIELD_TO_DESCRIPTION_MAP[name],
                 value=str(value), inherited_value=str(inherited), changed=value != inherited,
                 selected=parameter in draft.selections, current=parameter == draft.next_parameter,
                 steps=[], image_url=None,

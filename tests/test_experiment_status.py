@@ -375,7 +375,7 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         page = self.get()
         self.assertIn('class="choice-chart" href="/events/4"', page)
         self.assertIn('Render score trends chart', page)
-        self.assertIn('Read data /latest/scores', page)
+        self.assertIn('Read data <a class="read-target" href="/tool-results/8">/latest/scores</a>', page)
         self.assertIn('class="item-elapsed">00:00</td>', page)
         self.assertIn('class="item-elapsed">01:10</td>', page)
         self.assertIn('class="item-elapsed">00:15</td>', page)
@@ -408,6 +408,57 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         for recorded in self.experiments.choice_events.return_value:
             recorded['observed_at'] += timedelta(seconds=5)
         self.assertIn('class="item-elapsed">06:31</td>', self.get())
+
+    def test_read_targets_link_each_specific_result_and_include_guides_and_failures(self):
+        stamp = datetime(2026, 11, 16, 12)
+
+        def event(event_id, name, detail=None, parameter=None):
+            return dict(event_id=event_id, name=name, occurred_at=stamp, observed_at=stamp,
+                        parent_event_id=1, parameter=parameter, has_image=False, detail=detail)
+
+        events = [event(2, 'prompt_sent', parameter='revision')]
+        for start, name, path, end, status in (
+                (3, 'data_tool', '/draft', 4, 'ok'), (5, 'data_tool', '/', 6, 'ok'),
+                (7, 'data_tool', '/golden/model', 8, 'ok'), (9, 'kb_tool', '/', 10, 'ok'),
+                (11, 'data_tool', '/missing', 12, 'rejected'), (13, 'data_tool', '/draft', 14, 'failed')):
+            events.extend([
+                event(start, 'tool_execution_started', json.dumps(dict(function=dict(
+                    name=name, arguments=json.dumps(dict(url=path)))))),
+                event(end, 'tool_execution_failed' if status == 'failed' else 'tool_execution_completed', status),
+            ])
+        self.experiments.choice_events.return_value = events
+        page = self.get()
+        for result, path in ((4, '/draft'), (6, '/'), (8, '/golden/model'), (10, '/'), (12, '/missing'), (14, '/draft')):
+            self.assertIn(f'href="/tool-results/{result}">{path}</a>', page)
+        self.assertIn('Read guide <a', page)
+        events.append(event(15, 'tool_execution_started', json.dumps(dict(function=dict(
+            name='data_tool', arguments=json.dumps(dict(url='/draft')))))))
+        pending = self.get().split('>Read data', 1)[1]
+        self.assertNotIn('href="/tool-results/15"', pending)
+
+    def test_recorded_result_endpoint_formats_json_and_rejects_unrelated_events(self):
+        event_log = self.enterContext(patch('ax3l.server.ReportingServer.EventLogDb')).return_value
+        event = dict(event_id=8, category='Tool', name='tool_execution_completed',
+                     content=json.dumps(dict(status='ok', page=json.dumps(dict(high_score=38, zero=0)))))
+        event_log.get.return_value = event
+        page = self.get('/tool-results/8')
+        self.assertIn('Tool result #8', page)
+        self.assertIn('<td>high score</td>', page)
+        self.assertIn('<td>38</td>', page)
+        self.snake.get_run_result.assert_not_called()
+        event_log.get.assert_called_once_with(8)
+        for record in (None, dict(event, category='Conversation'), dict(event, name='tool_execution_started')):
+            with self.subTest(record=record):
+                event_log.get.return_value = record
+                with self.assertRaises(HTTPError) as error:
+                    self.get('/tool-results/8')
+                self.assertEqual(error.exception.code, 404)
+        self.db.close.reset_mock()
+        event_log.get.side_effect = RuntimeError('database unavailable')
+        with patch('ax3l.server.ReportingServer.traceback.print_exc'), self.assertRaises(HTTPError) as error:
+            self.get('/tool-results/8')
+        self.assertEqual(error.exception.code, 500)
+        self.db.close.assert_called_once()
 
     def test_image_endpoint_returns_latest_exact_png_and_missing_images_are_unlinked(self):
         run_id = str(uuid4())

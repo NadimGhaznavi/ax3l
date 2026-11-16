@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tool result #{{ event.event_id }} · Ax3l</title>
+  {% include "report_styles.html" %}
+  {% include "tool_result_styles.html" %}
+</head>
+<body>
+  <header><h1>Tool result #{{ event.event_id }}</h1><a href="/experiment-status">Back to Experiment Status</a></header>
+  <main id="tool-result" class="tool-result">{{ result_html | safe }}</main>
+</body>
+</html>

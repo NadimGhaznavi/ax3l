@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.4.7] - 2026-11-15 @ 22:06
+
 ### Summary
 
 Let Qwen choose which settings to adjust and when to run each experiment.

@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 
 ## [Unreleased]
+
+## [4.10.0] - 2026-11-16 @ 08:49
+
+### Summary
+
+Make prompt hover previews easier to trace to their source modules.
+
+### Changed
+
+- Include the recorded module name in Experiment Status prompt preview titles,
+  for example `Prompt (ComparisonSingle)` or `Prompt (FirstContact)`.
 
 ## [4.9.3] - 2026-11-16 @ 06:58
 

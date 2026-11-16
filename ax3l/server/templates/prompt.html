@@ -12,7 +12,7 @@
   <main>
     <section>
       <h2>Prompt sent to the LLM</h2>
-      <div id="message-content"{% if preview %} class="tool-result"{% endif %}>
+      <div id="message-content"{% if preview %} class="tool-result" data-preview-title="Prompt{% if event.source_name %} ({{ event.source_name }}){% endif %}"{% endif %}>
       {% for part in parts %}
         {% if part.type == 'text' %}
         {% if preview %}{{ markdown_html(part.text) | safe }}{% else %}<pre>{{ part.text }}</pre>{% endif %}

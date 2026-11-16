@@ -107,8 +107,11 @@ Any pending edit is excluded unless its changed values were accepted. Restarting
 begins a new budget.
 
 Experiment Status shows the settings to be chosen and the saved selections.
-An LLM countdown box beside the experiment details above the table on the right
-ticks every second using the current decision deadline. At zero it turns amber.
+The experiment title and LLM countdown share a full-width section header above
+the experiment details and table. The countdown occupies the right side of that
+header, stacking below the title on small screens. The same header remains visible
+in active, inactive, and empty states. The timer ticks every second using the
+current decision deadline. At zero it turns amber.
 With a saved unique draft, it switches to a three-minute **Simulation Start
 Countdown** with **Time remaining** below the number. Without a unique draft,
 the **LLM countdown** continues into negative time with **Exceeded decision time**

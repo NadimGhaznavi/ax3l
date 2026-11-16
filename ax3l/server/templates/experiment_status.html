@@ -22,30 +22,30 @@
   </nav>
   <p id="status-refresh-error" role="status" hidden></p>
   <main id="status-card" class="panel">
+    <header class="status-section-header" aria-labelledby="experiment-phase">
+      <div class="status-title">
+        <p class="status-view-label">{{ 'Current experiment' if view == 'current' else 'Last completed experiment' }}</p>
+        <h2 id="experiment-phase" aria-live="polite" aria-atomic="true">{{ phase if draft else ('Waiting for experiment' if view == 'current' else 'No completed experiment') }}</h2>
+      </div>
+      <div id="llm-countdown" class="status-countdown" role="group" aria-labelledby="llm-countdown-label" data-countdown='{{ (countdown if draft else none) | tojson }}'>
+        <span id="llm-countdown-label" class="countdown-label">LLM countdown</span>
+        <strong id="llm-countdown-value" role="timer" aria-live="off" aria-label="LLM time remaining">—</strong>
+        <span id="llm-countdown-state">{{ 'Waiting for timer' if draft and draft.phase in ('choosing', 'selecting_parameter', 'reviewing') else 'Not active' }}</span>
+      </div>
+    </header>
     {% if draft %}
     <div class="status-overview">
       <div class="status-summary">
-        <div class="status-heading">
-          <div>
-            <p class="status-view-label">{{ 'Current experiment' if view == 'current' else 'Last completed experiment' }}</p>
-            <h2 id="experiment-phase" role="status">{{ phase }}</h2>
-          </div>
-          <div class="status-identifiers">
-            <span>Seed <strong>{{ draft.config.seed }}</strong></span>
-            <span>Experiment <strong>{{ draft.draft_id.split('-')[0] }}</strong></span>
-            <span>Simulation {% if draft.run_id %}<a href="/simulations/{{ draft.run_id }}">{{ draft.run_id.split('-')[0] }}</a>{% else %}<strong>Not submitted</strong>{% endif %}</span>
-          </div>
+        <div class="status-identifiers">
+          <span>Seed <strong>{{ draft.config.seed }}</strong></span>
+          <span>Experiment <strong>{{ draft.draft_id.split('-')[0] }}</strong></span>
+          <span>Simulation {% if draft.run_id %}<a href="/simulations/{{ draft.run_id }}">{{ draft.run_id.split('-')[0] }}</a>{% else %}<strong>Not submitted</strong>{% endif %}</span>
         </div>
         <div class="status-progress">
           <span>{{ choices_selected }} setting{{ 's' if choices_selected != 1 else '' }} saved · Other settings use baseline values.</span>
         </div>
         <p class="status-detail">{{ detail }}</p>
         <p class="status-usage-note">Baseline values come from this experiment's starting golden configuration. Changed choices are highlighted.</p>
-      </div>
-      <div id="llm-countdown" class="status-countdown" data-countdown='{{ countdown | tojson }}'>
-        <span id="llm-countdown-label" class="countdown-label">LLM countdown</span>
-        <strong id="llm-countdown-value" role="timer" aria-live="off" aria-label="LLM time remaining">—</strong>
-        <span id="llm-countdown-state">{{ 'Waiting for timer' if draft.phase in ('choosing', 'selecting_parameter', 'reviewing') else 'Not active' }}</span>
       </div>
     </div>
     <div class="status-table-scroll" role="region" aria-label="Configuration choices and setup steps" tabindex="0">

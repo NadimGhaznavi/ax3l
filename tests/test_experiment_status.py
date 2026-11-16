@@ -265,7 +265,7 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         self.assertIn('Choosing a setting', self.get())
         page = self.get('/experiment-status?view=completed')
         self.assertIn('aria-current="page">Last completed</a>', page)
-        self.assertIn('id="experiment-phase" role="status">Complete</h2>', page)
+        self.assertIn('id="experiment-phase" aria-live="polite" aria-atomic="true">Complete</h2>', page)
         self.assertEqual(page.count('disabled checked'), 13)
         self.assertNotIn('>Pending</span>', page)
         self.assertNotIn('class="comparison-label"', page)

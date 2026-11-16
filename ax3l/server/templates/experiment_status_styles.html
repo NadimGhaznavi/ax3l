@@ -7,10 +7,11 @@
   .status-views a { padding: .3rem .65rem; }
   .status-views [aria-current="page"] { color: var(--text); background: #23364b; border-color: var(--link); }
   .experiment-status-page main.panel { overflow: visible; }
-  .status-overview { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: .75rem 1rem; padding: .75rem 1rem; }
+  .status-section-header { display: grid; grid-template-columns: minmax(0, 1fr) 15rem; align-items: stretch; gap: 0; margin: 0; padding: 0; border: 0; border-bottom: 1px solid var(--border); background: #151f2b; }
+  .status-title { min-width: 0; align-self: center; padding: .75rem 1rem; overflow-wrap: anywhere; }
+  .status-title h2 { margin: 0; padding: 0; border: 0; background: transparent; color: var(--link); font-size: 1rem; }
+  .status-overview { padding: .75rem 1rem; }
   .status-summary { min-width: 0; }
-  .status-heading { display: grid; gap: .5rem; overflow-wrap: anywhere; }
-  .status-heading h2 { margin: 0; padding: 0; border: 0; background: transparent; color: var(--link); font-size: 1rem; }
   .status-view-label { margin: 0 0 .2rem; font-size: .8rem; }
   .status-identifiers { font-size: .8rem; color: var(--muted); }
   .status-identifiers > span { white-space: nowrap; }
@@ -18,7 +19,7 @@
   .status-progress { margin-top: .45rem; color: var(--muted); font-size: .8rem; }
   .status-detail { margin: .35rem 0 .5rem; font-size: .8rem; }
   .status-summary .status-usage-note { margin: .5rem 0 0; }
-  .status-countdown { margin-left: auto; width: 14rem; max-width: 100%; padding: .4rem .75rem; border: 1px solid var(--border); border-radius: .25rem; background: #151f2b; text-align: right; }
+  .status-countdown { min-width: 0; padding: .65rem 1rem; border-left: 1px solid var(--border); text-align: right; }
   .status-countdown span { display: block; color: var(--muted); font-size: .7rem; }
   .status-countdown strong { display: block; color: var(--link); font-size: 1.5rem; font-variant-numeric: tabular-nums; line-height: 1.3; }
   .status-countdown.countdown-expired { border-color: #f5c77e; }
@@ -64,10 +65,9 @@
   @media (max-width: 900px) {
     .parameter-description { display: block; margin-left: 0; }
   }
-  @media (max-width: 768px) {
-    .status-overview { grid-template-columns: minmax(0, 1fr); }
-  }
   @media (max-width: 600px) {
+    .status-section-header { grid-template-columns: minmax(0, 1fr); }
+    .status-countdown { border-left: 0; border-top: 1px solid var(--border); }
     .status-toolbar > span { font-size: .7rem; }
     .status-checklist .value-column { width: 7rem; }
     .status-checklist th, .status-checklist td { padding: .4rem; }

@@ -5,6 +5,7 @@ from html import unescape
 import unittest
 
 from ax3l.activity.JsonMarkdown import json_markdown
+from ax3l.activity.MarkdownReport import markdown_html
 from ax3l.activity.SimulationDataPages import config_page, draft_page
 from ax3l.activity.ToolResult import tool_result_html
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
@@ -69,3 +70,11 @@ class JsonMarkdownTests(unittest.TestCase):
         self.assertIn('| 0 |', json_markdown([0, False, None]))
         for value, expected in ((None, 'null'), (False, 'false'), ([], '[]'), ({}, '{}')):
             self.assertIn(expected, self.render(json.dumps(value)))
+
+    def test_model_markdown_keeps_incomplete_json_examples_and_formats_valid_blocks(self):
+        html = markdown_html('Consider **these values**.\n\n```json\n{"learning_rate":\n```\n\n'
+                             '```json\n{"learning_rate":0.0005}\n```')
+        self.assertIn('<strong>these values</strong>', html)
+        self.assertIn('<code class="language-json">', html)
+        self.assertIn('<td>learning rate</td>', html)
+        self.assertIn('<td>0.0005</td>', html)

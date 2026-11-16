@@ -31,6 +31,7 @@ from ax3l.activity.SimulationAnimation import SimulationAnimation
 from ax3l.interface.SimulationGifStore import SimulationGifStore
 from ax3l.activity.SimulationMetrics import metrics
 from ax3l.activity.ToolResult import tool_result_html
+from ax3l.activity.MarkdownReport import markdown_html
 from ax3l.constants.DReportMgr import DReportMgr
 from ax3l.constants.DAx3l import DAx3l
 from ax3l.constants.DLabel import FIELD_TO_LABEL_MAP
@@ -309,7 +310,7 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
                     traceback.print_exc()
                     self.send_error(500, "Unable to load simulation config")
                     return
-            elif self.path == "/" or re.fullmatch(r"/events/[0-9]{1,20}(?:/reason)?", self.path):
+            elif self.path == "/" or re.fullmatch(r"/events/[0-9]{1,20}(?:/reason)?", urlsplit(self.path).path):
                 try:
                     db = timed("database connection", lambda: DbMgr(initialize_event_tables=False))
                     try:
@@ -354,8 +355,10 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
                                 **report,
                             ).encode("utf-8")
                         else:
-                            reason_page = self.path.endswith("/reason")
-                            event = log.get(int(self.path.split("/")[2]))
+                            event_path = urlsplit(self.path).path
+                            reason_page = event_path.endswith("/reason")
+                            preview = parse_qs(urlsplit(self.path).query).get("preview") == ["1"]
+                            event = log.get(int(event_path.split("/")[2]))
                             if (
                                 event is None
                                 or event["name"]
@@ -378,6 +381,7 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
                                     page_title=f"Reason #{event['event_id']}",
                                     message_title="Reason", back_url="/golden-configurations",
                                     back_label="Back to golden configurations",
+                                    preview=preview, markdown_html=markdown_html,
                                 ).encode("utf-8")
                             elif event["name"] == DEventCategory.Conversation.PROMPT:
                                 body = (
@@ -385,6 +389,7 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
                                     .render(
                                         event=event,
                                         parts=parts(json.loads(event["content"])),
+                                        preview=preview, markdown_html=markdown_html,
                                     )
                                     .encode("utf-8")
                                 )

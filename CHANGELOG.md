@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Keep unchanged Experiment Status values on one line.
+
+### Changed
+
+- Remove the redundant "No change" label beneath unchanged LLM-chosen values.
+
 ## [4.7.0] - 2026-11-15 @ 21:22
 
 ### Summary

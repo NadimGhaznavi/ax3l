@@ -236,7 +236,7 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         self.assertIn('id="experiment-phase" role="status">Complete</h2>', page)
         self.assertEqual(page.count('disabled checked'), 13)
         self.assertNotIn('>Pending</span>', page)
-        self.assertEqual(page.count('>No change</span>'), 13)
+        self.assertNotIn('class="comparison-label"', page)
         self.assertIn('<dt>High score</dt><dd>0</dd>', page)
         self.assertIn('<dt>Difference</dt><dd>+0</dd>', page)
         self.assertIn('Golden retained', page)
@@ -267,7 +267,10 @@ class ExperimentStatusHttpTests(unittest.TestCase):
                     self.assertLess(row.index(f'class="inherited-value">{inherited}</td>'),
                                     row.index(f'class="parameter-value">{chosen}</span>'))
                     self.assertEqual('class="changed-value"' in row, changed)
-                    self.assertIn(f'>{"Changed" if changed else "No change"}</span>', row)
+                    if changed:
+                        self.assertIn('>Changed</span>', row)
+                    else:
+                        self.assertNotIn('class="comparison-label"', row)
                 pending = page.split('data-parameter="epsilon_nice.probability"', 1)[1].split('</tr>', 1)[0]
                 self.assertIn('>Pending</span>', pending)
                 self.assertNotIn('class="parameter-value"', pending)

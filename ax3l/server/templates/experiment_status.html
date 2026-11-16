@@ -50,7 +50,7 @@
           <td class="inherited-value">{{ row.inherited_value if row.inherited_value is not none else '—' }}</td>
           <td{% if row.selected and row.changed %} class="changed-value"{% endif %}>
             {% if row.selected is false %}<span class="pending-label">Pending</span>
-            {% else %}<span class="parameter-value">{{ row.value }}</span>{% if row.selected %}<span class="comparison-label">{{ 'Changed' if row.changed else 'No change' }}</span>{% endif %}{% endif %}
+            {% else %}<span class="parameter-value">{{ row.value }}</span>{% if row.selected and row.changed %}<span class="comparison-label">Changed</span>{% endif %}{% endif %}
           </td>
           <td></td><td></td><td></td>
         </tr>

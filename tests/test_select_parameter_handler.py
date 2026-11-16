@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from ax3l.app.snakelab.SelectParameterHandler import SelectParameterHandler
+from ax3l.app.snakelab.SubmitPairValuesHandler import SubmitPairValuesHandler
 from ax3l.app.snakelab.SubmitSingleValueHandler import SubmitSingleValueHandler
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
@@ -24,17 +25,17 @@ class SelectParameterHandlerTests(unittest.TestCase):
         self.bind()
 
     def bind(self):
-        self.draft = ConfigurationDraft('draft', 'gold', {'golden': 'gold'}, SimulationConfiguration.defaults(),
-                                        PARAMETER_ORDER.copy(), 'selecting_parameter')
+        self.draft = ConfigurationDraft('draft', 'gold', {'golden': 'gold'}, SimulationConfiguration.defaults())
         self.experiments.draft.return_value = self.draft
 
     def select(self, parameter='hidden_size', draft_id='draft'):
         return self.handler.submit(dict(draft_id=draft_id, parameter=parameter))
 
-    def test_every_single_and_pair_can_be_reopened_without_changing_values(self):
+    def test_every_unused_single_and_pair_can_be_selected_without_changing_values(self):
         for parameter in PARAMETER_ORDER:
             with self.subTest(parameter=parameter):
                 self.bind()
+                self.draft.selections = [name for name in PARAMETER_ORDER if name != parameter]
                 original = deepcopy(self.draft)
                 self.experiments.save_draft.reset_mock()
                 self.assertEqual(self.select(parameter), dict(status='ok', draft_id='draft', phase='choosing'))
@@ -111,13 +112,22 @@ class SelectParameterHandlerTests(unittest.TestCase):
         self.assertEqual(self.draft.next_parameter, 'gamma')
         self.assertEqual(self.draft.selections, [])
 
-    def test_unique_candidate_can_revisit_the_same_parameter_repeatedly(self):
+    def test_used_single_and_pair_cannot_be_selected_again_after_a_snapshot_round_trip(self):
         self.snake.is_config_unique.return_value = True
-        self.draft.selections = []
-        single = SubmitSingleValueHandler(self.db)
-        for value in (2, 3, 1):
-            self.select('layers')
-            self.assertEqual(single.submit(dict(draft_id='draft', parameter='layers', value=value))['phase'],
-                             'reviewing')
-            self.assertEqual(self.draft.selections, ['layers'])
-        self.assertEqual(self.draft.config['model']['layers'], 1)
+        for parameter, handler, payload in (
+            ('learning_rate', SubmitSingleValueHandler, dict(parameter='learning_rate', value=.002)),
+            ('epsilon_pair', SubmitPairValuesHandler, dict(pair='epsilon_pair', value_1=.91, value_2=.95)),
+        ):
+            with self.subTest(parameter=parameter):
+                self.bind()
+                self.select(parameter)
+                self.assertEqual(handler(self.db).submit(dict(draft_id='draft', **payload))['phase'], 'reviewing')
+                self.draft = ConfigurationDraft(**json.loads(json.dumps(asdict(self.draft))))
+                self.experiments.draft.return_value = self.draft
+                original = deepcopy(self.draft)
+                self.experiments.save_draft.reset_mock()
+                result = self.select(parameter)
+                self.assertEqual(result['status'], 'rejected')
+                self.assertIn('already been chosen', result['reason'])
+                self.assertEqual(self.draft, original)
+                self.experiments.save_draft.assert_not_called()

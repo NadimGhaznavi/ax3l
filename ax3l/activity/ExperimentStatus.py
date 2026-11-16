@@ -10,7 +10,7 @@ from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 
 RUN_PHASES = {
     "queued": ("Simulation queued", "Waiting for Snake Lab to start the simulation."),
-    "running": ("Simulation running", "Qwen chose to run the saved configuration. Snake Lab is running the simulation."),
+    "running": ("Simulation running", "Snake Lab is running the saved configuration."),
     "paused": ("Simulation paused", "Snake Lab has paused the simulation."),
     "cancelling": ("Simulation cancelling", "Snake Lab is stopping the simulation."),
     "cancelled": ("Simulation cancelled", "The simulation was cancelled."),
@@ -74,9 +74,9 @@ def _phase(draft: ConfigurationDraft, run: dict | None, comparison: dict | None,
         return ("Choosing a setting to revise",
                 "The configuration is a duplicate. Qwen will choose which setting to change.")
     if draft.phase == "reviewing":
-        return "Choosing next step", "The configuration is unique. Qwen can run it or change any setting again."
+        return "Choosing next step", "The configuration is unique. Qwen can run it or change an unused setting."
     if draft.phase == "ready":
-        return "Ready to submit", "Qwen chose to run the saved configuration."
+        return "Ready to submit", "The saved configuration is ready to run."
     if draft.phase == "submitting":
         return "Submission pending", "Waiting for Snake Lab to confirm the simulation."
     if run is None:

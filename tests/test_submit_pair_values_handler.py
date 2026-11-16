@@ -40,11 +40,11 @@ class SubmitPairValuesHandlerTests(unittest.TestCase):
         self.experiments.save_draft.assert_not_called()
         self.snake.submit_simulation.assert_not_called()
 
-    def test_both_values_are_saved_together_and_unchanged_values_are_allowed(self):
+    def test_both_values_are_saved_together_when_at_least_one_changes(self):
         for pair, first, second, section, expected in (
-            ('epsilon_pair', .96, .97, 'epsilon', {'initial': .96, 'decay': .97, 'minimum': 0}),
+            ('epsilon_pair', .96, .95, 'epsilon', {'initial': .96, 'decay': .95, 'minimum': 0}),
             ('reward_pair', .25, -.5, 'game', None),
-            ('epsilon_nice_pair', .01, 40, 'epsilon_nice', {'probability': .01, 'steps': 40}),
+            ('epsilon_nice_pair', .01, 20, 'epsilon_nice', {'probability': .01, 'steps': 20}),
         ):
             with self.subTest(pair=pair):
                 self.bind(pair)
@@ -60,6 +60,19 @@ class SubmitPairValuesHandlerTests(unittest.TestCase):
         self.assertEqual(self.snake.is_config_unique.call_count, 3)
         self.snake.is_config_unique.assert_called_with(self.draft.config)
         self.snake.submit_simulation.assert_not_called()
+
+    def test_unchanged_pairs_are_rejected_without_saving_or_checking_uniqueness(self):
+        for pair, first, second in (('epsilon_pair', .96, .97), ('reward_pair', 1, -1),
+                                    ('epsilon_nice_pair', .05, 20.0)):
+            with self.subTest(pair=pair):
+                self.bind(pair)
+                original = deepcopy(self.draft)
+                result = self.submit(pair, first, second)
+                self.assertEqual(result['status'], 'rejected')
+                self.assertIn('at least one value', result['reason'])
+                self.assertEqual(self.draft, original)
+        self.experiments.save_draft.assert_not_called()
+        self.snake.is_config_unique.assert_not_called()
 
     def test_duplicate_configuration_rejects_the_whole_pair_without_leaving_its_choice(self):
         self.bind('epsilon_nice_pair')

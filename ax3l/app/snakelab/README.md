@@ -4,7 +4,8 @@ Ax3l starts a draft from the current golden configuration and asks Qwen which
 setting to change. Qwen can choose any of seven single settings—hidden size,
 encoder layers, dropout, sequence length, batch size, learning rate, and gamma—or
 the epsilon, distance-reward, and EpsilonNice pairs. Each value conversation
-saves its choice in the durable draft. Unchanged values are permitted.
+saves its choice in the durable draft. Once selected, a setting must change:
+a single value must differ, and at least one value in a pair must differ.
 
 The baseline builds on SnakeLab 3.0.4's `transformer-epsilon-nice.json` sample:
 a Transformer with hidden size 64, one encoder layer, four attention heads,
@@ -22,7 +23,9 @@ against all stored runs. A duplicate is rejected without saving it; Qwen must
 submit different values for the same selected setting in the same conversation.
 It cannot switch parameters or run until the setting produces a unique draft.
 A unique configuration gives Qwen both `select_parameter` and
-`run_simulation`: change any setting, including the same one again, or run now.
+`run_simulation`: change an unused setting or run now. Each parameter can be
+selected only once within a draft, including after a restart. Used parameters
+are omitted from the next selection prompt and rejected by the selection tool.
 There is no fixed parameter order or requirement to change every setting.
 Other values stay in the draft. Only an explicit run decision submits the
 unique configuration once. Restarts resume the saved selection, value choice,
@@ -57,10 +60,14 @@ every next-step decision, so Qwen can research which setting to tweak.
 Qwen has an advisory five-minute budget to select a parameter and find values
 that produce a unique configuration, or decide to run an already unique draft.
 After every data request, it receives the time remaining, including inference
-and lookup time. Duplicate attempts keep the same countdown. An accepted unique
+and lookup time. Rejected attempts keep the same countdown. An accepted unique
 change resets it to five minutes for the next parameter or run decision.
-At zero, the reminder urges a decision; it does not stop the conversation or
-disable tools. Restarting the optimizer begins a fresh budget.
+Before the first unique change, expiry remains advisory. Once a unique draft
+is saved, expiry gives Qwen a three-minute grace period. At the end of that
+period, Ax3l submits the saved unique configuration, completes the normal
+simulation, comparison, and measurement cycle, and starts the next experiment.
+A pending edit is not included unless its changed values were accepted.
+Restarting the optimizer begins a fresh budget.
 
 `kb_tool(url)` opens one short local guide. Use `/` for the guide list.
 Run IDs and draft IDs are bound privately to the conversation.

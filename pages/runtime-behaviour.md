@@ -36,7 +36,8 @@ A new draft starts from the current golden configuration. It freezes the latest,
 golden, and all-time best reference runs for the entire selection pass. The
 draft is saved while Ax3l records any missing measurements. A restart uses
 the same frozen references and resumes the saved parameter or next-step decision.
-Qwen can choose any of the following settings, including the same setting again:
+Qwen can choose any unused setting from the following list. Each setting can be
+chosen only once per experiment, including after a restart:
 
 | Parameter | Purpose | Allowed values | Tuned with |
 | --- | --- | --- | --- |
@@ -78,7 +79,9 @@ Qwen needs more detail. The tool menu at `/` links to `draft`, `latest`,
 `golden`, and `best`. Navigation uses English and experiment values use
 JSON. `kb_tool` serves optional background. Choice rules appear in the
 submission tool description. Accepted choices are saved without starting a
-simulation. A value can remain unchanged. After every submitted change, Ax3l
+simulation. A selected setting must change its current value, or at least one
+value for a pair. Submitting all the same values is rejected before the uniqueness
+check. After every submitted change, Ax3l
 checks the complete draft for duplicates.
 
 At startup and after a unique change, Qwen can use `select_parameter` to choose
@@ -87,7 +90,8 @@ decision. Ax3l opens the selected setting's value conversation with the usual
 evidence and tools; other values stay saved. A duplicate proposal is rejected
 without saving it. Qwen stays on the selected setting and must submit different
 values until the complete configuration is unique. After a unique change, Qwen can
-use `run_simulation` or select any setting again. Unselected settings keep their
+use `run_simulation` or select an unused setting. Used settings cannot be selected
+again and are omitted from the next selection prompt. Unselected settings keep their
 baseline values. Only Qwen's explicit run decision submits the unique draft.
 Each selection, value choice, and run decision resumes after a restart.
 
@@ -95,8 +99,12 @@ Qwen is asked to select a parameter and find a unique setting, or decide to run
 the current unique draft, within five minutes. Each data request is followed by
 an updated time remaining. Parameter selection and duplicate-value retries share
 the countdown; every accepted unique change resets it to five minutes for the
-next parameter or run decision. The budget is advisory: reaching zero prompts
-a decision without stopping the conversation. Restarting begins a new budget.
+next parameter or run decision. Before the first unique change, expiry remains
+advisory. With a saved unique draft, expiry starts a three-minute grace period.
+When grace expires, Ax3l submits the saved unique configuration through the normal
+simulation, comparison, and measurement cycle, then starts the next experiment.
+Any pending edit is excluded unless its changed values were accepted. Restarting
+begins a new budget.
 
 Experiment Status shows the settings to be chosen and the saved selections.
 It lists chart rendering, each Qwen request, each data or guide lookup, and

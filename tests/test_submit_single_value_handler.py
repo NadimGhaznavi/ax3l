@@ -56,9 +56,18 @@ class SubmitSingleValueHandlerTests(unittest.TestCase):
         self.snake.is_config_unique.assert_called_once_with(saved.config)
         self.snake.submit_simulation.assert_not_called()
 
-    def test_unchanged_value_is_an_explicit_accepted_choice(self):
-        self.assertEqual(self.submit(value=self.baseline['training']['learning_rate'])['status'], 'ok')
-        self.experiments.save_draft.assert_called_once()
+    def test_unchanged_values_are_rejected_even_when_the_complete_draft_is_unique(self):
+        for parameter, value in (('learning_rate', .001), ('layers', 1.0), ('dropout', .05)):
+            with self.subTest(parameter=parameter):
+                self.bind(parameter)
+                self.draft.config['model']['hidden_size'] = 96
+                original = deepcopy(self.draft)
+                result = self.submit(parameter, value)
+                self.assertEqual(result['status'], 'rejected')
+                self.assertIn('current values', result['reason'])
+                self.assertEqual(self.draft, original)
+        self.experiments.save_draft.assert_not_called()
+        self.snake.is_config_unique.assert_not_called()
 
     def test_all_single_parameters_are_staged(self):
         for name, value in (('hidden_size', 32), ('layers', 3), ('dropout', .02),

@@ -3,6 +3,8 @@
 import json
 from pathlib import Path
 import sys
+from threading import Event
+from time import monotonic
 import unittest
 from unittest.mock import Mock
 
@@ -10,7 +12,7 @@ from mcp import Client
 from mcp.client.stdio import StdioServerParameters
 
 from ax3l.app.Prompt import Prompt
-from ax3l.app.snakelab.ToolConversation import converse
+from ax3l.app.snakelab.ToolConversation import converse, DecisionTimeExpired
 from ax3l.constants.DChoice import REVISION_PARAMETER
 from ax3l.entities.ConfigurationDraft import PARAMETER_ORDER
 from ax3l.interface.SnakeLabTools import SnakeLabTools
@@ -21,6 +23,29 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
+    async def test_grace_expiry_cancels_a_read_without_submitting_a_choice(self):
+        release = Event()
+        requests = []
+
+        def handle(message):
+            requests.append(message)
+            release.wait()
+            return dict(status='ok', page='Late data.')
+
+        llm = Mock(url='fixture')
+        llm.complete.return_value = (200, '', json.dumps({'choices': [{'message': dict(role='assistant', tool_calls=[
+            dict(id='data', type='function', function=dict(name='data_tool', arguments='{"url":"/draft"}'))])}]}).encode())
+        with ZMQServer('tcp://127.0.0.1:*', handle) as server:
+            async with SnakeLabTools(server.endpoint, REVISION_PARAMETER, draft_id='draft', allow_run=True) as tools:
+                now = monotonic()
+                try:
+                    with self.assertRaises(DecisionTimeExpired):
+                        await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('Decide.')],
+                                       decision_deadline=now - 180, run_deadline=now + .2)
+                finally:
+                    release.set()
+        self.assertEqual([request.method for request in requests], ['read_simulation_data'])
+
     async def test_unbound_sessions_discover_tools_but_cannot_submit(self):
         entry = StdioServerParameters(command=sys.executable, args=['-m', 'ax3l.app.snakelab.tools'],
                                       cwd=str(ROOT), env={'PYTHONPATH': str(ROOT), 'PYTHONDONTWRITEBYTECODE': '1'})

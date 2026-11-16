@@ -22,23 +22,25 @@
   <p id="status-refresh-error" role="status" hidden></p>
   <main id="status-card" class="panel">
     {% if draft %}
-    <div class="status-heading">
-      <div>
-        <p class="status-view-label">{{ 'Current experiment' if view == 'current' else 'Last completed experiment' }}</p>
-        <h2 id="experiment-phase" role="status">{{ phase }}</h2>
+    <div class="status-overview">
+      <div class="status-summary">
+        <div class="status-heading">
+          <div>
+            <p class="status-view-label">{{ 'Current experiment' if view == 'current' else 'Last completed experiment' }}</p>
+            <h2 id="experiment-phase" role="status">{{ phase }}</h2>
+          </div>
+          <div class="status-identifiers">
+            <span>Seed <strong>{{ draft.config.seed }}</strong></span>
+            <span>Experiment <strong>{{ draft.draft_id.split('-')[0] }}</strong></span>
+            <span>Simulation {% if draft.run_id %}<a href="/simulations/{{ draft.run_id }}">{{ draft.run_id.split('-')[0] }}</a>{% else %}<strong>Not submitted</strong>{% endif %}</span>
+          </div>
+        </div>
+        <div class="status-progress">
+          <span>{{ choices_selected }} setting{{ 's' if choices_selected != 1 else '' }} saved · Other settings use baseline values.</span>
+        </div>
+        <p class="status-detail">{{ detail }}</p>
+        <p class="status-usage-note">Baseline values come from this experiment's starting golden configuration. Changed choices are highlighted.</p>
       </div>
-      <div class="status-identifiers">
-        <span>Seed <strong>{{ draft.config.seed }}</strong></span>
-        <span>Experiment <strong>{{ draft.draft_id.split('-')[0] }}</strong></span>
-        <span>Simulation {% if draft.run_id %}<a href="/simulations/{{ draft.run_id }}">{{ draft.run_id.split('-')[0] }}</a>{% else %}<strong>Not submitted</strong>{% endif %}</span>
-      </div>
-    </div>
-    <div class="status-progress">
-      <span>{{ choices_selected }} setting{{ 's' if choices_selected != 1 else '' }} saved · Other settings use baseline values.</span>
-    </div>
-    <p class="status-detail">{{ detail }}</p>
-    <div class="status-table-heading">
-      <p class="status-usage-note">Baseline values come from this experiment's starting golden configuration. Changed choices are highlighted.</p>
       <div id="llm-countdown" class="status-countdown" data-countdown='{{ countdown | tojson }}'>
         <span class="countdown-label">LLM countdown</span>
         <strong id="llm-countdown-value" role="timer" aria-live="off" aria-label="LLM time remaining">—</strong>
@@ -108,12 +110,13 @@
       const remaining = countdown.remaining_seconds - (performance.now() - countdownStartedAt) / 1000;
       const expired = remaining <= 0;
       const hasGrace = countdown.grace_seconds > 0;
-      const seconds = Math.max(0, Math.ceil(expired && hasGrace ? remaining + countdown.grace_seconds : remaining));
+      const signedSeconds = Math.ceil(remaining);
+      const seconds = Math.abs(signedSeconds);
       const minutes = String(Math.floor(seconds / 60)).padStart(2, '0');
       const remainder = String(seconds % 60).padStart(2, '0');
-      card.querySelector('#llm-countdown-value').textContent = `${minutes}:${remainder}`;
+      card.querySelector('#llm-countdown-value').textContent = `${signedSeconds < 0 ? '-' : ''}${minutes}:${remainder}`;
       card.querySelector('#llm-countdown-state').textContent = !expired ? 'Decision time remaining' :
-        !hasGrace ? 'Advisory time elapsed' : seconds > 0 ? 'Grace time remaining' : 'Submitting saved configuration';
+        !hasGrace ? 'Advisory time elapsed' : remaining + countdown.grace_seconds > 0 ? 'Grace period' : 'Submitting saved configuration';
       card.querySelector('#llm-countdown').classList.toggle('countdown-expired', expired);
     }
 

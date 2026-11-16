@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Inspect prompts and Qwen's recorded reasoning from the Experiment Status line items.
+
+### Added
+
+- Add an LLM details column with Prompt links on saved prompt rows and Reasoning
+  links on completed Qwen requests that contain reasoning. Include follow-up
+  prompts and timer reminders without changing elapsed or token totals.
+
 ## [4.8.4] - 2026-11-16 @ 05:38
 
 ### Summary

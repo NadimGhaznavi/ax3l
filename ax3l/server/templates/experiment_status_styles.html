@@ -21,8 +21,9 @@
   .status-countdown strong { display: block; color: var(--link); font-size: 1.5rem; font-variant-numeric: tabular-nums; line-height: 1.3; }
   .status-countdown.countdown-expired { border-color: #ff7b72; }
   .countdown-expired strong { color: #ff7b72; }
-  .status-checklist { min-width: 52rem; }
+  .status-checklist { min-width: 59rem; }
   .status-checklist .check-column { width: 4rem; }
+  .status-checklist .details-column { width: 7rem; }
   .status-checklist .value-column { width: 9rem; }
   .status-checklist .time-column { width: 6rem; }
   .status-checklist .token-column { width: 5rem; }
@@ -35,6 +36,7 @@
   .status-checklist input:checked::after { content: ""; display: block; width: .28rem; height: .52rem; margin: .04rem auto; border: solid #7fd9a1; border-width: 0 2px 2px 0; transform: rotate(45deg); }
   .status-checklist .parameter-label { color: var(--text); }
   .status-checklist .item-elapsed, .status-checklist .item-tokens { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .status-checklist .item-details { white-space: nowrap; }
   .status-checklist .status-total > * { background: #151f2b; color: var(--text); font-weight: bold; }
   .setup-step th { font-weight: normal; }
   .status-checklist .setup-step th { padding-left: 1.8rem; }

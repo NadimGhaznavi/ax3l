@@ -1,6 +1,9 @@
 """Short labels for Qwen's configuration choices and reference runs."""
 
 
+REVISION_PARAMETER = "revision"
+
+
 CHOICE_LABELS = {
     "hidden_size": "hidden size", "layers": "encoder layers", "dropout": "dropout",
     "sequence_length": "sequence length",

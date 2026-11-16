@@ -13,7 +13,8 @@ from jsonschema import ValidationError
 from ax3l.app.snakelab.SnakeLabLoop import optimize, SimulationUnsuccessful, submit_draft
 from ax3l.app.snakelab.SubmitSingleValueHandler import SubmitSingleValueHandler
 from ax3l.app.snakelab.SubmitPairValuesHandler import SubmitPairValuesHandler
-from ax3l.constants.DChoice import CHOICE_CHARTS, CHOICE_LABELS
+from ax3l.app.snakelab.SelectParameterHandler import SelectParameterHandler
+from ax3l.constants.DChoice import CHOICE_CHARTS, CHOICE_LABELS, REVISION_PARAMETER
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
@@ -83,6 +84,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         shared = 'ax3l.app.snakelab.SubmitSingleValueHandler.'
         self.enterContext(patch(shared + 'ExperimentDb', return_value=self.store))
         self.enterContext(patch(shared + 'SnakeLab', return_value=self.snake))
+        self.enterContext(patch('ax3l.app.snakelab.SelectParameterHandler.ExperimentDb', return_value=self.store))
         self.db = Mock()
         self.prompts = []
         self.values = dict(hidden_size=96, layers=3, dropout=.02, sequence_length=12, batch_size=26,
@@ -157,6 +159,68 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([call.kwargs['parameter'] for call in self.conversation.await_args_list], PARAMETER_ORDER[2:])
         self.assertEqual(self.snake.submit_simulation.call_args.args[0]['model'], dict(
             type='transformer', heads=4, hidden_size=104, layers=2, dropout=.02))
+
+    async def test_duplicates_select_different_single_and_pair_branches_before_one_submission(self):
+        self.snake.is_config_unique.side_effect = [False, False, True]
+        choose_value = self.conversation.side_effect
+        revisions = iter(('hidden_size', 'reward_pair'))
+
+        async def choose(llm, output, db, tools, prompts, *, parameter, process_id):
+            if parameter == REVISION_PARAMETER:
+                self.assertIn('select_parameter', prompts[0].to_md())
+                name = next(revisions)
+                self.values[name] = 104 if name == 'hidden_size' else (.5, -1)
+                return SelectParameterHandler(db).submit(dict(draft_id=process_id, parameter=name))
+            return await choose_value(llm, output, db, tools, prompts, parameter=parameter, process_id=process_id)
+
+        self.conversation.side_effect = choose
+        await self.cycle()
+        self.assertEqual([call.kwargs['parameter'] for call in self.conversation.await_args_list],
+                         PARAMETER_ORDER + [REVISION_PARAMETER, 'hidden_size', REVISION_PARAMETER, 'reward_pair'])
+        candidate = self.snake.submit_simulation.call_args.args[0]
+        self.assertEqual(candidate['model']['hidden_size'], 104)
+        self.assertEqual(candidate['model']['layers'], 3)
+        self.assertEqual(candidate['game']['rewards']['closer_to_food'], .5)
+        self.assertEqual(candidate['game']['rewards']['further_from_food'], -1)
+        self.assertEqual(candidate['epsilon_nice'], dict(probability=.01, steps=40))
+        self.assertEqual(self.snake.is_config_unique.call_count, 3)
+        self.snake.submit_simulation.assert_called_once()
+
+    async def test_restart_at_parameter_selection_resumes_only_the_selected_branch(self):
+        self.store.saved = self.draft(len(PARAMETER_ORDER), 'selecting_parameter')
+        self.store.saved.config['model']['hidden_size'] = 104
+        choose_value = self.conversation.side_effect
+
+        async def choose(llm, output, db, tools, prompts, *, parameter, process_id):
+            if parameter == REVISION_PARAMETER:
+                return SelectParameterHandler(db).submit(dict(draft_id=process_id, parameter='dropout'))
+            return await choose_value(llm, output, db, tools, prompts, parameter=parameter, process_id=process_id)
+
+        self.conversation.side_effect = choose
+        await self.cycle()
+        self.assertEqual([call.kwargs['parameter'] for call in self.conversation.await_args_list],
+                         [REVISION_PARAMETER, 'dropout'])
+        self.assertEqual(self.snake.submit_simulation.call_args.args[0]['model']['hidden_size'], 104)
+        self.assertEqual(self.snake.submit_simulation.call_args.args[0]['model']['dropout'], .02)
+
+    async def test_restart_after_branch_selection_does_not_choose_the_branch_again(self):
+        self.store.saved = self.draft(len(PARAMETER_ORDER))
+        self.store.saved.selections.remove('layers')
+        await self.cycle()
+        self.assertEqual([call.kwargs['parameter'] for call in self.conversation.await_args_list], ['layers'])
+        self.assertEqual(self.snake.submit_simulation.call_args.args[0]['model']['layers'], 3)
+
+    async def test_interrupted_reference_preparation_keeps_the_duplicate_state(self):
+        self.store.saved = self.draft(len(PARAMETER_ORDER), 'selecting_parameter')
+        self.analysis.side_effect = asyncio.CancelledError()
+        await self.cycle()
+        self.assertEqual(self.store.saved.phase, 'preparing')
+        self.assertEqual(self.store.saved.selections, PARAMETER_ORDER)
+        self.analysis.side_effect = lambda snake, experiments, run_id: experiments.analysis(run_id)
+        self.conversation.side_effect = asyncio.CancelledError()
+        await self.cycle()
+        self.assertEqual(self.conversation.await_args.kwargs['parameter'], REVISION_PARAMETER)
+        self.snake.submit_simulation.assert_not_called()
 
     async def test_only_relevant_choices_get_a_chart_and_matching_json(self):
         await self.cycle()

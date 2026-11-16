@@ -12,6 +12,7 @@ from urllib.request import urlopen
 from uuid import uuid4
 
 from ax3l.activity.ExperimentStatus import _elapsed, experiment_status
+from ax3l.constants.DChoice import REVISION_PARAMETER
 from ax3l.app.DbMgr import DbMgr
 from ax3l.app.snakelab.ExperimentDb import ExperimentDb
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
@@ -99,6 +100,24 @@ class ExperimentStatusTests(unittest.TestCase):
                 self.assertEqual(report['analysis_status'], 'Pending')
                 if state in ('cancelled', 'failed'):
                     self.assertEqual(report['outcome'], 'No completed result')
+
+    def test_duplicate_selection_and_revised_branch_have_distinct_status_and_accounting(self):
+        self.draft.selections = PARAMETER_ORDER.copy()
+        self.draft.phase = 'selecting_parameter'
+        work = {REVISION_PARAMETER: dict(image_event_id=None, steps=[
+            dict(label='Qwen request', seconds=12, state='Complete', input_tokens=100, output_tokens=20),
+        ])}
+        report = self.report(activity=work)
+        self.assertEqual(report['phase'], 'Choosing a setting to revise')
+        self.assertEqual(report['choices_selected'], len(PARAMETER_ORDER))
+        self.assertEqual([row['path'] for row in report['rows'] if row['current']], [REVISION_PARAMETER])
+        self.assertEqual(report['totals'], dict(elapsed='00:12', input_tokens=100, output_tokens=20, tokens=120))
+        self.draft.selections.remove('layers')
+        self.draft.phase = 'choosing'
+        report = self.report(activity=work)
+        self.assertEqual(report['phase'], 'Choosing Encoder Layers')
+        self.assertEqual([row['path'] for row in report['rows'] if row['current']], ['model.layers'])
+        self.assertEqual(report['totals']['tokens'], 120)
 
     def test_finished_run_is_distinct_from_comparison_and_analysis(self):
         self.draft.selections = PARAMETER_ORDER.copy()
@@ -214,6 +233,16 @@ class ExperimentStatusHttpTests(unittest.TestCase):
             self.get()
         self.assertEqual(error.exception.code, 500)
         self.db.close.assert_called_once()
+
+    def test_duplicate_draft_displays_revision_work_without_an_extra_configuration_checkbox(self):
+        self.draft.phase = 'selecting_parameter'
+        self.draft.selections = PARAMETER_ORDER.copy()
+        page = self.get()
+        self.assertIn('Choosing a setting to revise', page)
+        self.assertIn('Setting to revise', page)
+        self.assertIn('10 / 10 choices saved', page)
+        self.assertEqual(page.count('disabled checked'), 13)
+        self.assertNotIn('>inherited</span>', page)
 
     def test_setup_shows_live_steps_with_separate_turn_times_and_tokens(self):
         stamp = datetime(2026, 11, 15, 12)

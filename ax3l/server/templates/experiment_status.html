@@ -44,9 +44,9 @@
       <tbody class="status-configuration">
         {% for row in rows %}
         <tr data-parameter="{{ row.path }}" class="{{ 'selected' if row.selected else 'pending' }}{% if row.current %} current-choice{% endif %}">
-          <td><input type="checkbox" disabled {% if row.selected %}checked{% endif %} aria-label="{{ row.label }} choice saved"></td>
+          <td>{% if row.selected is not none %}<input type="checkbox" disabled {% if row.selected %}checked{% endif %} aria-label="{{ row.label }} choice saved">{% endif %}</td>
           <th scope="row"><span class="parameter-label">{{ row.label }}</span><span class="parameter-description">{{ row.description }}</span>{% if row.image_url %}<a class="choice-chart" href="{{ row.image_url }}" target="_blank" rel="noopener">View chart prompt</a>{% endif %}</th>
-          <td><span class="parameter-value">{{ row.value }}</span>{% if not row.selected %}<span class="pending-label">inherited</span>{% endif %}</td>
+          <td><span class="parameter-value">{{ row.value }}</span>{% if row.selected is false %}<span class="pending-label">inherited</span>{% endif %}</td>
           <td></td><td></td><td></td>
         </tr>
         {% for step in row.steps %}

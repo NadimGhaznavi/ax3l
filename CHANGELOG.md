@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Let Qwen choose which setting to revise when a complete configuration is a duplicate.
+
+### Changed
+
+- Save duplicate drafts and open a parameter-selection conversation instead of
+  forcing changes to the final EpsilonNice pair. Reopen the selected single or
+  paired setting, keep the other saved values, and check the complete draft again
+  after the revision. Repeat parameter selection for every further duplicate.
+- Resume duplicate resolution and the selected revision after interruption.
+  Show the selection step and its time and token usage in Experiment Status.
+
 ## [4.5.0] - 2026-11-15 @ 20:44
 
 ### Summary

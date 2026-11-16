@@ -2,6 +2,7 @@
 
 from ax3l.app.snakelab.ParameterSpace import parameter_paths
 from ax3l.constants.DLabel import FIELD_TO_LABEL_MAP
+from ax3l.constants.DChoice import REVISION_PARAMETER
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
@@ -44,6 +45,15 @@ def _rows(draft: ConfigurationDraft, activity: dict[str, dict]) -> list[dict]:
             rows[-1]["steps"] = [dict(step, elapsed=_elapsed(step["seconds"])) for step in work["steps"]]
             image = work["image_event_id"]
             rows[-len(paths)]["image_url"] = f"/events/{image}" if image is not None else None
+    if draft.phase == "selecting_parameter" or REVISION_PARAMETER in activity:
+        work = activity.get(REVISION_PARAMETER)
+        rows.append(dict(
+            path=REVISION_PARAMETER, label=FIELD_TO_LABEL_MAP[REVISION_PARAMETER],
+            description="Choose which saved setting to change after a duplicate configuration.",
+            value="Choosing" if draft.phase == "selecting_parameter" else "Selected",
+            selected=None, current=draft.phase == "selecting_parameter", image_url=None,
+            steps=[dict(step, elapsed=_elapsed(step["seconds"])) for step in work["steps"]] if work else [],
+        ))
     return rows
 
 
@@ -54,6 +64,9 @@ def _phase(draft: ConfigurationDraft, run: dict | None, comparison: dict | None,
     if draft.phase == "choosing":
         return (f"Choosing {FIELD_TO_LABEL_MAP[draft.next_parameter]}",
                 "A checkmark indicates that Ax3l accepted and saved the choice.")
+    if draft.phase == "selecting_parameter":
+        return ("Choosing a setting to revise",
+                "The complete configuration is a duplicate. Qwen will choose which setting to change.")
     if draft.phase == "ready":
         return "Ready to submit", "All configuration choices are saved."
     if draft.phase == "submitting":

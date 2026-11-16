@@ -81,6 +81,14 @@ submission tool description. Accepted choices are saved without starting a
 simulation. A value can remain unchanged. After all ten choices, Ax3l
 checks the complete draft for duplicates and submits one simulation.
 
+If the complete draft is a duplicate, Ax3l saves every choice and asks Qwen
+which setting to revise. Qwen can choose any single setting or paired setting
+using `select_parameter`. Ax3l then opens that setting's value conversation
+with the usual evidence and tools. The other choices stay saved. After the
+revision, Ax3l checks the complete configuration again. Each further duplicate
+returns to parameter selection; only a unique configuration reaches Snake Lab.
+Both the selection step and the reopened value conversation resume after a restart.
+
 Experiment Status shows the settings to be chosen and the saved selections.
 It lists chart rendering, each Qwen request, each data or guide lookup, and
 each submission under the relevant setting or pair. Each step has its own

@@ -19,9 +19,13 @@ non-positive-sum reward-pair rule. Seeds and fixed fields remain
 application-controlled.
 
 After the last pair is chosen, Ax3l checks the **whole configuration** against
-all stored runs. A duplicate is rejected within the last conversation so Qwen
-can select a different final pair. Individual parameter domains are not skipped
-as exhausted: other settings can change within the same draft.
+all stored runs. If it is a duplicate, Ax3l saves all choices and asks Qwen which
+setting to revise. `select_parameter` reopens any single or paired setting;
+the remaining saved values stay in the draft. After Qwen submits the revision,
+Ax3l checks the complete configuration again. Another duplicate returns to
+parameter selection; a unique configuration is submitted once. Restarts resume
+the selection step or the selected revision. Individual parameter domains are
+not skipped as exhausted: other settings can change within the same draft.
 
 ## Selection evidence
 
@@ -66,10 +70,12 @@ JSON data; transport envelopes and full identifiers remain internal.
 | --- | --- | --- |
 | `submit_single_value` | `value` | Draft UUID and assigned parameter |
 | `submit_pair_values` | `value_1`, `value_2` | Draft UUID and assigned pair |
+| `select_parameter` | `parameter` | Duplicate draft UUID |
 | `kb_tool` | `url` | Allowlisted local reference pages |
 | `data_tool` | `url` | Selection draft and frozen references |
 
 `AX3L_CONVERSATION_PARAMETER` identifies the single or pair.
+It is `revision` while Qwen chooses which setting to change after a duplicate.
 `AX3L_CONFIGURATION_DRAFT` binds the selection session. Numeric inputs reject
 strings, booleans, nonfinite values, and schema violations. The model cannot
 replace the bound identifiers in its tool arguments.

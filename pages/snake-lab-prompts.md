@@ -15,7 +15,7 @@ supplies the setting, the chart when applicable, and the tools for the choice.
 | --- | --- |
 | `ConfigurationChoice` | Names the choice, supplies current values and reference scores in JSON, and gives direct data paths. The learning rate, epsilon, and reward choices can include one chart. |
 | `InvalidValue` | Explains why Ax3l rejected a value. |
-| `NoDupes` | Explains a duplicate completed draft and requests different values for its final pair. |
+| `NoDupes` | Explains a duplicate complete draft, lists saved settings, and asks which setting to revise using `select_parameter`. |
 
 The seven single choices (hidden size, layers, dropout, sequence length, batch
 size, learning rate, and gamma) precede the epsilon, distance-reward, and
@@ -23,6 +23,12 @@ EpsilonNice pairs. `submit_single_value` and `submit_pair_values` save one choic
 runs the simulation after it accepts the complete configuration. Draft and
 parameter identifiers are bound outside the model's arguments. The tool
 description contains the allowed values.
+
+A duplicate complete draft opens a separate `select_parameter(parameter)`
+conversation. Qwen chooses any single setting or paired setting, then Ax3l
+returns to that setting's `ConfigurationChoice` conversation. The complete
+draft is checked again after the revision. Another duplicate reopens parameter
+selection instead of forcing changes to the final pair.
 
 `data_tool(url)` reads one small page. Use `/draft` for saved and inherited
 values, `/` for the run menu, and direct paths such as `/latest/scores` or

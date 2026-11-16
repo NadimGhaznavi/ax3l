@@ -11,6 +11,8 @@ from mcp.client.stdio import StdioServerParameters
 
 from ax3l.app.Prompt import Prompt
 from ax3l.app.snakelab.ToolConversation import converse
+from ax3l.constants.DChoice import REVISION_PARAMETER
+from ax3l.entities.ConfigurationDraft import PARAMETER_ORDER
 from ax3l.interface.SnakeLabTools import SnakeLabTools
 from ax3l.zmq.ZMQServer import ZMQServer
 
@@ -24,14 +26,46 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
                                       cwd=str(ROOT), env={'PYTHONPATH': str(ROOT), 'PYTHONDONTWRITEBYTECODE': '1'})
         async with Client(entry, read_timeout_seconds=10) as client:
             tools = {tool.name: tool for tool in (await client.list_tools()).tools}
-            self.assertEqual(set(tools), {'submit_single_value', 'submit_pair_values', 'submit_simulation_summary', 'kb_tool', 'data_tool'})
+            self.assertEqual(set(tools), {'submit_single_value', 'submit_pair_values', 'select_parameter',
+                                         'submit_simulation_summary', 'kb_tool', 'data_tool'})
             for name, arguments in (('submit_single_value', {'value': 240}),
                                     ('submit_pair_values', {'value_1': .91, 'value_2': .95}),
+                                    ('select_parameter', {'parameter': 'layers'}),
                                     ('submit_simulation_summary', {'summary': 'Scores rose. Loss fell.'})):
                 self.assertEqual(set(tools[name].input_schema['properties']), set(arguments))
                 self.assertTrue((await client.call_tool(name, arguments)).is_error)
             self.assertEqual(set(tools['data_tool'].input_schema['properties']), {'url'})
             self.assertTrue((await client.call_tool('data_tool', {'url': '/'})).is_error)
+
+    async def test_revision_session_offers_all_branches_and_keeps_the_draft_private(self):
+        requests = []
+
+        def handle(message):
+            requests.append(message)
+            if message.method == 'read_simulation_data':
+                return dict(status='ok', page='Saved draft values.')
+            return dict(status='ok', draft_id='private-draft', phase='choosing')
+
+        with ZMQServer('tcp://127.0.0.1:*', handle) as server:
+            async with SnakeLabTools(server.endpoint, REVISION_PARAMETER, draft_id='private-draft') as tools:
+                self.assertEqual([definition['function']['name'] for definition in tools.definitions],
+                                 ['select_parameter', 'kb_tool', 'data_tool'])
+                self.assertEqual(set(tools.definition['function']['parameters']['properties']), {'parameter'})
+                for name in PARAMETER_ORDER:
+                    self.assertIn(name, tools.definition['function']['description'])
+                self.assertNotIn('private-draft', json.dumps(tools.definitions))
+                self.assertEqual((await tools.data(dict(url='/draft')))['page'], 'Saved draft values.')
+                self.assertEqual((await tools.submit(dict(parameter='layers')))['phase'], 'choosing')
+                self.assertEqual(requests[-1].method, 'select_parameter')
+                self.assertEqual(requests[-1].payload, dict(draft_id='private-draft', parameter='layers'))
+                for arguments in (dict(parameter=True), dict(parameter=2)):
+                    with self.assertRaises(RuntimeError):
+                        await tools.submit(arguments)
+                self.assertTrue((await tools._client.call_tool('submit_single_value', dict(value=72))).is_error)
+                self.assertEqual(len(requests), 2)
+            async with SnakeLabTools(server.endpoint, 'layers', draft_id='private-draft') as tools:
+                self.assertTrue((await tools._client.call_tool('select_parameter', dict(parameter='gamma'))).is_error)
+                self.assertEqual(len(requests), 2)
 
     async def test_single_choices_bind_the_draft_and_parameter_outside_model_arguments(self):
         requests = []

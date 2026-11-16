@@ -21,4 +21,6 @@ class ConfigurationDraft:
 
     @property
     def next_parameter(self) -> str | None:
-        return PARAMETER_ORDER[len(self.selections)] if self.phase == "choosing" else None
+        if self.phase != "choosing":
+            return None
+        return next(parameter for parameter in PARAMETER_ORDER if parameter not in self.selections)

@@ -74,11 +74,12 @@ def choice_activity(events: list[dict]) -> dict[str, dict]:
         if parameter in active:
             active[parameter].update(state="Interrupted", seconds=None)
         step = dict(label=label, started=at, seconds=None, state="Running",
-                    input_tokens=None, output_tokens=None, target=target, result_url=None)
+                    input_tokens=None, output_tokens=None, target=target, result_url=None,
+                    detail_label=None, detail_url=None)
         choice(parameter)["steps"].append(step)
         active[parameter] = step
 
-    def finish(parameter, state, at, usage=None, result_event_id=None):
+    def finish(parameter, state, at, usage=None, result_event_id=None, reasoning_event_id=None):
         step = active.pop(parameter, None)
         if step is not None:
             usage = usage or {}
@@ -86,6 +87,8 @@ def choice_activity(events: list[dict]) -> dict[str, dict]:
                         input_tokens=usage.get("prompt_tokens"), output_tokens=usage.get("completion_tokens"))
             if step["target"] is not None and result_event_id is not None:
                 step["result_url"] = f"/tool-results/{result_event_id}"
+            if reasoning_event_id is not None:
+                step.update(detail_label="Reasoning", detail_url=f"/events/{reasoning_event_id}/reason")
 
     for event in events:
         name, at, detail = event["name"], event["occurred_at"], event["detail"]
@@ -94,16 +97,24 @@ def choice_activity(events: list[dict]) -> dict[str, dict]:
             start(parameter, f"Render {detail.lower()} chart", at)
         elif name == config.CHART_FINISHED:
             finish(parameter, detail, at)
-        elif name == chat.PROMPT and parameter is not None:
-            conversations[parent] = parameter
-            if event["has_image"]:
-                choice(parameter)["image_event_id"] = event["event_id"]
+        elif name == chat.PROMPT:
+            if parameter is not None:
+                conversations[parent] = parameter
+                if event["has_image"]:
+                    choice(parameter)["image_event_id"] = event["event_id"]
+            if parent in conversations:
+                choice(conversations[parent])["steps"].append(dict(
+                    label="Prompt sent", started=at, seconds=None, state="Complete",
+                    input_tokens=None, output_tokens=None, target=None, result_url=None,
+                    detail_label="Prompt", detail_url=f"/events/{event['event_id']}",
+                ))
         elif parent in conversations:
             parameter = conversations[parent]
             if name == llm.REQUEST_STARTED:
                 start(parameter, "Qwen request", at)
             elif name == chat.RESPONSE:
-                finish(parameter, "Complete", at, json.loads(detail) if detail else None)
+                finish(parameter, "Complete", at, json.loads(detail) if detail else None,
+                       reasoning_event_id=event["event_id"] if event["has_reasoning"] else None)
             elif name == tool.STARTED:
                 function = json.loads(detail)["function"]
                 label = {"data_tool": "Read data", "kb_tool": "Read guide"}.get(function["name"], "Submit choice")

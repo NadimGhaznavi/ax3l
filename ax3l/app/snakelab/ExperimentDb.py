@@ -153,6 +153,11 @@ class ExperimentDb:
                    e.parent_event_id, e.name, e.parameter,
                    CASE WHEN e.name = %s AND e.source_name = 'ConfigurationChoice'
                         THEN JSON_TYPE(JSON_EXTRACT(m.content, '$.content')) = 'ARRAY' END AS has_image,
+                   CASE WHEN e.name = %s THEN
+                        JSON_TYPE(JSON_EXTRACT(m.content, '$.choices[0].message.reasoning_content')) = 'STRING'
+                        AND JSON_UNQUOTE(JSON_EXTRACT(m.content, '$.choices[0].message.reasoning_content'))
+                            REGEXP '[^[:space:]]'
+                   END AS has_reasoning,
                    CASE WHEN e.name IN (%s, %s, %s) THEN m.content
                         WHEN e.name = %s THEN JSON_EXTRACT(m.content, '$.usage')
                         WHEN e.name = %s THEN JSON_UNQUOTE(JSON_EXTRACT(m.content, '$.status'))
@@ -164,7 +169,7 @@ class ExperimentDb:
                 (e.category = %s AND e.name IN (%s, %s)) OR
                 (e.category = %s AND e.name IN (%s, %s, %s)))
             ORDER BY e.event_id
-        """, (chat.PROMPT, config.CHART_STARTED, config.CHART_FINISHED, tool.STARTED,
+        """, (chat.PROMPT, chat.RESPONSE, config.CHART_STARTED, config.CHART_FINISHED, tool.STARTED,
               chat.RESPONSE, tool.COMPLETED, draft_id,
               config.CATEGORY, config.CHART_STARTED, config.CHART_FINISHED,
               chat.CATEGORY, chat.PROMPT, chat.RESPONSE, chat.ENDED,

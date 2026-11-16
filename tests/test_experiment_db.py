@@ -207,6 +207,30 @@ class ExperimentDatabaseTests(unittest.TestCase):
         work = item_activity(ExperimentDb(self.db).activity_events([run_id]))
         self.assertIsNone(work[run_id, 'hidden_size']['tokens'])
 
+    def test_choice_metadata_flags_reasoning_without_loading_prompt_or_response_text(self):
+        draft_id = self.process_ids[0]
+        conversation = self.db.log('conversation_started', 'Conversation', 'INFO', 'Started', process_id=draft_id)
+        prompt = self.db.log('prompt_sent', 'Conversation', 'INFO',
+            json.dumps(dict(content='PRIVATE_PROMPT_SNAPSHOT')), process_id=draft_id,
+            parent_event_id=conversation, parameter='revision', source_name='ConfigurationNextStep')
+        expected = {}
+        for reasoning in ('PRIVATE_REASONING_SNAPSHOT', '', ' \n\t ', None, 123):
+            event_id = self.db.log('reply_received', 'Conversation', 'INFO', json.dumps(dict(
+                choices=[dict(message=dict(reasoning_content=reasoning))],
+                usage=dict(prompt_tokens=10, completion_tokens=2))),
+                process_id=draft_id, parent_event_id=conversation)
+            expected[event_id] = reasoning == 'PRIVATE_REASONING_SNAPSHOT'
+        event_id = self.db.log('reply_received', 'Conversation', 'INFO',
+            '{"choices":[{"message":{}}]}', process_id=draft_id, parent_event_id=conversation)
+        expected[event_id] = False
+        events = ExperimentDb(self.db).choice_events(draft_id)
+        self.assertIn(prompt, [event['event_id'] for event in events])
+        self.assertEqual({event['event_id']: bool(event['has_reasoning']) for event in events
+                          if event['name'] == 'reply_received'}, expected)
+        metadata = json.dumps(events, default=str)
+        self.assertNotIn('PRIVATE_PROMPT_SNAPSHOT', metadata)
+        self.assertNotIn('PRIVATE_REASONING_SNAPSHOT', metadata)
+
     def test_reference_selection_uses_completed_runs_and_stable_ties(self):
         self.db.execute('''CREATE TEMPORARY TABLE simulation_runs (
             id INTEGER PRIMARY KEY, run_id VARCHAR(36), status VARCHAR(16), high_score INTEGER,

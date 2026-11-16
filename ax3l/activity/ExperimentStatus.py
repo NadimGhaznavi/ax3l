@@ -27,16 +27,18 @@ def _elapsed(seconds: float | None) -> str:
     return f"{hours:02}:{clock}" if hours else clock
 
 
-def _rows(draft: ConfigurationDraft, activity: dict[str, dict]) -> list[dict]:
+def _rows(draft: ConfigurationDraft, inherited_config: dict, activity: dict[str, dict]) -> list[dict]:
     rows = []
     for parameter in PARAMETER_ORDER:
         paths = parameter_paths(parameter)
         for path in paths:
             name = ".".join(path)
+            value = SimulationConfiguration.value_at(draft.config, path)
+            inherited = SimulationConfiguration.value_at(inherited_config, path)
             rows.append(dict(
                 path=name, label=FIELD_TO_LABEL_MAP[name],
                 description=SimulationConfiguration.field(path)["description"],
-                value=str(SimulationConfiguration.value_at(draft.config, path)),
+                value=str(value), inherited_value=str(inherited), changed=value != inherited,
                 selected=parameter in draft.selections, current=parameter == draft.next_parameter,
                 steps=[], image_url=None,
             ))
@@ -51,6 +53,7 @@ def _rows(draft: ConfigurationDraft, activity: dict[str, dict]) -> list[dict]:
             path=REVISION_PARAMETER, label=FIELD_TO_LABEL_MAP[REVISION_PARAMETER],
             description="Choose which saved setting to change after a duplicate configuration.",
             value="Choosing" if draft.phase == "selecting_parameter" else "Selected",
+            inherited_value=None, changed=False,
             selected=None, current=draft.phase == "selecting_parameter", image_url=None,
             steps=[dict(step, elapsed=_elapsed(step["seconds"])) for step in work["steps"]] if work else [],
         ))
@@ -98,7 +101,7 @@ def experiment_status(draft: ConfigurationDraft | None, run: dict | None = None,
                    "New golden" if comparison["current_golden_run_id"] == draft.run_id else "Golden retained")
     elif run is not None and run["status"] in ("failed", "cancelled"):
         outcome = "No completed result"
-    rows = _rows(draft, activity or {})
+    rows = _rows(draft, golden["config"], activity or {})
     steps = [step for row in rows for step in row["steps"]]
     seconds = sum(step["seconds"] for step in steps if step["seconds"] is not None)
     input_tokens = sum(step["input_tokens"] for step in steps if step["input_tokens"] is not None)

@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.7.0] - 2026-11-15 @ 21:22
+
+### Summary
+
+Compare inherited and LLM-chosen settings side by side in Experiment Status.
+
+### Added
+
+- Show an Inherited column before the LLM-chosen values using the experiment's
+  starting golden configuration. Highlight changed choices, label saved matches
+  as "No change", and show pending choices until they are saved.
+
 ## [4.6.0] - 2026-11-15 @ 21:14
 
 ### Summary

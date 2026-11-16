@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.4.6] - 2026-11-15 @ 21:36
+
 ### Summary
 
 Show changed Experiment Status values on one line.

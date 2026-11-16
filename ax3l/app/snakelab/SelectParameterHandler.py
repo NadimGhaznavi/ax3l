@@ -1,0 +1,24 @@
+"""Reopen one saved choice after the complete configuration is a duplicate."""
+
+from ax3l.app.snakelab.ExperimentDb import ExperimentDb
+from ax3l.app.snakelab.SubmitSingleValueHandler import SubmitSingleValueHandler
+from ax3l.entities.ConfigurationDraft import PARAMETER_ORDER
+
+
+class SelectParameterHandler(SubmitSingleValueHandler):
+    def submit(self, payload: dict) -> dict:
+        if not isinstance(payload, dict) or set(payload) != {"draft_id", "parameter"}:
+            return self._reject("Supply exactly draft_id and parameter.")
+        parameter, draft_id = payload["parameter"], payload["draft_id"]
+        if not isinstance(parameter, str) or parameter not in PARAMETER_ORDER:
+            return self._reject("parameter must be one of " + ", ".join(PARAMETER_ORDER) + ".")
+        if not isinstance(draft_id, str) or not draft_id:
+            return self._reject("draft_id must identify the active configuration draft.")
+        experiments = ExperimentDb(self._db)
+        draft = experiments.draft()
+        if draft is None or draft.draft_id != draft_id or draft.phase != "selecting_parameter":
+            return self._reject("This draft is not waiting for a parameter to revise.")
+        draft.selections.remove(parameter)
+        draft.phase = "choosing"
+        experiments.save_draft(draft)
+        return {"status": "ok", "draft_id": draft.draft_id, "phase": draft.phase}

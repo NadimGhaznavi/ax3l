@@ -51,7 +51,7 @@ class ConfigurationChoice(Prompt):
                 text.append(f"The chart shows the {chart_scope} run. {focus}")
             text.append(f"See {label} at /{chart_scope}/{page} in data_tool.")
         text.append("Use data_tool at /draft for saved choices or / for other runs.")
-        if parameter == PARAMETER_ORDER[-1]:
+        if len(draft.selections) == len(PARAMETER_ORDER) - 1:
             text.append("The complete configuration must differ from every earlier run.")
         text.append(f"Submit using {tool}.")
         text.append(f"Measured data and current values:\n```json\n{json.dumps(evidence, allow_nan=False)}\n```")

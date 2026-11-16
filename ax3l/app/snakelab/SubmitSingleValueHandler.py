@@ -21,15 +21,14 @@ class SubmitSingleValueHandler:
         self._db = db
         self._snake = SnakeLab()
 
-    def _reject(self, reason: str, *, duplicate: bool = False) -> dict:
+    def _reject(self, reason: str) -> dict:
         category = DEventCategory.Configuration
-        prompt = NoDupes(reason) if duplicate else InvalidValue(reason)
+        prompt = InvalidValue(reason)
         self._db.log(
-            category.PROPOSAL_DUPLICATE if duplicate else category.PROPOSAL_INVALID,
-            category.CATEGORY, "INFO", prompt.to_md(),
+            category.PROPOSAL_INVALID, category.CATEGORY, "INFO", prompt.to_md(),
         )
         return {"status": "rejected", "reason": reason,
-                "code": "duplicate_config" if duplicate else "invalid_value",
+                "code": "invalid_value",
                 "prompt": json.loads(prompt.to_json()), "source_name": prompt.source_name}
 
     def submit(self, payload: dict) -> dict:
@@ -68,12 +67,12 @@ class SubmitSingleValueHandler:
         SimulationConfiguration.validate(candidate)
         selections = draft.selections + [parameter]
         if len(selections) == len(PARAMETER_ORDER):
-            if not self._snake.is_config_unique(candidate):
-                return self._reject(
-                    "The complete draft already exists in the simulation database. "
-                    "Choose different values for this final pair.", duplicate=True)
-            draft.phase = "ready"
+            draft.phase = "ready" if self._snake.is_config_unique(candidate) else "selecting_parameter"
         draft.config = candidate
         draft.selections = selections
         experiments.save_draft(draft)
+        if draft.phase == "selecting_parameter":
+            category = DEventCategory.Configuration
+            self._db.log(category.PROPOSAL_DUPLICATE, category.CATEGORY, "INFO", NoDupes(draft).to_md(),
+                         process_id=draft.draft_id)
         return {"status": "ok", "draft_id": draft.draft_id, "phase": draft.phase}

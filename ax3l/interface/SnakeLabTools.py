@@ -8,6 +8,7 @@ import sys
 from ax3l.app.snakelab.SingleParameters import SINGLE_PARAMETERS
 from ax3l.app.snakelab.PairParameters import PAIR_PARAMETERS
 from ax3l.constants.DSnakeLab import DSnakeLab
+from ax3l.constants.DChoice import REVISION_PARAMETER
 
 from mcp import Client
 from mcp.client.stdio import StdioServerParameters
@@ -16,9 +17,11 @@ from mcp.client.stdio import StdioServerParameters
 class SnakeLabTools:
     def __init__(self, endpoint: str, parameter: str, *, draft_id: str | None = None,
                  run_id: str | None = None, section: str | None = None):
-        if parameter not in SINGLE_PARAMETERS and parameter not in PAIR_PARAMETERS and parameter != "simulation_summary":
+        if (parameter not in SINGLE_PARAMETERS and parameter not in PAIR_PARAMETERS
+                and parameter not in ("simulation_summary", REVISION_PARAMETER)):
             raise ValueError(f"Unknown conversation parameter: {parameter}")
         self._tool_name = ("submit_simulation_summary" if parameter == "simulation_summary" else
+                           "select_parameter" if parameter == REVISION_PARAMETER else
                            "submit_pair_values" if parameter in PAIR_PARAMETERS else "submit_single_value")
         root = Path(__file__).resolve().parents[2]
         environment = {"PYTHONPATH": str(root), "AX3L_ZMQ_ENDPOINT": endpoint,

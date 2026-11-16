@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.8.4] - 2026-11-16 @ 05:38
+
+### Summary
+
+Inspect recorded Read results from Experiment Status with compact, readable previews.
+
+### Added
+
+- Link Read data and Read guide targets to their recorded results and show a
+  popup on hover or keyboard focus. Keep previews open across status refreshes.
+- Add a reusable JSON-to-Markdown translator for nested settings, simple lists,
+  and record lists. Render tool JSON, including JSON code blocks, as compact
+  tables in previews and result pages.
+
 ## [4.8.3] - 2026-11-16 @ 00:30
 
 ### Changed

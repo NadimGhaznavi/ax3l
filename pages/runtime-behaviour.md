@@ -116,7 +116,10 @@ It lists chart rendering, each Qwen request, each data or guide lookup, and
 each submission under the relevant setting or pair. Each step has its own
 elapsed time. Each returned Qwen request shows its own input and output token
 counts when reported by the server. The chart link opens the prompt with
-the exact image sent to Qwen. The page refreshes every five seconds.
+the exact image sent to Qwen. Read targets link to their recorded responses;
+hovering or focusing a link shows a scrollable preview, with JSON formatted as
+compact tables. The preview shows what Qwen received at that time, including
+rejected or failed reads. The page refreshes every five seconds.
 
 ## Golden configurations and seed rotation
 

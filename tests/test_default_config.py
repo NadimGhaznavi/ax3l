@@ -19,10 +19,16 @@ class DefaultConfigTests(unittest.TestCase):
         schema = json.loads((ROOT / "ax3l/app/snakelab/simulation-config-v2.schema.json").read_text())
         config = GenerateDefaultConfig().run()
         Draft202012Validator(schema).validate(config)
-        self.assertEqual(config["training"]["batch_size"], 24)
+        self.assertEqual(config["model"], {
+            "type": "transformer", "heads": 4, "hidden_size": 64, "layers": 1, "dropout": 0.05,
+        })
+        self.assertEqual(config["training"], {
+            "sequence_length": 4, "batch_size": 64, "replay_max_frames": 100000,
+            "learning_rate": 0.001, "gamma": 0.96, "tau": 0.05, "max_gradient_norm": 1.0,
+        })
         self.assertEqual(config["game"]["rewards"]["wall"], -10)
         config["training"]["batch_size"] = 8
-        self.assertEqual(GenerateDefaultConfig().run()["training"]["batch_size"], 24)
+        self.assertEqual(GenerateDefaultConfig().run()["training"]["batch_size"], 64)
 
     def test_startup_generates_only_for_an_empty_database(self):
         for num_sims in (0, 3):

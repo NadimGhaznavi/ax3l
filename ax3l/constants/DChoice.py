@@ -2,7 +2,8 @@
 
 
 CHOICE_LABELS = {
-    "hidden_size": "hidden size", "sequence_length": "sequence length",
+    "hidden_size": "hidden size", "layers": "encoder layers", "dropout": "dropout",
+    "sequence_length": "sequence length",
     "batch_size": "batch size", "learning_rate": "learning rate", "gamma": "gamma",
     "epsilon_pair": "epsilon", "reward_pair": "distance rewards",
     "epsilon_nice_pair": "safe detours",

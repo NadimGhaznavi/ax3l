@@ -85,7 +85,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.enterContext(patch(shared + 'SnakeLab', return_value=self.snake))
         self.db = Mock()
         self.prompts = []
-        self.values = dict(hidden_size=240, sequence_length=12, batch_size=26,
+        self.values = dict(hidden_size=96, layers=3, dropout=.02, sequence_length=12, batch_size=26,
                            learning_rate=.003, gamma=.97, epsilon_pair=(.91, .95),
                            reward_pair=(.25, -.5), epsilon_nice_pair=(.01, 40))
 
@@ -114,11 +114,13 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
                                   {'latest': self.latest, 'golden': self.gold, 'all_time_best': self.best},
                                   deepcopy(self.config), PARAMETER_ORDER[:count], phase)
 
-    async def test_eight_choices_then_exactly_one_simulation_with_all_changes(self):
+    async def test_ten_choices_then_exactly_one_simulation_with_all_changes(self):
         await self.cycle()
         self.assertEqual([call.kwargs['parameter'] for call in self.conversation.await_args_list], PARAMETER_ORDER)
         candidate = self.snake.submit_simulation.call_args.args[0]
-        self.assertEqual(candidate['model']['hidden_size'], 240)
+        self.assertEqual(candidate['model']['hidden_size'], 96)
+        self.assertEqual(candidate['model']['layers'], 3)
+        self.assertEqual(candidate['model']['dropout'], .02)
         self.assertEqual(candidate['training']['sequence_length'], 12)
         self.assertEqual(candidate['training']['batch_size'], 26)
         self.assertEqual(candidate['training']['learning_rate'], .003)
@@ -139,11 +141,22 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_restart_resumes_at_the_first_unselected_parameter(self):
         self.store.saved = self.draft(3)
-        self.store.saved.config['model']['hidden_size'] = 272
+        self.store.saved.config['model']['hidden_size'] = 104
+        self.store.saved.config['model'].update(layers=2, dropout=.03)
         await self.cycle()
         self.assertEqual([call.kwargs['parameter'] for call in self.conversation.await_args_list], PARAMETER_ORDER[3:])
-        self.assertEqual(self.snake.submit_simulation.call_args.args[0]['model']['hidden_size'], 272)
+        self.assertEqual(self.snake.submit_simulation.call_args.args[0]['model']['hidden_size'], 104)
+        self.assertEqual(self.snake.submit_simulation.call_args.args[0]['model']['layers'], 2)
+        self.assertEqual(self.snake.submit_simulation.call_args.args[0]['model']['dropout'], .03)
         self.assertEqual(self.rotation.await_count, 1)  # Resume pending rotation only.
+
+    async def test_restart_between_layers_and_dropout_preserves_the_saved_depth(self):
+        self.store.saved = self.draft(2)
+        self.store.saved.config['model'].update(hidden_size=104, layers=2)
+        await self.cycle()
+        self.assertEqual([call.kwargs['parameter'] for call in self.conversation.await_args_list], PARAMETER_ORDER[2:])
+        self.assertEqual(self.snake.submit_simulation.call_args.args[0]['model'], dict(
+            type='transformer', heads=4, hidden_size=104, layers=2, dropout=.02))
 
     async def test_only_relevant_choices_get_a_chart_and_matching_json(self):
         await self.cycle()
@@ -187,7 +200,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_interrupted_reference_analysis_preserves_resumed_choices(self):
         self.store.saved = self.draft(3)
-        self.store.saved.config['model']['hidden_size'] = 272
+        self.store.saved.config['model']['hidden_size'] = 104
         original = deepcopy(self.store.saved)
         original.phase = 'preparing'
         self.analysis.side_effect = asyncio.CancelledError()
@@ -197,13 +210,13 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.snake.submit_simulation.assert_not_called()
 
     async def test_restart_after_final_choice_does_not_repeat_any_conversation(self):
-        self.store.saved = self.draft(8, 'ready')
+        self.store.saved = self.draft(len(PARAMETER_ORDER), 'ready')
         await self.cycle()
         self.conversation.assert_not_awaited()
         self.snake.submit_simulation.assert_called_once()
 
     async def test_restart_reconciles_a_lost_submission_reply_without_resubmitting(self):
-        self.store.saved = self.draft(8, 'submitting')
+        self.store.saved = self.draft(len(PARAMETER_ORDER), 'submitting')
         self.snake.find_config_run.return_value = self.run
         await self.cycle()
         self.snake.submit_simulation.assert_not_called()
@@ -212,7 +225,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.conversation.assert_not_awaited()
 
     async def test_ambiguous_unrecorded_submission_stops_without_retry(self):
-        self.store.saved = self.draft(8, 'submitting')
+        self.store.saved = self.draft(len(PARAMETER_ORDER), 'submitting')
         self.snake.find_config_run.return_value = None
         with self.assertRaisesRegex(RuntimeError, 'will not be retried'):
             await optimize(Mock(), Path('/tmp'), self.db, 'endpoint')
@@ -220,14 +233,14 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.wait.assert_not_awaited()
 
     async def test_submitted_run_is_not_submitted_again(self):
-        self.store.saved = self.draft(8, 'submitted')
+        self.store.saved = self.draft(len(PARAMETER_ORDER), 'submitted')
         self.store.saved.run_id = self.run
         await self.cycle()
         self.snake.submit_simulation.assert_not_called()
         self.wait.assert_awaited_once_with(self.snake, self.db, self.run)
 
     async def test_cancelled_simulation_is_marked_failed_without_comparison(self):
-        self.store.saved = self.draft(8, 'submitted')
+        self.store.saved = self.draft(len(PARAMETER_ORDER), 'submitted')
         self.store.saved.run_id = self.run
         self.wait.side_effect = SimulationUnsuccessful('cancelled')
         with self.assertRaises(SimulationUnsuccessful):
@@ -244,7 +257,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.prompts), len(PARAMETER_ORDER))
 
     async def test_recorded_comparison_resumes_analysis_without_comparing_again(self):
-        self.store.saved = self.draft(8, 'submitted')
+        self.store.saved = self.draft(len(PARAMETER_ORDER), 'submitted')
         self.store.saved.run_id = self.run
         self.store.comparisons[self.run] = {'current_golden_run_id': self.run,
                                            'reason': 'Improved', 'event_id': 123}
@@ -271,9 +284,9 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('"high_score": 30', prompt)
 
     def test_ready_drafts_cannot_submit_epsilon_nice_values_above_either_cap(self):
-        for probability, steps in ((.1, 51), (.11, 50)):
+        for probability, steps in ((.1, 41), (.11, 40)):
             with self.subTest(probability=probability, steps=steps):
-                draft = self.draft(8, 'ready')
+                draft = self.draft(len(PARAMETER_ORDER), 'ready')
                 draft.config['epsilon_nice'].update(probability=probability, steps=steps)
                 original = deepcopy(draft)
                 with self.assertRaises(ValidationError):
@@ -284,7 +297,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.db.log.assert_not_called()
 
     def test_submission_intent_survives_transport_failure(self):
-        draft = self.draft(8, 'ready')
+        draft = self.draft(len(PARAMETER_ORDER), 'ready')
         self.snake.submit_simulation.side_effect = TimeoutError('lost reply')
         with self.assertRaises(TimeoutError):
             submit_draft(self.snake, self.db, self.store, draft)

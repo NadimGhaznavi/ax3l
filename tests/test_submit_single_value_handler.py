@@ -31,7 +31,9 @@ class SubmitSingleValueHandlerTests(unittest.TestCase):
             with self.subTest(value=value):
                 self.assertEqual(self.submit(value=value)['code'], 'invalid_value')
         for parameter, value in (('seed', 1), ('epochs', 500), ('initial', .95), ('unknown', 1),
-                                 ('batch_size', 25)):
+                                 ('batch_size', 25), ('hidden_size', 24), ('hidden_size', 136),
+                                 ('hidden_size', 33), ('layers', 0), ('layers', 4), ('layers', 1.5),
+                                 ('dropout', -.01), ('dropout', .11), ('dropout', .005)):
             self.assertEqual(self.submit(parameter, value)['code'], 'invalid_value')
         self.assertEqual(self.submit(extra=1)['code'], 'invalid_value')
         self.assertEqual(self.handler.submit({})['code'], 'invalid_value')
@@ -40,12 +42,12 @@ class SubmitSingleValueHandlerTests(unittest.TestCase):
         self.snake.submit_simulation.assert_not_called()
 
     def test_choice_preserves_earlier_choices_and_does_not_submit_or_check_duplicates(self):
-        self.draft.config['model']['hidden_size'] = 240
+        self.draft.config['model']['hidden_size'] = 96
         original = deepcopy(self.baseline)
         result = self.submit()
         self.assertEqual(result, {'status': 'ok', 'draft_id': 'draft', 'phase': 'choosing'})
         saved = self.experiments.save_draft.call_args.args[0]
-        self.assertEqual(saved.config['model']['hidden_size'], 240)
+        self.assertEqual(saved.config['model']['hidden_size'], 96)
         self.assertEqual(saved.config['training']['learning_rate'], .003)
         self.assertEqual(saved.next_parameter, 'gamma')
         self.assertEqual(self.baseline, original)
@@ -57,7 +59,8 @@ class SubmitSingleValueHandlerTests(unittest.TestCase):
         self.experiments.save_draft.assert_called_once()
 
     def test_all_single_parameters_are_staged(self):
-        for name, value in (('hidden_size', 240), ('sequence_length', 12), ('batch_size', 26),
+        for name, value in (('hidden_size', 32), ('layers', 3), ('dropout', .02),
+                             ('sequence_length', 12), ('batch_size', 26),
                              ('learning_rate', .003), ('gamma', .97)):
             with self.subTest(parameter=name):
                 self.bind(name)

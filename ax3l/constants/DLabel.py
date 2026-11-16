@@ -7,6 +7,8 @@ class DLabel:
     # Pair labels follow the component order in PairParameters.PAIR_PARAMETERS.
 
     HIDDEN_SIZE: Final[str] = "Hidden Size"
+    LAYERS: Final[str] = "Encoder Layers"
+    DROPOUT: Final[str] = "Dropout"
     SEQUENCE_LENGTH: Final[str] = "Sequence Length"
     BATCH_SIZE: Final[str] = "Batch Size"
     LEARNING_RATE: Final[str] = "Learning Rate"
@@ -27,6 +29,10 @@ FIELD_TO_LABEL_MAP: Final[dict[str, str]] = {
     "simulation_summary": "Simulation analysis",
     "hidden_size": DLabel.HIDDEN_SIZE,
     "model.hidden_size": DLabel.HIDDEN_SIZE,
+    "layers": DLabel.LAYERS,
+    "model.layers": DLabel.LAYERS,
+    "dropout": DLabel.DROPOUT,
+    "model.dropout": DLabel.DROPOUT,
     "sequence_length": DLabel.SEQUENCE_LENGTH,
     "training.sequence_length": DLabel.SEQUENCE_LENGTH,
     "batch_size": DLabel.BATCH_SIZE,

@@ -267,10 +267,7 @@ class ExperimentStatusHttpTests(unittest.TestCase):
                     self.assertLess(row.index(f'class="inherited-value">{inherited}</td>'),
                                     row.index(f'class="parameter-value">{chosen}</span>'))
                     self.assertEqual('class="changed-value"' in row, changed)
-                    if changed:
-                        self.assertIn('>Changed</span>', row)
-                    else:
-                        self.assertNotIn('class="comparison-label"', row)
+                    self.assertNotIn('class="comparison-label"', row)
                 pending = page.split('data-parameter="epsilon_nice.probability"', 1)[1].split('</tr>', 1)[0]
                 self.assertIn('>Pending</span>', pending)
                 self.assertNotIn('class="parameter-value"', pending)

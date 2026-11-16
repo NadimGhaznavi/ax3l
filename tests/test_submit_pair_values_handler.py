@@ -1,4 +1,4 @@
-"""Joint choices are atomic; duplicate drafts reopen a parameter-selection step."""
+"""Joint choices are atomic; duplicates stay in the selected pair's conversation."""
 
 from copy import deepcopy
 import unittest
@@ -61,18 +61,19 @@ class SubmitPairValuesHandlerTests(unittest.TestCase):
         self.snake.is_config_unique.assert_called_with(self.draft.config)
         self.snake.submit_simulation.assert_not_called()
 
-    def test_duplicate_configuration_saves_the_pair_and_requests_a_revision(self):
+    def test_duplicate_configuration_rejects_the_whole_pair_without_leaving_its_choice(self):
         self.bind('epsilon_nice_pair')
         original = deepcopy(self.draft)
         self.snake.is_config_unique.return_value = False
         result = self.submit('epsilon_nice_pair', .005, 20)
-        self.assertEqual(result, dict(status='ok', draft_id='draft', phase='selecting_parameter'))
-        self.assertEqual(self.draft.selections, ['epsilon_nice_pair'])
-        self.assertEqual(self.draft.config['model'], original.config['model'])
-        self.assertEqual(self.draft.config['epsilon_nice'], dict(probability=.005, steps=20))
-        self.assertIsNone(self.draft.next_parameter)
+        self.assertEqual(result['code'], 'duplicate_configuration')
+        self.assertIn('submit_pair_values', result['prompt']['content'])
+        self.assertEqual(self.draft, original)
+        self.assertEqual(self.draft.next_parameter, 'epsilon_nice_pair')
+        self.experiments.save_draft.assert_not_called()
+        self.snake.is_config_unique.return_value = True
+        self.assertEqual(self.submit('epsilon_nice_pair', .01, 40)['phase'], 'reviewing')
         self.experiments.save_draft.assert_called_once_with(self.draft)
-        self.assertEqual(self.submit('epsilon_nice_pair', .01, 40)['status'], 'rejected')
         self.snake.submit_simulation.assert_not_called()
 
     def test_epsilon_nice_caps_reject_the_whole_pair_and_accept_both_upper_bounds(self):

@@ -88,12 +88,15 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
                                    reply('select_parameter', dict(parameter='gamma'))]
         with ZMQServer('tcp://127.0.0.1:*', handle) as server:
             async with SnakeLabTools(server.endpoint, REVISION_PARAMETER, draft_id='private-draft') as tools:
-                self.assertEqual((await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('Research a setting.')]))['phase'],
+                self.assertEqual((await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('Research a setting.')],
+                                                 decision_deadline=0))['phase'],
                                  'choosing')
         self.assertEqual([request.method for request in requests],
                          ['read_simulation_data', 'read_simulation_data', 'select_parameter'])
         payload = json.loads(llm.complete.call_args.args[0])
         self.assertEqual(len([message for message in payload['messages'] if message['role'] == 'tool']), 2)
+        self.assertEqual(sum(message['content'].startswith('Decision time remaining: 00:00')
+                             for message in payload['messages'] if message['role'] == 'user'), 3)
         self.assertNotIn('private-draft', json.dumps(payload))
 
     async def test_unique_candidate_can_research_then_run_or_select_another_setting(self):

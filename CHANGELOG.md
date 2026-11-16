@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.5.1] - 2026-11-15 @ 22:24
+
+### Summary
+
+Guide Qwen with an advisory countdown and require unique values for each selected setting.
+
+### Added
+
+- Give selection and value conversations an advisory five-minute countdown, with
+  updated time remaining after every data request. Reset it after each accepted
+  unique change for the next parameter or run decision. At zero, urge a decision
+  while keeping the conversation and tools available.
+
+### Changed
+
+- Reject duplicate configurations without saving the proposed values or leaving
+  the selected parameter. Continue the same value conversation until Qwen submits
+  a unique candidate, preserving the countdown during retries.
+
 ## [4.4.7] - 2026-11-15 @ 22:06
 
 ### Summary

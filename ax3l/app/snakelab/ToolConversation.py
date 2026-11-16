@@ -2,6 +2,8 @@
 
 import asyncio
 import json
+from math import ceil
+from time import monotonic
 
 from uuid import uuid4
 
@@ -9,8 +11,17 @@ from ax3l.constants.DAx3l import DAx3l
 from ax3l.constants.DEventCategory import DEventCategory as Events
 
 
+def _time_reminder(deadline: float) -> dict[str, str]:
+    seconds = max(0, ceil(deadline - monotonic()))
+    minutes, remainder = divmod(seconds, 60)
+    detail = ("Make your next decision promptly using the evidence gathered." if seconds else
+              "The advisory budget has elapsed. Make your next decision now using the evidence gathered.")
+    return {"role": "user", "content":
+            f"Decision time remaining: {minutes:02}:{remainder:02} ({seconds} seconds). {detail}"}
+
+
 async def converse(llm, output, db, tools, prompts, *, parameter: str | None = None,
-                   process_id: str | None = None) -> dict:
+                   process_id: str | None = None, decision_deadline: float | None = None) -> dict:
     process_id = process_id or str(uuid4())
     print(f"Conversation: {process_id}", flush=True)
     conversation_id = db.log(Events.Conversation.STARTED, Events.Conversation.CATEGORY,
@@ -30,6 +41,11 @@ async def converse(llm, output, db, tools, prompts, *, parameter: str | None = N
         for prompt, message in zip(prompts, messages):
             log(Events.Conversation, Events.Conversation.PROMPT, json.dumps(message, ensure_ascii=False),
                 source_name=prompt.source_name)
+        if decision_deadline is not None:
+            reminder = _time_reminder(decision_deadline)
+            messages.append(reminder)
+            log(Events.Conversation, Events.Conversation.PROMPT, json.dumps(reminder, ensure_ascii=False),
+                source_name="ToolConversation")
         turn = 0
         while True:
             turn += 1
@@ -97,6 +113,11 @@ async def converse(llm, output, db, tools, prompts, *, parameter: str | None = N
                 messages.append(feedback)
                 log(Events.Conversation, Events.Conversation.PROMPT, json.dumps(feedback, ensure_ascii=False),
                     source_name=result.get("source_name", "ToolConversation"))
+            if called_name == "data_tool" and decision_deadline is not None:
+                reminder = _time_reminder(decision_deadline)
+                messages.append(reminder)
+                log(Events.Conversation, Events.Conversation.PROMPT, json.dumps(reminder, ensure_ascii=False),
+                    source_name="ToolConversation")
     except (KeyboardInterrupt, asyncio.CancelledError):
         outcome = "Stopped by user."
         raise

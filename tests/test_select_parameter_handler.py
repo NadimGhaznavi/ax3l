@@ -7,7 +7,6 @@ import unittest
 from unittest.mock import Mock, patch
 
 from ax3l.app.snakelab.SelectParameterHandler import SelectParameterHandler
-from ax3l.app.snakelab.SubmitPairValuesHandler import SubmitPairValuesHandler
 from ax3l.app.snakelab.SubmitSingleValueHandler import SubmitSingleValueHandler
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
@@ -69,25 +68,26 @@ class SelectParameterHandlerTests(unittest.TestCase):
         self.assertEqual(self.select()['status'], 'rejected')
         self.experiments.save_draft.assert_not_called()
 
-    def test_repeated_duplicates_return_to_parameter_selection_after_each_revision(self):
+    def test_repeated_duplicates_keep_the_same_parameter_until_a_unique_value(self):
         self.snake.is_config_unique.side_effect = [False, False, True]
+        self.draft.selections = []
         single = SubmitSingleValueHandler(self.db)
-        pair = SubmitPairValuesHandler(self.db)
         self.select('hidden_size')
-        result = single.submit(dict(draft_id='draft', parameter='hidden_size', value=96))
-        self.assertEqual(result['phase'], 'selecting_parameter')
-        self.select('layers')
-        result = single.submit(dict(draft_id='draft', parameter='layers', value=3))
-        self.assertEqual(result['phase'], 'selecting_parameter')
-        self.select('epsilon_pair')
-        result = pair.submit(dict(draft_id='draft', pair='epsilon_pair', value_1=.91, value_2=.95))
+        original = deepcopy(self.draft)
+        self.experiments.save_draft.reset_mock()
+        for value in (96, 104):
+            result = single.submit(dict(draft_id='draft', parameter='hidden_size', value=value))
+            self.assertEqual(result['code'], 'duplicate_configuration')
+            self.assertEqual(self.draft, original)
+            self.assertEqual(self.select('layers')['status'], 'rejected')
+            self.experiments.save_draft.assert_not_called()
+        result = single.submit(dict(draft_id='draft', parameter='hidden_size', value=112))
         self.assertEqual(result['phase'], 'reviewing')
-        self.assertEqual(self.draft.config['model']['hidden_size'], 96)
-        self.assertEqual(self.draft.config['model']['layers'], 3)
-        self.assertEqual(self.draft.config['epsilon']['initial'], .91)
+        self.assertEqual(self.draft.config['model']['hidden_size'], 112)
+        self.assertEqual(self.draft.config['model']['layers'], 1)
         self.assertEqual(self.draft.config['epsilon_nice'], dict(probability=.05, steps=20))
-        self.assertEqual(set(self.draft.selections), set(PARAMETER_ORDER))
-        self.assertEqual(len(self.draft.selections), len(PARAMETER_ORDER))
+        self.assertEqual(self.draft.selections, ['hidden_size'])
+        self.experiments.save_draft.assert_called_once_with(self.draft)
         self.assertEqual(self.snake.is_config_unique.call_count, 3)
         self.snake.submit_simulation.assert_not_called()
 

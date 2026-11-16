@@ -3,6 +3,7 @@
 import asyncio
 from copy import deepcopy
 import json
+from time import monotonic
 from uuid import uuid4
 
 from ax3l.activity.RunAnalysis import render_analysis
@@ -15,7 +16,7 @@ from ax3l.app.snakelab.ExperimentDb import ExperimentDb
 from ax3l.app.snakelab.prompts.ConfigurationChoice import ConfigurationChoice
 from ax3l.app.snakelab.prompts.ConfigurationNextStep import ConfigurationNextStep
 from ax3l.constants.DAx3l import DAx3l
-from ax3l.constants.DChoice import CHOICE_CHARTS, REVISION_PARAMETER
+from ax3l.constants.DChoice import CHOICE_CHARTS, PARAMETER_SELECTION_SECONDS, REVISION_PARAMETER
 from ax3l.constants.DEventCategory import DEventCategory as Events
 from ax3l.constants.DSimulationAnalysis import DSimulationAnalysis
 from ax3l.constants.DSnakeLab import DSnakeLab
@@ -172,6 +173,7 @@ async def optimize(llm, output, db, endpoint):
             if draft.phase == "preparing":
                 draft.phase = "selecting_parameter"
                 experiments.save_draft(draft)
+            decision_deadline = monotonic() + PARAMETER_SELECTION_SECONDS
             while draft.phase in ("choosing", "selecting_parameter", "reviewing"):
                 parameter = draft.next_parameter if draft.phase == "choosing" else REVISION_PARAMETER
                 section = CHOICE_CHARTS.get(parameter)
@@ -186,8 +188,11 @@ async def optimize(llm, output, db, endpoint):
                 async with SnakeLabTools(endpoint, parameter, draft_id=draft.draft_id,
                                          allow_run=draft.phase == "reviewing") as tools:
                     await converse(llm, output, db, tools, [prompt],
-                                   parameter=parameter, process_id=draft.draft_id)
+                                   parameter=parameter, process_id=draft.draft_id,
+                                   decision_deadline=decision_deadline)
                 draft = experiments.draft(draft.draft_id)
+                if draft.phase == "reviewing":
+                    decision_deadline = monotonic() + PARAMETER_SELECTION_SECONDS
         submit_draft(snake, db, experiments, draft)
         try:
             await wait_for_run(snake, db, draft.run_id)

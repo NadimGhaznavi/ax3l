@@ -38,6 +38,7 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
         calls = []
         selections = []
         chart_choices = []
+        duplicate_attempts = []
         decisions = ['reward_pair', 'learning_rate', 'epsilon_pair', 'learning_rate', 'run']
         expected_choices = decisions[:-1]
         values = dict(hidden_size=96, layers=3, dropout=.02, sequence_length=12, batch_size=26,
@@ -87,7 +88,7 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
                 pages = [message['content'] for message in request['messages'] if message['role'] == 'tool']
                 if tool == 'select_parameter':
                     names = [definition['function']['name'] for definition in request['tools']]
-                    self_test.assertEqual('run_simulation' in names, len(selections) > 1)
+                    self_test.assertEqual('run_simulation' in names, bool(selections))
                     if not pages:
                         tool, arguments = 'data_tool', dict(url='/golden/scores')
                     else:
@@ -99,19 +100,26 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
                             arguments = dict(parameter=step)
                 else:
                     parameter = next(name for name in PARAMETER_ORDER if f'Choose {CHOICE_LABELS[name]}.' in text)
+                    duplicate_retry = any(message['role'] == 'user' and 'configuration that already exists' in message['content']
+                                          for message in request['messages'])
                     evidence = json.loads(text.split('```json\n')[1].split('\n```')[0])
                     self_test.assertEqual(evidence['reference_runs']['golden']['high_score'], 10)
                     if not pages and parameter == 'learning_rate':
                         return self.reply('data_tool', dict(url='/golden/activity'))
                     if parameter in CHOICE_CHARTS:
                         self_test.assertEqual([part['type'] for part in content], ['text', 'image_url'])
-                        chart_choices.append(parameter)
+                        if not duplicate_retry:
+                            chart_choices.append(parameter)
                     else:
                         self_test.assertIsInstance(content, str)
-                    if pages:
+                    if pages and not duplicate_retry:
                         self_test.assertEqual(json.loads(pages[0])['episodes_with_loss'], 9)
-                    selections.append(parameter)
-                    value = .002 if parameter == 'learning_rate' and selections.count(parameter) == 2 else values[parameter]
+                    if parameter == 'reward_pair' and not duplicate_retry:
+                        duplicate_attempts.append(parameter)
+                    else:
+                        selections.append(parameter)
+                    value = ((.25, -.5) if duplicate_retry else .002
+                             if parameter == 'learning_rate' and selections.count(parameter) == 2 else values[parameter])
                     arguments = ({'value_1': value[0], 'value_2': value[1]} if isinstance(value, tuple)
                                  else {'value': value})
                 self_test.assertNotIn(baseline_id.split('-')[0], text)
@@ -141,6 +149,7 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(asyncio.CancelledError):
                 await optimize(InferenceFixture(), Path('/tmp'), db, server.endpoint)
         self.assertEqual(len(calls), 1)
+        self.assertEqual(duplicate_attempts, ['reward_pair'])
         self.assertEqual(chart_choices, expected_choices)
         self.assertEqual(calls[0]['model'], config['model'])
         self.assertEqual(calls[0]['training']['learning_rate'], .002)
@@ -155,10 +164,10 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(saved.metrics['termination_reasons']['snake'], {'count': 7, 'percent': 70})
         self.assertIsNone(saved.summary)
         events = ExperimentDb(db).choice_events(draft.draft_id)
-        self.assertEqual(sum(event['name'] == 'llm_request_started' for event in events), 16)
+        self.assertEqual(sum(event['name'] == 'llm_request_started' for event in events), 17)
         self.assertEqual(sum(bool(event['has_image']) for event in events), 4)
         replies = [json.loads(event['detail']) for event in events if event['name'] == 'reply_received']
-        self.assertEqual(replies, [{'prompt_tokens': 123, 'completion_tokens': 7}] * 16)
+        self.assertEqual(replies, [{'prompt_tokens': 123, 'completion_tokens': 7}] * 17)
         self.assertNotIn('data:image/png', json.dumps(events, default=str))
         rows = db.query("SELECT name, COUNT(*) AS n FROM events WHERE event_id>%s AND name IN ('simulation_analyzed','simulation_analysis_progress','simulation_submitted','configuration_compared') GROUP BY name", (first_event,))
         self.assertEqual({row['name']: row['n'] for row in rows},

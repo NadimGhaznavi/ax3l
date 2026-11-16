@@ -51,8 +51,9 @@ class ConfigurationChoice(Prompt):
                 text.append(f"The chart shows the {chart_scope} run. {focus}")
             text.append(f"See {label} at /{chart_scope}/{page} in data_tool.")
         text.append("Use data_tool at /draft for saved choices or / for other runs.")
-        text.append("Ax3l checks the complete draft for uniqueness after this choice. "
-                    "You can then change another setting or run a unique configuration.")
+        text.append("This setting must produce a unique complete configuration. "
+                    "If a proposal is a duplicate, submit different values for this same setting. "
+                    "After a unique choice, you can change another setting or run the configuration.")
         text.append(f"Submit using {tool}.")
         text.append(f"Measured data and current values:\n```json\n{json.dumps(evidence, allow_nan=False)}\n```")
         super().__init__("\n\n".join(text))

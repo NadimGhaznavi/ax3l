@@ -201,7 +201,9 @@
           readResults.set(url, result);
         }
         if (generation !== previewGeneration) return;
-        previewContent.replaceChildren(...Array.from(readResults.get(url).childNodes, node => node.cloneNode(true)));
+        const result = readResults.get(url);
+        document.querySelector('#read-preview-title').textContent = result.dataset.previewTitle || link.textContent;
+        previewContent.replaceChildren(...Array.from(result.childNodes, node => node.cloneNode(true)));
         previewContent.scrollTop = 0;
         positionReadPreview();
       } catch (error) {

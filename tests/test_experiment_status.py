@@ -80,6 +80,25 @@ class ExperimentStatusTests(unittest.TestCase):
         self.assertEqual([row['path'] for row in report['rows'] if row['current']],
                          ['game.rewards.closer_to_food', 'game.rewards.further_from_food'])
 
+    def test_values_are_compared_with_the_starting_golden_configuration_per_field(self):
+        self.golden['config']['model']['hidden_size'] = 96
+        self.draft.config['model']['hidden_size'] = 96
+        self.draft.config['model']['layers'] = 2
+        self.draft.config['epsilon']['initial'] = 0.75
+        self.draft.config['epsilon_nice']['steps'] = float(self.golden['config']['epsilon_nice']['steps'])
+        self.draft.selections = PARAMETER_ORDER.copy()
+        self.draft.phase = 'ready'
+        inherited_config = deepcopy(self.golden['config'])
+        rows = {row['path']: row for row in self.report()['rows']}
+        self.assertEqual(rows['model.hidden_size']['inherited_value'], '96')
+        self.assertEqual(rows['model.hidden_size']['value'], '96')
+        self.assertFalse(rows['model.hidden_size']['changed'])
+        self.assertEqual(rows['model.layers']['inherited_value'], '1')
+        self.assertEqual(rows['model.layers']['value'], '2')
+        self.assertEqual({name for name, row in rows.items() if row['changed']},
+                         {'model.layers', 'epsilon.initial'})
+        self.assertEqual(self.golden['config'], inherited_config)
+
     def test_ready_submitting_and_simulation_states(self):
         self.draft.selections = PARAMETER_ORDER.copy()
         for phase, label in [('ready', 'Ready to submit'), ('submitting', 'Submission pending')]:
@@ -111,6 +130,8 @@ class ExperimentStatusTests(unittest.TestCase):
         self.assertEqual(report['phase'], 'Choosing a setting to revise')
         self.assertEqual(report['choices_selected'], len(PARAMETER_ORDER))
         self.assertEqual([row['path'] for row in report['rows'] if row['current']], [REVISION_PARAMETER])
+        self.assertIsNone(report['rows'][-1]['inherited_value'])
+        self.assertFalse(report['rows'][-1]['changed'])
         self.assertEqual(report['totals'], dict(elapsed='00:12', input_tokens=100, output_tokens=20, tokens=120))
         self.draft.selections.remove('layers')
         self.draft.phase = 'choosing'
@@ -173,7 +194,8 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         self.experiments.analysis.return_value = None
         self.experiments.choice_events.return_value = []
         self.experiments.activity_events.return_value = []
-        self.snake.get_run_result.return_value = dict(status='completed', high_score=0)
+        self.snake.get_run_result.return_value = dict(
+            status='completed', high_score=0, config=deepcopy(self.draft.config))
         server = make_server('127.0.0.1', 0)
         thread = Thread(target=server.serve_forever, daemon=True)
         thread.start()
@@ -192,7 +214,8 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         self.assertIn('Choosing Hidden Size', page)
         self.assertIn('0 / 10 choices saved', page)
         self.assertEqual(page.count('type="checkbox" disabled'), 13)
-        self.assertIn('>inherited</span>', page)
+        self.assertEqual(page.count('>Pending</span>'), 13)
+        self.assertNotIn('<td class="changed-value">', page)
         self.assertIn('window.setTimeout(refreshStatus, 5000)', page)
         self.assertIn('Showing the last successful report', page)
         self.assertIn('cache: \'no-store\'', page)
@@ -212,12 +235,42 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         self.assertIn('aria-current="page">Last completed</a>', page)
         self.assertIn('id="experiment-phase" role="status">Complete</h2>', page)
         self.assertEqual(page.count('disabled checked'), 13)
-        self.assertNotIn('>inherited</span>', page)
+        self.assertNotIn('>Pending</span>', page)
+        self.assertEqual(page.count('>No change</span>'), 13)
         self.assertIn('<dt>High score</dt><dd>0</dd>', page)
         self.assertIn('<dt>Difference</dt><dd>+0</dd>', page)
         self.assertIn('Golden retained', page)
         self.assertIn(f'href="/simulations/{completed.run_id}"', page)
         self.snake.get_run_result.assert_any_call(completed.golden_run_id)
+
+    def test_inherited_column_precedes_chosen_values_and_only_changes_are_highlighted(self):
+        self.snake.get_run_result.return_value['config']['model']['hidden_size'] = 96
+        self.draft.config['model']['hidden_size'] = 96
+        self.draft.config['model']['layers'] = 2
+        self.draft.config['epsilon']['initial'] = 0.75
+        self.draft.selections = PARAMETER_ORDER[:8]
+        for view in ('current', 'completed'):
+            with self.subTest(view=view):
+                self.experiments.last_completed_draft.return_value = self.draft
+                page = self.get('/experiment-status?view=' + view)
+                self.assertIn('<th scope="col">Inherited</th><th scope="col">LLM chosen / state</th>', page)
+                self.assertEqual(page.count('<td class="changed-value">'), 2)
+                for path, inherited, chosen, changed in [
+                    ('model.hidden_size', '96', '96', False),
+                    ('model.layers', '1', '2', True),
+                    ('epsilon.initial', str(self.snake.get_run_result.return_value['config']['epsilon']['initial']),
+                     '0.75', True),
+                    ('epsilon.decay', str(self.draft.config['epsilon']['decay']),
+                     str(self.draft.config['epsilon']['decay']), False),
+                ]:
+                    row = page.split(f'data-parameter="{path}"', 1)[1].split('</tr>', 1)[0]
+                    self.assertLess(row.index(f'class="inherited-value">{inherited}</td>'),
+                                    row.index(f'class="parameter-value">{chosen}</span>'))
+                    self.assertEqual('class="changed-value"' in row, changed)
+                    self.assertIn(f'>{"Changed" if changed else "No change"}</span>', row)
+                pending = page.split('data-parameter="epsilon_nice.probability"', 1)[1].split('</tr>', 1)[0]
+                self.assertIn('>Pending</span>', pending)
+                self.assertNotIn('class="parameter-value"', pending)
 
     def test_empty_invalid_view_and_database_failure_cleanup(self):
         self.experiments.draft.return_value = None
@@ -242,7 +295,7 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         self.assertIn('Setting to revise', page)
         self.assertIn('10 / 10 choices saved', page)
         self.assertEqual(page.count('disabled checked'), 13)
-        self.assertNotIn('>inherited</span>', page)
+        self.assertNotIn('>Pending</span>', page)
 
     def test_setup_shows_live_steps_with_separate_turn_times_and_tokens(self):
         stamp = datetime(2026, 11, 15, 12)

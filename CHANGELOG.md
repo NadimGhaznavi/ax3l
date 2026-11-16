@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.9.3] - 2026-11-16 @ 06:58
+
 ### Summary
 
 Keep Experiment Status compact with collapsible tasks and concise setting descriptions.

@@ -11,11 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Summary
 
-Keep unchanged Experiment Status values on one line.
+Simplify the Experiment Status comparison labels.
 
 ### Changed
 
 - Remove the redundant "No change" label beneath unchanged LLM-chosen values.
+- Rename the comparison columns to "Baseline" and "LLM Choice".
 
 ## [4.7.0] - 2026-11-15 @ 21:22
 

@@ -38,10 +38,10 @@
       <progress id="choice-progress" value="{{ choices_selected }}" max="{{ choices_total }}"></progress>
     </div>
     <p class="status-detail">{{ detail }}</p>
-    <p class="status-usage-note">Inherited values come from this experiment's starting golden configuration. Changed choices are highlighted.</p>
+    <p class="status-usage-note">Baseline values come from this experiment's starting golden configuration. Changed choices are highlighted.</p>
     <table class="status-checklist" aria-label="Configuration choices and setup steps">
       <colgroup><col class="check-column"><col><col class="value-column"><col class="value-column"><col class="time-column"><col class="token-column"><col class="token-column"></colgroup>
-      <thead><tr><th scope="col">Saved</th><th scope="col">Setting or step</th><th scope="col">Inherited</th><th scope="col">LLM chosen / state</th><th scope="col">Elapsed</th><th scope="col">Input tokens</th><th scope="col">Output tokens</th></tr></thead>
+      <thead><tr><th scope="col">Saved</th><th scope="col">Setting or step</th><th scope="col">Baseline</th><th scope="col">LLM Choice</th><th scope="col">Elapsed</th><th scope="col">Input tokens</th><th scope="col">Output tokens</th></tr></thead>
       <tbody class="status-configuration">
         {% for row in rows %}
         <tr data-parameter="{{ row.path }}" class="{{ 'selected' if row.selected else 'pending' }}{% if row.current %} current-choice{% endif %}">

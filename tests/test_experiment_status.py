@@ -253,7 +253,7 @@ class ExperimentStatusHttpTests(unittest.TestCase):
             with self.subTest(view=view):
                 self.experiments.last_completed_draft.return_value = self.draft
                 page = self.get('/experiment-status?view=' + view)
-                self.assertIn('<th scope="col">Inherited</th><th scope="col">LLM chosen / state</th>', page)
+                self.assertIn('<th scope="col">Baseline</th><th scope="col">LLM Choice</th>', page)
                 self.assertEqual(page.count('<td class="changed-value">'), 2)
                 for path, inherited, chosen, changed in [
                     ('model.hidden_size', '96', '96', False),

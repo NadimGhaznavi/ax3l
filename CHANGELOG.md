@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Present the experiment title and countdown as one consistent section header.
+
+### Fixed
+
+- Integrate the countdown into the full-width Experiment Status header instead
+  of styling it as a separate rounded box. Keep the same header structure while
+  choosing settings, awaiting submission, running, showing results, or empty,
+  including the last-completed view and narrow screens.
+
 ## [4.9.1] - 2026-11-16 @ 06:27
 
 ### Summary

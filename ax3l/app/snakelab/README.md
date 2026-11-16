@@ -18,8 +18,10 @@ non-positive-sum reward-pair rule. Seeds and fixed fields remain
 application-controlled.
 
 After every submitted value or pair, Ax3l checks the **whole configuration**
-against all stored runs. A duplicate returns to `select_parameter` and cannot
-run. A unique configuration gives Qwen both `select_parameter` and
+against all stored runs. A duplicate is rejected without saving it; Qwen must
+submit different values for the same selected setting in the same conversation.
+It cannot switch parameters or run until the setting produces a unique draft.
+A unique configuration gives Qwen both `select_parameter` and
 `run_simulation`: change any setting, including the same one again, or run now.
 There is no fixed parameter order or requirement to change every setting.
 Other values stay in the draft. Only an explicit run decision submits the
@@ -52,6 +54,13 @@ contain scores, termination counts and percentages, activity counts, and
 settings. Notes from previously analyzed runs remain available.
 The data tool is available before the first parameter selection and during
 every next-step decision, so Qwen can research which setting to tweak.
+Qwen has an advisory five-minute budget to select a parameter and find values
+that produce a unique configuration, or decide to run an already unique draft.
+After every data request, it receives the time remaining, including inference
+and lookup time. Duplicate attempts keep the same countdown. An accepted unique
+change resets it to five minutes for the next parameter or run decision.
+At zero, the reminder urges a decision; it does not stop the conversation or
+disable tools. Restarting the optimizer begins a fresh budget.
 
 `kb_tool(url)` opens one short local guide. Use `/` for the guide list.
 Run IDs and draft IDs are bound privately to the conversation.

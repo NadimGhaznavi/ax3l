@@ -81,13 +81,22 @@ submission tool description. Accepted choices are saved without starting a
 simulation. A value can remain unchanged. After every submitted change, Ax3l
 checks the complete draft for duplicates.
 
-At startup and after a duplicate, Qwen uses `select_parameter` to choose a single
-or paired setting. `data_tool` and `kb_tool` are available while making that
+At startup and after a unique change, Qwen can use `select_parameter` to choose
+a single or paired setting. `data_tool` and `kb_tool` are available while making that
 decision. Ax3l opens the selected setting's value conversation with the usual
-evidence and tools; other values stay saved. After a unique change, Qwen can
+evidence and tools; other values stay saved. A duplicate proposal is rejected
+without saving it. Qwen stays on the selected setting and must submit different
+values until the complete configuration is unique. After a unique change, Qwen can
 use `run_simulation` or select any setting again. Unselected settings keep their
 baseline values. Only Qwen's explicit run decision submits the unique draft.
 Each selection, value choice, and run decision resumes after a restart.
+
+Qwen is asked to select a parameter and find a unique setting, or decide to run
+the current unique draft, within five minutes. Each data request is followed by
+an updated time remaining. Parameter selection and duplicate-value retries share
+the countdown; every accepted unique change resets it to five minutes for the
+next parameter or run decision. The budget is advisory: reaching zero prompts
+a decision without stopping the conversation. Restarting begins a new budget.
 
 Experiment Status shows the settings to be chosen and the saved selections.
 It lists chart rendering, each Qwen request, each data or guide lookup, and

@@ -94,7 +94,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
                            learning_rate=.003, gamma=.97, epsilon_pair=(.91, .95),
                            reward_pair=(.25, -.5), epsilon_nice_pair=(.01, 40))
 
-        async def select(llm, output, db, tools, prompts, *, parameter, process_id):
+        async def select(llm, output, db, tools, prompts, *, parameter, process_id, decision_deadline):
             self.snake.submit_simulation.assert_not_called()
             self.prompts.append(prompts[-1].to_md())
             if parameter == REVISION_PARAMETER:
@@ -171,20 +171,37 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
             type='transformer', heads=4, hidden_size=104, layers=2, dropout=.03))
         self.assertEqual(self.rotation.await_count, 1)
 
-    async def test_duplicates_choose_different_single_and_pair_branches_before_running(self):
+    async def test_duplicates_keep_the_parameter_and_reset_the_budget_only_after_unique_acceptance(self):
         self.snake.is_config_unique.side_effect = [False, False, True]
-        self.decisions = ['layers', 'hidden_size', 'reward_pair', 'run']
-        await self.cycle()
-        self.assertEqual(self.trace(), [REVISION_PARAMETER, 'layers', REVISION_PARAMETER, 'hidden_size',
-                                       REVISION_PARAMETER, 'reward_pair', REVISION_PARAMETER])
+        self.decisions = ['layers', 'run']
+        choose = self.conversation.side_effect
+
+        async def revise(llm, output, db, tools, prompts, *, parameter, process_id, decision_deadline):
+            if parameter != 'layers':
+                return await choose(llm, output, db, tools, prompts, parameter=parameter,
+                                    process_id=process_id, decision_deadline=decision_deadline)
+            for value in (1, 2, 3):
+                result = SubmitSingleValueHandler(db).submit(dict(draft_id=process_id, parameter='layers', value=value))
+                if result['status'] == 'rejected':
+                    self.assertEqual(self.store.saved.next_parameter, 'layers')
+                    self.assertEqual(self.store.saved.config['model']['layers'], 1)
+                    self.snake.submit_simulation.assert_not_called()
+            return result
+
+        self.conversation.side_effect = revise
+        with patch('ax3l.app.snakelab.SnakeLabLoop.monotonic', side_effect=[100, 450]):
+            await self.cycle()
+        self.assertEqual(self.trace(), [REVISION_PARAMETER, 'layers', REVISION_PARAMETER])
+        self.assertEqual([call.kwargs['decision_deadline'] for call in self.conversation.await_args_list],
+                         [400, 400, 750])
         candidate = self.snake.submit_simulation.call_args.args[0]
-        self.assertEqual(candidate['model']['hidden_size'], 96)
+        self.assertEqual(candidate['model']['hidden_size'], self.config['model']['hidden_size'])
         self.assertEqual(candidate['model']['layers'], 3)
-        self.assertEqual(candidate['game']['rewards']['closer_to_food'], .25)
+        self.assertEqual(candidate['game']['rewards'], self.config['game']['rewards'])
         self.assertEqual(candidate['epsilon_nice'], self.config['epsilon_nice'])
         self.assertEqual(self.snake.is_config_unique.call_count, 3)
         self.assertEqual([call.kwargs['allow_run'] for call in self.tools.call_args_list],
-                         [False, False, False, False, False, False, True])
+                         [False, False, True])
         self.snake.submit_simulation.assert_called_once()
 
     async def test_restart_at_parameter_selection_can_choose_a_new_branch(self):

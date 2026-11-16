@@ -4,7 +4,7 @@ import json
 
 from ax3l.app.Prompt import Prompt
 from ax3l.app.snakelab.ParameterSpace import parameter_values
-from ax3l.constants.DChoice import CHOICE_LABELS
+from ax3l.constants.DChoice import CHOICE_LABELS, PARAMETER_SELECTION_SECONDS
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
 
 
@@ -22,8 +22,13 @@ class ConfigurationNextStep(Prompt):
             instruction = ("The draft starts with baseline values from the golden configuration. "
                            "Research which setting would be best to tweak, then choose it using select_parameter.")
         super().__init__(
-            instruction + " Paired settings are changed together. Other values stay in the draft. "
+            instruction + f" Aim to make this decision within {PARAMETER_SELECTION_SECONDS // 60} minutes. "
+            "This is an advisory time budget; after each data_tool request you will receive the remaining time. "
+            "The countdown continues while choosing a value. An accepted unique change starts a fresh five-minute "
+            "budget to choose another parameter or run the configuration. "
+            "Paired settings are changed together. Other values stay in the draft. "
             "After each submitted change, Ax3l checks the complete configuration for uniqueness. "
+            "Duplicate values must be revised within the selected setting before you can choose another setting. "
             "You choose which settings to adjust and when to run; there is no required parameter order. "
             "Use data_tool at / for measured reference runs, /golden/notes for observations, "
             "or /draft for the current values.\n\n"

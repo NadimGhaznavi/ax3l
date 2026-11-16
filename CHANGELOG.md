@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.5.2] - 2026-11-15 @ 22:57
+
 ### Summary
 
 Require meaningful parameter changes, prevent repeated selections, and run unique drafts after a decision timeout.

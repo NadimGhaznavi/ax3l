@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.8.3] - 2026-11-16 @ 00:30
+
+### Changed
+
+- HTTP Timeout from 5 to 8 minutes.
+
 ## [4.8.2] - 2026-11-16 @ 00:24
 
 ### Summary

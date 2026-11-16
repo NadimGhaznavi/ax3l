@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Preview captured prompts and Qwen reasoning on hover in Experiment Status.
+
+### Added
+
+- Extend the existing hover and keyboard-focus popups to Prompt and Reasoning
+  links. Reuse the Read preview parser to render Markdown and compact JSON
+  tables, including captured chart images in prompts.
+
 ## [4.9.0] - 2026-11-16 @ 05:59
 
 ### Summary

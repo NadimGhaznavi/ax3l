@@ -67,7 +67,7 @@
         {% for step in row.steps %}
         <tr class="setup-step{% if step.state == 'Running' %} current-choice{% endif %}"{% if step.state == 'Running' %} aria-current="step"{% endif %}>
           <td></td><th scope="row">{{ step.label }}{% if step.target %} {% if step.result_url %}<a class="read-target" href="{{ step.result_url }}">{{ step.target }}</a>{% else %} {{ step.target }}{% endif %}{% endif %}</th>
-          <td class="item-details">{% if step.detail_url %}<a href="{{ step.detail_url }}" target="_blank" rel="noopener">{{ step.detail_label }}</a>{% endif %}</td>
+          <td class="item-details">{% if step.detail_url %}<a data-preview-url="{{ step.detail_url }}?preview=1" data-preview-content="#message-content" href="{{ step.detail_url }}" target="_blank" rel="noopener">{{ step.detail_label }}</a>{% endif %}</td>
           <td></td>
           <td>{{ step.state }}</td>
           <td class="item-elapsed">{{ step.elapsed }}</td>
@@ -102,8 +102,8 @@
     <p class="empty">{{ 'No completed experiments recorded yet.' if view == 'completed' else 'No configuration selections recorded yet. Ax3l may still be establishing its initial baseline.' }}</p>
     {% endif %}
   </main>
-  <aside id="read-preview" class="read-preview" role="dialog" aria-label="Recorded read result" hidden>
-    <div class="read-preview-heading"><strong id="read-preview-title"></strong><button type="button" id="read-preview-close" aria-label="Close read result">×</button></div>
+  <aside id="read-preview" class="read-preview" role="dialog" aria-label="Recorded content preview" hidden>
+    <div class="read-preview-heading"><strong id="read-preview-title"></strong><button type="button" id="read-preview-close" aria-label="Close preview">×</button></div>
     <div id="read-preview-content" class="tool-result" tabindex="0"></div>
   </aside>
   <script>
@@ -112,6 +112,7 @@
     const card = document.querySelector('#status-card');
     const preview = document.querySelector('#read-preview');
     const previewContent = document.querySelector('#read-preview-content');
+    const previewLinks = '.read-target, .item-details a';
     const readResults = new Map();
     let activeRead = null;
     let previewRequest = null;
@@ -152,20 +153,20 @@
       link.setAttribute('aria-describedby', 'read-preview-content');
       const generation = ++previewGeneration;
       document.querySelector('#read-preview-title').textContent = link.textContent;
-      previewContent.textContent = 'Loading read result…';
+      previewContent.textContent = 'Loading content…';
       preview.hidden = false;
       positionReadPreview();
       const controller = new AbortController();
       previewRequest = controller;
       const timeout = window.setTimeout(() => controller.abort(), {{ request_timeout_seconds | tojson }} * 1000);
       try {
-        const url = link.href;
+        const url = link.dataset.previewUrl || link.href;
         if (!readResults.has(url)) {
           const response = await fetch(url, {cache: 'no-store', signal: controller.signal});
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
           const page = new DOMParser().parseFromString(await response.text(), 'text/html');
-          const result = page.querySelector('#tool-result');
-          if (!result) throw new Error('Missing tool result');
+          const result = page.querySelector(link.dataset.previewContent || '#tool-result');
+          if (!result) throw new Error('Missing captured content');
           readResults.set(url, result);
         }
         if (generation !== previewGeneration) return;
@@ -174,7 +175,7 @@
         positionReadPreview();
       } catch (error) {
         if (generation === previewGeneration) {
-          previewContent.textContent = 'Unable to load this read result. Open the link to try again.';
+          previewContent.textContent = 'Unable to load this content. Open the link to try again.';
           positionReadPreview();
         }
       } finally {
@@ -183,15 +184,15 @@
     }
 
     card.addEventListener('pointerover', event => {
-      const link = event.target.closest('.read-target');
+      const link = event.target.closest(previewLinks);
       if (link && !link.contains(event.relatedTarget)) showReadPreview(link);
     });
     card.addEventListener('pointerout', event => {
-      const link = event.target.closest('.read-target');
+      const link = event.target.closest(previewLinks);
       if (link && !link.contains(event.relatedTarget)) scheduleReadPreviewHide();
     });
     card.addEventListener('focusin', event => {
-      const link = event.target.closest('.read-target');
+      const link = event.target.closest(previewLinks);
       if (link) showReadPreview(link);
     });
     card.addEventListener('focusout', scheduleReadPreviewHide);
@@ -251,7 +252,7 @@
         const readHadFocus = activeRead === document.activeElement;
         card.replaceChildren(...nextCard.childNodes);
         if (activeRead) {
-          const nextLink = Array.from(card.querySelectorAll('.read-target')).find(link => link.href === activeRead.href);
+          const nextLink = Array.from(card.querySelectorAll(previewLinks)).find(link => link.href === activeRead.href);
           if (nextLink) {
             activeRead = nextLink;
             activeRead.setAttribute('aria-describedby', 'read-preview-content');

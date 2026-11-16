@@ -116,7 +116,10 @@ It lists chart rendering, each Qwen request, each data or guide lookup, and
 each submission under the relevant setting or pair. Each step has its own
 elapsed time. Saved prompt messages have their own rows with a Prompt link in
 the LLM details column. Completed Qwen requests link to their captured Reasoning
-when Qwen returned nonempty reasoning text. These links open in a separate tab.
+when Qwen returned nonempty reasoning text. Hovering or focusing either link
+shows a scrollable preview using the same Markdown and JSON-table parser as
+Read results; prompts also include their captured chart images. Clicking these
+links opens the original content in a separate tab.
 Each returned Qwen request shows its own input and output token
 counts when reported by the server. The chart link opens the prompt with
 the exact image sent to Qwen. Read targets link to their recorded responses;

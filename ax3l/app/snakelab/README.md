@@ -1,15 +1,22 @@
 # Complete-configuration optimization
 
 Ax3l asks Qwen to choose every tunable setting before executing one SnakeLab
-simulation. A pass contains five single choices—hidden size, sequence length,
-batch size, learning rate, and gamma—followed by the epsilon, distance-reward,
-and EpsilonNice pairs. Each conversation saves its choice in a durable draft.
+simulation. A pass contains seven single choices—hidden size, encoder layers,
+dropout, sequence length, batch size, learning rate, and gamma—followed by the
+epsilon, distance-reward, and EpsilonNice pairs. Each conversation saves its
+choice in a durable draft.
 It never submits a simulation. Unchanged values are permitted.
 
-The baseline still uses SnakeLab 3.0.1, a four-head Transformer, 500 episodes,
-and required EpsilonNice. `SimulationConfiguration` owns defaults, schema
-validation, and the non-positive-sum reward-pair rule. Seeds and fixed fields
-remain application-controlled.
+The baseline builds on SnakeLab 3.0.4's `transformer-epsilon-nice.json` sample:
+a Transformer with hidden size 64, one encoder layer, four attention heads,
+and dropout 0.05. Training starts with four-frame sequences, batch size 64,
+learning rate 0.001, and target update rate (`tau`) 0.05. It runs 500 episodes
+with required EpsilonNice starting at probability 0.05. The LLM chooses hidden
+sizes from 32 to 128 in multiples of 8, encoder depth from 1 to 3 layers, and
+dropout from 0 to 0.1 in steps of 0.01. Tau remains fixed at 0.05.
+`SimulationConfiguration` owns defaults, schema validation, and the
+non-positive-sum reward-pair rule. Seeds and fixed fields remain
+application-controlled.
 
 After the last pair is chosen, Ax3l checks the **whole configuration** against
 all stored runs. A duplicate is rejected within the last conversation so Qwen

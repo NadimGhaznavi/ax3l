@@ -38,7 +38,7 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
         calls = []
         selections = []
         chart_choices = []
-        values = dict(hidden_size=240, sequence_length=12, batch_size=26,
+        values = dict(hidden_size=96, layers=3, dropout=.02, sequence_length=12, batch_size=26,
                       learning_rate=.003, gamma=.97, epsilon_pair=(.91, .95),
                       reward_pair=(.25, -.5), epsilon_nice_pair=(.01, 40))
 
@@ -125,7 +125,9 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
                 await optimize(InferenceFixture(), Path('/tmp'), db, server.endpoint)
         self.assertEqual(len(calls), 1)
         self.assertEqual(chart_choices, list(CHOICE_CHARTS))
-        self.assertEqual(calls[0]['model']['hidden_size'], 240)
+        self.assertEqual(calls[0]['model']['hidden_size'], 96)
+        self.assertEqual(calls[0]['model']['layers'], 3)
+        self.assertEqual(calls[0]['model']['dropout'], .02)
         self.assertEqual(calls[0]['training']['learning_rate'], .003)
         self.assertEqual(calls[0]['epsilon_nice'], {'probability': .01, 'steps': 40})
         self.assertEqual(EventLogDb(db).current_golden_config()['process_id'], candidate_id)
@@ -137,10 +139,10 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(saved.metrics['termination_reasons']['snake'], {'count': 7, 'percent': 70})
         self.assertIsNone(saved.summary)
         events = ExperimentDb(db).choice_events(draft.draft_id)
-        self.assertEqual(sum(event['name'] == 'llm_request_started' for event in events), 9)
+        self.assertEqual(sum(event['name'] == 'llm_request_started' for event in events), 11)
         self.assertEqual(sum(bool(event['has_image']) for event in events), 3)
         replies = [json.loads(event['detail']) for event in events if event['name'] == 'reply_received']
-        self.assertEqual(replies, [{'prompt_tokens': 123, 'completion_tokens': 7}] * 9)
+        self.assertEqual(replies, [{'prompt_tokens': 123, 'completion_tokens': 7}] * 11)
         self.assertNotIn('data:image/png', json.dumps(events, default=str))
         rows = db.query("SELECT name, COUNT(*) AS n FROM events WHERE event_id>%s AND name IN ('simulation_analyzed','simulation_analysis_progress','simulation_submitted','configuration_compared') GROUP BY name", (first_event,))
         self.assertEqual({row['name']: row['n'] for row in rows},

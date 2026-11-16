@@ -474,6 +474,32 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         pending = self.get().split('>Read data', 1)[1]
         self.assertNotIn('href="/tool-results/15"', pending)
 
+    def test_prompt_and_reasoning_previews_use_the_shared_parser_and_preserve_original_pages(self):
+        event_log = self.enterContext(patch('ax3l.server.ReportingServer.EventLogDb')).return_value
+        text = '# Evidence\n\nCompare **settings**.\n\n```json\n{"learning_rate":0.0005}\n```\n<script>alert(1)</script>'
+        image = 'data:image/png;base64,cG5n'
+        event_log.get.return_value = dict(event_id=81, category='Conversation', name='prompt_sent',
+            content=json.dumps(dict(role='user', content=[dict(type='text', text=text),
+                dict(type='image_url', image_url=dict(url=image))])))
+        original = self.get('/events/81')
+        self.assertIn('```json', original)
+        prompt = self.get('/events/81?preview=1')
+        self.assertIn('id="message-content" class="tool-result"', prompt)
+        self.assertIn('<strong>settings</strong>', prompt)
+        self.assertIn('<td>learning rate</td>', prompt)
+        self.assertIn('<td>0.0005</td>', prompt)
+        self.assertIn(f'<img src="{image}"', prompt)
+        self.assertNotIn('```json', prompt)
+        self.assertNotIn('<script>', prompt)
+        event_log.get.return_value = dict(event_id=82, category='Conversation', name='reply_received',
+            content=json.dumps(dict(choices=[dict(message=dict(reasoning_content=text, content='Assistant answer'))])))
+        reasoning = self.get('/events/82/reason?preview=1')
+        self.assertIn('<td>learning rate</td>', reasoning)
+        self.assertIn('<strong>settings</strong>', reasoning)
+        self.assertNotIn('Assistant answer', reasoning)
+        self.assertNotIn('<script>', reasoning)
+        self.assertIn('```json', self.get('/events/82/reason'))
+
     def test_recorded_result_endpoint_formats_json_and_rejects_unrelated_events(self):
         event_log = self.enterContext(patch('ax3l.server.ReportingServer.EventLogDb')).return_value
         event = dict(event_id=8, category='Tool', name='tool_execution_completed',

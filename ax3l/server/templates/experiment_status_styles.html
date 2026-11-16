@@ -6,21 +6,24 @@
   .status-toolbar { justify-content: space-between; margin: .75rem 0; color: var(--muted); font-size: .8rem; }
   .status-views a { padding: .3rem .65rem; }
   .status-views [aria-current="page"] { color: var(--text); background: #23364b; border-color: var(--link); }
+  .experiment-status-page main.panel { overflow: visible; }
   .status-overview { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: .75rem 1rem; padding: .75rem 1rem; }
   .status-summary { min-width: 0; }
-  .status-heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .5rem 1rem; }
+  .status-heading { display: grid; gap: .5rem; overflow-wrap: anywhere; }
   .status-heading h2 { margin: 0; padding: 0; border: 0; background: transparent; color: var(--link); font-size: 1rem; }
   .status-view-label { margin: 0 0 .2rem; font-size: .8rem; }
-  .status-identifiers { justify-content: flex-end; font-size: .8rem; color: var(--muted); }
+  .status-identifiers { font-size: .8rem; color: var(--muted); }
+  .status-identifiers > span { white-space: nowrap; }
   .status-identifiers a, .status-results a { border: 0; padding: 0; }
   .status-progress { margin-top: .45rem; color: var(--muted); font-size: .8rem; }
   .status-detail { margin: .35rem 0 .5rem; font-size: .8rem; }
   .status-summary .status-usage-note { margin: .5rem 0 0; }
-  .status-countdown { margin-left: auto; min-width: 12rem; padding: .4rem .75rem; border: 1px solid var(--border); border-radius: .25rem; background: #151f2b; text-align: right; }
+  .status-countdown { margin-left: auto; width: 14rem; max-width: 100%; padding: .4rem .75rem; border: 1px solid var(--border); border-radius: .25rem; background: #151f2b; text-align: right; }
   .status-countdown span { display: block; color: var(--muted); font-size: .7rem; }
   .status-countdown strong { display: block; color: var(--link); font-size: 1.5rem; font-variant-numeric: tabular-nums; line-height: 1.3; }
-  .status-countdown.countdown-expired { border-color: #ff7b72; }
-  .countdown-expired strong { color: #ff7b72; }
+  .status-countdown.countdown-expired { border-color: #f5c77e; }
+  .countdown-expired strong { color: #f5c77e; }
+  .status-table-scroll { overflow-x: auto; }
   .status-checklist { min-width: 59rem; }
   .status-checklist .check-column { width: 4rem; }
   .status-checklist .details-column { width: 7rem; }
@@ -60,12 +63,12 @@
   #status-refresh-error { border: 1px solid var(--border); padding: .5rem 1rem; font-size: .8rem; color: #f5c77e; }
   @media (max-width: 900px) {
     .parameter-description { display: block; margin-left: 0; }
-    .status-identifiers { justify-content: flex-start; }
+  }
+  @media (max-width: 768px) {
+    .status-overview { grid-template-columns: minmax(0, 1fr); }
   }
   @media (max-width: 600px) {
-    .status-overview { grid-template-columns: minmax(0, 1fr); }
     .status-toolbar > span { font-size: .7rem; }
-    .status-checklist .check-column { width: 3.2rem; }
     .status-checklist .value-column { width: 7rem; }
     .status-checklist th, .status-checklist td { padding: .4rem; }
     .status-results { grid-template-columns: repeat(2, minmax(0, 1fr)); }

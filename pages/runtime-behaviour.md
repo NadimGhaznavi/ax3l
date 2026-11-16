@@ -92,7 +92,7 @@ without saving it. Qwen stays on the selected setting and must submit different
 values until the complete configuration is unique. After a unique change, Qwen can
 use `run_simulation` or select an unused setting. Used settings cannot be selected
 again and are omitted from the next selection prompt. Unselected settings keep their
-baseline values. Only Qwen's explicit run decision submits the unique draft.
+baseline values. Qwen can submit the unique draft through an explicit run decision.
 Each selection, value choice, and run decision resumes after a restart.
 
 Qwen is asked to select a parameter and find a unique setting, or decide to run
@@ -108,15 +108,22 @@ begins a new budget.
 
 Experiment Status shows the settings to be chosen and the saved selections.
 An LLM countdown box beside the experiment details above the table on the right
-ticks every second using the current decision deadline. At zero it turns red and
-continues downward with negative time throughout expiry and any grace period.
+ticks every second using the current decision deadline. At zero it turns amber.
+With a saved unique draft, it switches to a three-minute **Simulation Start
+Countdown** with **Time remaining** below the number. Without a unique draft,
+the **LLM countdown** continues into negative time with **Exceeded decision time**
+below the number.
 It resets after an accepted unique change and becomes inactive when the
-configuration is submitted.
+configuration is submitted. The table scrolls horizontally on its own, keeping
+the experiment details and countdown visible; refreshes retain its scroll position.
 It lists chart rendering, each Qwen request, each data or guide lookup, and
 each submission under the relevant setting or pair. Each step has its own
 elapsed time. Saved prompt messages have their own rows with a Prompt link in
 the LLM details column. Completed Qwen requests link to their captured Reasoning
-when Qwen returned nonempty reasoning text. These links open in a separate tab.
+when Qwen returned nonempty reasoning text. Hovering or focusing either link
+shows a scrollable preview using the same Markdown and JSON-table parser as
+Read results; prompts also include their captured chart images. Clicking these
+links opens the original content in a separate tab.
 Each returned Qwen request shows its own input and output token
 counts when reported by the server. The chart link opens the prompt with
 the exact image sent to Qwen. Read targets link to their recorded responses;

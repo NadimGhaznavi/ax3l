@@ -57,7 +57,7 @@ class GoldenHistoryTests(unittest.TestCase):
         rows = EventLogDb(Db()).golden_configurations()
         self.assertEqual([r['process_id'] for r in rows], ['seed-baseline', 'winner', 'baseline'])
         self.assertEqual([r['high_score'] for r in rows], [None, 55, 0])
-        self.assertEqual(parameter_change(rows[1]['decision']), '4 > 6')
+        self.assertEqual(parameter_change(rows[1]['decision']), 'network.size: 4 > 6')
         self.assertEqual(parameter_change(rows[2]['decision']), '')
         self.assertEqual(rows[1]['reply_id'], 6)
         self.assertEqual(rows[1]['parameter'], 'configuration')
@@ -76,8 +76,10 @@ class GoldenHistoryTests(unittest.TestCase):
             (None, ''),
             ('Initial defaults', ''),
             ('Fresh baseline after seed rotation. Score to beat: 55.', ''),
-            ('High score: 55 > 0; network.size: 4 -> 6.', '4 > 6'),
-            ('High score: 55 > 0; learning_rate: 1e-05 -> 0.001.', '1e-05 > 0.001'),
+            ('High score: 55 > 0; network.size: 4 -> 6.', 'network.size: 4 > 6'),
+            ('High score: 55 > 0; learning_rate: 1e-05 -> 0.001.', 'Learning Rate: 1e-05 > 0.001'),
+            ('High score: 55 > 0; model.layers: 1 -> 2.', 'Encoder Layers: 1 > 2'),
+            ('High score: 55 > 0; epsilon.initial: 0.9 -> 0.8.', 'Epsilon: initial: 0.9 > 0.8'),
             ('High score: 55 > 0; rewards.food: 0 -> 6; rewards.death: -4 -> -2.',
              'rewards.food: 0 > 6; rewards.death: -4 > -2'),
         ):
@@ -99,7 +101,7 @@ class GoldenReportTests(unittest.TestCase):
         log.golden_configurations.return_value = [
             dict(event_id=9, occurred_at=datetime(2026, 9, 15, 12, 30, 45),
                  process_id=run_id, parameter='<parameter>', reply_id=6, response=response, high_score=55,
-                 decision='High score: 55 > 0; network.size: 4 -> 6.'),
+                 decision='High score: 55 > 0; epsilon.initial: 0.9 -> 0.8.'),
             dict(event_id=1, occurred_at=None, process_id=None, parameter=None,
                  reply_id=None, response=None, high_score=None),
             dict(event_id=0, occurred_at=None, process_id=None, parameter=None,
@@ -120,7 +122,7 @@ class GoldenReportTests(unittest.TestCase):
                 return result.read().decode()
 
         page = get('/golden-configurations')
-        for value in ('Date', 'Time', 'Configuration', 'Simulation', 'High Score', '<td>55</td>', '<td>0</td>', 'Parameter', 'Change', '<td>4 &gt; 6</td>', 'Reason', '2026-09-15',
+        for value in ('Date', 'Time', 'Configuration', 'Simulation', 'High Score', '<td>55</td>', '<td>0</td>', 'Parameter', 'Change', '<td>Epsilon: initial: 0.9 &gt; 0.8</td>', 'Reason', '2026-09-15',
                       '12:30:45', '&lt;parameter&gt;', f'href="/simulations/{run_id}/config"'):
             self.assertIn(value, page)
         self.assertIn(f'href="/simulations/{run_id}/config">{run_id[:8]}</a>', page)
@@ -143,7 +145,7 @@ class GoldenReportTests(unittest.TestCase):
             decision='game.rewards.further_from_food: -4 -> -2; game.rewards.closer_to_food: -2 -> -2.')
         page = get('/golden-configurations')
         self.assertIn('Food Reward: closer, further', page)
-        self.assertIn('-2 &gt; -2, -4 &gt; -2', page)
+        self.assertIn('Food Reward: closer: -2 &gt; -2, Food Reward: further: -4 &gt; -2', page)
         log.get.return_value['content'] = '{}'
         with self.assertRaises(HTTPError) as error:
             get('/events/6/reason')

@@ -9,26 +9,26 @@ from ax3l.activity.ScoreDistribution import distribution_frames, render_distribu
 
 
 class ScoreDistributionTests(unittest.TestCase):
-    def test_2054_simulations_have_four_cumulative_checkpoints_and_all_runs(self):
+    def test_2054_simulations_have_41_cumulative_checkpoints_and_all_runs(self):
         scores = {number: number % 20 for number in range(1, 2055)}
         frames = distribution_frames(scores)
-        self.assertEqual(len(frames), 6)
+        self.assertEqual(len(frames), 43)
         self.assertEqual(frames[0], ('Before simulation #1', []))
-        self.assertEqual(frames[1][0], 'Simulations #1–500')
-        self.assertEqual(frames[2][0], 'Simulations #1–1000')
-        self.assertEqual(frames[-2][0], 'Simulations #1–2000')
+        self.assertEqual(frames[1][0], 'Simulations #1–50')
+        self.assertEqual(frames[2][0], 'Simulations #1–100')
+        self.assertEqual(frames[-2][0], 'Simulations #1–2050')
         self.assertEqual(frames[-1][0], 'All simulations #1–2054')
-        self.assertEqual([len(values) for _, values in frames[1:-1]], [500, 1000, 1500, 2000])
+        self.assertEqual([len(values) for _, values in frames[1:-1]], list(range(50, 2051, 50)))
         for index, (_, values) in enumerate(frames[1:-1], 1):
-            self.assertEqual(values, [scores[number] for number in range(1, index * 500 + 1)])
+            self.assertEqual(values, [scores[number] for number in range(1, index * 50 + 1)])
         self.assertEqual(len(frames[-1][1]), 2054)
         gif = Image.open(BytesIO(render_distribution(scores)))
-        self.assertEqual(gif.n_frames, 6)
+        self.assertEqual(gif.n_frames, 43)
         self.assertEqual(gif.info['loop'], 0)
         self.assertEqual(gif.size, (800, 480))
-        for index in range(6):
+        for index in range(43):
             gif.seek(index)
-            self.assertEqual(gif.info['duration'], 5000 if index == 5 else 2000)
+            self.assertEqual(gif.info['duration'], 5000 if index == 42 else 2000)
             self.assertEqual(gif.disposal_method, 2)
 
     def test_fixed_axes_bar_positions_and_embedded_labels(self):
@@ -68,7 +68,7 @@ class ScoreDistributionTests(unittest.TestCase):
         x = int(PLOT[0] + .5 * (PLOT[2] - PLOT[0]) / 11)
         blue = (76, 155, 232)
         self.assertNotEqual(images[0].getpixel((x, 300)), blue)
-        self.assertEqual(images[1].getpixel((x, 300)), blue)
+        self.assertEqual(images[1].getpixel((x, 345)), blue)
         self.assertNotEqual(images[1].getpixel((x, 150)), blue)
         self.assertEqual(images[-1].getpixel((x, 150)), blue)
         self.assertEqual(data, render_distribution(scores))
@@ -78,21 +78,22 @@ class ScoreDistributionTests(unittest.TestCase):
         self.assertEqual(distribution_frames(scores)[-1][1], [9, 0])
         missing = {number: None for number in range(1, 1001) if number != 50}
         frames = distribution_frames(missing)
-        self.assertEqual(len(frames), 4)
-        self.assertEqual(frames[1][0], 'Simulations #1–500')
-        self.assertEqual(len(frames[1][1]), 499)
-        self.assertEqual(frames[2][0], 'Simulations #1–1000')
-        self.assertEqual(len(frames[2][1]), 999)
+        self.assertEqual(len(frames), 22)
+        self.assertEqual(frames[1][0], 'Simulations #1–50')
+        self.assertEqual(len(frames[1][1]), 49)
+        self.assertEqual(frames[2][0], 'Simulations #1–100')
+        self.assertEqual(len(frames[2][1]), 99)
+        self.assertEqual(len(frames[-2][1]), 999)
         for scores in ({}, {1: None}, {1: 0}, missing):
             gif = Image.open(BytesIO(render_distribution(scores)))
             self.assertEqual(gif.n_frames, len(distribution_frames(scores)))
             gif.seek(gif.n_frames - 1)
             self.assertEqual(gif.info['duration'], 5000)
 
-    def test_second_encoded_frame_shows_first_500_range_despite_missing_id(self):
+    def test_second_encoded_frame_shows_first_50_range_despite_missing_id(self):
         scores = {number: 0 for number in range(2, 1055)}
         gif = Image.open(BytesIO(render_distribution(scores)))
-        self.assertEqual(gif.n_frames, 4)
+        self.assertEqual(gif.n_frames, 23)
         palette = gif.copy()
         gif.seek(1)
         self.assertEqual(gif.info['duration'], 2000)
@@ -100,13 +101,13 @@ class ScoreDistributionTests(unittest.TestCase):
         expected = Image.new('RGB', gif.size, '#101720')
         from PIL import ImageFont
         from ax3l.activity.ScoreDistribution import FONT
-        ImageDraw.Draw(expected).text((24, 56), 'Simulations #1–500',
+        ImageDraw.Draw(expected).text((24, 56), 'Simulations #1–50',
                                       font=ImageFont.truetype(str(FONT), 14), fill='#d5dfeb')
         expected = expected.quantize(palette=palette, dither=Image.Dither.NONE).convert('RGB')
         self.assertEqual(gif.convert('RGB').crop((24, 56, 250, 80)).tobytes(),
                          expected.crop((24, 56, 250, 80)).tobytes())
         self.assertEqual(distribution_frames({1001: 0})[1:3],
-                         [('Simulations #1–500', []), ('Simulations #1–1000', [])])
+                         [('Simulations #1–50', []), ('Simulations #1–100', [])])
 
     def test_final_y_scale_includes_partial_block_and_is_used_throughout(self):
         scores = {number: number % 50 for number in range(1, 501)}
@@ -122,7 +123,7 @@ class ScoreDistributionTests(unittest.TestCase):
             return original(draw, xy, text, *args, **kwargs)
         with patch.object(ImageDraw.ImageDraw, 'text', record):
             render_distribution(scores)
-        self.assertEqual(ticks, [['0', '26', '52', '78', '104', '130']] * 4)
+        self.assertEqual(ticks, [['0', '26', '52', '78', '104', '130']] * 23)
 
     def test_rare_scores_remain_visible_with_large_all_run_counts(self):
         scores = {number: 0 for number in range(1, 1001)}
@@ -167,6 +168,8 @@ class ScoreDistributionTests(unittest.TestCase):
                 page = response.read().decode()
                 self.assertEqual(response.headers['Cache-Control'], 'no-store')
             self.assertIn('All simulations: 4 (3 scored).', page)
+            self.assertIn('every 50 simulations (#1–50, #1–100, …)', page)
+            self.assertIn('every 50 simulation IDs', page)
             self.assertNotIn('Plotly', page)
             self.assertNotIn('<script', page)
             self.assertIn('Back to event log', page)

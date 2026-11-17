@@ -14,7 +14,7 @@
   </p>
 
   <p>
-    An empty plot is followed by cumulative results every 500 simulations (#1–500, #1–1000, …),
+    An empty plot is followed by cumulative results every {{ checkpoint_interval }} simulations (#1–{{ checkpoint_interval }}, #1–{{ checkpoint_interval * 2 }}, …),
     for two seconds each. All simulations, including the partial block, appear for five seconds before restarting.
     The final all-simulations distribution sets fixed X and Y axes for every frame.
     Blue bars count the latest high scores; unscored runs are excluded from bars.
@@ -23,7 +23,7 @@
   </section>
   <main class="panel">
     <img class="score-distribution" width="800" height="480" src="data:image/gif;base64,{{ animation }}"
-         alt="Cumulative score distribution every 500 simulation IDs, followed by all {{ total }} simulations ({{ scored }} scored). Fixed X and Y axes based on all simulations. Each frame includes its range and counts.">
+         alt="Cumulative score distribution every {{ checkpoint_interval }} simulation IDs, followed by all {{ total }} simulations ({{ scored }} scored). Fixed X and Y axes based on all simulations. Each frame includes its range and counts.">
     {% if not scored %}
     <p>No scores recorded yet.</p>
     {% endif %}

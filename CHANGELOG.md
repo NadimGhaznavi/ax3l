@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Show score-distribution progress in smaller simulation checkpoints.
+
+### Changed
+
+- Use cumulative score-distribution GIF checkpoints every 50 simulations.
+  Keep the interval in `DScoreDistribution.CHECKPOINT_INTERVAL` and use it in
+  the report description so future tuning stays consistent.
+
 ## [4.10.0] - 2026-11-16 @ 08:49
 
 ### Summary

@@ -1,4 +1,4 @@
-"""Render cumulative score distributions every 500 simulations on fixed axes."""
+"""Render cumulative score distributions at fixed checkpoints on fixed axes."""
 
 from base64 import b64encode
 from collections import Counter
@@ -7,8 +7,9 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+from ax3l.constants.DScoreDistribution import DScoreDistribution
 
-BLOCK_SIZE = 500
+
 FONT = Path(__file__).parent / 'fonts' / 'DejaVuSansMono.ttf'
 SIZE = (800, 480)
 PLOT = (90, 110, 775, 350)
@@ -21,7 +22,8 @@ def distribution_frames(scores: dict[int, int | None]) -> list[tuple[str, list[i
     cumulative = []
     position = 0
     maximum_id = rows[-1][0] if rows else 0
-    for last in range(BLOCK_SIZE, maximum_id + 1, BLOCK_SIZE):
+    interval = DScoreDistribution.CHECKPOINT_INTERVAL
+    for last in range(interval, maximum_id + 1, interval):
         while position < len(rows) and rows[position][0] <= last:
             cumulative.append(rows[position][1])
             position += 1
@@ -98,4 +100,5 @@ def render_distribution(scores: dict[int, int | None]) -> bytes:
 def distribution(scores: dict[int, int | None]) -> dict:
     """Keep the animation and page counts in the same database snapshot."""
     return dict(total=len(scores), scored=sum(score is not None for score in scores.values()),
+                checkpoint_interval=DScoreDistribution.CHECKPOINT_INTERVAL,
                 animation=b64encode(render_distribution(scores)).decode('ascii'))

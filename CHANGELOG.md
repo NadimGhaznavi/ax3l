@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.10.1] - 2026-11-17 @ 04:50
+
 ### Summary
 
 Show score-distribution progress in smaller simulation checkpoints.

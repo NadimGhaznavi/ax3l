@@ -107,3 +107,20 @@ class SubmitPairValuesHandlerTests(unittest.TestCase):
         self.assertEqual(self.draft.config['epsilon_nice'], dict(probability=.1, steps=40))
         self.assertEqual(self.draft.phase, 'reviewing')
         self.experiments.save_draft.assert_called_once_with(self.draft)
+
+    def test_exhausted_reward_pair_reopens_the_run_decision_without_saving_the_duplicate(self):
+        self.bind('reward_pair')
+        self.draft.selections = ['learning_rate']
+        self.draft.config['training']['learning_rate'] = .003
+        original = deepcopy(self.draft)
+        self.snake.is_config_unique.return_value = False
+        self.snake.available_parameters.return_value = []
+        result = self.submit('reward_pair', .25, -.5)
+        self.assertEqual(result['status'], 'rejected')
+        self.assertEqual(result['code'], 'parameter_space_exhausted')
+        self.assertEqual(self.draft.config, original.config)
+        self.assertEqual(self.draft.selections, original.selections)
+        self.assertEqual(self.draft.phase, 'reviewing')
+        self.assertIsNone(self.draft.parameter)
+        self.experiments.save_draft.assert_called_once_with(self.draft)
+        self.snake.submit_simulation.assert_not_called()

@@ -2,7 +2,7 @@
 
 from concurrent.futures import ThreadPoolExecutor
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from uuid import uuid4
 
 import zmq
@@ -11,6 +11,24 @@ from ax3l.interface.SnakeLab import SnakeLab, SnakeLabQueryError, SimulationUnav
 
 
 class SnakeLabTests(unittest.TestCase):
+    def test_availability_reads_use_the_shared_connection_and_close_it_after_success_or_failure(self):
+        config, parameters = {'seed': 1970}, ['layers']
+        for error in (None, RuntimeError('database unavailable')):
+            with self.subTest(error=error):
+                db, dal = Mock(), Mock()
+                dal.available_parameters.return_value = parameters
+                dal.available_parameters.side_effect = error
+                with patch('ax3l.interface.SnakeLab.DbMgr', return_value=db) as factory, \
+                        patch('ax3l.interface.SnakeLab.SnakeLabDb', return_value=dal):
+                    if error is None:
+                        self.assertEqual(SnakeLab().available_parameters(config, parameters), parameters)
+                    else:
+                        with self.assertRaisesRegex(RuntimeError, 'database unavailable'):
+                            SnakeLab().available_parameters(config, parameters)
+                factory.assert_called_once_with(database='snakelab', initialize_event_tables=False)
+                dal.available_parameters.assert_called_once_with(config, parameters)
+                db.close.assert_called_once()
+
     def exchange(self, payload, **overrides):
         with zmq.Context() as context:
             with context.socket(zmq.REP) as server:

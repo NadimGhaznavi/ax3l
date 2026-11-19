@@ -43,12 +43,15 @@ class ExperimentStatusTests(unittest.TestCase):
         for phase in ('selecting_parameter', 'choosing', 'reviewing'):
             with self.subTest(phase=phase):
                 self.draft.phase, self.draft.parameter = phase, 'gamma'
-                with patch('ax3l.activity.ExperimentStatus.time', return_value=850.5):
-                    self.assertEqual(self.report()['countdown'], dict(remaining_seconds=149.5, grace_seconds=0))
+                for now, remaining in ((850.5, 149.5), (1030, -30), (1180, -180)):
+                    with patch('ax3l.activity.ExperimentStatus.time', return_value=now):
+                        self.assertEqual(self.report()['countdown'], dict(
+                            remaining_seconds=remaining, grace_seconds=180, expiry_action='reset'))
         self.draft.selections = ['layers']
         for now, remaining in ((850, 150), (1030, -30), (1180, -180)):
             with self.subTest(now=now), patch('ax3l.activity.ExperimentStatus.time', return_value=now):
-                self.assertEqual(self.report()['countdown'], dict(remaining_seconds=remaining, grace_seconds=180))
+                self.assertEqual(self.report()['countdown'], dict(
+                    remaining_seconds=remaining, grace_seconds=180, expiry_action='run'))
 
     def test_countdown_is_inactive_outside_decisions_or_without_a_saved_deadline(self):
         self.assertIsNone(self.report()['countdown'])
@@ -328,12 +331,12 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         self.assertLess(page.index('id="llm-countdown"'), page.index('<table class="status-checklist"'))
         self.assertIn('LLM countdown', page)
         self.assertEqual(json.loads(page.split("data-countdown='", 1)[1].split("'", 1)[0]),
-                         dict(remaining_seconds=100.5, grace_seconds=0))
+                         dict(remaining_seconds=100.5, grace_seconds=180, expiry_action='reset'))
         self.draft.phase, self.draft.selections = 'reviewing', ['layers']
         with patch('ax3l.activity.ExperimentStatus.time', return_value=1030.5):
             page = self.get()
         self.assertEqual(json.loads(page.split("data-countdown='", 1)[1].split("'", 1)[0]),
-                         dict(remaining_seconds=-30, grace_seconds=180))
+                         dict(remaining_seconds=-30, grace_seconds=180, expiry_action='run'))
         self.draft.phase = 'ready'
         page = self.get()
         self.assertIn("data-countdown='null'", page)

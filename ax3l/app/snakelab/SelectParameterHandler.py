@@ -2,6 +2,7 @@
 
 from ax3l.app.snakelab.ExperimentDb import ExperimentDb
 from ax3l.app.snakelab.SubmitSingleValueHandler import SubmitSingleValueHandler
+from ax3l.constants.DChoice import CHOICE_LABELS
 from ax3l.entities.ConfigurationDraft import PARAMETER_ORDER
 
 
@@ -21,6 +22,11 @@ class SelectParameterHandler(SubmitSingleValueHandler):
         if parameter in draft.selections:
             return self._reject(f"{parameter} has already been chosen in this experiment. "
                                 "Choose an unused parameter or run the unique configuration.")
+        if not self._snake.available_parameters(draft.config, [parameter]):
+            result = self._reject(f"No untested changes remain for {CHOICE_LABELS[parameter]} with the current "
+                                  "seed and other draft settings. Choose another available setting, "
+                                  "or run the unique configuration.")
+            return {**result, "code": "parameter_space_exhausted"}
         draft.parameter = parameter
         draft.phase = "choosing"
         experiments.save_draft(draft)

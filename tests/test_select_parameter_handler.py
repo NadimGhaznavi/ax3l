@@ -17,6 +17,7 @@ class SelectParameterHandlerTests(unittest.TestCase):
     def setUp(self):
         shared = 'ax3l.app.snakelab.SubmitSingleValueHandler.'
         self.snake = self.enterContext(patch(shared + 'SnakeLab')).return_value
+        self.snake.available_parameters.side_effect = lambda config, parameters: parameters
         self.experiments = self.enterContext(patch(shared + 'ExperimentDb')).return_value
         self.enterContext(patch('ax3l.app.snakelab.SelectParameterHandler.ExperimentDb',
                                 return_value=self.experiments))
@@ -56,6 +57,36 @@ class SelectParameterHandlerTests(unittest.TestCase):
                         dict(draft_id=None, parameter='layers')):
             self.assertEqual(self.handler.submit(payload)['status'], 'rejected')
         self.experiments.draft.assert_not_called()
+        self.experiments.save_draft.assert_not_called()
+
+    def test_exhausted_parameters_are_rejected_without_locking_or_changing_the_draft(self):
+        self.snake.available_parameters.side_effect = lambda config, parameters: [
+            parameter for parameter in parameters if parameter != 'layers']
+        for phase in ('selecting_parameter', 'reviewing'):
+            with self.subTest(phase=phase):
+                self.bind()
+                self.draft.phase = phase
+                if phase == 'reviewing':
+                    self.draft.selections = ['learning_rate']
+                    self.draft.config['training']['learning_rate'] = .003
+                    self.draft.config['seed'] += 1
+                original = deepcopy(self.draft)
+                self.experiments.save_draft.reset_mock()
+                result = self.select('layers')
+                self.assertEqual(result['code'], 'parameter_space_exhausted')
+                self.assertIn('encoder layers', result['reason'])
+                self.assertEqual(self.draft, original)
+                self.experiments.save_draft.assert_not_called()
+                self.snake.available_parameters.assert_called_with(self.draft.config, ['layers'])
+                self.assertEqual(self.select('gamma')['phase'], 'choosing')
+                self.assertEqual(self.draft.parameter, 'gamma')
+
+    def test_availability_read_errors_propagate_without_saving_a_selection(self):
+        original = deepcopy(self.draft)
+        self.snake.available_parameters.side_effect = RuntimeError('database unavailable')
+        with self.assertRaisesRegex(RuntimeError, 'database unavailable'):
+            self.select('layers')
+        self.assertEqual(self.draft, original)
         self.experiments.save_draft.assert_not_called()
 
     def test_stale_drafts_and_choices_outside_the_revision_phase_are_rejected(self):

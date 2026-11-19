@@ -48,7 +48,7 @@ class SelectParameterHandlerTests(unittest.TestCase):
         self.snake.submit_simulation.assert_not_called()
 
     def test_invalid_names_and_arguments_do_not_read_or_change_the_draft(self):
-        for parameter in ('seed', 'epochs', 'revision', 'probability', 'unknown', None, [], True):
+        for parameter in ('epochs', 'revision', 'probability', 'unknown', None, [], True):
             with self.subTest(parameter=parameter):
                 self.assertEqual(self.select(parameter)['status'], 'rejected')
         for payload in (None, {}, dict(draft_id='draft'),

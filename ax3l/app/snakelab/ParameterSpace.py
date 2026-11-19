@@ -34,6 +34,8 @@ def finite_values(field):
 
 
 def parameter_paths(parameter):
+    if parameter == "seed":
+        return (("seed",),)
     if parameter in SINGLE_PARAMETERS:
         return (SINGLE_PARAMETERS[parameter][0],)
     return PAIR_PARAMETERS[parameter]
@@ -44,6 +46,8 @@ def parameter_values(config: dict, parameter: str) -> dict[str, int | float]:
 
 
 def finite_choices(parameter):
+    if parameter == "seed":
+        return None
     domains = []
     for path in parameter_paths(parameter):
         field = SCHEMA

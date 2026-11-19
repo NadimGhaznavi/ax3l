@@ -146,6 +146,7 @@ exec /usr/bin/systemd-analyze "$@"
                                'app/snakelab/tools/SubmitSimulationSummary.py',
                                'app/snakelab/SelectParameterHandler.py', 'app/snakelab/tools/SelectParameter.py',
                                'app/snakelab/RunSimulationHandler.py', 'app/snakelab/tools/RunSimulation.py',
+                               'app/snakelab/RequestSeedChangeHandler.py', 'app/snakelab/tools/RequestSeedChange.py',
                                'app/snakelab/prompts/ConfigurationNextStep.py',
                                'app/snakelab/prompts/NoDupes.py',
                                'interface/KnowledgeBase.py', 'constants/DSimulationAnalysis.py',

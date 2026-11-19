@@ -16,6 +16,7 @@ from ax3l.app.snakelab.SubmitSingleValueHandler import SubmitSingleValueHandler
 from ax3l.app.snakelab.SubmitPairValuesHandler import SubmitPairValuesHandler
 from ax3l.app.snakelab.SelectParameterHandler import SelectParameterHandler
 from ax3l.app.snakelab.RunSimulationHandler import RunSimulationHandler
+from ax3l.app.snakelab.RequestSeedChangeHandler import RequestSeedChangeHandler
 from ax3l.constants.DChoice import CHOICE_CHARTS, CHOICE_LABELS, REVISION_PARAMETER
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
@@ -76,7 +77,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.enterContext(patch(module + 'SnakeLab', return_value=self.snake))
         self.enterContext(patch(module + 'ExperimentDb', return_value=self.store))
         self.enterContext(patch(module + 'EventLogDb', return_value=self.events))
-        self.rotation = self.enterContext(patch(module + 'rotate_if_needed', new_callable=AsyncMock))
+        self.rotation = self.enterContext(patch(module + 'resume_seed_rotation', new_callable=AsyncMock))
         self.wait = self.enterContext(patch(module + 'wait_for_run', new_callable=AsyncMock))
         self.analysis = self.enterContext(patch(module + 'record_run_metrics'))
         self.analysis.side_effect = lambda snake, experiments, run_id: experiments.analysis(run_id)
@@ -88,6 +89,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.enterContext(patch(shared + 'SnakeLab', return_value=self.snake))
         self.enterContext(patch('ax3l.app.snakelab.SelectParameterHandler.ExperimentDb', return_value=self.store))
         self.enterContext(patch('ax3l.app.snakelab.RunSimulationHandler.ExperimentDb', return_value=self.store))
+        self.enterContext(patch('ax3l.app.snakelab.RequestSeedChangeHandler.ExperimentDb', return_value=self.store))
         self.db = Mock()
         self.decisions = ['learning_rate', 'run']
         self.prompts = []
@@ -105,9 +107,10 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
                 if step != 'run':
                     payload['parameter'] = step
                 return handler.submit(payload)
-            value = self.values[parameter]
             payload = {'draft_id': process_id}
-            if isinstance(value, tuple):
+            if parameter == 'seed':
+                result = RequestSeedChangeHandler(db).submit(payload)
+            elif isinstance(value := self.values[parameter], tuple):
                 payload.update(pair=parameter, value_1=value[0], value_2=value[1])
                 result = SubmitPairValuesHandler(db).submit(payload)
             else:
@@ -154,7 +157,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.tools.call_args_list[0].kwargs['allow_run'])
         self.assertTrue(self.tools.call_args_list[-1].kwargs['allow_run'])
 
-    async def test_one_change_can_run_without_choosing_the_other_nine_settings(self):
+    async def test_one_change_can_run_without_choosing_the_other_settings(self):
         await self.cycle()
         self.assertEqual(self.trace(), [REVISION_PARAMETER, 'learning_rate', REVISION_PARAMETER])
         self.assertEqual(self.store.saved.selections, ['learning_rate'])
@@ -394,11 +397,10 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('configuration_compared', [call.args[0] for call in self.db.log.call_args_list])
         self.analysis.assert_called_once()
 
-    async def test_new_draft_uses_the_rotated_baseline_before_parameter_selection(self):
+    async def test_new_draft_uses_a_recovered_legacy_baseline_before_parameter_selection(self):
         rotated = self.store.analyses[self.best]
-        async def rotate(*args, resume_only=False):
-            if not resume_only:
-                self.events.current_golden_config.return_value = {'process_id': self.best}
+        async def rotate(*args):
+            self.events.current_golden_config.return_value = {'process_id': self.best}
         self.rotation.side_effect = rotate
         self.snake.get_run_result.return_value = None
         self.snake.get_run_result.side_effect = lambda run_id: dict(
@@ -410,6 +412,42 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         prompt = self.conversation.await_args.args[4][-1].to_md()
         self.assertIn('baseline values from the golden configuration', prompt)
         self.assertIn('select_parameter', prompt)
+
+    async def test_seed_change_is_staged_before_the_explicit_run_and_uses_normal_scoring(self):
+        self.decisions = ['seed', 'run']
+        await self.cycle()
+        self.assertEqual(self.trace(), [REVISION_PARAMETER, 'seed', REVISION_PARAMETER])
+        self.assertEqual(self.store.saved.selections, ['seed'])
+        self.assertEqual(self.snake.submit_simulation.call_args.args[0], {**self.config, 'seed': 1971})
+        prompt = self.prompts[1]
+        self.assertIn('request_seed_change with no arguments', prompt)
+        self.assertNotIn('Submit using submit_single_value', prompt)
+        self.assertEqual(self.rotation.await_count, 1)
+        self.assertIn('configuration_compared', [call.args[0] for call in self.db.log.call_args_list])
+
+    async def test_restart_after_a_seed_choice_does_not_increment_it_again(self):
+        self.store.saved = self.draft(phase='reviewing')
+        self.store.saved.selections = ['seed']
+        self.store.saved.config['seed'] = 1971
+        self.decisions = ['run']
+        await self.cycle()
+        self.assertEqual(self.trace(), [REVISION_PARAMETER])
+        self.assertEqual(self.snake.submit_simulation.call_args.args[0]['seed'], 1971)
+        self.assertEqual(self.store.saved.selections, ['seed'])
+
+    async def test_chart_source_is_reselected_when_a_seed_changes_mid_draft(self):
+        self.decisions = ['epsilon_pair', 'seed', 'learning_rate', 'run']
+        await self.cycle()
+        messages = {call.kwargs['parameter']: call.args[4][0].to_md()
+                    for call in self.conversation.await_args_list}
+        self.assertIn('The chart shows the latest run.', messages['epsilon_pair'])
+        self.assertIn('The chart shows the golden run.', messages['learning_rate'])
+        self.assertIn('different seed from the draft', messages['learning_rate'])
+        evidence = json.loads(messages['learning_rate'].split('```json\n')[1].split('\n```')[0])
+        self.assertFalse(evidence['reference_runs']['golden']['same_seed_as_draft'])
+        self.assertEqual([call.args[0]['seed'] for call in self.chart.call_args_list], [1970, 1970])
+        self.assertEqual([call.args[0] for call in self.snake.get_analysis_episodes.call_args_list],
+                         [self.latest, self.gold])
 
     def test_ready_drafts_cannot_submit_epsilon_nice_values_above_either_cap(self):
         for probability, steps in ((.1, 41), (.11, 40)):

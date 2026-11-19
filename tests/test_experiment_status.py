@@ -82,14 +82,14 @@ class ExperimentStatusTests(unittest.TestCase):
         self.draft.phase, self.draft.parameter = 'choosing', 'epsilon_pair'
         report = self.report()
         self.assertEqual(report['choices_selected'], 7)
-        self.assertEqual(report['choices_total'], 10)
+        self.assertEqual(report['choices_total'], 11)
         rows = report['rows']
-        self.assertEqual(len(rows), 13)
+        self.assertEqual(len(rows), 14)
         self.assertEqual([row['path'] for row in rows], [
             'model.hidden_size', 'model.layers', 'model.dropout', 'training.sequence_length', 'training.batch_size',
             'training.learning_rate', 'training.gamma', 'epsilon.initial', 'epsilon.decay',
             'game.rewards.closer_to_food', 'game.rewards.further_from_food',
-            'epsilon_nice.probability', 'epsilon_nice.steps'])
+            'epsilon_nice.probability', 'epsilon_nice.steps', 'seed'])
         self.assertTrue(all(row['selected'] for row in rows[:7]))
         self.assertTrue(all(not row['selected'] for row in rows[7:]))
         self.assertEqual([row['path'] for row in rows if row['current']], ['epsilon.initial', 'epsilon.decay'])
@@ -101,6 +101,23 @@ class ExperimentStatusTests(unittest.TestCase):
         self.assertTrue(all(row['selected'] for row in report['rows'][:9]))
         self.assertEqual([row['path'] for row in report['rows'] if row['current']],
                          ['game.rewards.closer_to_food', 'game.rewards.further_from_food'])
+
+    def test_seed_choice_has_its_own_pending_and_saved_checklist_row(self):
+        self.draft.phase, self.draft.parameter = 'choosing', 'seed'
+        seed = next(row for row in self.report()['rows'] if row['path'] == 'seed')
+        self.assertTrue(seed['current'])
+        self.assertFalse(seed['selected'])
+        self.assertEqual(seed['label'], 'Random Seed')
+        self.draft.config['seed'] += 1
+        self.draft.selections = ['seed']
+        self.draft.phase, self.draft.parameter = 'reviewing', None
+        report = self.report()
+        seed = next(row for row in report['rows'] if row['path'] == 'seed')
+        self.assertTrue(seed['selected'])
+        self.assertTrue(seed['changed'])
+        self.assertEqual(seed['inherited_value'], '1970')
+        self.assertEqual(seed['value'], '1971')
+        self.assertEqual(report['choices_selected'], 1)
 
     def test_values_are_compared_with_the_starting_golden_configuration_per_field(self):
         self.golden['config']['model']['hidden_size'] = 96
@@ -245,7 +262,7 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         page = self.get()
         self.assertIn('Choosing a setting', page)
         self.assertIn('0 settings saved', page)
-        self.assertEqual(page.count('type="checkbox" disabled'), 13)
+        self.assertEqual(page.count('type="checkbox" disabled'), 14)
         self.assertNotIn('>Pending</span>', page)
         self.assertNotIn('<td class="changed-value">', page)
         self.assertIn('window.setTimeout(refreshStatus, 5000)', page)
@@ -266,7 +283,7 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         page = self.get('/experiment-status?view=completed')
         self.assertIn('aria-current="page">Last completed</a>', page)
         self.assertIn('id="experiment-phase" aria-live="polite" aria-atomic="true">Complete</h2>', page)
-        self.assertEqual(page.count('disabled checked'), 13)
+        self.assertEqual(page.count('disabled checked'), 14)
         self.assertNotIn('>Pending</span>', page)
         self.assertNotIn('class="comparison-label"', page)
         self.assertIn('<dt>High score</dt><dd>0</dd>', page)
@@ -343,8 +360,8 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         page = self.get()
         self.assertIn('Choosing a setting to revise', page)
         self.assertIn('Experiment decision', page)
-        self.assertIn('10 settings saved', page)
-        self.assertEqual(page.count('disabled checked'), 13)
+        self.assertIn('11 settings saved', page)
+        self.assertEqual(page.count('disabled checked'), 14)
         self.assertNotIn('>Pending</span>', page)
 
     def test_setup_shows_live_steps_with_separate_turn_times_and_tokens(self):

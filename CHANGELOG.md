@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Let Qwen request seed changes through the existing configuration experiment
+workflow instead of rotating automatically after nine unsuccessful proposals.
+
+### Added
+
+- PNG showing the transformer.
+- Add a seed choice and argument-free `request_seed_change` MCP tool. Ax3l
+  increments the seed, skipping complete configurations already stored in any
+  status, and saves the unique choice without starting a simulation.
+
+### Changed
+
+- Keep seed changes subject to the existing configuration choices, run
+  decisions, restart recovery, and strict high-score promotion rules.
+- Show seed selections in Experiment Status and refresh chart-source selection
+  after draft seed changes, identifying measurements from other seeds.
+- Bound seed increments to the signed integer range used by Ax3l's score
+  history and retain recovery of seed rotations recorded before this change.
+
+### Removed
+
+- Stop starting automatic seed rotations after nine unsuccessful proposals.
+
 ## [4.10.2] - 2026-11-17 @ 05:12
 
 ### Summary

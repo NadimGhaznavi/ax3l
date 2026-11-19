@@ -79,6 +79,7 @@ class GoldenHistoryTests(unittest.TestCase):
             ('High score: 55 > 0; network.size: 4 -> 6.', 'network.size: 4 > 6'),
             ('High score: 55 > 0; learning_rate: 1e-05 -> 0.001.', 'Learning Rate: 1e-05 > 0.001'),
             ('High score: 55 > 0; model.layers: 1 -> 2.', 'Encoder Layers: 1 > 2'),
+            ('High score: 55 > 0; seed: 1970 -> 1971.', 'Random Seed: 1970 > 1971'),
             ('High score: 55 > 0; epsilon.initial: 0.9 -> 0.8.', 'Epsilon: initial: 0.9 > 0.8'),
             ('High score: 55 > 0; rewards.food: 0 -> 6; rewards.death: -4 -> -2.',
              'rewards.food: 0 > 6; rewards.death: -4 > -2'),

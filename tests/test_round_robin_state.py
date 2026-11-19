@@ -10,7 +10,6 @@ from ax3l.app.Prompt import Prompt
 from ax3l.app.EventLogDb import EventLogDb
 from ax3l.app.snakelab.RoundRobinState import RoundRobinState, ROUND_ROBIN_ORDER
 from ax3l.app.snakelab.ToolConversation import converse
-from ax3l.app.snakelab.SeedRotation import rotate_if_needed
 from ax3l.app.snakelab.GenerateDefaultConfig import GenerateDefaultConfig
 from ax3l.constants.DSnakeLab import DSnakeLab
 
@@ -157,7 +156,7 @@ class ConfigurationProgressTests(unittest.TestCase):
         self.assertEqual(self.restart().stagnant_rounds(), 1)
         self.assertEqual(self.restart().experiment_cycles(), 2)
 
-    def test_rotation_gate_counts_nine_complete_configuration_proposals(self):
+    def test_stagnation_counts_complete_configuration_proposals_until_promotion(self):
         self.db.log('golden_config_created')
         for number in range(9):
             self.db.log('configuration_compared', process_id=str(number))

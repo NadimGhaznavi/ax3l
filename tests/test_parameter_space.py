@@ -19,7 +19,7 @@ class ParameterSpaceTests(unittest.TestCase):
         self.assertIn((Fraction(1, 10), Fraction(-1, 10)), finite_choices('reward_pair'))
         self.assertIn((0, 0), finite_choices('reward_pair'))
         self.assertNotIn((6, 0), finite_choices('reward_pair'))
-        for parameter in ('learning_rate', 'gamma', 'epsilon_pair', 'epsilon_nice_pair'):
+        for parameter in ('learning_rate', 'gamma', 'epsilon_pair', 'epsilon_nice_pair', 'seed'):
             self.assertIsNone(finite_choices(parameter))
 
     def test_exclusive_bounds_decimal_steps_and_enum(self):

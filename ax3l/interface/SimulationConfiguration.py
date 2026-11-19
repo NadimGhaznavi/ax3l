@@ -49,6 +49,10 @@ class SimulationConfiguration:
         return closer + further <= 0
 
     @staticmethod
+    def next_seed(seed: int) -> int:
+        return SimulationConfiguration.value(("seed",), seed + 1)
+
+    @staticmethod
     def validate_reward_pair(closer: int | float, further: int | float) -> None:
         if not SimulationConfiguration.reward_pair_allowed(closer, further):
             raise ValidationError(

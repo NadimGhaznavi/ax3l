@@ -11,10 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Summary
 
-Reset stalled initial configuration conversations with a fresh model context.
+Reset stalled initial configuration conversations with a fresh model context
+and restore finite-domain exhaustion checks for parameter selection.
 
 ### Fixed
 
+- Omit exhausted parameters from Qwen's available choices and reject their
+  selection before locking the draft to a setting. Check legal changes against
+  every stored run status with the current draft seed and other settings, and
+  reopen selection for exhausted assignments recovered on restart.
 - After the initial five-minute decision budget and three-minute grace period,
   discard the tentative parameter selection and restart from the opening prompt
   with a fresh timer, without carrying over conversation history or submitting

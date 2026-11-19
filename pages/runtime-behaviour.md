@@ -102,6 +102,14 @@ again and are omitted from the next selection prompt. Unselected settings keep t
 baseline values. Qwen can submit the unique draft through an explicit run decision.
 Each selection, value choice, and run decision resumes after a restart.
 
+Parameters with finite choices are also omitted when all changed choices already
+exist for the draft's current seed and other settings. For example, encoder layers
+cannot be selected if both alternatives to the current layer count have already
+been stored with those settings. Every run status counts, matching duplicate
+protection. The selection tool rejects exhausted settings before saving an
+assignment. Availability is recalculated against the current draft after each
+accepted change. A restart reopens selection if the pending assignment is exhausted.
+
 Qwen is asked to select a parameter and find a unique setting, or decide to run
 the current unique draft, within five minutes. Each data request is followed by
 an updated time remaining. Parameter selection and duplicate-value retries share

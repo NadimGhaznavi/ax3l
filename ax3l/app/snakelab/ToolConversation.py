@@ -152,6 +152,9 @@ async def converse(llm, output, db, tools, prompts, *, parameter: str | None = N
                 log(Events.Tool, Events.Tool.FAILED, str(error), "ERROR")
                 raise
             log(Events.Tool, Events.Tool.COMPLETED, json.dumps(result))
+            if result.get("code") == Events.Configuration.PARAMETER_SPACE_EXHAUSTED:
+                outcome = result["reason"]
+                return result
             if result["status"] == "ok" and called_name not in ("kb_tool", "data_tool"):
                 return result
             # Explicit validation rejections are safe to correct. Transport failures are not retried.

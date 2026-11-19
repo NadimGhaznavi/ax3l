@@ -194,6 +194,7 @@ async def optimize(llm, output, db, endpoint):
                     prompt = ConfigurationNextStep(draft, parameters)
                 else:
                     prompt = ConfigurationChoice(draft, latest, golden, chart_scope, png)
+                selected_count = len(draft.selections)
                 async with SnakeLabTools(endpoint, parameter, draft_id=draft.draft_id,
                                          allow_run=draft.phase == "reviewing") as tools:
                     try:
@@ -215,7 +216,7 @@ async def optimize(llm, output, db, endpoint):
                         draft.parameter = None
                         experiments.save_draft(draft)
                 draft = experiments.draft(draft.draft_id)
-                if draft.phase == "reviewing":
+                if draft.phase == "reviewing" and len(draft.selections) > selected_count:
                     decision_deadline = monotonic() + PARAMETER_SELECTION_SECONDS
                     draft.decision_expires_at = time() + PARAMETER_SELECTION_SECONDS
                     experiments.save_draft(draft)

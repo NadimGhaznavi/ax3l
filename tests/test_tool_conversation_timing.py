@@ -190,7 +190,7 @@ class ToolConversationTimingTests(unittest.IsolatedAsyncioTestCase):
         for phase, selections in (('selecting_parameter', []), ('reviewing', ['gamma'])):
             draft.phase = phase
             draft.selections = selections
-            text = ConfigurationNextStep(draft).to_md()
+            text = ConfigurationNextStep(draft, [name for name in PARAMETER_ORDER if name not in selections]).to_md()
             self.assertIn('5 minutes', text)
             self.assertIn('3 extra minutes', text)
             self.assertIn('After each data_tool request', text)
@@ -203,12 +203,12 @@ class ToolConversationTimingTests(unittest.IsolatedAsyncioTestCase):
     def test_next_step_prompt_lists_only_unused_parameters_and_offers_run_when_all_are_used(self):
         draft = ConfigurationDraft('draft', 'gold', {}, SimulationConfiguration.defaults(),
                                     ['learning_rate', 'epsilon_pair'], 'reviewing')
-        text = ConfigurationNextStep(draft).to_md()
+        text = ConfigurationNextStep(draft, [name for name in PARAMETER_ORDER if name not in draft.selections]).to_md()
         choices = json.loads(text.split('```json\n')[1].split('\n```')[0])
         self.assertEqual(set(choices), set(PARAMETER_ORDER) - set(draft.selections))
         self.assertIn('only once per experiment', text)
         self.assertIn('keeping the current values is not allowed', text)
         draft.selections = PARAMETER_ORDER.copy()
-        text = ConfigurationNextStep(draft).to_md()
+        text = ConfigurationNextStep(draft, []).to_md()
         self.assertEqual(json.loads(text.split('```json\n')[1].split('\n```')[0]), {})
-        self.assertIn('Use run_simulation to run it; no unused settings remain', text)
+        self.assertIn('Use run_simulation to run it.', text)

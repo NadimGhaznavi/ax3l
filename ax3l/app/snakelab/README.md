@@ -29,6 +29,13 @@ A unique configuration gives Qwen both `select_parameter` and
 selected only once within a draft, including after a restart. Used parameters
 are omitted from the next selection prompt and rejected by the selection tool.
 There is no fixed parameter order or requirement to change every setting.
+Before offering a setting, Ax3l checks finite domains, such as encoder layers,
+against stored configurations with the draft's current seed and all other
+settings unchanged. A setting is omitted when every changed choice already
+exists in any run status. The current values cannot count as an available change.
+The selection tool enforces the same check before saving the assignment.
+Availability is recalculated after accepted changes, including seed changes.
+On restart, an exhausted pending assignment returns to the next-step decision.
 Other values stay in the draft. Only an explicit run decision submits the
 unique configuration once. Restarts resume the saved selection, value choice,
 or run decision.
@@ -145,8 +152,8 @@ value choices or enumerated as a finite search grid.
 The nine-proposal automatic rotation is removed. Startup only finishes an
 interrupted rotation already recorded under the old policy, preserving its
 original baseline acceptance and submission recovery. Historical rotation
-events and scores remain readable. The old per-parameter cycle and exhaustion
-rules are no longer used by the optimization loop.
+events and scores remain readable. The old per-parameter cycle is no longer
+used; finite-domain exhaustion now filters Qwen's available parameter choices.
 
 ## Running and reporting
 

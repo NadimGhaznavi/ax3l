@@ -64,6 +64,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.snake = Mock()
         self.snake.is_simulation_running.return_value = False
         self.snake.is_config_unique.return_value = True
+        self.snake.available_parameters.side_effect = lambda config, parameters: parameters
         self.snake.get_latest_completed_run_id.return_value = self.latest
         self.snake.get_all_time_best_run_id.return_value = self.best
         self.snake.get_num_sims.return_value = 2
@@ -164,6 +165,85 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.store.saved.selections, ['learning_rate'])
         self.assertEqual(self.snake.is_config_unique.call_count, 1)
         self.snake.submit_simulation.assert_called_once()
+
+    async def test_exhausted_parameters_are_omitted_and_rechecked_against_the_changed_draft(self):
+        def available(config, parameters):
+            return [parameter for parameter in parameters if parameter != 'layers'
+                    or config['training']['learning_rate'] != self.config['training']['learning_rate']]
+
+        self.snake.available_parameters.side_effect = available
+        self.decisions = ['learning_rate', 'layers', 'run']
+        await self.cycle()
+        prompts = [call.args[4][0].to_md() for call in self.conversation.await_args_list
+                   if call.kwargs['parameter'] == REVISION_PARAMETER]
+        choices = [json.loads(prompt.split('```json\n')[1].split('\n```')[0]) for prompt in prompts]
+        self.assertNotIn('layers', choices[0])
+        self.assertIn('layers', choices[1])
+        self.assertNotIn('learning_rate', choices[1])
+        self.assertNotIn('layers', choices[2])
+        candidate = self.snake.submit_simulation.call_args.args[0]
+        self.assertEqual(candidate['training']['learning_rate'], .003)
+        self.assertEqual(candidate['model']['layers'], 3)
+
+    async def test_unique_draft_with_exhausted_unused_parameters_can_still_run(self):
+        self.store.saved = self.draft(phase='reviewing')
+        self.store.saved.selections = ['learning_rate', 'gamma', 'epsilon_pair', 'epsilon_nice_pair', 'seed']
+        self.snake.available_parameters.side_effect = lambda config, parameters: []
+        self.decisions = ['run']
+        await self.cycle()
+        self.assertEqual(self.trace(), [REVISION_PARAMETER])
+        self.assertIn('No unused settings with untested changes remain', self.prompts[0])
+        self.assertEqual(json.loads(self.prompts[0].split('```json\n')[1].split('\n```')[0]), {})
+        self.snake.submit_simulation.assert_called_once()
+
+    async def test_restart_reopens_selection_when_the_pending_parameter_is_exhausted(self):
+        self.store.saved = self.draft(phase='choosing', parameter='layers')
+        self.snake.available_parameters.side_effect = lambda config, parameters: [
+            parameter for parameter in parameters if parameter != 'layers']
+        self.decisions = ['gamma', 'run']
+        await self.cycle()
+        self.assertEqual(self.trace(), [REVISION_PARAMETER, 'gamma', REVISION_PARAMETER])
+        self.assertEqual(self.store.saved.selections, ['gamma'])
+        self.assertEqual(self.snake.submit_simulation.call_args.args[0]['model']['layers'], 1)
+
+    async def test_live_exhaustion_reopens_selection_without_saving_values_or_extending_the_budget(self):
+        for count in (0, 1):
+            with self.subTest(saved_choices=count):
+                exhausted = False
+                self.store.saved = self.draft(count, 'choosing', parameter='layers')
+                if count:
+                    self.store.saved.config['model']['hidden_size'] = 96
+                original = deepcopy(self.store.saved)
+                self.conversation.reset_mock()
+
+                def available(config, parameters):
+                    return [parameter for parameter in parameters if parameter != 'layers' or not exhausted]
+
+                async def choose(llm, output, db, tools, prompts, *, parameter, process_id, **timing):
+                    nonlocal exhausted
+                    if parameter == 'layers':
+                        exhausted = True
+                        return SubmitSingleValueHandler(db).submit(
+                            dict(draft_id=process_id, parameter='layers', value=2))
+                    raise asyncio.CancelledError()
+
+                self.snake.available_parameters.side_effect = available
+                self.snake.is_config_unique.return_value = False
+                self.conversation.side_effect = choose
+                with patch('ax3l.app.snakelab.SnakeLabLoop.monotonic', side_effect=[100]), \
+                        patch('ax3l.app.snakelab.SnakeLabLoop.time', side_effect=[1000]):
+                    await self.cycle()
+                self.assertEqual(self.trace(), ['layers', REVISION_PARAMETER])
+                self.assertEqual([call.kwargs['decision_deadline'] for call in self.conversation.await_args_list],
+                                 [400, 400])
+                self.assertEqual(self.store.saved.decision_expires_at, 1300)
+                self.assertEqual(self.store.saved.config, original.config)
+                self.assertEqual(self.store.saved.selections, original.selections)
+                self.assertEqual(self.store.saved.phase, 'reviewing' if count else 'selecting_parameter')
+                self.assertIsNone(self.store.saved.parameter)
+                prompt = self.conversation.await_args.args[4][0].to_md()
+                self.assertNotIn('layers', json.loads(prompt.split('```json\n')[1].split('\n```')[0]))
+        self.snake.submit_simulation.assert_not_called()
 
     async def test_restart_resumes_the_explicit_setting_and_preserves_other_choices(self):
         self.store.saved = self.draft(3, 'choosing', parameter='gamma')

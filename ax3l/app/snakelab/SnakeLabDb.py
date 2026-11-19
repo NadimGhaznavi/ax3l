@@ -68,6 +68,30 @@ class SnakeLabDb:
         tried = {tuple(Fraction(str(row[column])) for column in columns) for row in rows}
         return choices <= tried
 
+    def available_parameters(self, config: dict, parameters: list[str]) -> list[str]:
+        """Keep settings with an untried change to the current complete draft."""
+        values = dict(zip((column for column, _, _ in CONFIGURATION_FIELDS), _config_values(config)))
+        available = []
+        for parameter in parameters:
+            choices = finite_choices(parameter)
+            if choices is None:
+                available.append(parameter)
+                continue
+            columns = ["_".join(path) for path in parameter_paths(parameter)]
+            fixed = {column: value for column, value in values.items() if column not in columns}
+            conditions = " AND ".join(f"c.{column} = %s" for column in fixed)
+            rows = self._db.query(f"""
+                SELECT DISTINCT {', '.join('c.' + column for column in columns)}
+                FROM simulation_runs r JOIN configurations c ON c.run_id = r.run_id
+                WHERE {conditions}
+            """, tuple(fixed.values()))
+            tried = {tuple(Fraction(str(row[column])) for column in columns) for row in rows}
+            # Keeping the draft's current values is not an eligible change.
+            tried.add(tuple(Fraction(str(values[column])) for column in columns))
+            if not choices <= tried:
+                available.append(parameter)
+        return available
+
     def get_num_sims(self) -> int:
         """Count all stored runs, including repeated configurations and all statuses."""
         return self._db.query("SELECT COUNT(*) AS num_sims FROM simulation_runs")[0]["num_sims"]

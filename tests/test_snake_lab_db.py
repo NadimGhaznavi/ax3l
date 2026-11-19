@@ -1,6 +1,8 @@
 """Run with AX3L_TEST_DB=1 and the disposable test DB_* credentials."""
 
 import os
+from fractions import Fraction
+from copy import deepcopy
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -141,6 +143,49 @@ class SnakeLabDbTests(unittest.TestCase):
         db.execute(f"INSERT INTO configurations (run_id, {CONFIGURATION_COLUMNS}) VALUES ({placeholders})",
                    (run_id, *_config_values(config)))
         return run_id
+
+    def test_available_parameters_restore_exhaustion_for_the_current_seed_and_draft_settings(self):
+        from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb
+        db = self.configuration_db()
+        dal = SnakeLabDb(db)
+        config = GenerateDefaultConfig().run()
+        for layers, status in ((1, 'completed'), (2, 'failed'), (3, 'queued')):
+            trial = deepcopy(config)
+            trial['model']['layers'] = layers
+            self.insert_config(db, trial, status)
+        original = deepcopy(config)
+        self.assertEqual(dal.available_parameters(config, ['layers', 'gamma', 'seed']), ['gamma', 'seed'])
+        self.assertEqual(config, original)
+        config['seed'] += 1
+        self.assertEqual(dal.available_parameters(config, ['layers']), ['layers'])
+        config['seed'] = original['seed']
+        config['training']['batch_size'] = 32
+        self.assertEqual(dal.available_parameters(config, ['layers']), ['layers'])
+        # The draft is not stored, so only its changed alternatives exist in history.
+        for layers in (2, 3):
+            trial = deepcopy(config)
+            trial['model']['layers'] = layers
+            self.insert_config(db, trial)
+        self.assertIsNone(dal.find_config_run(config))
+        self.assertEqual(dal.available_parameters(config, ['layers']), [])
+
+    def test_available_parameters_need_every_legal_reward_pair_and_ignore_invalid_history(self):
+        from ax3l.app.snakelab.ParameterSpace import finite_choices
+        from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb
+        db = self.configuration_db()
+        dal = SnakeLabDb(db)
+        config = GenerateDefaultConfig().run()
+        missing = (Fraction(1, 10), Fraction(-1, 10))
+        for closer, further in finite_choices('reward_pair') - {missing}:
+            trial = deepcopy(config)
+            trial['game']['rewards'].update(closer_to_food=float(closer), further_from_food=float(further))
+            self.insert_config(db, trial)
+        trial['game']['rewards'].update(closer_to_food=6, further_from_food=0)
+        self.insert_config(db, trial)
+        self.assertEqual(dal.available_parameters(config, ['reward_pair']), ['reward_pair'])
+        trial['game']['rewards'].update(closer_to_food=float(missing[0]), further_from_food=float(missing[1]))
+        self.insert_config(db, trial, 'cancelled')
+        self.assertEqual(dal.available_parameters(config, ['reward_pair']), [])
 
     def test_full_configuration_uniqueness_uses_values_and_all_statuses(self):
         from copy import deepcopy

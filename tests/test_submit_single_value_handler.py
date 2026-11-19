@@ -14,6 +14,7 @@ class SubmitSingleValueHandlerTests(unittest.TestCase):
         module = 'ax3l.app.snakelab.SubmitSingleValueHandler.'
         self.snake = self.enterContext(patch(module + 'SnakeLab')).return_value
         self.snake.is_config_unique.return_value = True
+        self.snake.available_parameters.side_effect = lambda config, parameters: parameters
         self.experiments = self.enterContext(patch(module + 'ExperimentDb')).return_value
         self.handler = SubmitSingleValueHandler(Mock())
         self.baseline = SimulationConfiguration.defaults()
@@ -97,5 +98,15 @@ class SubmitSingleValueHandlerTests(unittest.TestCase):
         self.snake.is_config_unique.side_effect = RuntimeError('database unavailable')
         with self.assertRaisesRegex(RuntimeError, 'database unavailable'):
             self.submit()
+        self.assertEqual(self.draft, original)
+        self.experiments.save_draft.assert_not_called()
+
+    def test_exhaustion_check_failure_does_not_mutate_or_save_the_draft(self):
+        self.bind('layers')
+        original = deepcopy(self.draft)
+        self.snake.is_config_unique.return_value = False
+        self.snake.available_parameters.side_effect = RuntimeError('database unavailable')
+        with self.assertRaisesRegex(RuntimeError, 'database unavailable'):
+            self.submit('layers', 2)
         self.assertEqual(self.draft, original)
         self.experiments.save_draft.assert_not_called()

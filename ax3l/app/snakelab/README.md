@@ -29,6 +29,13 @@ A unique configuration gives Qwen both `select_parameter` and
 selected only once within a draft, including after a restart. Used parameters
 are omitted from the next selection prompt and rejected by the selection tool.
 There is no fixed parameter order or requirement to change every setting.
+Before offering a setting, Ax3l checks finite domains, such as encoder layers,
+against stored configurations with the draft's current seed and all other
+settings unchanged. A setting is omitted when every changed choice already
+exists in any run status. The current values cannot count as an available change.
+The selection tool enforces the same check before saving the assignment.
+Availability is recalculated after accepted changes, including seed changes.
+On restart, an exhausted pending assignment returns to the next-step decision.
 Other values stay in the draft. Only an explicit run decision submits the
 unique configuration once. Restarts resume the saved selection, value choice,
 or run decision.
@@ -61,15 +68,17 @@ contain scores, termination counts and percentages, activity counts, and
 settings. Notes from previously analyzed runs remain available.
 The data tool is available before the first parameter selection and during
 every next-step decision, so Qwen can research which setting to tweak.
-Qwen has an advisory five-minute budget to select a parameter and find values
+Qwen has a five-minute budget to select a parameter and find values
 that produce a unique configuration, or decide to run an already unique draft.
 After every data request, it receives the time remaining, including inference
 and lookup time. Rejected attempts keep the same countdown. An accepted unique
 change resets it to five minutes for the next parameter or run decision.
-Before the first unique change, expiry remains advisory. Once a unique draft
-is saved, expiry gives Qwen a three-minute grace period. At the end of that
-period, Ax3l submits the saved unique configuration, completes the normal
-simulation, comparison, and measurement cycle, and starts the next experiment.
+Expiry gives Qwen a three-minute grace period. Before the first unique change,
+the end of grace restarts from the initial prompt in a fresh conversation with
+a fresh five-minute budget. The tentative parameter selection, prior research,
+reasoning, and rejected proposals are discarded. Once a unique draft is saved,
+the end of grace submits that configuration through the normal simulation,
+comparison, and measurement cycle, and starts the next experiment.
 A pending edit is not included unless its changed values were accepted.
 Restarting the optimizer begins a fresh budget.
 
@@ -143,8 +152,8 @@ value choices or enumerated as a finite search grid.
 The nine-proposal automatic rotation is removed. Startup only finishes an
 interrupted rotation already recorded under the old policy, preserving its
 original baseline acceptance and submission recovery. Historical rotation
-events and scores remain readable. The old per-parameter cycle and exhaustion
-rules are no longer used by the optimization loop.
+events and scores remain readable. The old per-parameter cycle is no longer
+used; finite-domain exhaustion now filters Qwen's available parameter choices.
 
 ## Running and reporting
 

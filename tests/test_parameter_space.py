@@ -2,6 +2,7 @@ import copy
 import sqlite3
 import unittest
 from fractions import Fraction
+from unittest.mock import Mock
 
 from ax3l.app.snakelab.ParameterSpace import finite_choices, finite_values
 from ax3l.app.snakelab.GenerateDefaultConfig import GenerateDefaultConfig
@@ -29,6 +30,12 @@ class ParameterSpaceTests(unittest.TestCase):
         self.assertEqual(finite_values({'type': 'integer', 'minimum': 1,
                                        'maximum': 8, 'multipleOf': 1.5}), (3, 6))
         self.assertEqual(finite_values({'type': 'integer', 'enum': [2, 8]}), (2, 8))
+
+    def test_continuous_parameters_and_seed_do_not_require_an_exhaustion_query(self):
+        db = Mock()
+        parameters = ['learning_rate', 'gamma', 'epsilon_pair', 'epsilon_nice_pair', 'seed']
+        self.assertEqual(SnakeLabDb(db).available_parameters(GenerateDefaultConfig().run(), parameters), parameters)
+        db.query.assert_not_called()
 
 
 class ExhaustionDbTests(unittest.TestCase):

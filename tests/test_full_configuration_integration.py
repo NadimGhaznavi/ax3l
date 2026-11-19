@@ -69,6 +69,8 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
                         for index in range(1, 11)]
             def is_config_unique(self, candidate):
                 return all(candidate != result['config'] for result in results.values())
+            def available_parameters(self, config, parameters):
+                return parameters
             def submit_simulation(self, candidate):
                 self_test.assertEqual(selections, expected_choices)
                 calls.append(deepcopy(candidate))

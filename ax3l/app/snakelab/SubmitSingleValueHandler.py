@@ -69,6 +69,20 @@ class SubmitSingleValueHandler:
             node[path[-1]] = value
         SimulationConfiguration.validate(candidate)
         if not self._snake.is_config_unique(candidate):
+            if not self._snake.available_parameters(draft.config, [parameter]):
+                reason = (f"No untested changes remain for {CHOICE_LABELS[parameter]} with seed "
+                          f"{draft.config['seed']} and the other draft settings. The proposal was not saved. "
+                          "Ax3l is reopening parameter selection in a fresh conversation.")
+                draft.parameter = None
+                draft.phase = "reviewing" if draft.selections else "selecting_parameter"
+                experiments.save_draft(draft)
+                category = DEventCategory.Configuration
+                self._db.log(category.PARAMETER_SPACE_EXHAUSTED, category.CATEGORY, "INFO", reason,
+                             process_id=draft.draft_id, parameter=parameter)
+                return {"status": "rejected", "code": "parameter_space_exhausted",
+                        "draft_id": draft.draft_id, "phase": draft.phase, "reason": reason,
+                        "prompt": {"role": "user", "content": reason},
+                        "source_name": "SubmitSingleValueHandler"}
             prompt = NoDupes(parameter, candidate)
             category = DEventCategory.Configuration
             self._db.log(category.PROPOSAL_DUPLICATE, category.CATEGORY, "INFO", prompt.to_md(),

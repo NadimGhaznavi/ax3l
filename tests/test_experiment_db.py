@@ -14,8 +14,10 @@ from ax3l.activity.ExperimentActivity import item_activity
 from ax3l.app.snakelab.ExperimentDb import ExperimentDb
 from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb
 from ax3l.app.snakelab.SubmitSimulationSummaryHandler import SubmitSimulationSummaryHandler
+from ax3l.app.snakelab.RequestSeedChangeHandler import RequestSeedChangeHandler
+from ax3l.app.snakelab.SelectParameterHandler import SelectParameterHandler
 from ax3l.constants.DSimulationAnalysis import DSimulationAnalysis
-from ax3l.entities.ConfigurationDraft import ConfigurationDraft
+from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
 from ax3l.entities.AnalysisTask import AnalysisTask
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
@@ -33,7 +35,7 @@ class DraftRecoveryTests(unittest.TestCase):
 
     def test_current_snapshots_preserve_parameter_selection_and_run_decisions(self):
         self.draft.decision_expires_at = 1800000000.5
-        for phase, parameter in (('selecting_parameter', None), ('choosing', 'gamma'),
+        for phase, parameter in (('selecting_parameter', None), ('choosing', 'gamma'), ('choosing', 'seed'),
                                  ('reviewing', None), ('ready', None)):
             self.draft.phase, self.draft.parameter = phase, parameter
             self.assertEqual(self.restore(asdict(self.draft)), self.draft)
@@ -57,6 +59,14 @@ class DraftRecoveryTests(unittest.TestCase):
         for phase in ('submitting', 'submitted', 'completed'):
             data['phase'] = phase
             self.assertEqual(self.restore(data).phase, phase)
+
+    def test_fully_selected_legacy_draft_does_not_infer_a_seed_choice(self):
+        data = asdict(self.draft)
+        del data['parameter']
+        data.update(phase='preparing', selections=[name for name in PARAMETER_ORDER if name != 'seed'])
+        restored = self.restore(data)
+        self.assertEqual(restored.phase, 'preparing')
+        self.assertIsNone(restored.parameter)
 
 
 @unittest.skipUnless(os.environ.get('AX3L_TEST_DB') == '1', 'requires disposable MariaDB test database')
@@ -91,6 +101,32 @@ class ExperimentDatabaseTests(unittest.TestCase):
         self.assertEqual(restored.next_parameter, 'sequence_length')
         restored.config['model']['hidden_size'] = 272
         self.assertEqual(experiments.draft(draft_id).config['model']['hidden_size'], 240)
+
+    def test_seed_request_survives_a_new_connection_and_cannot_be_replayed_or_reselected(self):
+        draft_id, golden_id = self.process_ids
+        draft = ConfigurationDraft(draft_id, golden_id, {'golden': golden_id},
+                                    SimulationConfiguration.defaults(), phase='choosing', parameter='seed')
+        ExperimentDb(self.db).save_draft(draft)
+        with patch('ax3l.app.snakelab.SubmitSingleValueHandler.SnakeLab') as factory:
+            snake = factory.return_value
+            snake.is_config_unique.side_effect = [False, True]
+            result = RequestSeedChangeHandler(self.db).submit(dict(draft_id=draft_id))
+            self.assertEqual(result['seed'], 1972)
+            restarted = DbMgr()
+            try:
+                saved = ExperimentDb(restarted).draft(draft_id)
+                self.assertEqual(saved.config['seed'], 1972)
+                self.assertEqual(saved.selections, ['seed'])
+                self.assertEqual(saved.phase, 'reviewing')
+                self.assertEqual(RequestSeedChangeHandler(restarted).submit(dict(draft_id=draft_id))['status'],
+                                 'rejected')
+                self.assertEqual(SelectParameterHandler(restarted).submit(
+                    dict(draft_id=draft_id, parameter='seed'))['status'], 'rejected')
+                self.assertEqual(ExperimentDb(restarted).draft(draft_id), saved)
+            finally:
+                restarted.close()
+            self.assertEqual(snake.is_config_unique.call_count, 2)
+            snake.submit_simulation.assert_not_called()
 
     def test_report_states_use_latest_tasks_per_run_and_survive_new_connections(self):
         first, second = self.process_ids

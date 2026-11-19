@@ -10,7 +10,7 @@ from ax3l.activity.RunAnalysis import render_analysis
 from ax3l.app.ConfigurationLog import ConfigurationLog
 from ax3l.app.EventLogDb import EventLogDb
 from ax3l.app.snakelab.ToolConversation import converse, DecisionTimeExpired
-from ax3l.app.snakelab.SeedRotation import rotate_if_needed
+from ax3l.app.snakelab.SeedRotation import resume_seed_rotation
 from ax3l.app.snakelab.AnalyzeRun import record_run_metrics
 from ax3l.app.snakelab.ExperimentDb import ExperimentDb
 from ax3l.app.snakelab.prompts.ConfigurationChoice import ConfigurationChoice
@@ -149,11 +149,10 @@ async def optimize(llm, output, db, endpoint):
     experiments = ExperimentDb(db)
     while snake.is_simulation_running():
         await asyncio.sleep(DSnakeLab.STATUS_POLL_SECONDS)
-    await rotate_if_needed(snake, db, wait_for_run, resume_only=True)
+    await resume_seed_rotation(snake, db, wait_for_run)
     while True:
         draft = experiments.draft()
         if draft is None or draft.phase in ("completed", "failed"):
-            await rotate_if_needed(snake, db, wait_for_run)
             golden_id = EventLogDb(db).current_golden_config()["process_id"]
             baseline = snake.get_run_result(golden_id)
             if baseline is None or baseline["status"] != "completed" or baseline["high_score"] is None:
@@ -168,10 +167,7 @@ async def optimize(llm, output, db, endpoint):
                           for run_id in dict.fromkeys(draft.references.values())}
             golden = references[draft.golden_run_id]
             latest = references[draft.references["latest"]]
-            chart_scope = ("latest" if latest.run_id != golden.run_id and latest.config["seed"] == draft.config["seed"]
-                           else "golden")
-            chart_run = latest if chart_scope == "latest" else golden
-            chart_episodes = None
+            chart_episodes = {}
             if draft.phase == "preparing":
                 draft.phase = "selecting_parameter"
             decision_deadline = monotonic() + PARAMETER_SELECTION_SECONDS
@@ -179,13 +175,16 @@ async def optimize(llm, output, db, endpoint):
             experiments.save_draft(draft)
             while draft.phase in ("choosing", "selecting_parameter", "reviewing"):
                 parameter = draft.next_parameter if draft.phase == "choosing" else REVISION_PARAMETER
+                chart_scope = ("latest" if latest.run_id != golden.run_id
+                               and latest.config["seed"] == draft.config["seed"] else "golden")
+                chart_run = latest if chart_scope == "latest" else golden
                 section = CHOICE_CHARTS.get(parameter)
                 png = None
                 if section and (section != "loss" or chart_run.metrics["episodes_with_loss"]):
-                    if chart_episodes is None:
-                        chart_episodes = snake.get_analysis_episodes(chart_run.run_id)
+                    if chart_run.run_id not in chart_episodes:
+                        chart_episodes[chart_run.run_id] = snake.get_analysis_episodes(chart_run.run_id)
                     png = await prepare_chart(db, draft.draft_id, parameter, section, chart_run,
-                                              chart_episodes, golden.metrics["high_score"])
+                                              chart_episodes[chart_run.run_id], golden.metrics["high_score"])
                 prompt = (ConfigurationNextStep(draft) if parameter == REVISION_PARAMETER else
                           ConfigurationChoice(draft, latest, golden, chart_scope, png))
                 async with SnakeLabTools(endpoint, parameter, draft_id=draft.draft_id,

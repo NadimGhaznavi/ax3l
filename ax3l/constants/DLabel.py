@@ -13,6 +13,7 @@ class DLabel:
     BATCH_SIZE: Final[str] = "Batch Size"
     LEARNING_RATE: Final[str] = "Learning Rate"
     GAMMA: Final[str] = "Gamma"
+    SEED: Final[str] = "Random Seed"
     EPSILON_PAIR: Final[str] = "Epsilon: initial, decay"
     EPSILON_INITIAL: Final[str] = "Epsilon: initial"
     EPSILON_DECAY: Final[str] = "Epsilon: decay"
@@ -42,6 +43,7 @@ FIELD_TO_LABEL_MAP: Final[dict[str, str]] = {
     "training.learning_rate": DLabel.LEARNING_RATE,
     "gamma": DLabel.GAMMA,
     "training.gamma": DLabel.GAMMA,
+    "seed": DLabel.SEED,
     "epsilon_pair": DLabel.EPSILON_PAIR,
     "epsilon.initial": DLabel.EPSILON_INITIAL,
     "epsilon.decay": DLabel.EPSILON_DECAY,
@@ -66,6 +68,7 @@ FIELD_TO_DESCRIPTION_MAP: Final[dict[str, str]] = {
     "training.batch_size": "Training batch size",
     "training.learning_rate": "Optimizer learning rate",
     "training.gamma": "Discount factor",
+    "seed": "Request the next untested seed.",
     "epsilon.initial": "Initial probability",
     "epsilon.decay": "Probability decay rate",
     "game.rewards.closer_to_food": "",

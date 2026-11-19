@@ -11,6 +11,7 @@ from ax3l.app.snakelab.prompts.InvalidValue import InvalidValue
 from ax3l.app.snakelab.prompts.NoDupes import NoDupes
 from ax3l.constants.DEventCategory import DEventCategory
 from ax3l.constants.DChoice import CHOICE_LABELS
+from ax3l.entities.ConfigurationDraft import ConfigurationDraft
 from ax3l.interface.SnakeLab import SnakeLab
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 
@@ -38,7 +39,7 @@ class SubmitSingleValueHandler:
             return self._reject("parameter must be a JSON spec key.")
 
         if parameter == "seed":
-            return self._reject("Seed is managed by Ax3l and cannot be proposed.")
+            return self._reject("Use request_seed_change without a value; Ax3l increments the seed.")
         if parameter not in SINGLE_PARAMETERS:
             return self._reject(f"Parameter is not in the single-parameter search space: {parameter}.")
         path, _ = SINGLE_PARAMETERS[parameter]
@@ -75,6 +76,10 @@ class SubmitSingleValueHandler:
             return {"status": "rejected", "code": "duplicate_configuration",
                     "reason": prompt.to_md(), "prompt": json.loads(prompt.to_json()),
                     "source_name": prompt.source_name}
+        return self._save_choice(experiments, draft, parameter, candidate)
+
+    def _save_choice(self, experiments: ExperimentDb, draft: ConfigurationDraft,
+                     parameter: str, candidate: dict) -> dict:
         draft.phase = "reviewing"
         draft.config = candidate
         draft.selections.append(parameter)

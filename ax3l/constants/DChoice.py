@@ -12,6 +12,7 @@ CHOICE_LABELS = {
     "batch_size": "batch size", "learning_rate": "learning rate", "gamma": "gamma",
     "epsilon_pair": "epsilon", "reward_pair": "distance rewards",
     "epsilon_nice_pair": "safe detours",
+    "seed": "random seed",
 }
 
 PAIR_LABELS = {

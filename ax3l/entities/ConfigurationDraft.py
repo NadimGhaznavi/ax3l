@@ -6,7 +6,7 @@ from ax3l.app.snakelab.SingleParameters import SINGLE_PARAMETERS
 from ax3l.app.snakelab.PairParameters import PAIR_PARAMETERS
 
 
-PARAMETER_ORDER = list(SINGLE_PARAMETERS) + list(PAIR_PARAMETERS)
+PARAMETER_ORDER = list(SINGLE_PARAMETERS) + list(PAIR_PARAMETERS) + ["seed"]
 
 
 @dataclass

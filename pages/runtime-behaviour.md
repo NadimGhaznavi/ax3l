@@ -48,6 +48,7 @@ chosen only once per experiment, including after a restart:
 | Batch Size | Number of sequences sampled for each training update. | Integers from 8 to 64, in multiples of 2. | Individually |
 | Learning Rate | Size of gradient updates during training. | Numbers from 0.0005 to 0.005. | Individually |
 | Gamma | Discount factor controlling the value of future rewards. | Numbers from 0.9 to 0.99. | Individually |
+| Random Seed | Request a different simulation seed. | Ax3l increments the seed, skipping already stored complete configurations. Qwen supplies no number. | Request only |
 | Epsilon: initial | Starting probability of choosing a random action. | Numbers from 0.85 to 0.999. | Epsilon: decay |
 | Epsilon: decay | Multiplier applied to epsilon after each episode. | Numbers from 0.9 to 0.999. | Epsilon: initial |
 | Food Reward: closer | Reward for moving closer to the food. | 0, 0.1, 0.25, 0.5, 1, 2, 3, 4, 5. | Food Reward: further |
@@ -56,8 +57,12 @@ chosen only once per experiment, including after a restart:
 | EpsilonNice: steps | Duration of each detour, reset each episode. | Integers from 1 to 40. | EpsilonNice: probability |
 
 The epsilon settings, distance rewards, and EpsilonNice settings are chosen in
-pairs. The sum of the two distance rewards must be non-positive. Seeds and
-schema-fixed settings remain controlled by Ax3l.
+pairs. The sum of the two distance rewards must be non-positive. Qwen can select
+`seed` and use `request_seed_change` with no arguments. Ax3l increments the draft
+seed until the complete configuration is unique across every stored run and
+status, preserving all other settings. Seed can be selected only once per
+experiment. Numeric seed proposals are rejected; schema-fixed settings remain
+controlled by Ax3l.
 
 Ax3l loads the same short selection skill at the start of each choice. The
 prompt includes current values and same-setting values and scores from the
@@ -71,7 +76,9 @@ latest and golden runs. Qwen receives at most one chart per choice.
 
 Ax3l uses the latest run's charts when it shares the draft seed. Otherwise it
 uses the current golden run. The learning rate choice uses data alone when
-the run has no recorded loss. Ax3l records the completed simulation's
+the run has no recorded loss. The source is selected again for each choice;
+after a seed change, runs on other seeds are labeled as historical context.
+Ax3l records the completed simulation's
 measurements directly from episode data.
 
 English directions in the prompt lead to relevant `data_tool` pages when
@@ -137,16 +144,20 @@ hovering or focusing a link shows a scrollable preview, with JSON formatted as
 compact tables. The preview shows what Qwen received at that time, including
 rejected or failed reads. The page refreshes every five seconds.
 
-## Golden configurations and seed rotation
+## Golden configurations and seed changes
 
 A candidate becomes golden only if its high score strictly exceeds the current
 golden score. A tie retains the golden. Each completed configuration comparison
 counts as one experiment cycle.
 
-After nine complete proposals without an improvement, Ax3l increments the seed
-and reruns the golden settings to establish a fresh score baseline. Ax3l
-records its measurements before parameter selection resumes. The all-time best remains a
-separate historical reference and can come from an earlier seed.
+Seed-change candidates use the same comparison: a lower or tied score retains
+the existing golden configuration and seed. A request only saves the draft
+choice; the usual run decision or countdown starts its simulation. There is no
+automatic rotation after nine unsuccessful proposals and no fresh baseline
+reset for new seed requests. Ax3l finishes any previously recorded, interrupted
+automatic rotation under its original rules before resuming choices. The
+all-time best remains a separate historical reference and can come from an
+earlier seed.
 
 ## Restart behavior
 

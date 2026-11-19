@@ -4,7 +4,7 @@ import json
 
 from ax3l.app.Prompt import Prompt
 from ax3l.app.snakelab.ParameterSpace import parameter_values
-from ax3l.constants.DChoice import CHOICE_LABELS, PARAMETER_SELECTION_SECONDS, UNIQUE_CONFIG_GRACE_SECONDS
+from ax3l.constants.DChoice import CHOICE_LABELS, PARAMETER_SELECTION_SECONDS, DECISION_GRACE_SECONDS
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
 
 
@@ -24,13 +24,16 @@ class ConfigurationNextStep(Prompt):
         else:
             instruction = ("The draft starts with baseline values from the golden configuration. "
                            "Research which setting would be best to tweak, then choose it using select_parameter.")
+        expiry = ("then Ax3l submits the saved unique configuration and continues the normal experiment cycle. "
+                  if draft.selections else
+                  "then Ax3l restarts from the initial prompt in a fresh conversation, discarding the tentative "
+                  "parameter selection and all previous messages. ")
         super().__init__(
             instruction + f" Aim to make this decision within {PARAMETER_SELECTION_SECONDS // 60} minutes. "
-            "This is an advisory time budget; after each data_tool request you will receive the remaining time. "
+            "After each data_tool request you will receive the remaining time. "
             "The countdown continues while choosing a value. An accepted unique change starts a fresh five-minute "
             "budget to choose another parameter or run the configuration. "
-            f"Once a unique draft is available, an expired budget gives you {UNIQUE_CONFIG_GRACE_SECONDS // 60} extra "
-            "minutes; then Ax3l submits the saved unique configuration and continues the normal experiment cycle. "
+            f"An expired budget gives you {DECISION_GRACE_SECONDS // 60} extra minutes; {expiry}"
             "Paired settings are changed together. Other values stay in the draft. "
             "Select seed to request a seed change: Ax3l increments it and skips configurations already stored. "
             "You do not choose the seed's numeric value. A seed change must still beat golden to become golden. "

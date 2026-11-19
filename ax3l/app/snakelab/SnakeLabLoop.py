@@ -17,7 +17,7 @@ from ax3l.app.snakelab.prompts.ConfigurationChoice import ConfigurationChoice
 from ax3l.app.snakelab.prompts.ConfigurationNextStep import ConfigurationNextStep
 from ax3l.constants.DAx3l import DAx3l
 from ax3l.constants.DChoice import (
-    CHOICE_CHARTS, PARAMETER_SELECTION_SECONDS, REVISION_PARAMETER, UNIQUE_CONFIG_GRACE_SECONDS,
+    CHOICE_CHARTS, PARAMETER_SELECTION_SECONDS, REVISION_PARAMETER, DECISION_GRACE_SECONDS,
 )
 from ax3l.constants.DEventCategory import DEventCategory as Events
 from ax3l.constants.DSimulationAnalysis import DSimulationAnalysis
@@ -193,14 +193,19 @@ async def optimize(llm, output, db, endpoint):
                         await converse(llm, output, db, tools, [prompt],
                                        parameter=parameter, process_id=draft.draft_id,
                                        decision_deadline=decision_deadline,
-                                       run_deadline=decision_deadline + UNIQUE_CONFIG_GRACE_SECONDS
-                                       if draft.selections else None)
+                                       conversation_deadline=decision_deadline + DECISION_GRACE_SECONDS,
+                                       reset_on_expiry=not draft.selections)
                     except DecisionTimeExpired:
                         draft = experiments.draft(draft.draft_id)
-                        if not snake.is_config_unique(draft.config):
-                            raise ValueError("The saved configuration is no longer unique; cannot submit it automatically.")
+                        if draft.selections:
+                            if not snake.is_config_unique(draft.config):
+                                raise ValueError("The saved configuration is no longer unique; cannot submit it automatically.")
+                            draft.phase = "ready"
+                        else:
+                            draft.phase = "selecting_parameter"
+                            decision_deadline = monotonic() + PARAMETER_SELECTION_SECONDS
+                            draft.decision_expires_at = time() + PARAMETER_SELECTION_SECONDS
                         draft.parameter = None
-                        draft.phase = "ready"
                         experiments.save_draft(draft)
                 draft = experiments.draft(draft.draft_id)
                 if draft.phase == "reviewing":

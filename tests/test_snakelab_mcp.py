@@ -41,7 +41,7 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
                 try:
                     with self.assertRaises(DecisionTimeExpired):
                         await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('Decide.')],
-                                       decision_deadline=now - 180, run_deadline=now + .2)
+                                       decision_deadline=now - 180, conversation_deadline=now + .2)
                 finally:
                     release.set()
         self.assertEqual([request.method for request in requests], ['read_simulation_data'])

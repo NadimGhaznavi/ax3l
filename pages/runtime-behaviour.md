@@ -106,10 +106,13 @@ Qwen is asked to select a parameter and find a unique setting, or decide to run
 the current unique draft, within five minutes. Each data request is followed by
 an updated time remaining. Parameter selection and duplicate-value retries share
 the countdown; every accepted unique change resets it to five minutes for the
-next parameter or run decision. Before the first unique change, expiry remains
-advisory. With a saved unique draft, expiry starts a three-minute grace period.
-When grace expires, Ax3l submits the saved unique configuration through the normal
-simulation, comparison, and measurement cycle, then starts the next experiment.
+next parameter or run decision. Expiry starts a three-minute grace period.
+Before the first unique change, the end of grace discards the tentative parameter
+selection and starts a fresh conversation from the initial prompt with a new
+five-minute budget. Earlier messages, research, reasoning, and rejected proposals
+are not carried into the new context. With a saved unique draft, the end of grace
+submits that configuration through the normal simulation, comparison, and
+measurement cycle, then starts the next experiment.
 Any pending edit is excluded unless its changed values were accepted. Restarting
 begins a new budget.
 
@@ -120,9 +123,8 @@ header, stacking below the title on small screens. The same header remains visib
 in active, inactive, and empty states. The timer ticks every second using the
 current decision deadline. At zero it turns amber.
 With a saved unique draft, it switches to a three-minute **Simulation Start
-Countdown** with **Time remaining** below the number. Without a unique draft,
-the **LLM countdown** continues into negative time with **Exceeded decision time**
-below the number.
+Countdown** with **Time remaining** below the number. Before the first unique
+change, it instead shows a three-minute **Conversation Reset Countdown**.
 It resets after an accepted unique change and becomes inactive when the
 configuration is submitted. The table scrolls horizontally on its own, keeping
 the experiment details and countdown visible; refreshes retain its scroll position.

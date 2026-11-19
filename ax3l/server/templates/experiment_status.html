@@ -246,16 +246,18 @@
       if (countdown === null) return;
       const remaining = countdown.remaining_seconds - (performance.now() - countdownStartedAt) / 1000;
       const expired = remaining <= 0;
-      const simulationCountdown = expired && countdown.grace_seconds > 0;
-      const signedSeconds = Math.ceil(simulationCountdown ? Math.max(0, remaining + countdown.grace_seconds) : remaining);
+      const graceCountdown = expired && countdown.grace_seconds > 0;
+      const expiryLabel = countdown.expiry_action === 'reset' ? 'Conversation Reset Countdown' : 'Simulation Start Countdown';
+      const expiryDescription = countdown.expiry_action === 'reset' ? 'Time until conversation resets' : 'Time until simulation starts';
+      const signedSeconds = Math.ceil(graceCountdown ? Math.max(0, remaining + countdown.grace_seconds) : remaining);
       const seconds = Math.abs(signedSeconds);
       const minutes = String(Math.floor(seconds / 60)).padStart(2, '0');
       const remainder = String(seconds % 60).padStart(2, '0');
-      card.querySelector('#llm-countdown-label').textContent = simulationCountdown ? 'Simulation Start Countdown' : 'LLM countdown';
+      card.querySelector('#llm-countdown-label').textContent = graceCountdown ? expiryLabel : 'LLM countdown';
       const value = card.querySelector('#llm-countdown-value');
       value.textContent = `${signedSeconds < 0 ? '-' : ''}${minutes}:${remainder}`;
-      value.setAttribute('aria-label', simulationCountdown ? 'Time until simulation starts' : 'LLM time remaining');
-      card.querySelector('#llm-countdown-state').textContent = expired && !simulationCountdown ? 'Exceeded decision time' : 'Time remaining';
+      value.setAttribute('aria-label', graceCountdown ? expiryDescription : 'LLM time remaining');
+      card.querySelector('#llm-countdown-state').textContent = 'Time remaining';
       card.querySelector('#llm-countdown').classList.toggle('countdown-expired', expired);
     }
 

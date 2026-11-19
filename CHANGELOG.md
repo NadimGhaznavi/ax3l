@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Reset stalled initial configuration conversations with a fresh model context.
+
+### Fixed
+
+- After the initial five-minute decision budget and three-minute grace period,
+  discard the tentative parameter selection and restart from the opening prompt
+  with a fresh timer, without carrying over conversation history or submitting
+  the unchanged baseline.
+- Show a Conversation Reset Countdown before the first unique change, and tell
+  Qwen that expiry restarts the initial conversation.
+
 ## [4.11.0] - 2026-11-19 @ 04:16
 
 ### Summary

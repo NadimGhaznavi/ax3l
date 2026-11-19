@@ -22,7 +22,7 @@ from ax3l.constants.DChoice import (
 from ax3l.constants.DEventCategory import DEventCategory as Events
 from ax3l.constants.DSimulationAnalysis import DSimulationAnalysis
 from ax3l.constants.DSnakeLab import DSnakeLab
-from ax3l.entities.ConfigurationDraft import ConfigurationDraft
+from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
 from ax3l.interface.SnakeLab import SnakeLab, SimulationUnavailable
 from ax3l.interface.SnakeLabTools import SnakeLabTools
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
@@ -170,6 +170,9 @@ async def optimize(llm, output, db, endpoint):
             chart_episodes = {}
             if draft.phase == "preparing":
                 draft.phase = "selecting_parameter"
+            if draft.phase == "choosing" and not snake.available_parameters(draft.config, [draft.parameter]):
+                draft.parameter = None
+                draft.phase = "reviewing" if draft.selections else "selecting_parameter"
             decision_deadline = monotonic() + PARAMETER_SELECTION_SECONDS
             draft.decision_expires_at = time() + PARAMETER_SELECTION_SECONDS
             experiments.save_draft(draft)
@@ -185,8 +188,12 @@ async def optimize(llm, output, db, endpoint):
                         chart_episodes[chart_run.run_id] = snake.get_analysis_episodes(chart_run.run_id)
                     png = await prepare_chart(db, draft.draft_id, parameter, section, chart_run,
                                               chart_episodes[chart_run.run_id], golden.metrics["high_score"])
-                prompt = (ConfigurationNextStep(draft) if parameter == REVISION_PARAMETER else
-                          ConfigurationChoice(draft, latest, golden, chart_scope, png))
+                if parameter == REVISION_PARAMETER:
+                    parameters = snake.available_parameters(
+                        draft.config, [name for name in PARAMETER_ORDER if name not in draft.selections])
+                    prompt = ConfigurationNextStep(draft, parameters)
+                else:
+                    prompt = ConfigurationChoice(draft, latest, golden, chart_scope, png)
                 async with SnakeLabTools(endpoint, parameter, draft_id=draft.draft_id,
                                          allow_run=draft.phase == "reviewing") as tools:
                     try:

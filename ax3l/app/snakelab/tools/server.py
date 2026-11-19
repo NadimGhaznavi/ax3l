@@ -52,7 +52,8 @@ async def submit_pair_values(value_1: StrictInt | StrictFloat,
     return await SubmitPairValues(endpoint).submit(draft_id, assigned_parameter, value_1, value_2)
 
 
-@mcp.tool(description="Choose a setting that has not already been chosen in this experiment. "
+@mcp.tool(description="Choose one of the available parameter keys listed in the current task. "
+          "Already chosen settings and settings with no untested changes are unavailable. "
           "Use one parameter key: " + ", ".join(PARAMETER_ORDER) + ". Paired settings are revised together.")
 async def select_parameter(parameter: StrictStr) -> str:
     if assigned_parameter != REVISION_PARAMETER or not draft_id:

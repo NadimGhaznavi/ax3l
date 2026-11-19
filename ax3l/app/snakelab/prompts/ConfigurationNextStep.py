@@ -5,16 +5,16 @@ import json
 from ax3l.app.Prompt import Prompt
 from ax3l.app.snakelab.ParameterSpace import parameter_values
 from ax3l.constants.DChoice import CHOICE_LABELS, PARAMETER_SELECTION_SECONDS, DECISION_GRACE_SECONDS
-from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
+from ax3l.entities.ConfigurationDraft import ConfigurationDraft
 
 
 class ConfigurationNextStep(Prompt):
-    def __init__(self, draft: ConfigurationDraft):
+    def __init__(self, draft: ConfigurationDraft, parameters: list[str]):
         choices = {parameter: dict(label=CHOICE_LABELS[parameter], values=parameter_values(draft.config, parameter))
-                   for parameter in PARAMETER_ORDER if parameter not in draft.selections}
+                   for parameter in parameters}
         if draft.phase == "reviewing" and not choices:
-            instruction = ("All eligible settings have been changed and the configuration is unique. "
-                           "Use run_simulation to run it; no unused settings remain.")
+            instruction = ("No unused settings with untested changes remain and the configuration is unique. "
+                           "Use run_simulation to run it.")
         elif draft.phase == "reviewing":
             instruction = ("The current configuration is unique. Use run_simulation to run it, "
                            "or select_parameter to change an unused setting.")
@@ -39,6 +39,8 @@ class ConfigurationNextStep(Prompt):
             "You do not choose the seed's numeric value. A seed change must still beat golden to become golden. "
             "Each setting may be selected only once per experiment. Once selected, you must change at least one "
             "of its values; keeping the current values is not allowed. "
+            "Choose only from the available parameter keys below. Settings with no untested changes for the "
+            "current seed and other draft settings are omitted. "
             "After each submitted change, Ax3l checks the complete configuration for uniqueness. "
             "Duplicate values must be revised within the selected setting before you can choose another setting. "
             "You choose which settings to adjust and when to run; there is no required parameter order. "

@@ -203,6 +203,13 @@ class SnakeLab:
         finally:
             db.close()
 
+    def available_parameters(self, config: dict, parameters: list[str]) -> list[str]:
+        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
+        try:
+            return SnakeLabDb(db).available_parameters(config, parameters)
+        finally:
+            db.close()
+
     def get_epsilon_report(self, golden_run_id: str) -> list[dict]:
         UUID(golden_run_id)
         db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)

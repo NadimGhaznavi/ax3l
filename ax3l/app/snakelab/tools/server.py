@@ -9,6 +9,7 @@ from ax3l.app.snakelab.tools.SubmitSingleValue import SubmitSingleValue
 from ax3l.app.snakelab.tools.SubmitPairValues import SubmitPairValues
 from ax3l.app.snakelab.tools.SelectParameter import SelectParameter
 from ax3l.app.snakelab.tools.RunSimulation import RunSimulation
+from ax3l.app.snakelab.tools.RequestSeedChange import RequestSeedChange
 from ax3l.app.snakelab.tools.SubmitSimulationSummary import SubmitSimulationSummary
 from ax3l.app.snakelab.tools.ReadSimulationData import ReadSimulationData
 from ax3l.app.snakelab.PairParameters import PAIR_PARAMETERS, pair_instructions
@@ -66,6 +67,15 @@ async def run_simulation() -> str:
     return await RunSimulation(os.environ.get("AX3L_ZMQ_ENDPOINT")).submit(draft_id)
 
 
+@mcp.tool(description="Request a seed change without running a simulation. No arguments. "
+          "Ax3l increments the draft seed, skipping complete configurations already stored in any status. "
+          "Other settings stay unchanged. The candidate must still beat golden to become golden.")
+async def request_seed_change() -> str:
+    if assigned_parameter != "seed" or not draft_id:
+        raise ValueError("Ax3l must bind a seed-change conversation before requesting a seed change")
+    return await RequestSeedChange(os.environ.get("AX3L_ZMQ_ENDPOINT")).submit(draft_id)
+
+
 @mcp.tool(description="Save this chart's observation and optional concrete value to try next: 1–2 sentences, at most 40 words, no theory. Supply summary only, then stop.")
 async def submit_simulation_summary(summary: StrictStr) -> str:
     if assigned_parameter != "simulation_summary" or not run_id or section not in DSimulationAnalysis.SECTIONS:
@@ -100,6 +110,6 @@ async def data_tool(url: StrictStr) -> str:
             raise ValueError("Ax3l must bind a completed run and chart before settings lookup")
         return await ReadSimulationData(os.environ.get("AX3L_ZMQ_ENDPOINT")).read_run(run_id, url)
     if (assigned_parameter not in SINGLE_PARAMETERS and assigned_parameter not in PAIR_PARAMETERS
-            and assigned_parameter != REVISION_PARAMETER) or not draft_id:
+            and assigned_parameter not in ("seed", REVISION_PARAMETER)) or not draft_id:
         raise ValueError("Ax3l must bind a configuration choice before data lookup")
     return await ReadSimulationData(os.environ.get("AX3L_ZMQ_ENDPOINT")).read(draft_id, url)

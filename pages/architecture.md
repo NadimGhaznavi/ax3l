@@ -44,7 +44,7 @@ registration.
 
 - Reads from MariaDB.
 - Summarizes the current system state, e.g., the number of simulations run.
-- Offers an Experiment Status report card with eleven configuration values and
+- Offers an Experiment Status report card with fourteen configuration values and
   read-only checkmarks for accepted LLM choices, including unchanged values.
   Paired settings advance together, inherited pending values remain visible,
   and the next selection is highlighted. Simulation and measurement phases are
@@ -55,7 +55,8 @@ registration.
   and submission with per-step timings and per-request input and output tokens.
 - Presents a histogram showing score distribution across simulation runs.
 - Simulation details show exact termination counts and percentages and any previously saved Qwen notes. Run labels use the first UUID group; navigation retains full UUIDs.
-- Presents a plot of the high score over time, including the dips due to seed rotation events.
+- Presents a plot of the high score over time, including historical baseline
+  decreases from automatic seed rotations and accepted LLM-requested seed changes.
 - Presents an event log with filtering.
 - Handles HTTP connections in separate threads with a 30-second client timeout, so idle browser connections cannot block other pages or health checks. Shared background cache scheduling is serialized.
 - Retrieves captured high-score games from Snake Lab over ZMQ and shows animated GIFs in simulation reports and the current experiment panel. Runs without captured frames retain their saved SVG board; control-service transport outages also use that fallback.

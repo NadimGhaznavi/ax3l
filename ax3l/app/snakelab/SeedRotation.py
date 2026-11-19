@@ -1,46 +1,24 @@
-"""Rerun the current golden configuration to establish a fresh score baseline."""
+"""Finish seed rotations recorded before LLM-requested seed changes replaced them."""
 
-from copy import deepcopy
 import json
-from uuid import uuid4
-
-from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 
 from ax3l.app.ConfigurationLog import ConfigurationLog
 from ax3l.app.EventLogDb import EventLogDb
 from ax3l.constants.DEventCategory import DEventCategory as Events
-from ax3l.constants.DSnakeLab import DSnakeLab
-from ax3l.constants.DAx3l import DAx3l
 
 
-async def rotate_if_needed(snake, db, wait_for_run, *, resume_only=False) -> str | None:
+async def resume_seed_rotation(snake, db, wait_for_run) -> str | None:
     events = EventLogDb(db)
     pending = events.pending_seed_rotation()
-    fresh = pending is None
-    if fresh:
-        if resume_only:
-            return None
-        if events.stagnant_rounds() < DSnakeLab.SEED_STAGNANT_ROUNDS:
-            return None
-        golden_id = events.current_golden_config()["process_id"]
-        config = deepcopy(snake.get_config(golden_id))
-        config["seed"] += 1
-        SimulationConfiguration.validate(config)
-        intent_id = db.log(Events.Configuration.SEED_ROTATION_STARTED, Events.Configuration.CATEGORY,
-                           "INFO", json.dumps({"config": config, "golden_run_id": golden_id}),
-                           process_id=str(uuid4()), ax3l_version=DAx3l.VERSION)
-        pending = {"event_id": intent_id, "run_id": None, "submitted_event_id": None,
-                   "ax3l_version": DAx3l.VERSION}
-    else:
-        config = json.loads(pending["content"])["config"]
+    if pending is None:
+        return None
+    config = json.loads(pending["content"])["config"]
     run_id = pending["run_id"]
     if run_id is None:
         # Reconcile an interrupted/ambiguous submission by full config, never by retrying it.
         run_id = snake.find_config_run(config)
         if run_id is None:
-            if not fresh:
-                raise RuntimeError("Seed rotation submission is unresolved; no matching simulation was found")
-            run_id = snake.submit_simulation(config)
+            raise RuntimeError("Seed rotation submission is unresolved; no matching simulation was found")
         pending["submitted_event_id"] = db.log(
             Events.Configuration.GOLDEN_SEED_INCREMENTED, Events.Configuration.CATEGORY, "INFO",
             "Submitted golden configuration with the next seed after stagnant configuration proposals.",

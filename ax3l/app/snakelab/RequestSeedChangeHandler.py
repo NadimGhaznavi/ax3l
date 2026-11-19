@@ -1,0 +1,32 @@
+"""Stage the next unique seed without accepting a number or running a simulation."""
+
+from copy import deepcopy
+
+from jsonschema import ValidationError
+
+from ax3l.app.snakelab.ExperimentDb import ExperimentDb
+from ax3l.app.snakelab.SubmitSingleValueHandler import SubmitSingleValueHandler
+from ax3l.interface.SimulationConfiguration import SimulationConfiguration
+
+
+class RequestSeedChangeHandler(SubmitSingleValueHandler):
+    def submit(self, payload: dict) -> dict:
+        if not isinstance(payload, dict) or set(payload) != {"draft_id"}:
+            return self._reject("Supply exactly draft_id. Ax3l chooses the next seed.")
+        draft_id = payload["draft_id"]
+        if not isinstance(draft_id, str) or not draft_id:
+            return self._reject("draft_id must identify the active configuration draft.")
+        experiments = ExperimentDb(self._db)
+        draft = experiments.draft()
+        if draft is None or draft.draft_id != draft_id or draft.next_parameter != "seed":
+            return self._reject("This draft is not waiting for a seed change.")
+        candidate = deepcopy(draft.config)
+        while True:
+            try:
+                candidate["seed"] = SimulationConfiguration.next_seed(candidate["seed"])
+            except ValidationError as error:
+                return self._reject(f"Cannot increment the seed: {error.message}")
+            if self._snake.is_config_unique(candidate):
+                break
+        result = self._save_choice(experiments, draft, "seed", candidate)
+        return {**result, "seed": candidate["seed"]}

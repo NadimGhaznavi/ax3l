@@ -52,11 +52,13 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
         async with Client(entry, read_timeout_seconds=10) as client:
             tools = {tool.name: tool for tool in (await client.list_tools()).tools}
             self.assertEqual(set(tools), {'submit_single_value', 'submit_pair_values', 'select_parameter',
-                                         'run_simulation', 'submit_simulation_summary', 'kb_tool', 'data_tool'})
+                                         'run_simulation', 'request_seed_change', 'submit_simulation_summary',
+                                         'kb_tool', 'data_tool'})
             for name, arguments in (('submit_single_value', {'value': 240}),
                                     ('submit_pair_values', {'value_1': .91, 'value_2': .95}),
                                     ('select_parameter', {'parameter': 'layers'}),
                                     ('run_simulation', {}),
+                                    ('request_seed_change', {}),
                                     ('submit_simulation_summary', {'summary': 'Scores rose. Loss fell.'})):
                 self.assertEqual(set(tools[name].input_schema['properties']), set(arguments))
                 self.assertTrue((await client.call_tool(name, arguments)).is_error)
@@ -89,6 +91,7 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
                         await tools.submit(arguments)
                 self.assertTrue((await tools._client.call_tool('submit_single_value', dict(value=72))).is_error)
                 self.assertTrue((await tools._client.call_tool('run_simulation', {})).is_error)
+                self.assertTrue((await tools._client.call_tool('request_seed_change', {})).is_error)
                 self.assertEqual(len(requests), 2)
             async with SnakeLabTools(server.endpoint, 'layers', draft_id='private-draft') as tools:
                 self.assertTrue((await tools._client.call_tool('select_parameter', dict(parameter='gamma'))).is_error)
@@ -174,6 +177,37 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
                             await tools.submit({'value': invalid})
                     self.assertEqual(len(requests), count)
                     self.assertTrue((await tools._client.call_tool('submit_simulation_summary', {'summary': 'A. B.'})).is_error)
+
+    async def test_seed_conversation_researches_then_requests_a_change_with_no_model_arguments(self):
+        requests = []
+
+        def handle(message):
+            requests.append(message)
+            if message.method == 'read_simulation_data':
+                return dict(status='ok', page='Measured reference scores.')
+            return dict(status='ok', draft_id='private-draft', phase='reviewing', seed=1971)
+
+        def reply(tool, arguments):
+            return 200, '', json.dumps({'choices': [{'message': dict(role='assistant', tool_calls=[
+                dict(id=str(len(arguments)) + tool, type='function',
+                     function=dict(name=tool, arguments=json.dumps(arguments)))])}]}).encode()
+
+        llm = Mock(url='fixture')
+        llm.complete.side_effect = [reply('data_tool', {'url': '/golden/scores'}),
+                                   reply('request_seed_change', {'value': 99}),
+                                   reply('request_seed_change', {})]
+        with ZMQServer('tcp://127.0.0.1:*', handle) as server:
+            async with SnakeLabTools(server.endpoint, 'seed', draft_id='private-draft') as tools:
+                self.assertEqual([definition['function']['name'] for definition in tools.definitions],
+                                 ['request_seed_change', 'kb_tool', 'data_tool'])
+                self.assertEqual(tools.definition['function']['parameters']['properties'], {})
+                self.assertNotIn('private-draft', json.dumps(tools.definitions))
+                self.assertTrue((await tools._client.call_tool('submit_single_value', {'value': 99})).is_error)
+                result = await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('Request a seed change.')])
+        self.assertEqual(result['seed'], 1971)
+        self.assertEqual([request.method for request in requests], ['read_simulation_data', 'request_seed_change'])
+        self.assertEqual(requests[-1].payload, {'draft_id': 'private-draft'})
+        self.assertEqual(llm.complete.call_count, 3)
 
     async def test_all_pair_assignments_forward_two_values_and_private_draft_id(self):
         requests = []

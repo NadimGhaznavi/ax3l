@@ -18,10 +18,11 @@ class SnakeLabTools:
     def __init__(self, endpoint: str, parameter: str, *, draft_id: str | None = None,
                  run_id: str | None = None, section: str | None = None, allow_run: bool = False):
         if (parameter not in SINGLE_PARAMETERS and parameter not in PAIR_PARAMETERS
-                and parameter not in ("simulation_summary", REVISION_PARAMETER)):
+                and parameter not in ("seed", "simulation_summary", REVISION_PARAMETER)):
             raise ValueError(f"Unknown conversation parameter: {parameter}")
         self._tool_name = ("submit_simulation_summary" if parameter == "simulation_summary" else
                            "select_parameter" if parameter == REVISION_PARAMETER else
+                           "request_seed_change" if parameter == "seed" else
                            "submit_pair_values" if parameter in PAIR_PARAMETERS else "submit_single_value")
         self._allow_run = allow_run
         root = Path(__file__).resolve().parents[2]

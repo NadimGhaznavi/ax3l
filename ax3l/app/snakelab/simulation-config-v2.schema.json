@@ -20,7 +20,8 @@
       "description": "Master seed used to derive model, exploration, replay, and episode seeds.",
       "type": "integer",
       "default": 1970,
-      "minimum": 0
+      "minimum": 0,
+      "maximum": 9223372036854775807
     },
     "game": {
       "title": "Game environment",

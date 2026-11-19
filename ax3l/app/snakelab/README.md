@@ -3,7 +3,8 @@
 Ax3l starts a draft from the current golden configuration and asks Qwen which
 setting to change. Qwen can choose any of seven single settings—hidden size,
 encoder layers, dropout, sequence length, batch size, learning rate, and gamma—or
-the epsilon, distance-reward, and EpsilonNice pairs. Each value conversation
+the epsilon, distance-reward, and EpsilonNice pairs, or request a seed change.
+Each choice conversation
 saves its choice in the durable draft. Once selected, a setting must change:
 a single value must differ, and at least one value in a pair must differ.
 
@@ -15,8 +16,9 @@ with required EpsilonNice starting at probability 0.05. The LLM chooses hidden
 sizes from 32 to 128 in multiples of 8, encoder depth from 1 to 3 layers, and
 dropout from 0 to 0.1 in steps of 0.01. Tau remains fixed at 0.05.
 `SimulationConfiguration` owns defaults, schema validation, and the
-non-positive-sum reward-pair rule. Seeds and fixed fields remain
-application-controlled.
+non-positive-sum reward-pair rule. Qwen requests seed changes without choosing
+a number; Ax3l increments the seed, skipping complete configurations stored in
+any status. Fixed fields remain application-controlled.
 
 After every submitted value or pair, Ax3l checks the **whole configuration**
 against all stored runs. A duplicate is rejected without saving it; Qwen must
@@ -46,7 +48,9 @@ assignment calls for it:
 
 The chart comes from the latest run on the draft seed, or from the current
 golden run if the latest run used a different seed. The prompt supplies
-measured facts from the chart's source run. The all-time best is available
+each reference's seed and whether it matches the draft. Chart sources are
+selected again after seed changes; measurements from other seeds are historical
+context. It also supplies measured facts from the chart's source run. The all-time best is available
 through the data tool. Reference runs sharing several roles appear once in
 the run menu. All-time score ties resolve to the earliest stored run.
 
@@ -89,6 +93,7 @@ JSON data; transport envelopes and full identifiers remain internal.
 | `submit_pair_values` | `value_1`, `value_2` | Draft UUID and assigned pair |
 | `select_parameter` | `parameter` | Active draft UUID |
 | `run_simulation` | None | Unique draft UUID |
+| `request_seed_change` | None | Draft UUID and selected seed choice |
 | `kb_tool` | `url` | Allowlisted local reference pages |
 | `data_tool` | `url` | Selection draft and frozen references |
 
@@ -126,10 +131,20 @@ Recorded comparisons and promotions are recovered before the next draft starts.
 Failed or cancelled runs mark their draft failed and stop the current loop;
 a later startup begins a new draft using the retained golden configuration.
 
-A completed configuration comparison counts as one experiment cycle. After nine
-proposals without a new golden score, seed rotation reruns the golden settings
-on the next seed and establishes a new baseline. The old per-parameter cycle
-and exhaustion rules are no longer used by the optimization loop.
+A completed configuration comparison counts as one experiment cycle. Qwen can
+select `seed` once per draft, research its references, then call
+`request_seed_change()` to stage the next unique seed while preserving other
+choices. Replaying the request after acceptance cannot increment it again.
+The normal run decision, deadlines, and strict high-score comparison apply;
+ties and losses retain the golden seed. Seeds are nonnegative integers bounded
+by Ax3l's signed `BIGINT` score-history column. They are not offered as numeric
+value choices or enumerated as a finite search grid.
+
+The nine-proposal automatic rotation is removed. Startup only finishes an
+interrupted rotation already recorded under the old policy, preserving its
+original baseline acceptance and submission recovery. Historical rotation
+events and scores remain readable. The old per-parameter cycle and exhaustion
+rules are no longer used by the optimization loop.
 
 ## Running and reporting
 

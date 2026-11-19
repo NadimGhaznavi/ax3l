@@ -28,6 +28,23 @@ def result(score, lr):
 
 
 class ComparisonTests(unittest.TestCase):
+    def test_a_new_seed_obeys_the_same_win_tie_and_loss_rules(self):
+        for score in (9, 10, 11):
+            with self.subTest(score=score):
+                snake, db = Mock(), Mock()
+                snake.get_run_result.side_effect = [
+                    dict(status='completed', high_score=10, config={'seed': 1970}),
+                    dict(status='completed', high_score=score, config={'seed': 1971}),
+                ]
+                snake.get_num_sims.return_value = 2
+                self.assertEqual(compare(snake, db, 'gold', 'candidate'), 'candidate' if score > 10 else 'gold')
+                reason = json.loads(db.log.call_args_list[0].args[3])['reason']
+                self.assertIn('seed: 1970 -> 1971', reason)
+                if score > 10:
+                    self.assertEqual(db.log.call_args.kwargs['experiment_score']['seed'], 1971)
+                else:
+                    self.assertEqual(db.log.call_args.args[0], 'golden_config_retained')
+
     def test_wins_ties_and_losses(self):
         for score in (9, 10, 11):
             with self.subTest(score=score):

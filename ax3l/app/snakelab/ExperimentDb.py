@@ -14,10 +14,11 @@ def _restore_draft(data: dict) -> ConfigurationDraft:
     """Resume snapshots saved before Qwen chose the parameter order."""
     if "parameter" not in data:
         data = dict(data)
+        legacy_parameters = [parameter for parameter in PARAMETER_ORDER if parameter != "seed"]
         if data["phase"] == "choosing":
-            data["parameter"] = next(parameter for parameter in PARAMETER_ORDER if parameter not in data["selections"])
-        elif data["phase"] == "preparing" and data["selections"] and len(data["selections"]) < len(PARAMETER_ORDER):
-            data["parameter"] = next(parameter for parameter in PARAMETER_ORDER if parameter not in data["selections"])
+            data["parameter"] = next(parameter for parameter in legacy_parameters if parameter not in data["selections"])
+        elif data["phase"] == "preparing" and data["selections"] and len(data["selections"]) < len(legacy_parameters):
+            data["parameter"] = next(parameter for parameter in legacy_parameters if parameter not in data["selections"])
             data["phase"] = "choosing"
         elif data["phase"] == "ready":
             data["phase"] = "reviewing"

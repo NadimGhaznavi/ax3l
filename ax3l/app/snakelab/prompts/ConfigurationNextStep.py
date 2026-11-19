@@ -32,6 +32,8 @@ class ConfigurationNextStep(Prompt):
             f"Once a unique draft is available, an expired budget gives you {UNIQUE_CONFIG_GRACE_SECONDS // 60} extra "
             "minutes; then Ax3l submits the saved unique configuration and continues the normal experiment cycle. "
             "Paired settings are changed together. Other values stay in the draft. "
+            "Select seed to request a seed change: Ax3l increments it and skips configurations already stored. "
+            "You do not choose the seed's numeric value. A seed change must still beat golden to become golden. "
             "Each setting may be selected only once per experiment. Once selected, you must change at least one "
             "of its values; keeping the current values is not allowed. "
             "After each submitted change, Ax3l checks the complete configuration for uniqueness. "

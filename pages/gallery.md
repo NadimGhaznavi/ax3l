@@ -51,7 +51,8 @@ Run high scores across the experiment, comparing all scored runs with the oldest
 ## Experiment high scores
 
 The accepted configuration's high score over the course of the experiment,
-including seed rotations that establish a new local golden baseline.
+including seed rotations that establish a new local golden baseline and green
+points for simulations that tied the golden high score on their current seed.
 
 [![Chart of the accepted configuration's high score against the number of simulations]({{ '/pages/images/highscores.png' | relative_url }})]({{ '/pages/images/highscores.png' | relative_url }})
 

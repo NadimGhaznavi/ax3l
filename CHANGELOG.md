@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Show simulations that matched their seed's current golden high score in the
+Experiment High Scores plot.
+
+### Changed
+
+- Add green markers and hover details for completed same-seed ties, including
+  historical comparisons, while preserving golden promotion rules and the score line.
+
 ## [4.11.3] - 2026-11-20 @ 03:43
 
 ### Summary

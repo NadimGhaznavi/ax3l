@@ -8,6 +8,24 @@ import plotly.graph_objects as go
 from ax3l.activity.PlotTicks import axis_ticks
 
 
+_LOSS_MEAN_WINDOW = 20
+
+
+def _add_loss_traces(figure: go.Figure, episodes: list[dict], label: str, color: str) -> None:
+    numbers = [episode["episode"] for episode in episodes]
+    losses = [episode["loss"] for episode in episodes]
+    smoothed = [
+        mean(loss for loss in losses[max(0, index - _LOSS_MEAN_WINDOW + 1):index + 1]
+             if loss is not None) if value is not None else None
+        for index, value in enumerate(losses)
+    ]
+    figure.add_trace(go.Scatter(x=numbers, y=losses, mode="lines", name=f"{label} loss",
+                               connectgaps=False, opacity=.25, line=dict(color=color, width=1)))
+    figure.add_trace(go.Scatter(x=numbers, y=smoothed, mode="lines",
+                               name=f"{label} mean ({_LOSS_MEAN_WINDOW} episodes)",
+                               connectgaps=False, line=dict(color=color, width=3)))
+
+
 def measure(episodes: list[dict], high_score: int) -> dict:
     scores = [episode["score"] for episode in episodes]
     outcomes = Counter(episode["outcome"] for episode in episodes)
@@ -36,7 +54,8 @@ def measure(episodes: list[dict], high_score: int) -> dict:
 
 
 def render_analysis(config: dict, episodes: list[dict], metrics: dict,
-                    target_score: int, section: str) -> bytes:
+                    target_score: int, section: str, *,
+                    golden_episodes: list[dict] | None = None) -> bytes:
     figure = go.Figure()
     numbers = [episode["episode"] for episode in episodes]
     scores = [episode["score"] for episode in episodes]
@@ -63,15 +82,15 @@ def render_analysis(config: dict, episodes: list[dict], metrics: dict,
     elif section == "loss":
         title = "Training Loss During Training"
         x_label, y_label = "Episode number (episodes)", "Mean Smooth L1 loss (native loss units)"
-        figure.add_trace(go.Scatter(x=numbers, y=[episode["loss"] for episode in episodes],
-                                   name="Recorded loss", connectgaps=False,
-                                   line=dict(color="#4477aa", width=2)))
+        _add_loss_traces(figure, episodes, "Recorded", "#4477aa")
+        if golden_episodes is not None:
+            _add_loss_traces(figure, golden_episodes, "Golden", "#d46512")
         if not metrics["episodes_with_loss"]:
             figure.add_annotation(text="No training losses recorded", x=.5, y=.5,
                                   xref="x domain", yref="y domain", showarrow=False)
     else:
         raise ValueError(f"Unknown analysis section: {section}")
-    figure.update_xaxes(title_text=x_label, **axis_ticks(figure.data[0].x))
+    figure.update_xaxes(title_text=x_label, **axis_ticks(value for trace in figure.data for value in trace.x))
     figure.update_yaxes(title_text=y_label, rangemode="tozero")
     if section != "loss":
         values = [value for trace in figure.data for value in trace.y]

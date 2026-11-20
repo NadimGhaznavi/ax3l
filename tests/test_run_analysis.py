@@ -65,7 +65,7 @@ class RunAnalysisTests(unittest.TestCase):
                 self.assertNotEqual(metrics['mean_score'], first)
                 self.assertNotEqual(metrics['mean_score'], last)
 
-    def render(self, section, episodes=None):
+    def render(self, section, episodes=None, *, golden_episodes=None):
         figures = []
         def capture(figure, **kwargs):
             figures.append(figure)
@@ -73,7 +73,8 @@ class RunAnalysisTests(unittest.TestCase):
         episodes = self.episodes if episodes is None else episodes
         with patch('plotly.graph_objects.Figure.to_image', capture):
             self.assertEqual(render_analysis(self.config, episodes,
-                                            measure(episodes, 6), 9, section), b'png')
+                                            measure(episodes, 6), 9, section,
+                                            golden_episodes=golden_episodes), b'png')
         figure = figures[0]
         self.assertNotIn(self.run_id.split('-')[0], figure.layout.title.text)
         self.assertIn('Goal:', figure.layout.title.text)
@@ -94,15 +95,53 @@ class RunAnalysisTests(unittest.TestCase):
         self.assertEqual(len(distribution.layout.shapes), 0)
         self.assertIn('episodes', distribution.layout.yaxis.title.text)
         loss = self.render('loss')
-        self.assertEqual(len(loss.data), 1)
+        self.assertEqual(len(loss.data), 2)
         self.assertIn('Smooth L1', loss.layout.yaxis.title.text)
         self.assertEqual(list(loss.data[0].y), [None, .8, .4, .2, None])
         self.assertFalse(loss.data[0].connectgaps)
+
+    def test_loss_mean_uses_twenty_episodes_and_preserves_missing_and_zero_losses(self):
+        losses = [100] + [0] * 19 + [20, None, 0]
+        episodes = [dict(self.episodes[0], episode=index, loss=loss)
+                    for index, loss in enumerate(losses, 1)]
+        figure = self.render('loss', episodes)
+        raw, smoothed = figure.data
+        self.assertEqual(list(raw.y), losses)
+        self.assertEqual(smoothed.y[0], 100)
+        self.assertEqual(smoothed.y[1], 50)
+        self.assertEqual(smoothed.y[19], 5)
+        self.assertEqual(smoothed.y[20], 1)
+        self.assertIsNone(smoothed.y[21])
+        self.assertAlmostEqual(smoothed.y[22], 20 / 19)
+        self.assertFalse(smoothed.connectgaps)
+        self.assertLess(raw.opacity, 1)
+        self.assertLess(raw.line.width, smoothed.line.width)
+
+    def test_golden_loss_has_its_own_mean_color_and_episode_axis(self):
+        golden = [dict(self.episodes[0], episode=index, loss=2 if index == 1 else 0)
+                  for index in range(1, 61)]
+        original = deepcopy((self.episodes, golden))
+        figure = self.render('loss', golden_episodes=golden)
+        raw, smoothed, golden_raw, golden_mean = figure.data
+        self.assertEqual(list(raw.x), [1, 2, 3, 4, 5])
+        self.assertEqual(list(golden_raw.x), list(range(1, 61)))
+        self.assertEqual(golden_mean.x, golden_raw.x)
+        self.assertEqual(list(golden_raw.y), [2] + [0] * 59)
+        self.assertEqual(golden_mean.y[0], 2)
+        self.assertEqual(golden_mean.y[1], 1)
+        self.assertEqual(golden_mean.y[-1], 0)
+        self.assertEqual(raw.line.color, smoothed.line.color)
+        self.assertEqual(golden_raw.line.color, golden_mean.line.color)
+        self.assertNotEqual(smoothed.line.color, golden_mean.line.color)
+        self.assertIn('Golden', golden_mean.name)
+        self.assertEqual(figure.layout.xaxis.dtick, 10)
+        self.assertEqual((self.episodes, golden), original)
 
     def test_missing_loss_is_labeled_without_inventing_zero_measurements(self):
         episodes = [dict(episode, loss=None) for episode in self.episodes]
         figure = self.render('loss', episodes)
         self.assertEqual(list(figure.data[0].y), [None] * 5)
+        self.assertEqual(list(figure.data[1].y), [None] * 5)
         self.assertEqual(figure.layout.annotations[0].text, 'No training losses recorded')
 
 

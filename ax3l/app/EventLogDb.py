@@ -160,12 +160,30 @@ class EventLogDb:
         return rows[0]["process_id"] if rows else None
 
     def experiment_highscores(self) -> list[dict[str, Any]]:
-        """Read accepted scores in decision order, including lower seed baselines."""
-        return self._db.query("""
-            SELECT h.simulations, h.score, h.seed, e.process_id AS run_id, m.content AS reason
-            FROM experiment_highscores h JOIN events e USING (event_id)
-            JOIN event_messages m USING (event_id)
-            ORDER BY h.event_id
+        """Read golden scores and completed same-seed ties in decision order."""
+        return self._db.query(f"""
+            WITH runs AS (
+                SELECT run_id, status, high_score,
+                       ROW_NUMBER() OVER (ORDER BY id) AS simulations
+                FROM `{DSnakeLab.DATABASE}`.simulation_runs
+            ), history AS (
+                SELECT h.event_id, h.simulations, h.score, h.seed, e.process_id AS run_id,
+                       m.content AS reason, 0 AS matched
+                FROM experiment_highscores h JOIN events e USING (event_id)
+                JOIN event_messages m USING (event_id)
+                UNION ALL
+                SELECT e.event_id, r.simulations, r.high_score, c.seed, e.process_id,
+                       JSON_UNQUOTE(JSON_EXTRACT(m.content, '$.reason')), 1
+                FROM events e JOIN event_messages m USING (event_id)
+                JOIN runs r ON r.run_id = e.process_id COLLATE utf8mb4_unicode_ci
+                JOIN `{DSnakeLab.DATABASE}`.configurations c ON c.run_id = r.run_id
+                JOIN experiment_highscores h ON h.event_id = (
+                    SELECT MAX(event_id) FROM experiment_highscores WHERE event_id < e.event_id)
+                WHERE e.category = 'Configuration' AND e.name = 'configuration_compared'
+                  AND r.status = 'completed' AND r.high_score = h.score AND c.seed = h.seed
+            )
+            SELECT simulations, score, seed, run_id, reason, matched
+            FROM history ORDER BY event_id
         """)
 
     def simulation_metrics(self) -> list[dict[str, Any]]:

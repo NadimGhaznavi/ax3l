@@ -1,4 +1,4 @@
-"""Plot the accepted config's score, preserving seed baseline decreases."""
+"""Plot golden scores and same-seed ties, preserving seed baseline decreases."""
 
 from html import escape
 
@@ -10,37 +10,40 @@ from ax3l.activity.PlotTicks import axis_ticks
 def highscores(history: list[dict], total: int) -> dict:
     if not history:
         return {"chart": None, "total": total}
-    x = [row["simulations"] for row in history]
-    y = [row["score"] for row in history]
+    accepted = [row for row in history if not row["matched"]]
+    x = [row["simulations"] for row in accepted]
+    y = [row["score"] for row in accepted]
     seed_changes = [
-        index > 0 and row["seed"] is not None and history[index - 1]["seed"] is not None
-        and row["seed"] != history[index - 1]["seed"]
-        for index, row in enumerate(history)
-    ]
-    details = [
-        [row["seed"], escape(row["run_id"].split('-')[0]), escape(row["reason"]),
-         "<br>Seed change" if changed else ""]
-        for row, changed in zip(history, seed_changes)
+        index > 0 and row["seed"] is not None and accepted[index - 1]["seed"] is not None
+        and row["seed"] != accepted[index - 1]["seed"]
+        for index, row in enumerate(accepted)
     ]
     figure = go.Figure()
     # Continue the accepted score across unsuccessful and pending submissions.
-    end = max(total, x[-1])
+    end = max(total, max(row["simulations"] for row in history))
     figure.add_trace(go.Scatter(
         x=x + ([end] if end > x[-1] else []),
         y=y + ([y[-1]] if end > x[-1] else []),
         mode="lines", line=dict(shape="spline", color="#4c9be8", width=4),
         name="High score", hoverinfo="skip", showlegend=True,
     ))
-    for changed, name, color in (
-        (False, "Accepted config", "#f09445"),
-        (True, "Seed change", "#c792ea"),
+    for rows, name, color, label in (
+        ([row for row, changed in zip(accepted, seed_changes) if not changed],
+         "Accepted config", "#f09445", ""),
+        ([row for row, changed in zip(accepted, seed_changes) if changed],
+         "Seed change", "#c792ea", "<br>Seed change"),
+        ([row for row in history if row["matched"]],
+         "Matched high score", "#64c9a0", "<br>Matched high score"),
     ):
-        indices = [index for index, seed_changed in enumerate(seed_changes) if seed_changed == changed]
+        details = [
+            [row["seed"], escape(row["run_id"].split('-')[0]), escape(row["reason"]), label]
+            for row in rows
+        ]
         figure.add_trace(go.Scatter(
             # A null point keeps the legend entry visible when this category is absent.
-            x=[x[index] for index in indices] or [None],
-            y=[y[index] for index in indices] or [None],
-            customdata=[details[index] for index in indices], mode="markers",
+            x=[row["simulations"] for row in rows] or [None],
+            y=[row["score"] for row in rows] or [None],
+            customdata=details, mode="markers",
             marker=dict(color=color, size=8), name=name, showlegend=True,
             hovertemplate="Simulations: %{x}<br>Score: %{y}<br>Seed: %{customdata[0]}"
                           "<br>Run: %{customdata[1]}<br>%{customdata[2]}%{customdata[3]}<extra></extra>",

@@ -49,7 +49,10 @@ same short procedure. The prompt supplies the assigned setting's current
 values and reference results in JSON. Ax3l prepares one chart when the
 assignment calls for it:
 
-- Learning rate uses training loss, when recorded.
+- Learning rate uses training loss, when recorded, with faint raw traces and
+  trailing means over up to 20 episodes. A distinct golden run's loss and mean
+  appear in orange when recorded. Missing losses are excluded from the means
+  and remain gaps in both traces.
 - The epsilon pair uses the score trend.
 - The distance-reward pair uses the score distribution.
 

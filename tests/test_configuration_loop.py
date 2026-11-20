@@ -503,6 +503,8 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
             content = messages[parameter]
             self.assertEqual([part['type'] for part in content], ['text', 'image_url'])
             self.assertIn('The chart shows the latest run.', content[0]['text'])
+        self.assertIn('Orange overlays the golden run', messages['learning_rate'][0]['text'])
+        self.assertIn('bold lines show trailing means', messages['learning_rate'][0]['text'])
         self.assertEqual([call.args[-1] for call in self.chart.call_args_list],
                          ['distribution', 'loss', 'scores'])
         data = json.loads(messages['epsilon_pair'][0]['text'].split('```json\n')[1].split('\n```')[0])
@@ -510,6 +512,38 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(data['reference_runs']['latest']['mean_last_50_scores'], .2)
         self.assertEqual(data['current'], {key: self.config['epsilon'][key] for key in ('initial', 'decay')})
         self.assertNotIn('Previous notes.', messages['epsilon_pair'][0]['text'])
+
+    async def test_loss_overlay_loads_golden_once_and_reuses_cached_episode_data(self):
+        self.decisions = ['learning_rate', 'epsilon_pair', 'run']
+        episodes = {run_id: [dict(episode=1, loss=loss)]
+                    for run_id, loss in ((self.latest, .8), (self.gold, .3))}
+        self.snake.get_analysis_episodes.side_effect = episodes.__getitem__
+        await self.cycle()
+        loss, scores = self.chart.call_args_list
+        self.assertEqual(loss.args[1], episodes[self.latest])
+        self.assertEqual(loss.kwargs['golden_episodes'], episodes[self.gold])
+        self.assertIsNone(scores.kwargs['golden_episodes'])
+        self.assertEqual([call.args[0] for call in self.snake.get_analysis_episodes.call_args_list],
+                         [self.latest, self.gold])
+        prompt = self.conversation.await_args_list[1].args[4][0].to_md()
+        evidence = json.loads(prompt.split('```json\n')[1].split('\n```')[0])
+        for scope in ('latest', 'golden'):
+            self.assertEqual(evidence['reference_runs'][scope]['episodes_with_loss'], 480)
+
+    async def test_golden_source_is_not_overlaid_twice(self):
+        self.snake.get_latest_completed_run_id.return_value = self.gold
+        await self.cycle()
+        self.snake.get_analysis_episodes.assert_called_once_with(self.gold)
+        self.assertIsNone(self.chart.call_args.kwargs['golden_episodes'])
+        self.assertIn('The chart shows the golden run.', self.prompts[1])
+        self.assertNotIn('Orange overlays', self.prompts[1])
+
+    async def test_golden_without_recorded_loss_keeps_the_latest_loss_chart(self):
+        self.store.analyses[self.gold].metrics['episodes_with_loss'] = 0
+        await self.cycle()
+        self.snake.get_analysis_episodes.assert_called_once_with(self.latest)
+        self.assertIsNone(self.chart.call_args.kwargs['golden_episodes'])
+        self.assertIn('golden run has no recorded loss to overlay', self.prompts[1])
 
     async def test_golden_supplies_chart_after_seed_change_and_missing_loss_skips_chart(self):
         self.decisions = ['learning_rate', 'epsilon_pair', 'run']

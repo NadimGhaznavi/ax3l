@@ -16,6 +16,8 @@ class RequestSeedChangeHandlerTests(unittest.TestCase):
         shared = 'ax3l.app.snakelab.SubmitSingleValueHandler.'
         self.snake = self.enterContext(patch(shared + 'SnakeLab')).return_value
         self.snake.is_config_unique.return_value = True
+        self.baseline = SimulationConfiguration.defaults()
+        self.snake.get_run_result.return_value = dict(config=self.baseline)
         self.experiments = self.enterContext(patch(
             'ax3l.app.snakelab.RequestSeedChangeHandler.ExperimentDb')).return_value
         self.draft = ConfigurationDraft('draft', 'gold', {'golden': 'gold'},
@@ -50,10 +52,24 @@ class RequestSeedChangeHandlerTests(unittest.TestCase):
 
         self.snake.is_config_unique.side_effect = unique
         result = self.handler.submit({'draft_id': 'draft'})
-        self.assertEqual([config['seed'] for config in checked], [1971, 1972, 1973])
-        self.assertTrue(all(config == {**original.config, 'seed': config['seed']} for config in checked))
+        self.assertEqual([config['seed'] for config in checked], [1971, 1972, 1973, 1973])
+        self.assertTrue(all(config == {**original.config, 'seed': config['seed']} for config in checked[:-1]))
+        self.assertEqual(checked[-1], {**self.baseline, 'seed': 1973})
         self.assertEqual(result['seed'], 1973)
         self.experiments.save_draft.assert_called_once()
+
+    def test_stored_golden_baselines_are_skipped_even_when_the_draft_is_unique(self):
+        self.snake.is_config_unique.side_effect = lambda config: config != {**self.baseline, 'seed': 1971}
+        result = self.handler.submit({'draft_id': 'draft'})
+        self.assertEqual(result['seed'], 1972)
+        self.assertEqual(self.draft.config['model']['layers'], 2)
+
+    def test_seed_only_request_checks_each_complete_configuration_once(self):
+        self.draft.config = deepcopy(self.baseline)
+        self.draft.selections = []
+        self.snake.is_config_unique.side_effect = [False, True]
+        self.assertEqual(self.handler.submit({'draft_id': 'draft'})['seed'], 1972)
+        self.assertEqual(self.snake.is_config_unique.call_count, 2)
 
     def test_values_extra_fields_and_invalid_identifiers_are_rejected_before_reading(self):
         for payload in (None, {}, {'draft_id': None}, {'draft_id': ''},

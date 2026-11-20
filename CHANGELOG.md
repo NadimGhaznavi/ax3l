@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Establish a fresh local golden baseline when Qwen changes the seed before
+testing any other requested configuration changes.
+
+### Fixed
+
+- Run golden with only the new seed and accept its completed score, even if
+  lower. Seed-only drafts finish with that single run; drafts with other
+  changes run a second simulation and compare against the new seed baseline.
+- Recover interrupted seed baselines without duplicate submissions or score
+  history entries, and skip seeds already stored for the golden baseline.
+- Explain seed baseline resets in the LLM instructions, Experiment Status, and
+  High Scores report, retaining the existing seed marker color.
+
 ## [4.11.1] - 2026-11-19 @ 05:06
 
 ### Summary

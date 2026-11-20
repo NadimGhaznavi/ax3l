@@ -79,12 +79,18 @@ def _phase(draft: ConfigurationDraft, run: dict | None, comparison: dict | None,
         return "Choosing next step", "The configuration is unique. Qwen can run it or change an unused setting."
     if draft.phase == "ready":
         return "Ready to submit", "The saved configuration is ready to run."
+    if draft.phase == "rotating_seed":
+        return "Rotating seed", "Running the golden configuration with the new seed to establish its local high score."
     if draft.phase == "submitting":
         return "Submission pending", "Waiting for Snake Lab to confirm the simulation."
     if run is None:
         return "Simulation unavailable", "The submitted simulation has no stored run record."
     if run["status"] != "completed":
         return RUN_PHASES[run["status"]]
+    if draft.run_id == draft.golden_run_id:
+        if analysis is None:
+            return "Recording results", "Saving the measured results for the new seed baseline."
+        return "Complete", "The new seed baseline is saved as the local golden configuration."
     if comparison is None:
         return "Comparing results", "Comparing the high score with the golden configuration."
     if analysis is None:
@@ -104,7 +110,8 @@ def experiment_status(draft: ConfigurationDraft | None, run: dict | None = None,
     target = golden["high_score"]
     outcome = "Awaiting simulation"
     if completed:
-        outcome = ("Awaiting comparison" if comparison is None else
+        outcome = ("New golden baseline" if draft.run_id == draft.golden_run_id else
+                   "Awaiting comparison" if comparison is None else
                    "New golden" if comparison["current_golden_run_id"] == draft.run_id else "Golden retained")
     elif run is not None and run["status"] in ("failed", "cancelled"):
         outcome = "No completed result"

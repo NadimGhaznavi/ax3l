@@ -144,15 +144,22 @@ A completed configuration comparison counts as one experiment cycle. Qwen can
 select `seed` once per draft, research its references, then call
 `request_seed_change()` to stage the next unique seed while preserving other
 choices. Replaying the request after acceptance cannot increment it again.
-The normal run decision, deadlines, and strict high-score comparison apply;
-ties and losses retain the golden seed. Seeds are nonnegative integers bounded
+The normal run decision and deadlines apply. When the draft runs, Ax3l first
+runs the current golden configuration with only the new seed and accepts its
+score as the local golden baseline, even if it is lower. A seed-only draft
+finishes with that run. If other settings changed, Ax3l then runs the complete
+draft on the same new seed and compares it against the new baseline; ties and
+losses retain that baseline. Seed choices skip stored configurations for both
+the draft and its golden baseline. Seeds are nonnegative integers bounded
 by Ax3l's signed `BIGINT` score-history column. They are not offered as numeric
 value choices or enumerated as a finite search grid.
 
-The nine-proposal automatic rotation is removed. Startup only finishes an
-interrupted rotation already recorded under the old policy, preserving its
-original baseline acceptance and submission recovery. Historical rotation
-events and scores remain readable. The old per-parameter cycle is no longer
+There is no nine-proposal automatic rotation. Interrupted seed rotations resume
+their recorded baseline without resubmitting, including when the baseline was
+accepted just before a restart. Startup also finishes rotations recorded under
+the former automatic policy. Historical rotation events and scores remain
+readable. Seed-only rotations do not count as configuration comparisons.
+The old per-parameter cycle is no longer
 used; finite-domain exhaustion now filters Qwen's available parameter choices.
 
 ## Running and reporting

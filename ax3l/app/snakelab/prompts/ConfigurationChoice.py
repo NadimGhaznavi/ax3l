@@ -58,10 +58,12 @@ class ConfigurationChoice(Prompt):
         text.append("Use data_tool at /draft for saved choices or / for other runs.")
         if parameter == "seed":
             text.append("Request a seed change using request_seed_change with no arguments. "
-                        "Ax3l increments the draft seed, skipping complete configurations already stored in any status. "
+                        "Ax3l increments the draft seed, skipping stored draft configurations and golden baselines. "
                         "You do not choose a number. Other draft settings stay unchanged. "
                         "The request saves the change without running a simulation or resetting the golden score. "
-                        "The candidate must still beat golden to become golden.")
+                        "When the draft runs, Ax3l first runs golden with the new seed and accepts its score as the "
+                        "local golden baseline, even if lower. A seed-only draft stops there. Other saved changes "
+                        "then run on the new seed and must beat that baseline to become golden.")
         else:
             text.append("Change at least one of this setting's current values to produce a unique complete configuration. "
                         "If a proposal is a duplicate, submit different values for this same setting.")

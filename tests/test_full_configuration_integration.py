@@ -32,7 +32,7 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
             db.execute('UPDATE events SET parent_event_id=NULL WHERE event_id>%s', (first_event,))
             db.execute('DELETE FROM events WHERE event_id>%s', (first_event,))
         self.addCleanup(cleanup)
-        baseline_id, candidate_id = str(uuid4()), str(uuid4())
+        baseline_id, rotated_id, candidate_id = str(uuid4()), str(uuid4()), str(uuid4())
         config = SimulationConfiguration.defaults()
         results = {baseline_id: dict(status='completed', high_score=10, config=config)}
         previous = deepcopy(config)
@@ -73,9 +73,13 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
                 return parameters
             def submit_simulation(self, candidate):
                 self_test.assertEqual(selections, expected_choices)
+                run_id = rotated_id if not calls else candidate_id
+                if calls:
+                    self_test.assertEqual(EventLogDb(db).current_golden_config()['process_id'], rotated_id)
                 calls.append(deepcopy(candidate))
-                results[candidate_id] = dict(status='completed', high_score=12, config=deepcopy(candidate))
-                return candidate_id
+                results[run_id] = dict(status='completed', high_score=4 if run_id == rotated_id else 8,
+                                       config=deepcopy(candidate))
+                return run_id
             def get_simulation_status(self, run_id):
                 return 'completed'
 
@@ -161,19 +165,25 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
                 ZMQServer('tcp://127.0.0.1:*', handle_tool) as server:
             with self.assertRaises(asyncio.CancelledError):
                 await optimize(InferenceFixture(), Path('/tmp'), db, server.endpoint)
-        self.assertEqual(len(calls), 1)
+        self.assertEqual(len(calls), 2)
         self.assertEqual(duplicate_attempts, ['reward_pair'])
         self.assertEqual(repeated_selections, ['learning_rate'])
         self.assertEqual(chart_choices, [name for name in expected_choices if name in CHOICE_CHARTS])
-        self.assertEqual(calls[0]['seed'], config['seed'] + 1)
-        self.assertEqual(calls[0]['model'], config['model'])
-        self.assertEqual(calls[0]['training']['learning_rate'], .003)
-        self.assertEqual(calls[0]['epsilon']['initial'], .91)
-        self.assertEqual(calls[0]['epsilon_nice'], config['epsilon_nice'])
+        self.assertEqual(calls[0], {**config, 'seed': config['seed'] + 1})
+        self.assertEqual(calls[1]['seed'], config['seed'] + 1)
+        self.assertEqual(calls[1]['model'], config['model'])
+        self.assertEqual(calls[1]['training']['learning_rate'], .003)
+        self.assertEqual(calls[1]['epsilon']['initial'], .91)
+        self.assertEqual(calls[1]['epsilon_nice'], config['epsilon_nice'])
         self.assertEqual(EventLogDb(db).current_golden_config()['process_id'], candidate_id)
+        history = EventLogDb(db).experiment_highscores()
+        self.assertEqual([(row['run_id'], row['score'], row['seed']) for row in history],
+                         [(baseline_id, 10, config['seed']), (rotated_id, 4, config['seed'] + 1),
+                          (candidate_id, 8, config['seed'] + 1)])
         draft = ExperimentDb(db).draft()
         self.assertEqual(draft.phase, 'completed')
         self.assertEqual(draft.run_id, candidate_id)
+        self.assertEqual(draft.golden_run_id, rotated_id)
         saved = ExperimentDb(db).analysis(candidate_id)
         self.assertEqual(saved.metrics['termination_reasons']['wall'], {'count': 3, 'percent': 30})
         self.assertEqual(saved.metrics['termination_reasons']['snake'], {'count': 7, 'percent': 70})
@@ -187,4 +197,4 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
         rows = db.query("SELECT name, COUNT(*) AS n FROM events WHERE event_id>%s AND name IN ('simulation_analyzed','simulation_analysis_progress','simulation_submitted','configuration_compared') GROUP BY name", (first_event,))
         self.assertEqual({row['name']: row['n'] for row in rows},
                          {'simulation_analyzed': 2,
-                          'simulation_submitted': 1, 'configuration_compared': 1})
+                          'simulation_submitted': 2, 'configuration_compared': 1})

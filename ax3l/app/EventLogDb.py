@@ -123,12 +123,30 @@ class EventLogDb:
             FROM events i JOIN event_messages m ON m.event_id = i.event_id
             LEFT JOIN events s ON s.parent_event_id = i.event_id AND s.name = %s AND s.category = %s
             WHERE i.name = %s AND i.category = %s
+              AND JSON_EXTRACT(m.content, '$.draft_id') IS NULL
               AND NOT EXISTS (SELECT 1 FROM events g WHERE g.parent_event_id = s.event_id
                               AND g.name = %s AND g.category = %s)
             ORDER BY i.event_id DESC LIMIT 1
         """, (category.GOLDEN_SEED_INCREMENTED, category.CATEGORY,
                category.SEED_ROTATION_STARTED, category.CATEGORY,
                category.GOLDEN_CREATED, category.CATEGORY))
+        return rows[0] if rows else None
+
+    def seed_rotation(self, draft_id: str) -> dict[str, Any] | None:
+        """Recover a draft's seed baseline, including an already accepted result."""
+        category = DEventCategory.Configuration
+        rows = self._db.query("""
+            SELECT i.event_id, i.ax3l_version, m.content,
+                   s.event_id AS submitted_event_id, s.process_id AS run_id,
+                   g.event_id AS completed_event_id
+            FROM events i JOIN event_messages m ON m.event_id = i.event_id
+            LEFT JOIN events s ON s.parent_event_id = i.event_id AND s.name = %s AND s.category = %s
+            LEFT JOIN events g ON g.parent_event_id = s.event_id AND g.name = %s AND g.category = %s
+            WHERE i.name = %s AND i.category = %s AND i.process_id = %s
+            ORDER BY i.event_id DESC LIMIT 1
+        """, (category.GOLDEN_SEED_INCREMENTED, category.CATEGORY,
+               category.GOLDEN_CREATED, category.CATEGORY,
+               category.SEED_ROTATION_STARTED, category.CATEGORY, draft_id))
         return rows[0] if rows else None
 
     def latest_seed_baseline(self) -> str | None:

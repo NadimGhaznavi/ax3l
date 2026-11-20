@@ -51,6 +51,7 @@ class MemoryExperiments:
 class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.gold, self.latest, self.best, self.run = [str(uuid4()) for _ in range(4)]
+        self.seed_run = str(uuid4())
         self.config = SimulationConfiguration.defaults()
         self.store = MemoryExperiments()
         for run_id, score in ((self.gold, 20), (self.latest, 10), (self.best, 30)):
@@ -72,12 +73,25 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.snake.get_run_result.side_effect = lambda run_id: {
             'status': 'completed', 'high_score': 25 if run_id == self.run else 20,
             'config': self.config}
+        self.results = {}
+        original_result = self.snake.get_run_result.side_effect
+        self.snake.get_run_result.side_effect = lambda run_id: self.results.get(run_id) or original_result(run_id)
+
+        def submit(config):
+            run_id = self.seed_run if config == {**self.config, 'seed': config['seed']} and config != self.config else self.run
+            self.results[run_id] = dict(status='completed', high_score=5 if run_id == self.seed_run else 25,
+                                        config=deepcopy(config))
+            return run_id
+
+        self.snake.submit_simulation.side_effect = submit
         self.events = Mock()
         self.events.current_golden_config.return_value = {'process_id': self.gold}
+        self.events.seed_rotation.return_value = None
         module = 'ax3l.app.snakelab.SnakeLabLoop.'
         self.enterContext(patch(module + 'SnakeLab', return_value=self.snake))
         self.enterContext(patch(module + 'ExperimentDb', return_value=self.store))
         self.enterContext(patch(module + 'EventLogDb', return_value=self.events))
+        self.enterContext(patch('ax3l.app.snakelab.SeedRotation.EventLogDb', return_value=self.events))
         self.rotation = self.enterContext(patch(module + 'resume_seed_rotation', new_callable=AsyncMock))
         self.wait = self.enterContext(patch(module + 'wait_for_run', new_callable=AsyncMock))
         self.analysis = self.enterContext(patch(module + 'record_run_metrics'))
@@ -594,7 +608,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('baseline values from the golden configuration', prompt)
         self.assertIn('select_parameter', prompt)
 
-    async def test_seed_change_is_staged_before_the_explicit_run_and_uses_normal_scoring(self):
+    async def test_seed_only_change_runs_once_and_accepts_a_lower_local_baseline(self):
         self.decisions = ['seed', 'run']
         await self.cycle()
         self.assertEqual(self.trace(), [REVISION_PARAMETER, 'seed', REVISION_PARAMETER])
@@ -604,7 +618,77 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('request_seed_change with no arguments', prompt)
         self.assertNotIn('Submit using submit_single_value', prompt)
         self.assertEqual(self.rotation.await_count, 1)
-        self.assertIn('configuration_compared', [call.args[0] for call in self.db.log.call_args_list])
+        self.snake.submit_simulation.assert_called_once()
+        self.wait.assert_awaited_once_with(self.snake, self.db, self.seed_run)
+        self.assertEqual(self.store.saved.run_id, self.seed_run)
+        self.assertEqual(self.store.saved.golden_run_id, self.seed_run)
+        self.assertEqual(self.store.saved.references['golden'], self.seed_run)
+        self.assertNotIn('configuration_compared', [call.args[0] for call in self.db.log.call_args_list])
+        creations = [call for call in self.db.log.call_args_list if call.args[0] == 'golden_config_created']
+        self.assertEqual(len(creations), 1)
+        self.assertEqual(creations[0].kwargs['experiment_score'], dict(simulations=2, score=5, seed=1971))
+
+    async def test_other_changes_run_after_seed_baseline_and_compare_on_the_same_seed(self):
+        self.decisions = ['learning_rate', 'seed', 'layers', 'run']
+
+        async def wait(snake, db, run_id):
+            if run_id == self.seed_run:
+                self.assertEqual(self.snake.submit_simulation.call_count, 1)
+                self.assertNotIn('golden_config_created', [call.args[0] for call in self.db.log.call_args_list])
+            else:
+                self.assertEqual(self.snake.submit_simulation.call_count, 2)
+                self.assertIn('golden_config_created', [call.args[0] for call in self.db.log.call_args_list])
+
+        self.wait.side_effect = wait
+        await self.cycle()
+        baseline, candidate = [call.args[0] for call in self.snake.submit_simulation.call_args_list]
+        self.assertEqual(baseline, {**self.config, 'seed': 1971})
+        self.assertEqual(candidate['seed'], 1971)
+        self.assertEqual(candidate['training']['learning_rate'], .003)
+        self.assertEqual(candidate['model']['layers'], 3)
+        comparison = next(call for call in self.db.log.call_args_list if call.args[0] == 'configuration_compared')
+        saved = json.loads(comparison.args[3])
+        self.assertEqual(saved['golden_run_id'], self.seed_run)
+        self.assertEqual(saved['current_golden_run_id'], self.run)
+        self.assertIn('25 > 5', saved['reason'])
+        self.assertNotIn('seed:', saved['reason'])
+
+    async def test_candidate_ties_or_losses_keep_the_new_seed_baseline(self):
+        for score in (0, 5):
+            with self.subTest(score=score):
+                self.store.saved = self.draft(phase='ready')
+                self.store.saved.selections = ['layers', 'seed']
+                self.store.saved.config['seed'] = 1971
+                self.store.saved.config['model']['layers'] = 2
+                submit = self.snake.submit_simulation.side_effect
+
+                def submit_with_score(config):
+                    run_id = submit(config)
+                    if run_id == self.run:
+                        self.results[run_id]['high_score'] = score
+                    return run_id
+
+                self.snake.submit_simulation.side_effect = submit_with_score
+                self.db.reset_mock()
+                await self.cycle()
+                comparison = next(call for call in self.db.log.call_args_list if call.args[0] == 'configuration_compared')
+                self.assertEqual(json.loads(comparison.args[3])['current_golden_run_id'], self.seed_run)
+                creations = [call for call in self.db.log.call_args_list if call.args[0] == 'golden_config_created']
+                self.assertEqual(len(creations), 1)
+                self.assertEqual(creations[0].kwargs['process_id'], self.seed_run)
+                self.snake.submit_simulation.side_effect = submit
+
+    async def test_failed_seed_baseline_stops_before_other_changes_are_submitted(self):
+        self.store.saved = self.draft(phase='ready')
+        self.store.saved.selections = ['layers', 'seed']
+        self.store.saved.config['seed'] = 1971
+        self.store.saved.config['model']['layers'] = 2
+        self.wait.side_effect = SimulationUnsuccessful('baseline failed')
+        with self.assertRaisesRegex(SimulationUnsuccessful, 'baseline failed'):
+            await optimize(Mock(), Path('/tmp'), self.db, 'endpoint')
+        self.snake.submit_simulation.assert_called_once_with({**self.config, 'seed': 1971})
+        self.assertEqual(self.store.saved.phase, 'failed')
+        self.assertNotIn('golden_config_created', [call.args[0] for call in self.db.log.call_args_list])
 
     async def test_restart_after_a_seed_choice_does_not_increment_it_again(self):
         self.store.saved = self.draft(phase='reviewing')

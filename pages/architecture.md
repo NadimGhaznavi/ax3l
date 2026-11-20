@@ -48,15 +48,15 @@ registration.
   read-only checkmarks for accepted LLM choices, including unchanged values.
   Paired settings advance together, inherited pending values remain visible,
   and the next selection is highlighted. Simulation and measurement phases are
-  shown separately, with the result compared against the draft's original
-  golden baseline. Current and Last completed views refresh every five seconds;
+  shown separately, with the result compared against the golden baseline on
+  the same seed. Current and Last completed views refresh every five seconds;
   a failed refresh keeps the last successful card and its timestamp visible.
   Each choice shows its chart preparation, inference requests, tool lookups,
   and submission with per-step timings and per-request input and output tokens.
 - Presents a histogram showing score distribution across simulation runs.
 - Simulation details show exact termination counts and percentages and any previously saved Qwen notes. Run labels use the first UUID group; navigation retains full UUIDs.
-- Presents a plot of the high score over time, including historical baseline
-  decreases from automatic seed rotations and accepted LLM-requested seed changes.
+- Presents a plot of the high score over time, including local golden baselines
+  established by seed rotations, which may decrease the score.
 - Presents an event log with filtering.
 - Handles HTTP connections in separate threads with a 30-second client timeout, so idle browser connections cannot block other pages or health checks. Shared background cache scheduling is serialized.
 - Retrieves captured high-score games from Snake Lab over ZMQ and shows animated GIFs in simulation reports and the current experiment panel. Runs without captured frames retain their saved SVG board; control-service transport outages also use that fallback.

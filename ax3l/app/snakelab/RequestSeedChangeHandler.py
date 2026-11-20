@@ -21,12 +21,15 @@ class RequestSeedChangeHandler(SubmitSingleValueHandler):
         if draft is None or draft.draft_id != draft_id or draft.next_parameter != "seed":
             return self._reject("This draft is not waiting for a seed change.")
         candidate = deepcopy(draft.config)
+        baseline = self._snake.get_run_result(draft.golden_run_id)["config"]
         while True:
             try:
                 candidate["seed"] = SimulationConfiguration.next_seed(candidate["seed"])
             except ValidationError as error:
                 return self._reject(f"Cannot increment the seed: {error.message}")
-            if self._snake.is_config_unique(candidate):
+            seed_baseline = {**baseline, "seed": candidate["seed"]}
+            if (self._snake.is_config_unique(candidate)
+                    and (candidate == seed_baseline or self._snake.is_config_unique(seed_baseline))):
                 break
         result = self._save_choice(experiments, draft, "seed", candidate)
         return {**result, "seed": candidate["seed"]}

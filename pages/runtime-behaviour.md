@@ -160,12 +160,17 @@ A candidate becomes golden only if its high score strictly exceeds the current
 golden score. A tie retains the golden. Each completed configuration comparison
 counts as one experiment cycle.
 
-Seed-change candidates use the same comparison: a lower or tied score retains
-the existing golden configuration and seed. A request only saves the draft
-choice; the usual run decision or countdown starts its simulation. There is no
-automatic rotation after nine unsuccessful proposals and no fresh baseline
-reset for new seed requests. Ax3l finishes any previously recorded, interrupted
-automatic rotation under its original rules before resuming choices. The
+Seed requests save the draft choice; the usual run decision or countdown starts
+the simulations. Ax3l first runs the current golden configuration with only the
+new seed and accepts its score as the local golden baseline, even if lower.
+This seed rotation appears as a purple point on Experiment High Scores. If
+seed is the only change, that single run completes the draft. If other settings
+changed, a second simulation runs the complete draft on the new seed and must
+beat the new baseline to become golden. A tie or loss retains the new baseline.
+Seed-only rotations do not count as configuration comparisons.
+There is no automatic rotation after nine unsuccessful proposals. Interrupted
+rotations resume their recorded baseline without resubmitting. Ax3l also finishes
+rotations recorded under the former automatic policy before resuming choices. The
 all-time best remains a separate historical reference and can come from an
 earlier seed.
 

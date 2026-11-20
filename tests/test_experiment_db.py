@@ -109,6 +109,7 @@ class ExperimentDatabaseTests(unittest.TestCase):
         ExperimentDb(self.db).save_draft(draft)
         with patch('ax3l.app.snakelab.SubmitSingleValueHandler.SnakeLab') as factory:
             snake = factory.return_value
+            snake.get_run_result.return_value = dict(config=SimulationConfiguration.defaults())
             snake.is_config_unique.side_effect = [False, True]
             result = RequestSeedChangeHandler(self.db).submit(dict(draft_id=draft_id))
             self.assertEqual(result['seed'], 1972)

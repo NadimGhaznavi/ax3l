@@ -226,6 +226,21 @@ class ExperimentStatusTests(unittest.TestCase):
                 self.assertEqual(report['difference'], score - target)
                 self.assertEqual(report['outcome'], 'Golden retained')
 
+    def test_seed_rotation_reports_baseline_work_and_completion_without_a_comparison(self):
+        self.draft.phase = 'rotating_seed'
+        self.assertEqual(self.report()['phase'], 'Rotating seed')
+        self.draft.run_id = self.draft.golden_run_id
+        self.draft.phase = 'submitted'
+        run = dict(status='completed', high_score=5)
+        self.golden['high_score'] = 5
+        report = self.report(run=run)
+        self.assertEqual(report['phase'], 'Recording results')
+        self.assertEqual(report['outcome'], 'New golden baseline')
+        self.draft.phase = 'completed'
+        report = self.report(run=run, analysis=SimulationAnalysis(self.draft.run_id, self.draft.config, {}, None))
+        self.assertEqual(report['phase'], 'Complete')
+        self.assertEqual(report['outcome'], 'New golden baseline')
+
     def test_preparing_references_loads_measured_data_without_starting_choices(self):
         self.draft.phase = 'preparing'
         report = self.report()

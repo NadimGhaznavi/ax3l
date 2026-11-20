@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.11.2] - 2026-11-20 @ 02:36
+
 ### Summary
 
 Establish a fresh local golden baseline when Qwen changes the seed before

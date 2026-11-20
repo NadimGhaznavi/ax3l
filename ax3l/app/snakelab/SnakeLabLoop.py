@@ -10,7 +10,7 @@ from ax3l.activity.RunAnalysis import render_analysis
 from ax3l.app.ConfigurationLog import ConfigurationLog
 from ax3l.app.EventLogDb import EventLogDb
 from ax3l.app.snakelab.ToolConversation import converse, DecisionTimeExpired
-from ax3l.app.snakelab.SeedRotation import resume_seed_rotation
+from ax3l.app.snakelab.SeedRotation import resume_seed_rotation, rotate_draft_seed
 from ax3l.app.snakelab.AnalyzeRun import record_run_metrics
 from ax3l.app.snakelab.ExperimentDb import ExperimentDb
 from ax3l.app.snakelab.prompts.ConfigurationChoice import ConfigurationChoice
@@ -220,14 +220,17 @@ async def optimize(llm, output, db, endpoint):
                     decision_deadline = monotonic() + PARAMETER_SELECTION_SECONDS
                     draft.decision_expires_at = time() + PARAMETER_SELECTION_SECONDS
                     experiments.save_draft(draft)
-        submit_draft(snake, db, experiments, draft)
         try:
-            await wait_for_run(snake, db, draft.run_id)
+            if draft.phase in ("ready", "rotating_seed"):
+                await rotate_draft_seed(snake, db, experiments, draft, wait_for_run)
+            if draft.run_id != draft.golden_run_id:
+                submit_draft(snake, db, experiments, draft)
+                await wait_for_run(snake, db, draft.run_id)
+                complete_comparison(snake, db, experiments, draft)
         except SimulationUnsuccessful:
             draft.phase = "failed"
             experiments.save_draft(draft)
             raise
-        complete_comparison(snake, db, experiments, draft)
         record_run_metrics(snake, experiments, draft.run_id)
         draft.phase = "completed"
         experiments.save_draft(draft)

@@ -69,8 +69,9 @@ async def run_simulation() -> str:
 
 
 @mcp.tool(description="Request a seed change without running a simulation. No arguments. "
-          "Ax3l increments the draft seed, skipping complete configurations already stored in any status. "
-          "Other settings stay unchanged. The candidate must still beat golden to become golden.")
+          "Ax3l increments the draft seed, skipping stored draft configurations and golden baselines. "
+          "When the draft runs, golden runs first with the new seed to set its local baseline, even if lower. "
+          "Other saved changes then run on that seed and must beat the new baseline.")
 async def request_seed_change() -> str:
     if assigned_parameter != "seed" or not draft_id:
         raise ValueError("Ax3l must bind a seed-change conversation before requesting a seed change")

@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.11.4] - 2026-11-20 @ 05:03
+
+### Summary
+
+Improve score and loss plots with same-seed golden ties and loss trend comparisons.
+
+### Changed
+
+- Add green markers and hover details for completed same-seed ties, including
+  historical comparisons, while preserving golden promotion rules and the score line.
+- Overlay a 20-episode trailing mean on the LLM's raw training-loss trace and
+  show the golden run's loss and mean in orange. Preserve missing-loss gaps and
+  avoid duplicating golden when it supplies the chart itself.
+
 ## [4.11.3] - 2026-11-20 @ 03:43
 
 ### Summary

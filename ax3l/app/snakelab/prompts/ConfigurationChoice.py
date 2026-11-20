@@ -13,7 +13,8 @@ from ax3l.interface.KnowledgeBase import KnowledgeBase
 
 
 CHART_EVIDENCE = {
-    "loss": ("Look for instability in training loss.",
+    "loss": ("Faint lines show raw loss; bold lines show trailing means. "
+             "Gaps mean loss was unrecorded. Look for sustained rises and repeated spikes.",
              ("episodes_with_loss",), "activity", "move and loss counts"),
     "scores": ("Use the score trend to consider how quickly to reduce random moves.",
                ("mean_first_50_scores", "mean_last_50_scores", "epsilon_random_actions"), "scores", "score statistics"),
@@ -51,6 +52,12 @@ class ConfigurationChoice(Prompt):
                 {field: metrics[field] for field in ("episodes", *fields)})
             if png is not None:
                 text.append(f"The chart shows the {chart_scope} run. {focus}")
+                if chart == "loss" and chart_scope != "golden":
+                    evidence["reference_runs"]["golden"].update(
+                        {field: golden.metrics[field] for field in ("episodes", *fields)})
+                    text.append("Orange overlays the golden run's raw loss and trailing mean."
+                                if golden.metrics["episodes_with_loss"] else
+                                "The golden run has no recorded loss to overlay.")
             if references[chart_scope].config["seed"] != seed:
                 text.append("This reference uses a different seed from the draft. "
                             "Its measurements and chart are historical context for this choice.")

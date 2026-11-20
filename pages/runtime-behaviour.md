@@ -76,7 +76,10 @@ latest and golden runs. Qwen receives at most one chart per choice.
 
 Ax3l uses the latest run's charts when it shares the draft seed. Otherwise it
 uses the current golden run. The learning rate choice uses data alone when
-the run has no recorded loss. The source is selected again for each choice;
+the run has no recorded loss. Its loss chart overlays a trailing mean of up to
+20 episodes on the faint raw trace, with the golden run's loss and mean in
+orange when it is a different run with recorded loss. Means exclude missing
+losses and preserve their gaps. The source is selected again for each choice;
 after a seed change, runs on other seeds are labeled as historical context.
 Ax3l records the completed simulation's
 measurements directly from episode data.

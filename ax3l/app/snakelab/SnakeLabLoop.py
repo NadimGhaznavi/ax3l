@@ -32,13 +32,15 @@ class SimulationUnsuccessful(RuntimeError):
     """A simulation ended without completed results to compare."""
 
 
-async def prepare_chart(db, draft_id, parameter, section, run, episodes, target):
+async def prepare_chart(db, draft_id, parameter, section, run, episodes, target, *,
+                        golden_episodes: list[dict] | None = None):
     category = Events.Configuration
     title = DSimulationAnalysis.SECTIONS[section]
     fields = dict(process_id=draft_id, parameter=parameter)
     db.log(category.CHART_STARTED, category.CATEGORY, "INFO", title, **fields)
     try:
-        png = await asyncio.to_thread(render_analysis, run.config, episodes, run.metrics, target, section)
+        png = await asyncio.to_thread(render_analysis, run.config, episodes, run.metrics, target, section,
+                                      golden_episodes=golden_episodes)
     except BaseException as error:
         state = "Stopped" if isinstance(error, (asyncio.CancelledError, KeyboardInterrupt)) else "Failed"
         db.log(category.CHART_FINISHED, category.CATEGORY, "ERROR", state, **fields)
@@ -186,8 +188,15 @@ async def optimize(llm, output, db, endpoint):
                 if section and (section != "loss" or chart_run.metrics["episodes_with_loss"]):
                     if chart_run.run_id not in chart_episodes:
                         chart_episodes[chart_run.run_id] = snake.get_analysis_episodes(chart_run.run_id)
+                    golden_episodes = None
+                    if (section == "loss" and chart_run.run_id != golden.run_id
+                            and golden.metrics["episodes_with_loss"]):
+                        if golden.run_id not in chart_episodes:
+                            chart_episodes[golden.run_id] = snake.get_analysis_episodes(golden.run_id)
+                        golden_episodes = chart_episodes[golden.run_id]
                     png = await prepare_chart(db, draft.draft_id, parameter, section, chart_run,
-                                              chart_episodes[chart_run.run_id], golden.metrics["high_score"])
+                                              chart_episodes[chart_run.run_id], golden.metrics["high_score"],
+                                              golden_episodes=golden_episodes)
                 if parameter == REVISION_PARAMETER:
                     parameters = snake.available_parameters(
                         draft.config, [name for name in PARAMETER_ORDER if name not in draft.selections])

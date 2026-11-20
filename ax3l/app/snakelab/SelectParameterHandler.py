@@ -20,6 +20,10 @@ class SelectParameterHandler(SubmitSingleValueHandler):
         if draft is None or draft.draft_id != draft_id or draft.phase not in ("selecting_parameter", "reviewing"):
             return self._reject("This draft is not waiting for a parameter selection.")
         if parameter in draft.selections:
+            if parameter == "seed":
+                result = self._reject("The seed has already been changed for this draft and cannot be changed again. "
+                                      "Choose another available setting, or run the unique configuration.")
+                return {**result, "code": "parameter_space_exhausted"}
             return self._reject(f"{parameter} has already been chosen in this experiment. "
                                 "Choose an unused parameter or run the unique configuration.")
         if not self._snake.available_parameters(draft.config, [parameter]):

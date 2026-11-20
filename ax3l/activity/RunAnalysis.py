@@ -5,6 +5,8 @@ from statistics import mean, median
 
 import plotly.graph_objects as go
 
+from ax3l.activity.PlotTicks import axis_ticks
+
 
 def measure(episodes: list[dict], high_score: int) -> dict:
     scores = [episode["score"] for episode in episodes]
@@ -69,8 +71,13 @@ def render_analysis(config: dict, episodes: list[dict], metrics: dict,
                                   xref="x domain", yref="y domain", showarrow=False)
     else:
         raise ValueError(f"Unknown analysis section: {section}")
-    figure.update_xaxes(title_text=x_label)
+    figure.update_xaxes(title_text=x_label, **axis_ticks(figure.data[0].x))
     figure.update_yaxes(title_text=y_label, rangemode="tozero")
+    if section != "loss":
+        values = [value for trace in figure.data for value in trace.y]
+        if section == "scores":
+            values.append(target_score)
+        figure.update_yaxes(**axis_ticks(values))
     figure.update_layout(
         title=dict(text=f"{title}<br>"
                    f"<sup>Goal: improve the simulation high score | Seed {config['seed']} | "

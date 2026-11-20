@@ -144,6 +144,8 @@ A completed configuration comparison counts as one experiment cycle. Qwen can
 select `seed` once per draft, research its references, then call
 `request_seed_change()` to stage the next unique seed while preserving other
 choices. Replaying the request after acceptance cannot increment it again.
+Repeated seed selections or requests return `parameter_space_exhausted`, reopening
+the available choices and explaining that the seed cannot change again in this draft.
 The normal run decision and deadlines apply. When the draft runs, Ax3l first
 runs the current golden configuration with only the new seed and accepts its
 score as the local golden baseline, even if it is lower. A seed-only draft

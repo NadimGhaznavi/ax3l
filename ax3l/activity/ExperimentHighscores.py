@@ -4,6 +4,8 @@ from html import escape
 
 import plotly.graph_objects as go
 
+from ax3l.activity.PlotTicks import axis_ticks
+
 
 def highscores(history: list[dict], total: int) -> dict:
     if not history:
@@ -47,8 +49,8 @@ def highscores(history: list[dict], total: int) -> dict:
         template="plotly_dark", paper_bgcolor="#101720", plot_bgcolor="#151f2b",
         font=dict(family="Courier New, monospace", color="#d5dfeb"),
         xaxis_title="Number of simulations", yaxis_title="Current config high score",
-        xaxis=dict(rangemode="tozero", dtick=1 if end < 20 else None),
-        yaxis=dict(rangemode="tozero"),
+        xaxis=dict(rangemode="tozero", **axis_ticks([end])),
+        yaxis=dict(rangemode="tozero", **axis_ticks(y)),
         legend=dict(orientation="h", x=.5, xanchor="center", y=-.22, yanchor="top"),
         margin=dict(l=65, r=25, t=30, b=115),
     )

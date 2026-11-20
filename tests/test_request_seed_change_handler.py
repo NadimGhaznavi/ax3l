@@ -1,6 +1,8 @@
 """Seed requests stage one durable unique change without accepting numeric values."""
 
 from copy import deepcopy
+from dataclasses import asdict
+import json
 import unittest
 from unittest.mock import Mock, patch
 
@@ -95,12 +97,21 @@ class RequestSeedChangeHandlerTests(unittest.TestCase):
         self.snake.is_config_unique.assert_not_called()
         self.experiments.save_draft.assert_not_called()
 
-    def test_repeating_an_accepted_request_does_not_increment_again(self):
+    def test_repeating_an_accepted_request_after_restart_reports_exhaustion_without_incrementing(self):
         self.handler.submit({'draft_id': 'draft'})
+        self.draft = ConfigurationDraft(**json.loads(json.dumps(asdict(self.draft))))
+        self.experiments.draft.return_value = self.draft
         saved = deepcopy(self.draft)
-        self.assertEqual(self.handler.submit({'draft_id': 'draft'})['status'], 'rejected')
+        self.snake.reset_mock()
+        result = self.handler.submit({'draft_id': 'draft'})
+        self.assertEqual(result['status'], 'rejected')
+        self.assertEqual(result['code'], 'parameter_space_exhausted')
+        self.assertIn('seed has already been changed', result['reason'])
         self.assertEqual(self.draft, saved)
         self.experiments.save_draft.assert_called_once()
+        self.snake.get_run_result.assert_not_called()
+        self.snake.is_config_unique.assert_not_called()
+        self.snake.submit_simulation.assert_not_called()
 
     def test_seed_limit_rejects_without_wrapping_or_saving(self):
         self.draft.config['seed'] = SimulationConfiguration.field(('seed',))['maximum']

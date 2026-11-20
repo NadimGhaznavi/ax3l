@@ -123,7 +123,7 @@ class ScoreDistributionTests(unittest.TestCase):
             return original(draw, xy, text, *args, **kwargs)
         with patch.object(ImageDraw.ImageDraw, 'text', record):
             render_distribution(scores)
-        self.assertEqual(ticks, [['0', '26', '52', '78', '104', '130']] * 23)
+        self.assertEqual(ticks, [['0', '30', '60', '90', '120', '150']] * 23)
 
     def test_rare_scores_remain_visible_with_large_all_run_counts(self):
         scores = {number: 0 for number in range(1, 1001)}

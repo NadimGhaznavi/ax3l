@@ -700,6 +700,33 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.snake.submit_simulation.call_args.args[0]['seed'], 1971)
         self.assertEqual(self.store.saved.selections, ['seed'])
 
+    async def test_repeated_seed_selections_refresh_choices_without_blocking_other_changes_or_running(self):
+        self.decisions = ['seed', 'seed', 'layers', 'seed', 'run']
+        choose = self.conversation.side_effect
+        rejections = []
+
+        async def select(*args, **kwargs):
+            result = await choose(*args, **kwargs)
+            if result['status'] == 'rejected':
+                rejections.append(result['code'])
+            return result
+
+        self.conversation.side_effect = select
+        await self.cycle()
+        self.assertEqual(rejections, ['parameter_space_exhausted'] * 2)
+        self.assertEqual(self.trace().count('seed'), 1)
+        self.assertEqual(self.store.saved.selections, ['seed', 'layers'])
+        for prompt in self.prompts[2:]:
+            if not prompt.startswith('Choose '):
+                self.assertIn('seed has already been changed for this draft and cannot be changed again', prompt)
+                self.assertNotIn('Select seed to request', prompt)
+                choices = json.loads(prompt.split('```json\n')[1].split('\n```')[0])
+                self.assertNotIn('seed', choices)
+        baseline, candidate = [call.args[0] for call in self.snake.submit_simulation.call_args_list]
+        self.assertEqual(baseline, {**self.config, 'seed': 1971})
+        self.assertEqual(candidate['seed'], 1971)
+        self.assertEqual(candidate['model']['layers'], 3)
+
     async def test_chart_source_is_reselected_when_a_seed_changes_mid_draft(self):
         self.decisions = ['epsilon_pair', 'seed', 'learning_rate', 'run']
         await self.cycle()

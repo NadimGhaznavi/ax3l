@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Make the one-seed-change limit explicit during simulation setup.
+
+### Fixed
+
+- Reject repeated seed selections and requests with the existing parameter-space
+  exhaustion signal. Refresh the available choices and tell Qwen that the seed
+  cannot change again in the current draft, including after a restart.
+
 ## [4.11.2] - 2026-11-20 @ 02:36
 
 ### Summary

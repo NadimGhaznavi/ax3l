@@ -89,6 +89,27 @@ class SelectParameterHandlerTests(unittest.TestCase):
         self.assertEqual(self.draft, original)
         self.experiments.save_draft.assert_not_called()
 
+    def test_seed_cannot_be_reselected_after_restart_or_other_changes_and_reports_exhaustion(self):
+        for selections in (['seed'], ['seed', 'learning_rate']):
+            with self.subTest(selections=selections):
+                self.bind()
+                self.draft.selections = selections
+                self.draft.phase = 'reviewing'
+                self.draft.config['seed'] += 1
+                if 'learning_rate' in selections:
+                    self.draft.config['training']['learning_rate'] = .003
+                self.draft = ConfigurationDraft(**json.loads(json.dumps(asdict(self.draft))))
+                self.experiments.draft.return_value = self.draft
+                original = deepcopy(self.draft)
+                result = self.select('seed')
+                self.assertEqual(result['status'], 'rejected')
+                self.assertEqual(result['code'], 'parameter_space_exhausted')
+                self.assertIn('seed has already been changed', result['reason'])
+                self.assertEqual(self.draft, original)
+        self.experiments.save_draft.assert_not_called()
+        self.snake.available_parameters.assert_not_called()
+        self.snake.is_config_unique.assert_not_called()
+
     def test_stale_drafts_and_choices_outside_the_revision_phase_are_rejected(self):
         original = deepcopy(self.draft)
         self.assertEqual(self.select(draft_id='old')['status'], 'rejected')

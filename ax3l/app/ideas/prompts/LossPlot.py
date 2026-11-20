@@ -6,6 +6,7 @@ from uuid import UUID
 
 import plotly.graph_objects as go
 
+from ax3l.activity.PlotTicks import axis_ticks
 from ax3l.app.DynamicPrompt import DynamicPrompt
 from ax3l.constants.DLossPlot import DLossPlot
 from ax3l.interface.SnakeLab import SnakeLab
@@ -39,6 +40,7 @@ class LossPlot(DynamicPrompt):
             template="plotly_dark", width=DLossPlot.WIDTH, height=DLossPlot.HEIGHT,
             margin=dict(l=80, r=40, t=80, b=70),
         )
+        figure.update_xaxes(**axis_ticks(figure.data[0].x))
         png = figure.to_image(format="png", scale=DLossPlot.SCALE)
         self._image_url = "data:image/png;base64," + base64.b64encode(png).decode("ascii")
         self._content = (

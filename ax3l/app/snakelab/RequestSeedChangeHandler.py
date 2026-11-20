@@ -18,7 +18,13 @@ class RequestSeedChangeHandler(SubmitSingleValueHandler):
             return self._reject("draft_id must identify the active configuration draft.")
         experiments = ExperimentDb(self._db)
         draft = experiments.draft()
-        if draft is None or draft.draft_id != draft_id or draft.next_parameter != "seed":
+        if draft is None or draft.draft_id != draft_id:
+            return self._reject("This draft is not waiting for a seed change.")
+        if "seed" in draft.selections:
+            result = self._reject("The seed has already been changed for this draft and cannot be changed again. "
+                                  "Choose another available setting, or run the unique configuration.")
+            return {**result, "code": "parameter_space_exhausted"}
+        if draft.next_parameter != "seed":
             return self._reject("This draft is not waiting for a seed change.")
         candidate = deepcopy(draft.config)
         baseline = self._snake.get_run_result(draft.golden_run_id)["config"]

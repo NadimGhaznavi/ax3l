@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.11.3] - 2026-11-20 @ 03:43
+
 ### Summary
 
 Make the one-seed-change limit explicit during simulation setup and improve

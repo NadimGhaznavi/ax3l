@@ -4,6 +4,7 @@ from statistics import mean, median
 
 import plotly.graph_objects as go
 
+from ax3l.activity.PlotTicks import axis_ticks
 from ax3l.constants.DReportMgr import DReportMgr
 
 
@@ -81,16 +82,18 @@ def metrics(history: list[dict], bucket_size: int = DReportMgr.SIMULATION_BUCKET
         template="plotly_dark", paper_bgcolor="#101720", plot_bgcolor="#151f2b",
         font=dict(family="Courier New, monospace", color="#d5dfeb"),
         xaxis_title=f"Simulation bucket ({bucket_size} runs per bucket)",
-        xaxis=dict(rangemode="tozero", dtick=1 if len(summaries) < 20 else None),
+        xaxis=dict(rangemode="tozero", **axis_ticks([len(summaries)])),
         showlegend=True,
         legend=dict(orientation="h", x=.5, xanchor="center", y=-.22, yanchor="top"),
         margin=dict(l=65, r=85, t=30, b=115),
     )
     figure.update_layout(**layout,
-        yaxis=dict(title="Mean time (minutes)", rangemode="tozero"),
+        yaxis=dict(title="Mean time (minutes)", rangemode="tozero",
+                   **axis_ticks(value for trace in figure.data[:2] for value in trace.y)),
         yaxis2=dict(title=dict(text="Mean steps per simulation", font=dict(color="#c792ea")),
                     tickfont=dict(color="#c792ea"), overlaying="y", side="right",
-                    rangemode="tozero", showgrid=False),
+                    rangemode="tozero", showgrid=False,
+                    **axis_ticks(bucket["total_steps"] for bucket in summaries)),
     )
     result["chart"] = figure.to_html(
         full_html=False, include_plotlyjs=True, div_id="simulation-runtime", default_height="65vh",
@@ -107,7 +110,8 @@ def metrics(history: list[dict], bucket_size: int = DReportMgr.SIMULATION_BUCKET
                       " (%{customdata[2]} runs)<br>Steps / second: %{y:,.2f}"
                       " (%{customdata[3]} runs)<extra></extra>",
     ))
-    rate.update_layout(**layout, yaxis=dict(title="Steps / second", rangemode="tozero"))
+    rate.update_layout(**layout, yaxis=dict(title="Steps / second", rangemode="tozero",
+                                          **axis_ticks(bucket["steps_per_second"] for bucket in summaries)))
     result["rate_chart"] = rate.to_html(
         full_html=False, include_plotlyjs=False, div_id="steps-per-second", default_height="65vh",
         config={"responsive": True, "displaylogo": False},

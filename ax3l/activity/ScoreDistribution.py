@@ -7,6 +7,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+from ax3l.activity.PlotTicks import tick_step
 from ax3l.constants.DScoreDistribution import DScoreDistribution
 
 
@@ -37,10 +38,11 @@ def render_distribution(scores: dict[int, int | None]) -> bytes:
     """Use the final all-run distribution's X and Y scales in every frame."""
     frames = distribution_frames(scores)
     all_counts = Counter(score for score in scores.values() if score is not None)
-    low, high = min(all_counts, default=0), max(all_counts, default=0)
-    y_step = max(1, (max(all_counts.values(), default=0) + 4) // 5)
+    low = min(all_counts, default=0) // 5 * 5
+    high = (max(all_counts, default=0) + 4) // 5 * 5
+    y_step = tick_step(max(all_counts.values(), default=0), intervals=5)
     ceiling = y_step * 5
-    x_step = max(1, (high - low + 5) // 6)
+    x_step = tick_step(high - low)
     fonts = {size: ImageFont.truetype(str(FONT), size) for size in (11, 12, 14, 15, 17)}
     left, top, right, bottom = PLOT
     bin_width = (right - left) / (high - low + 1)
@@ -60,9 +62,8 @@ def render_distribution(scores: dict[int, int | None]) -> bytes:
             y = bottom - (bottom - top) * value / ceiling
             draw.line((left, y, right, y), fill='#40566e')
             draw.text((left - 10, y), f'{value:,}', anchor='rm', font=fonts[11], fill='#a7b8cb')
-        ticks = list(range(low, high + 1, x_step))
-        if ticks[-1] != high and (high - ticks[-1]) >= x_step / 2:
-            ticks.append(high)
+        first_tick = (low + x_step - 1) // x_step * x_step
+        ticks = range(first_tick, high + 1, x_step)
         for value in ticks:
             x = x_position(value)
             draw.line((x, top, x, bottom), fill='#40566e')

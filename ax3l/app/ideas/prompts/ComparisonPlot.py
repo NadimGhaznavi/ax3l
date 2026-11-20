@@ -5,6 +5,7 @@ from uuid import UUID
 
 import plotly.graph_objects as go
 
+from ax3l.activity.PlotTicks import axis_ticks
 from ax3l.app.ideas.prompts.LossPlot import LossPlot
 from ax3l.constants.DLossPlot import DLossPlot
 
@@ -32,6 +33,7 @@ class ComparisonPlot(LossPlot):
             margin=dict(l=70, r=30, t=80, b=70),
             legend=dict(orientation="h", y=1.15, x=0),
         )
+        figure.update_xaxes(**axis_ticks(value for trace in figure.data for value in trace.x))
         png = figure.to_image(format="png", scale=DLossPlot.SCALE)
         self._image_url = "data:image/png;base64," + base64.b64encode(png).decode("ascii")
         self._content = (

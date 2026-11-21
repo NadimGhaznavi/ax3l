@@ -4,7 +4,7 @@ import json
 
 from ax3l.app.Prompt import Prompt
 from ax3l.app.snakelab.ParameterSpace import parameter_values
-from ax3l.constants.DChoice import CHOICE_LABELS, PARAMETER_SELECTION_SECONDS, DECISION_GRACE_SECONDS
+from ax3l.constants.DChoice import CHOICE_LABELS
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft
 
 
@@ -13,42 +13,23 @@ class ConfigurationNextStep(Prompt):
         choices = {parameter: dict(label=CHOICE_LABELS[parameter], values=parameter_values(draft.config, parameter))
                    for parameter in parameters}
         if draft.phase == "reviewing" and not choices:
-            instruction = ("No unused settings with untested changes remain and the configuration is unique. "
-                           "Use run_simulation to run it.")
+            instruction = "Call run_simulation. The draft is unique and no untested changes remain."
         elif draft.phase == "reviewing":
-            instruction = ("The current configuration is unique. Use run_simulation to run it, "
-                           "or select_parameter to change an unused setting.")
+            instruction = "Call run_simulation for this unique draft, or select_parameter with a listed key."
         elif draft.selections:
-            instruction = ("The current configuration already exists in the simulation database. "
-                           "Choose which setting to change using select_parameter; this draft cannot run yet.")
+            instruction = "This draft already exists. Call select_parameter with a listed key to make it unique."
         else:
-            instruction = ("The draft starts with baseline values from the golden configuration. "
-                           "Research which setting would be best to tweak, then choose it using select_parameter.")
-        expiry = ("then Ax3l submits the saved unique configuration and continues the normal experiment cycle. "
-                  if draft.selections else
-                  "then Ax3l restarts from the initial prompt in a fresh conversation, discarding the tentative "
-                  "parameter selection and all previous messages. ")
-        seed_instruction = ("The seed has already been changed for this draft and cannot be changed again. "
-                            if "seed" in draft.selections else
-                            "Select seed to request a seed change once per draft: Ax3l increments it and skips "
-                            "configurations already stored. You do not choose the seed's numeric value. ")
-        super().__init__(
-            instruction + f" Aim to make this decision within {PARAMETER_SELECTION_SECONDS // 60} minutes. "
-            "After each data_tool request you will receive the remaining time. "
-            "The countdown continues while choosing a value. An accepted unique change starts a fresh five-minute "
-            "budget to choose another parameter or run the configuration. "
-            f"An expired budget gives you {DECISION_GRACE_SECONDS // 60} extra minutes; {expiry}"
-            "Paired settings are changed together. Other values stay in the draft. "
-            f"{seed_instruction}When the draft runs, Ax3l first runs golden with the new "
-            "seed and accepts its score as the local golden baseline, even if lower. If other settings changed, "
-            "Ax3l then runs the complete draft on that seed and compares it with the new baseline. "
-            "Each setting may be selected only once per experiment. Once selected, you must change at least one "
-            "of its values; keeping the current values is not allowed. "
-            "Choose only from the available parameter keys below. Settings with no untested changes for the "
-            "current seed and other draft settings are omitted. "
-            "After each submitted change, Ax3l checks the complete configuration for uniqueness. "
-            "Duplicate values must be revised within the selected setting before you can choose another setting. "
-            "You choose which settings to adjust and when to run; there is no required parameter order. "
-            "Use data_tool at / for measured reference runs or /draft for the current values.\n\n"
-            f"Available parameter keys and current values:\n```json\n{json.dumps(choices, allow_nan=False)}\n```"
-        )
+            instruction = "The draft starts from golden. Use the run data to choose a listed key with select_parameter."
+        text = [instruction, "Aim to beat golden's high score in 500 episodes. Prefer same-seed evidence."]
+        if choices:
+            text.append("Choose any subset in any order, at most once per setting. Change at least one value and "
+                        "submit pairs together. Revise duplicates within the same setting.")
+            text.append("The timer continues during value selection. A saved unique change resets it.")
+        if "seed" in choices:
+            text.append("Select seed to let Ax3l choose the next unused seed. On run, golden sets the new seed's "
+                        "baseline even if it scores lower. Other changes run afterward against that baseline.")
+        elif "seed" in draft.selections:
+            text.append("The seed can change only once per draft and is already set.")
+        text.append("Use data_tool at / for reference runs or /draft for current values.")
+        text.append(f"Available keys and current values\n```json\n{json.dumps(choices, allow_nan=False)}\n```")
+        super().__init__("\n\n".join(text))

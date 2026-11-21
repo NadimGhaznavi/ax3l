@@ -206,7 +206,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.decisions = ['run']
         await self.cycle()
         self.assertEqual(self.trace(), [REVISION_PARAMETER])
-        self.assertIn('No unused settings with untested changes remain', self.prompts[0])
+        self.assertIn('no untested changes remain', self.prompts[0])
         self.assertEqual(json.loads(self.prompts[0].split('```json\n')[1].split('\n```')[0]), {})
         self.snake.submit_simulation.assert_called_once()
 
@@ -374,8 +374,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIsNone(self.store.saved.parameter)
                 self.assertEqual(self.store.saved.selections, [])
                 self.assertEqual(self.store.saved.decision_expires_at, 1800)
-                self.assertIn('Research which setting would be best to tweak',
-                              self.conversation.await_args.args[4][0].to_md())
+                self.assertIn('The draft starts from golden', self.conversation.await_args.args[4][0].to_md())
         self.snake.is_config_unique.assert_not_called()
         self.snake.submit_simulation.assert_not_called()
 
@@ -639,7 +638,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.store.saved.golden_run_id, self.best)
         self.assertEqual(self.store.saved.config['seed'], self.config['seed'] + 1)
         prompt = self.conversation.await_args.args[4][-1].to_md()
-        self.assertIn('baseline values from the golden configuration', prompt)
+        self.assertIn('The draft starts from golden', prompt)
         self.assertIn('select_parameter', prompt)
 
     async def test_seed_only_change_runs_once_and_accepts_a_lower_local_baseline(self):
@@ -650,7 +649,8 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.snake.submit_simulation.call_args.args[0], {**self.config, 'seed': 1971})
         prompt = self.prompts[1]
         self.assertIn('request_seed_change with no arguments', prompt)
-        self.assertNotIn('Submit using submit_single_value', prompt)
+        self.assertNotIn('submit_single_value', prompt)
+        self.assertIn('A seed-only draft ends there', prompt)
         self.assertEqual(self.rotation.await_count, 1)
         self.snake.submit_simulation.assert_called_once()
         self.wait.assert_awaited_once_with(self.snake, self.db, self.seed_run)
@@ -750,10 +750,10 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(rejections, ['parameter_space_exhausted'] * 2)
         self.assertEqual(self.trace().count('seed'), 1)
         self.assertEqual(self.store.saved.selections, ['seed', 'layers'])
-        for prompt in self.prompts[2:]:
-            if not prompt.startswith('Choose '):
-                self.assertIn('seed has already been changed for this draft and cannot be changed again', prompt)
-                self.assertNotIn('Select seed to request', prompt)
+        for parameter, prompt in zip(self.trace()[2:], self.prompts[2:]):
+            if parameter == REVISION_PARAMETER:
+                self.assertIn('The seed can change only once per draft and is already set', prompt)
+                self.assertNotIn('Select seed to let Ax3l', prompt)
                 choices = json.loads(prompt.split('```json\n')[1].split('\n```')[0])
                 self.assertNotIn('seed', choices)
         baseline, candidate = [call.args[0] for call in self.snake.submit_simulation.call_args_list]

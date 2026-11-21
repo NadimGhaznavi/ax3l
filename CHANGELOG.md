@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.13.0] - 2026-11-20 @ 21:12
+
 ### Summary
 
 Make the LLM grace countdown configurable and extend its default to five minutes.

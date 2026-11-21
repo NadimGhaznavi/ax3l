@@ -6,10 +6,10 @@ class DAx3l:
     HTTP_TIMEOUT_SECONDS: Final[int] = 480
     DECISION_GRACE_SECONDS: Final[int] = 5 * 60
 
-    VERSION: Final[str] = "4.12.0"
+    VERSION: Final[str] = "4.13.0"
     CMDB_SUBTYPE: Final[str] = "Lab Experiment"
     CMDB_SUPPLIER: Final[str] = "Nadim-Daniel"
-    CMDB_CODENAME: Final[str] = "Tandy"
+    CMDB_CODENAME: Final[str] = "Unisys"
     CMDB_DATABASES: Final[tuple[tuple[str, str], ...]] = (("Ax3l", "ax3l"),)
 
     BASE_DIR: Final[str] = "/opt/prod/ax3l"

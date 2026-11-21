@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.18.0] - 2026-11-21 @ 10:57
+
 ### Summary
 
 Show how games ended when choosing snake and wall collision rewards.

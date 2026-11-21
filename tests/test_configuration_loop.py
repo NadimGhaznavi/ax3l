@@ -120,7 +120,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.values = dict(hidden_size=96, layers=3, dropout=.02, sequence_length=12, batch_size=26,
                            learning_rate=.003, gamma=.97, epsilon_pair=(.91, .95),
                            reward_pair=(.25, -.5), epsilon_nice_pair=(.01, 40),
-                           empty=2, snake=-5, wall=-15)
+                           food=20, empty=2, snake=-5, wall=-15)
 
         async def select(llm, output, db, tools, prompts, *, parameter, process_id,
                          conversation_deadline, reset_on_expiry):
@@ -190,14 +190,14 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.snake.is_config_unique.call_count, 1)
         self.snake.submit_simulation.assert_called_once()
 
-    async def test_qwen_can_tune_move_and_collision_rewards_independently(self):
-        self.decisions = ['empty', 'snake', 'wall', 'run']
+    async def test_qwen_can_tune_food_move_and_collision_rewards_independently(self):
+        self.decisions = ['food', 'empty', 'snake', 'wall', 'run']
         await self.cycle()
         candidate = self.snake.submit_simulation.call_args.args[0]
         expected = deepcopy(self.config)
-        expected['game']['rewards'].update(empty=2, snake=-5, wall=-15)
+        expected['game']['rewards'].update(food=20, empty=2, snake=-5, wall=-15)
         self.assertEqual(candidate, expected)
-        self.assertEqual(self.store.saved.selections, ['empty', 'snake', 'wall'])
+        self.assertEqual(self.store.saved.selections, ['food', 'empty', 'snake', 'wall'])
         for call in self.conversation.await_args_list:
             parameter = call.kwargs['parameter']
             content = json.loads(call.args[4][0].to_json())['content']
@@ -215,8 +215,24 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
                                      self.store.analyses[self.latest].metrics['termination_reasons'])
                     self.assertEqual(measured['termination_reasons']['snake']['percent'], 52.8)
         self.assertEqual([call.args[-1] for call in self.chart.call_args_list],
-                         ['distribution', 'endings', 'endings'])
+                         ['distribution', 'distribution', 'endings', 'endings'])
         self.assertTrue(any(call.args[3] == 'Game-ending reasons' for call in self.db.log.call_args_list))
+
+    async def test_food_reward_can_resume_and_run_as_the_only_change(self):
+        self.store.saved = self.draft(phase='choosing', parameter='food')
+        self.decisions = ['run']
+        await self.cycle()
+        expected = deepcopy(self.config)
+        expected['game']['rewards']['food'] = 20
+        self.snake.submit_simulation.assert_called_once_with(expected)
+        self.assertEqual(self.trace(), ['food', REVISION_PARAMETER])
+        self.assertEqual(self.store.saved.selections, ['food'])
+        content = json.loads(self.conversation.await_args_list[0].args[4][0].to_json())['content']
+        self.assertEqual([part['type'] for part in content], ['text', 'image_url'])
+        self.assertIn('Use score spread', content[0]['text'])
+        evidence = json.loads(content[0]['text'].split('```json\n')[1].split('\n```')[0])
+        self.assertEqual(evidence['current'], {'food': 10})
+        self.assertEqual(evidence['reference_runs']['latest']['settings'], {'food': 10})
 
     async def test_resumed_empty_reward_choice_can_stage_a_positive_reward(self):
         self.store.saved = self.draft(phase='choosing', parameter='empty')

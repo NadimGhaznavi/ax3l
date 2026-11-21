@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Let the LLM tune the reward for eating food alongside the existing rewards.
+
+### Added
+
+- Offer food reward as an independent choice from 0 to 20, retaining the default
+  of 10, with score-distribution evidence, schema-backed tool limits, and a
+  labelled Experiment Status row.
+
 ## [4.18.0] - 2026-11-21 @ 10:57
 
 ### Summary

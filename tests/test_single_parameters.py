@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import Mock
 
-from ax3l.app.snakelab.SingleParameters import SINGLE_PARAMETERS
+from ax3l.app.snakelab.SingleParameters import SINGLE_PARAMETERS, parameter_instructions
 from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb
 from ax3l.app.snakelab.prompts.FirstContactSingle import FirstContactSingle
 from ax3l.app.snakelab.prompts.ComparisonSingle import ComparisonSingle
@@ -10,7 +10,7 @@ from ax3l.app.snakelab.prompts.ComparisonSingle import ComparisonSingle
 class SingleParameterTests(unittest.TestCase):
     def test_prompts_offer_only_tunable_single_parameters_with_schema_rules(self):
         expected = {'hidden_size', 'layers', 'dropout', 'sequence_length', 'batch_size', 'learning_rate', 'gamma',
-                    'empty', 'snake', 'wall'}
+                    'food', 'empty', 'snake', 'wall'}
         self.assertEqual(set(SINGLE_PARAMETERS), expected)
         for parameter in expected:
             for prompt in (FirstContactSingle(parameter), ComparisonSingle(parameter)):
@@ -18,8 +18,11 @@ class SingleParameterTests(unittest.TestCase):
                 self.assertIn(parameter, content)
                 self.assertIn(SINGLE_PARAMETERS[parameter][1]['description'], content)
                 for other in expected - {parameter}:
-                    self.assertNotIn(other, content)
+                    self.assertNotIn(f'{other}:', content)
                 self.assertIn('{"value": number}', content)
+
+    def test_food_choice_instructions_include_the_allowed_reward_range(self):
+        self.assertEqual(parameter_instructions('food'), 'food reward: number; at least 0; at most 20.')
 
     def test_reports_use_parameter_path_and_preserve_seed_history(self):
         for name, (path, _) in SINGLE_PARAMETERS.items():

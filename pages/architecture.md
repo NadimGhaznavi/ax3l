@@ -44,7 +44,7 @@ registration.
 
 - Reads from MariaDB.
 - Summarizes the current system state, e.g., the number of simulations run.
-- Offers an Experiment Status report card with fourteen configuration values and
+- Offers an Experiment Status report card with fifteen configuration choices and
   read-only checkmarks for accepted LLM choices, including unchanged values.
   Paired settings advance together, inherited pending values remain visible,
   and the next selection is highlighted. Simulation and measurement phases are

@@ -204,7 +204,7 @@ class AnalysisRunDataTests(unittest.TestCase):
         self.assertEqual(parameters['game.rewards.empty'], dict(type='number', minimum=-2, maximum=2))
         for field in ('snake', 'wall'):
             self.assertEqual(parameters[f'game.rewards.{field}'], dict(type='number', minimum=-20, maximum=0))
-        self.assertNotIn('game.rewards.food', parameters)
+        self.assertEqual(parameters['game.rewards.food'], dict(type='number', minimum=0, maximum=20))
         self.assertNotIn('game.rewards.max_moves', parameters)
         self.assertNotIn('seed', parameters)
         self.assertNotIn('epochs', parameters)

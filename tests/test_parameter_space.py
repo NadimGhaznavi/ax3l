@@ -21,7 +21,7 @@ class ParameterSpaceTests(unittest.TestCase):
         self.assertIn((0, 0), finite_choices('reward_pair'))
         self.assertNotIn((6, 0), finite_choices('reward_pair'))
         for parameter in ('learning_rate', 'gamma', 'epsilon_pair', 'epsilon_nice_pair', 'seed',
-                          'empty', 'snake', 'wall'):
+                          'food', 'empty', 'snake', 'wall'):
             self.assertIsNone(finite_choices(parameter))
 
     def test_exclusive_bounds_decimal_steps_and_enum(self):
@@ -35,7 +35,7 @@ class ParameterSpaceTests(unittest.TestCase):
     def test_continuous_parameters_and_seed_do_not_require_an_exhaustion_query(self):
         db = Mock()
         parameters = ['learning_rate', 'gamma', 'epsilon_pair', 'epsilon_nice_pair', 'seed',
-                      'empty', 'snake', 'wall']
+                      'food', 'empty', 'snake', 'wall']
         self.assertEqual(SnakeLabDb(db).available_parameters(GenerateDefaultConfig().run(), parameters), parameters)
         db.query.assert_not_called()
 

@@ -20,6 +20,7 @@ class DLabel:
     REWARD_PAIR: Final[str] = "Food Reward: closer, further"
     CLOSER_TO_FOOD: Final[str] = "Food Reward: closer"
     FURTHER_FROM_FOOD: Final[str] = "Food Reward: further"
+    FOOD: Final[str] = "Food Reward"
     EMPTY: Final[str] = "Empty Space Reward"
     SNAKE: Final[str] = "Snake Collision Reward"
     WALL: Final[str] = "Wall Collision Reward"
@@ -55,6 +56,8 @@ FIELD_TO_LABEL_MAP: Final[dict[str, str]] = {
     "game.rewards.closer_to_food": DLabel.CLOSER_TO_FOOD,
     "further_from_food": DLabel.FURTHER_FROM_FOOD,
     "game.rewards.further_from_food": DLabel.FURTHER_FROM_FOOD,
+    "food": DLabel.FOOD,
+    "game.rewards.food": DLabel.FOOD,
     "empty": DLabel.EMPTY,
     "game.rewards.empty": DLabel.EMPTY,
     "snake": DLabel.SNAKE,
@@ -82,6 +85,7 @@ FIELD_TO_DESCRIPTION_MAP: Final[dict[str, str]] = {
     "epsilon.decay": "Probability decay rate",
     "game.rewards.closer_to_food": "",
     "game.rewards.further_from_food": "",
+    "game.rewards.food": "Reward for eating food.",
     "game.rewards.empty": "Reward for a move without food.",
     "game.rewards.snake": "Penalty for colliding with the snake.",
     "game.rewards.wall": "Penalty for colliding with a wall.",

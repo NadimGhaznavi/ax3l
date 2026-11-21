@@ -12,7 +12,8 @@ CHOICE_LABELS = {
     "batch_size": "batch size", "learning_rate": "learning rate", "gamma": "gamma",
     "epsilon_pair": "epsilon", "reward_pair": "distance rewards",
     "epsilon_nice_pair": "safe detours",
-    "empty": "empty space reward", "snake": "snake collision reward", "wall": "wall collision reward",
+    "food": "food reward", "empty": "empty space reward",
+    "snake": "snake collision reward", "wall": "wall collision reward",
     "seed": "random seed",
 }
 
@@ -28,6 +29,7 @@ CHOICE_CHARTS = {
     "learning_rate": "loss",
     "epsilon_pair": "scores",
     "reward_pair": "distribution",
+    "food": "distribution",
     "empty": "distribution",
     "snake": "endings",
     "wall": "endings",

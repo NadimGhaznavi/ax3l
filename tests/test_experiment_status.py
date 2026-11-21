@@ -89,11 +89,11 @@ class ExperimentStatusTests(unittest.TestCase):
         self.draft.phase, self.draft.parameter = 'choosing', 'epsilon_pair'
         report = self.report()
         self.assertEqual(report['choices_selected'], 7)
-        self.assertEqual(report['choices_total'], 14)
+        self.assertEqual(report['choices_total'], 15)
         rows = report['rows']
-        self.assertEqual(len(rows), 17)
+        self.assertEqual(len(rows), 18)
         self.assertEqual([row['path'] for row in rows], [
-            'game.rewards.wall', 'game.rewards.snake', 'game.rewards.empty',
+            'game.rewards.food', 'game.rewards.wall', 'game.rewards.snake', 'game.rewards.empty',
             'model.hidden_size', 'model.layers', 'model.dropout', 'training.sequence_length', 'training.batch_size',
             'training.learning_rate', 'training.gamma', 'epsilon.initial', 'epsilon.decay',
             'game.rewards.closer_to_food', 'game.rewards.further_from_food',
@@ -292,7 +292,7 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         page = self.get()
         self.assertIn('Choosing a setting', page)
         self.assertIn('0 settings saved', page)
-        self.assertEqual(page.count('type="checkbox" disabled'), 17)
+        self.assertEqual(page.count('type="checkbox" disabled'), 18)
         self.assertNotIn('>Pending</span>', page)
         self.assertNotIn('<td class="changed-value">', page)
         self.assertIn('window.setTimeout(refreshStatus, 5000)', page)
@@ -313,7 +313,7 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         page = self.get('/experiment-status?view=completed')
         self.assertIn('aria-current="page">Last completed</a>', page)
         self.assertIn('id="experiment-phase" aria-live="polite" aria-atomic="true">Complete</h2>', page)
-        self.assertEqual(page.count('disabled checked'), 17)
+        self.assertEqual(page.count('disabled checked'), 18)
         self.assertNotIn('>Pending</span>', page)
         self.assertNotIn('class="comparison-label"', page)
         self.assertIn('<dt>High score</dt><dd>0</dd>', page)
@@ -390,8 +390,8 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         page = self.get()
         self.assertIn('Choosing a setting to revise', page)
         self.assertIn('Experiment decision', page)
-        self.assertIn('14 settings saved', page)
-        self.assertEqual(page.count('disabled checked'), 17)
+        self.assertIn('15 settings saved', page)
+        self.assertEqual(page.count('disabled checked'), 18)
         self.assertNotIn('>Pending</span>', page)
 
     def test_setup_shows_live_steps_with_separate_turn_times_and_tokens(self):

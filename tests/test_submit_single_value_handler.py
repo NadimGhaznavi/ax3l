@@ -39,7 +39,8 @@ class SubmitSingleValueHandlerTests(unittest.TestCase):
                                  ('dropout', -.01), ('dropout', .11), ('dropout', .005),
                                  ('empty', -2.01), ('empty', 2.01), ('empty', True), ('empty', '1'),
                                  ('snake', -20.01), ('snake', .1), ('wall', -20.01), ('wall', .1),
-                                 ('food', 5), ('max_moves', -5)):
+                                 ('food', -.01), ('food', 20.01), ('food', True), ('food', '10'),
+                                 ('max_moves', -5)):
             self.assertEqual(self.submit(parameter, value)['code'], 'invalid_value')
         self.assertEqual(self.submit(extra=1)['code'], 'invalid_value')
         self.assertEqual(self.handler.submit({})['code'], 'invalid_value')
@@ -63,7 +64,7 @@ class SubmitSingleValueHandlerTests(unittest.TestCase):
 
     def test_unchanged_values_are_rejected_even_when_the_complete_draft_is_unique(self):
         for parameter, value in (('learning_rate', .001), ('layers', 1.0), ('dropout', .05),
-                                 ('empty', 0), ('snake', -10), ('wall', -10)):
+                                 ('food', 10), ('empty', 0), ('snake', -10), ('wall', -10)):
             with self.subTest(parameter=parameter):
                 self.bind(parameter)
                 self.draft.config['model']['hidden_size'] = 96
@@ -79,6 +80,7 @@ class SubmitSingleValueHandlerTests(unittest.TestCase):
         for name, value in (('hidden_size', 32), ('layers', 3), ('dropout', .02),
                              ('sequence_length', 12), ('batch_size', 26),
                              ('learning_rate', .003), ('gamma', .97),
+                             ('food', 0), ('food', .25), ('food', 12.5), ('food', 20),
                              ('empty', -2), ('empty', .25), ('empty', 2),
                              ('snake', -20), ('snake', -2.5), ('snake', 0),
                              ('wall', -20), ('wall', -2.5), ('wall', 0)):

@@ -62,9 +62,9 @@
             "food": {
               "type": "number",
               "minimum": 0,
+              "maximum": 20,
               "default": 10,
-              "description": "Reward for eating food.",
-              "const": 10
+              "description": "Reward for eating food."
             },
             "wall": {
               "type": "number",

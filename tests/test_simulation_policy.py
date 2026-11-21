@@ -21,8 +21,8 @@ class SimulationPolicyTests(unittest.TestCase):
         self.assertEqual(config['model']['dropout'], .05)
         self.assertEqual(config['epsilon_nice'], {'probability': .05, 'steps': 20})
         self.assertEqual(config['epsilon'], {'initial': .96, 'minimum': 0, 'decay': .97})
-        self.assertEqual({key: config['game']['rewards'][key] for key in ('empty', 'snake', 'wall')},
-                         {'empty': 0, 'snake': -10, 'wall': -10})
+        self.assertEqual({key: config['game']['rewards'][key] for key in ('food', 'empty', 'snake', 'wall')},
+                         {'food': 10, 'empty': 0, 'snake': -10, 'wall': -10})
         config['epsilon_nice']['probability'] = 0
         self.assertEqual(SimulationConfiguration.defaults()['epsilon_nice']['probability'], .05)
 
@@ -98,11 +98,11 @@ class SimulationPolicyTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ValidationError):
                 SimulationConfiguration.value(('epsilon_nice', 'probability'), value)
 
-    def test_move_and_collision_rewards_accept_boundaries_and_fractional_values(self):
+    def test_food_move_and_collision_rewards_accept_boundaries_and_fractional_values(self):
         root = Path(__file__).resolve().parents[1]
         upstream = Draft202012Validator(json.loads(
             (root / 'pages/snake-lab/simulation-config-v2.schema.json').read_text()))
-        for field, values in (('empty', (-2, -1.25, 0, .25, 2)),
+        for field, values in (('food', (0, .25, 10, 12.5, 20)), ('empty', (-2, -1.25, 0, .25, 2)),
                               ('snake', (-20, -2.5, 0)), ('wall', (-20, -2.5, 0))):
             for value in values:
                 with self.subTest(field=field, value=value):
@@ -116,7 +116,7 @@ class SimulationPolicyTests(unittest.TestCase):
     def test_reward_limits_apply_to_choices_and_complete_configurations(self):
         for field, values in (('empty', (-2.001, 2.001)),
                               ('snake', (-20.001, .001)), ('wall', (-20.001, .001)),
-                              ('food', (5,)), ('max_moves', (-5,))):
+                              ('food', (-.001, 20.001)), ('max_moves', (-5,))):
             for value in values:
                 with self.subTest(field=field, value=value):
                     path = ('game', 'rewards', field)

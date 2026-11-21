@@ -142,6 +142,7 @@ exec /usr/bin/systemd-analyze "$@"
                                'entities/SimulationAnalysis.py', 'app/snakelab/AnalyzeRun.py',
                                'app/snakelab/ExperimentDb.py', 'app/snakelab/knowledge/choose-snake-setting/SKILL.md',
                                'app/snakelab/prompts/ConfigurationChoice.py',
+                               'entities/EpsilonNiceChoice.py',
                                'app/snakelab/SubmitSimulationSummaryHandler.py',
                                'app/snakelab/tools/SubmitSimulationSummary.py',
                                'app/snakelab/SelectParameterHandler.py', 'app/snakelab/tools/SelectParameter.py',

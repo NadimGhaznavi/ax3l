@@ -56,6 +56,9 @@ assignment calls for it:
 - The epsilon pair uses the score trend.
 - The distance-reward pair uses the score distribution.
 
+EpsilonNice choices use `EpsilonNiceChoice`, which adds a compact definition of
+the custom exploration rule, its probability and duration, and episode resets.
+
 The chart comes from the latest run on the draft seed, or from the current
 golden run if the latest run used a different seed. The prompt supplies
 each reference's seed and whether it matches the draft. Chart sources are

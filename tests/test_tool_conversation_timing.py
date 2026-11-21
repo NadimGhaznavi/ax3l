@@ -51,11 +51,11 @@ class ToolConversationTimingTests(unittest.IsolatedAsyncioTestCase):
         messages = json.loads(llm.complete.call_args.args[0])['messages']
         reminders = [message['content'] for message in messages
                      if message['role'] == 'user' and message['content'].startswith('Decision time remaining:')]
-        self.assertEqual([text.split(' (')[0] for text in reminders], [
+        self.assertEqual([text.split('.')[0] for text in reminders], [
             'Decision time remaining: 05:00', 'Decision time remaining: 04:10',
             'Decision time remaining: 02:40', 'Decision time remaining: 00:00',
             'Decision time remaining: 00:00'])
-        self.assertIn('advisory budget has elapsed', reminders[-1])
+        self.assertIn('Advisory budget expired', reminders[-1])
         self.assertEqual([message['content'] for message in messages if message['role'] == 'tool'],
                          ['Guide text.', page, 'Rejected.', 'Rejected.', page])
         logged = [json.loads(call.args[3])['content'] for call in db.log.call_args_list
@@ -82,7 +82,7 @@ class ToolConversationTimingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('Grace time remaining: 03:00', reminders[1])
         self.assertIn('Grace time remaining: 02:10', reminders[2])
         self.assertIn('Grace time remaining: 00:00', reminders[3])
-        self.assertIn('continue the normal experiment cycle', reminders[3])
+        self.assertIn('run the saved unique draft', reminders[3])
 
     def test_initial_reminders_explain_the_reset_without_offering_to_run_the_baseline(self):
         with patch('ax3l.app.snakelab.ToolConversation.monotonic', side_effect=[100, 400, 580]):
@@ -92,8 +92,8 @@ class ToolConversationTimingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('Grace time remaining: 03:00', reminders[1])
         self.assertIn('Grace time remaining: 00:00', reminders[2])
         for reminder in reminders:
-            self.assertIn('restart from the initial prompt in a fresh conversation', reminder)
-            self.assertNotIn('run the saved unique configuration', reminder)
+            self.assertIn('restart the conversation and discard the pending choice', reminder)
+            self.assertNotIn('run the saved unique draft', reminder)
 
     async def test_initial_expiry_logs_a_reset_and_ignores_a_late_inference_reply(self):
         tools, llm, db = self.tools(), Mock(url='fixture'), Mock()
@@ -185,20 +185,17 @@ class ToolConversationTimingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result['status'], 'ok')
         tools.submit.assert_awaited_once()
 
-    def test_next_step_prompts_explain_the_budget_and_the_initial_reset_or_unique_submission(self):
+    def test_next_step_prompts_explain_when_the_timer_resets_and_which_actions_are_available(self):
         draft = ConfigurationDraft('draft', 'gold', {}, SimulationConfiguration.defaults())
         for phase, selections in (('selecting_parameter', []), ('reviewing', ['gamma'])):
             draft.phase = phase
             draft.selections = selections
             text = ConfigurationNextStep(draft, [name for name in PARAMETER_ORDER if name not in selections]).to_md()
-            self.assertIn('5 minutes', text)
-            self.assertIn('3 extra minutes', text)
-            self.assertIn('After each data_tool request', text)
-            self.assertIn('accepted unique change starts a fresh', text)
-            self.assertIn('then Ax3l submits the saved unique configuration' if selections else
-                          'then Ax3l restarts from the initial prompt in a fresh conversation', text)
-            self.assertIn('Use data_tool at / for measured reference runs or /draft', text)
-            self.assertNotIn('/golden/notes', text)
+            self.assertIn('The timer continues during value selection', text)
+            self.assertIn('A saved unique change resets it', text)
+            self.assertIn('select_parameter', text.split('\n\n')[0])
+            self.assertEqual('run_simulation' in text, bool(selections))
+            self.assertIn('Use data_tool at / for reference runs or /draft', text)
 
     def test_next_step_prompt_lists_only_unused_parameters_and_offers_run_when_all_are_used(self):
         draft = ConfigurationDraft('draft', 'gold', {}, SimulationConfiguration.defaults(),
@@ -206,9 +203,10 @@ class ToolConversationTimingTests(unittest.IsolatedAsyncioTestCase):
         text = ConfigurationNextStep(draft, [name for name in PARAMETER_ORDER if name not in draft.selections]).to_md()
         choices = json.loads(text.split('```json\n')[1].split('\n```')[0])
         self.assertEqual(set(choices), set(PARAMETER_ORDER) - set(draft.selections))
-        self.assertIn('only once per experiment', text)
-        self.assertIn('keeping the current values is not allowed', text)
+        self.assertIn('at most once per setting', text)
+        self.assertIn('Change at least one value and submit pairs together', text)
         draft.selections = PARAMETER_ORDER.copy()
         text = ConfigurationNextStep(draft, []).to_md()
         self.assertEqual(json.loads(text.split('```json\n')[1].split('\n```')[0]), {})
-        self.assertIn('Use run_simulation to run it.', text)
+        self.assertTrue(text.startswith('Call run_simulation.'))
+        self.assertNotIn('select_parameter', text)

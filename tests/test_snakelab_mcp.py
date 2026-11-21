@@ -65,7 +65,7 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(set(tools['data_tool'].input_schema['properties']), {'url'})
             self.assertTrue((await client.call_tool('data_tool', {'url': '/'})).is_error)
 
-    async def test_revision_session_offers_all_branches_and_keeps_the_draft_private(self):
+    async def test_revision_session_uses_prompt_choices_and_keeps_the_draft_private(self):
         requests = []
 
         def handle(message):
@@ -79,8 +79,10 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual([definition['function']['name'] for definition in tools.definitions],
                                  ['select_parameter', 'kb_tool', 'data_tool'])
                 self.assertEqual(set(tools.definition['function']['parameters']['properties']), {'parameter'})
+                description = tools.definition['function']['description']
+                self.assertIn("prompt's available list", description)
                 for name in PARAMETER_ORDER:
-                    self.assertIn(name, tools.definition['function']['description'])
+                    self.assertNotIn(name, description)
                 self.assertNotIn('private-draft', json.dumps(tools.definitions))
                 self.assertEqual((await tools.data(dict(url='/draft')))['page'], 'Saved draft values.')
                 self.assertEqual((await tools.submit(dict(parameter='layers')))['phase'], 'choosing')
@@ -311,7 +313,7 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
             async with SnakeLabTools(server.endpoint, 'hidden_size', draft_id='private-draft') as tools:
                 definition = next(d for d in tools.definitions if d['function']['name'] == 'data_tool')
                 self.assertEqual(set(definition['function']['parameters']['properties']), {'url'})
-                self.assertIn('Data payloads are JSON', definition['function']['description'])
+                self.assertIn('JSON null means unrecorded', definition['function']['description'])
                 result = await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('Choose hidden size.')])
                 before = len(requests)
                 with self.assertRaises(RuntimeError):

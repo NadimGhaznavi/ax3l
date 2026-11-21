@@ -13,8 +13,6 @@ class NoDupes(Prompt):
         tool = "submit_pair_values" if parameter in PAIR_PARAMETERS else "submit_single_value"
         values = json.dumps(parameter_values(candidate, parameter), allow_nan=False)
         super().__init__(
-            f"The proposed {CHOICE_LABELS[parameter]} values {values} produce a configuration that already exists. "
-            "The proposal was not saved. Keep working on this selected setting; do not choose another parameter. "
-            f"Submit different values using {tool} until the complete configuration is unique. "
-            "Other draft values stay unchanged. Use data_tool to research values if needed."
+            f"Duplicate draft with {CHOICE_LABELS[parameter]} values {values}. "
+            f"Use {tool} with different values for this same setting."
         )

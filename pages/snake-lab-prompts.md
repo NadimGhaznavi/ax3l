@@ -6,29 +6,32 @@ layout: single
 
 # Snake Lab Prompts
 
-Ax3l activates the `choose-snake-setting` skill for each parameter choice and
-sends a single prompt with the assignment and relevant evidence. The skill
-defines how to use the evidence and when to keep the current value. Ax3l
-supplies the setting, the chart when applicable, and the tools for the choice.
+Qwen starts with golden's configuration and chooses which settings to change
+before running a simulation. Each prompt opens with the available decision.
+For value choices, `choose-snake-setting` tells Qwen how to weigh the evidence.
 
 | Prompt | Purpose |
 | --- | --- |
-| `ConfigurationChoice` | Names the choice, supplies current values and reference scores in JSON, and gives direct data paths. The learning rate, epsilon, and reward choices can include one chart. |
+| `ConfigurationNextStep` | Lists available keys and current values. Gives Qwen the option to run once the draft is unique. |
+| `ConfigurationChoice` | Names the submission tool and supplies current values, reference scores, and data paths. Learning rate, epsilon, and distance rewards can include a chart. |
 | `InvalidValue` | Explains why Ax3l rejected a value. |
-| `NoDupes` | Explains a duplicate complete draft, lists saved settings, and asks which setting to revise using `select_parameter`. |
+| `NoDupes` | Identifies the duplicate proposal and asks Qwen to try different values for the same setting. |
 
-The seven single choices (hidden size, layers, dropout, sequence length, batch
-size, learning rate, and gamma) precede the epsilon, distance-reward, and
-EpsilonNice pairs. `submit_single_value` and `submit_pair_values` save one choice. Ax3l
-runs the simulation after it accepts the complete configuration. Draft and
-parameter identifiers are bound outside the model's arguments. The tool
-description contains the allowed values.
+Use `select_parameter(parameter)` with a listed key. Each setting can be chosen
+once per draft, in any order. `submit_single_value` and `submit_pair_values`
+save changes using the limits in their tool descriptions. Ax3l binds the draft
+and setting identifiers. Duplicate proposals stay in the same conversation
+while untested values remain for that setting.
 
-A duplicate complete draft opens a separate `select_parameter(parameter)`
-conversation. Qwen chooses any single setting or paired setting, then Ax3l
-returns to that setting's `ConfigurationChoice` conversation. The complete
-draft is checked again after the revision. Another duplicate reopens parameter
-selection instead of forcing changes to the final pair.
+`request_seed_change()` saves the next unused seed once per draft. After the
+run decision, golden runs first on the new seed and sets the baseline even if
+its score is lower. If other settings changed, Ax3l tests them on the new seed
+and requires a higher score to promote the draft.
+
+The five-minute decision timer spans setting selection and value choice. Ax3l
+shows the remaining time at the start and after each `data_tool` call. Saving
+a unique change resets the timer. After three minutes of grace, Ax3l restarts
+the conversation if there is no saved change or runs the saved unique draft.
 
 `data_tool(url)` reads one small page. Use `/draft` for saved and inherited
 values, `/` for the run menu, and direct paths such as `/latest/scores` or

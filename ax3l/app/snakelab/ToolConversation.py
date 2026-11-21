@@ -35,25 +35,22 @@ async def _before_deadline(operation, deadline: float | None):
 
 def _time_reminder(deadline: float, conversation_deadline: float | None = None, *,
                    reset_on_expiry: bool = False) -> dict[str, str]:
-    action = ("restart from the initial prompt in a fresh conversation, discarding the tentative parameter "
-              "selection and all previous messages" if reset_on_expiry else
-              "run the saved unique configuration and continue the normal experiment cycle")
+    action = ("restart the conversation and discard the pending choice" if reset_on_expiry else
+              "run the saved unique draft")
     now = monotonic()
     if conversation_deadline is not None and now >= deadline:
         seconds = max(0, ceil(conversation_deadline - now))
         minutes, remainder = divmod(seconds, 60)
         return {"role": "user", "content":
-                f"The decision budget has expired. Grace time remaining: {minutes:02}:{remainder:02} "
-                f"({seconds} seconds). Decide now; when the grace period ends, Ax3l will {action}."}
+                f"Grace time remaining: {minutes:02}:{remainder:02}. Then Ax3l will {action}."}
     seconds = max(0, ceil(deadline - now))
     minutes, remainder = divmod(seconds, 60)
-    detail = ("Make your next decision promptly using the evidence gathered." if seconds else
-              "The advisory budget has elapsed. Make your next decision now using the evidence gathered.")
+    content = f"Decision time remaining: {minutes:02}:{remainder:02}."
     if conversation_deadline is not None:
-        detail += (f" A further {DECISION_GRACE_SECONDS // 60}-minute grace period follows this budget; "
-                   f"then Ax3l will {action} if you have not decided.")
-    return {"role": "user", "content":
-            f"Decision time remaining: {minutes:02}:{remainder:02} ({seconds} seconds). {detail}"}
+        content += f" After the {DECISION_GRACE_SECONDS // 60}-minute grace period, Ax3l will {action}."
+    elif not seconds:
+        content += " Advisory budget expired. Decide now."
+    return {"role": "user", "content": content}
 
 
 async def converse(llm, output, db, tools, prompts, *, parameter: str | None = None,

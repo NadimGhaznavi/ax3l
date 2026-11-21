@@ -2,7 +2,6 @@
 
 import asyncio
 import json
-from math import ceil
 from time import monotonic
 
 from uuid import uuid4
@@ -32,29 +31,8 @@ async def _before_deadline(operation, deadline: float | None):
         raise
 
 
-def _time_reminder(deadline: float, conversation_deadline: float | None = None, *,
-                   reset_on_expiry: bool = False) -> dict[str, str]:
-    action = ("restart the conversation and discard the pending choice" if reset_on_expiry else
-              "run the saved unique draft")
-    now = monotonic()
-    if conversation_deadline is not None and now >= deadline:
-        seconds = max(0, ceil(conversation_deadline - now))
-        minutes, remainder = divmod(seconds, 60)
-        return {"role": "user", "content":
-                f"Grace time remaining: {minutes:02}:{remainder:02}. Then Ax3l will {action}."}
-    seconds = max(0, ceil(deadline - now))
-    minutes, remainder = divmod(seconds, 60)
-    content = f"Decision time remaining: {minutes:02}:{remainder:02}."
-    if conversation_deadline is not None:
-        grace_minutes = (conversation_deadline - deadline) / 60
-        content += f" After the {grace_minutes:g}-minute grace period, Ax3l will {action}."
-    elif not seconds:
-        content += " Advisory budget expired. Decide now."
-    return {"role": "user", "content": content}
-
-
 async def converse(llm, output, db, tools, prompts, *, parameter: str | None = None,
-                   process_id: str | None = None, decision_deadline: float | None = None,
+                   process_id: str | None = None,
                    conversation_deadline: float | None = None, reset_on_expiry: bool = False) -> dict:
     process_id = process_id or str(uuid4())
     print(f"Conversation: {process_id}", flush=True)
@@ -75,11 +53,6 @@ async def converse(llm, output, db, tools, prompts, *, parameter: str | None = N
         for prompt, message in zip(prompts, messages):
             log(Events.Conversation, Events.Conversation.PROMPT, json.dumps(message, ensure_ascii=False),
                 source_name=prompt.source_name)
-        if decision_deadline is not None:
-            reminder = _time_reminder(decision_deadline, conversation_deadline, reset_on_expiry=reset_on_expiry)
-            messages.append(reminder)
-            log(Events.Conversation, Events.Conversation.PROMPT, json.dumps(reminder, ensure_ascii=False),
-                source_name="ToolConversation")
         turn = 0
         while True:
             turn += 1
@@ -162,11 +135,6 @@ async def converse(llm, output, db, tools, prompts, *, parameter: str | None = N
                 messages.append(feedback)
                 log(Events.Conversation, Events.Conversation.PROMPT, json.dumps(feedback, ensure_ascii=False),
                     source_name=result.get("source_name", "ToolConversation"))
-            if called_name == "data_tool" and decision_deadline is not None:
-                reminder = _time_reminder(decision_deadline, conversation_deadline, reset_on_expiry=reset_on_expiry)
-                messages.append(reminder)
-                log(Events.Conversation, Events.Conversation.PROMPT, json.dumps(reminder, ensure_ascii=False),
-                    source_name="ToolConversation")
     except DecisionTimeExpired:
         outcome = ("Decision budget and grace period expired; restarting from the initial prompt in a fresh conversation."
                    if reset_on_expiry else

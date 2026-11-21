@@ -113,11 +113,12 @@ protection. The selection tool rejects exhausted settings before saving an
 assignment. Availability is recalculated against the current draft after each
 accepted change. A restart reopens selection if the pending assignment is exhausted.
 
-Qwen is asked to select a parameter and find a unique setting, or decide to run
-the current unique draft, within seven minutes. Each data request is followed by
-an updated time remaining. Parameter selection and duplicate-value retries share
-the countdown; every accepted unique change resets it to seven minutes for the
-next parameter or run decision. Sending a prompt with a chart adds two minutes
+Ax3l internally allows seven minutes to select a parameter and find a unique
+setting, or decide to run the current unique draft. Prompts and tool feedback
+do not mention the timer, remaining time, or expiry actions. Experiment Status
+continues to display the countdown. Parameter selection and duplicate-value
+retries share the countdown; every accepted unique change resets it to seven
+minutes for the next parameter or run decision. Sending a prompt with a chart adds two minutes
 to the remaining decision budget and the displayed countdown. That allowance
 applies once for the prompt; tool reads and rejected values keep the extended
 deadline. Prompts without an image receive no extra time.

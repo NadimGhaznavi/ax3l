@@ -1,8 +1,9 @@
 # Complete-configuration optimization
 
 Ax3l starts a draft from the current golden configuration and asks Qwen which
-setting to change. Qwen can choose any of seven single settings—hidden size,
-encoder layers, dropout, sequence length, batch size, learning rate, and gamma—or
+setting to change. Qwen can choose any of ten single settings—hidden size,
+encoder layers, dropout, sequence length, batch size, learning rate, gamma,
+empty space reward, snake collision reward, and wall collision reward—or
 the epsilon, distance-reward, and EpsilonNice pairs, or request a seed change.
 Each choice conversation
 saves its choice in the durable draft. Once selected, a setting must change:
@@ -15,6 +16,11 @@ learning rate 0.001, and target update rate (`tau`) 0.05. It runs 750 episodes
 with required EpsilonNice starting at probability 0.05. The LLM chooses hidden
 sizes from 32 to 128 in multiples of 8, encoder depth from 1 to 3 layers, and
 dropout from 0 to 0.1 in steps of 0.01. Tau remains fixed at 0.05.
+Empty space rewards accept any number from -2 to +2, defaulting to 0.
+Snake and wall collision rewards each accept any number from -20 to 0,
+defaulting to -10. Food remains +10 and the move-limit penalty remains -10.
+The bundled SnakeLab 3.0.4 server schema limits empty rewards to zero or below;
+positive values require an updated SnakeLab server that accepts them.
 `SimulationConfiguration` owns defaults, schema validation, and the
 non-positive-sum reward-pair rule. Qwen requests seed changes without choosing
 a number; Ax3l increments the seed, skipping complete configurations stored in
@@ -54,7 +60,8 @@ assignment calls for it:
   appear in orange when recorded. Missing losses are excluded from the means
   and remain gaps in both traces.
 - The epsilon pair uses the score trend.
-- The distance-reward pair uses the score distribution.
+- The distance-reward pair and the empty space, snake collision, and wall
+  collision rewards use the score distribution.
 
 EpsilonNice choices use `EpsilonNiceChoice`, which adds a compact definition of
 the custom exploration rule, its probability and duration, and episode resets.

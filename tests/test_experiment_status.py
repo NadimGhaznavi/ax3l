@@ -84,27 +84,31 @@ class ExperimentStatusTests(unittest.TestCase):
 
     def test_saved_values_and_current_pair_follow_qwens_explicit_selection(self):
         self.assertEqual(self.report()['phase'], 'Choosing a setting')
-        self.draft.selections = PARAMETER_ORDER[:7]
+        self.draft.selections = ['hidden_size', 'layers', 'dropout', 'sequence_length',
+                                 'batch_size', 'learning_rate', 'gamma']
         self.draft.phase, self.draft.parameter = 'choosing', 'epsilon_pair'
         report = self.report()
         self.assertEqual(report['choices_selected'], 7)
-        self.assertEqual(report['choices_total'], 11)
+        self.assertEqual(report['choices_total'], 14)
         rows = report['rows']
-        self.assertEqual(len(rows), 14)
+        self.assertEqual(len(rows), 17)
         self.assertEqual([row['path'] for row in rows], [
+            'game.rewards.wall', 'game.rewards.snake', 'game.rewards.empty',
             'model.hidden_size', 'model.layers', 'model.dropout', 'training.sequence_length', 'training.batch_size',
             'training.learning_rate', 'training.gamma', 'epsilon.initial', 'epsilon.decay',
             'game.rewards.closer_to_food', 'game.rewards.further_from_food',
             'epsilon_nice.probability', 'epsilon_nice.steps', 'seed'])
-        self.assertTrue(all(row['selected'] for row in rows[:7]))
-        self.assertTrue(all(not row['selected'] for row in rows[7:]))
+        self.assertEqual([row['path'] for row in rows if row['selected']], [
+            'model.hidden_size', 'model.layers', 'model.dropout', 'training.sequence_length',
+            'training.batch_size', 'training.learning_rate', 'training.gamma'])
         self.assertEqual([row['path'] for row in rows if row['current']], ['epsilon.initial', 'epsilon.decay'])
-        self.assertEqual(rows[7]['value'], str(self.golden['config']['epsilon']['initial']))
+        self.assertEqual(next(row['value'] for row in rows if row['path'] == 'epsilon.initial'),
+                         str(self.golden['config']['epsilon']['initial']))
         self.assertEqual(self.draft.config, self.golden['config'])
         self.draft.selections.append('epsilon_pair')
         self.draft.parameter = 'reward_pair'
         report = self.report()
-        self.assertTrue(all(row['selected'] for row in report['rows'][:9]))
+        self.assertEqual(sum(row['selected'] for row in report['rows']), 9)
         self.assertEqual([row['path'] for row in report['rows'] if row['current']],
                          ['game.rewards.closer_to_food', 'game.rewards.further_from_food'])
 
@@ -288,7 +292,7 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         page = self.get()
         self.assertIn('Choosing a setting', page)
         self.assertIn('0 settings saved', page)
-        self.assertEqual(page.count('type="checkbox" disabled'), 14)
+        self.assertEqual(page.count('type="checkbox" disabled'), 17)
         self.assertNotIn('>Pending</span>', page)
         self.assertNotIn('<td class="changed-value">', page)
         self.assertIn('window.setTimeout(refreshStatus, 5000)', page)
@@ -309,7 +313,7 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         page = self.get('/experiment-status?view=completed')
         self.assertIn('aria-current="page">Last completed</a>', page)
         self.assertIn('id="experiment-phase" aria-live="polite" aria-atomic="true">Complete</h2>', page)
-        self.assertEqual(page.count('disabled checked'), 14)
+        self.assertEqual(page.count('disabled checked'), 17)
         self.assertNotIn('>Pending</span>', page)
         self.assertNotIn('class="comparison-label"', page)
         self.assertIn('<dt>High score</dt><dd>0</dd>', page)
@@ -323,7 +327,7 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         self.draft.config['model']['hidden_size'] = 96
         self.draft.config['model']['layers'] = 2
         self.draft.config['epsilon']['initial'] = 0.75
-        self.draft.selections = PARAMETER_ORDER[:8]
+        self.draft.selections = ['hidden_size', 'layers', 'epsilon_pair']
         for view in ('current', 'completed'):
             with self.subTest(view=view):
                 self.experiments.last_completed_draft.return_value = self.draft
@@ -386,8 +390,8 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         page = self.get()
         self.assertIn('Choosing a setting to revise', page)
         self.assertIn('Experiment decision', page)
-        self.assertIn('11 settings saved', page)
-        self.assertEqual(page.count('disabled checked'), 14)
+        self.assertIn('14 settings saved', page)
+        self.assertEqual(page.count('disabled checked'), 17)
         self.assertNotIn('>Pending</span>', page)
 
     def test_setup_shows_live_steps_with_separate_turn_times_and_tokens(self):

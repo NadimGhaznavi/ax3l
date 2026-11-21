@@ -115,7 +115,8 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.prompts = []
         self.values = dict(hidden_size=96, layers=3, dropout=.02, sequence_length=12, batch_size=26,
                            learning_rate=.003, gamma=.97, epsilon_pair=(.91, .95),
-                           reward_pair=(.25, -.5), epsilon_nice_pair=(.01, 40))
+                           reward_pair=(.25, -.5), epsilon_nice_pair=(.01, 40),
+                           empty=2, snake=-5, wall=-15)
 
         async def select(llm, output, db, tools, prompts, *, parameter, process_id,
                          conversation_deadline, reset_on_expiry):
@@ -184,6 +185,30 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.store.saved.selections, ['learning_rate'])
         self.assertEqual(self.snake.is_config_unique.call_count, 1)
         self.snake.submit_simulation.assert_called_once()
+
+    async def test_qwen_can_tune_move_and_collision_rewards_independently(self):
+        self.decisions = ['empty', 'snake', 'wall', 'run']
+        await self.cycle()
+        candidate = self.snake.submit_simulation.call_args.args[0]
+        expected = deepcopy(self.config)
+        expected['game']['rewards'].update(empty=2, snake=-5, wall=-15)
+        self.assertEqual(candidate, expected)
+        self.assertEqual(self.store.saved.selections, ['empty', 'snake', 'wall'])
+        for call in self.conversation.await_args_list:
+            parameter = call.kwargs['parameter']
+            content = json.loads(call.args[4][0].to_json())['content']
+            if parameter != REVISION_PARAMETER:
+                self.assertEqual([part['type'] for part in content], ['text', 'image_url'])
+                evidence = json.loads(content[0]['text'].split('```json\n')[1].split('\n```')[0])
+                self.assertEqual(evidence['current'], {parameter: self.config['game']['rewards'][parameter]})
+        self.assertEqual([call.args[-1] for call in self.chart.call_args_list], ['distribution'] * 3)
+
+    async def test_resumed_empty_reward_choice_can_stage_a_positive_reward(self):
+        self.store.saved = self.draft(phase='choosing', parameter='empty')
+        self.decisions = ['run']
+        await self.cycle()
+        self.assertEqual(self.trace(), ['empty', REVISION_PARAMETER])
+        self.assertEqual(self.snake.submit_simulation.call_args.args[0]['game']['rewards']['empty'], 2)
 
     async def test_epsilon_nice_choice_includes_custom_rule_and_pair_evidence(self):
         self.decisions = ['epsilon_nice_pair', 'gamma', 'run']
@@ -422,6 +447,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_expired_pending_edit_runs_the_last_saved_unique_config(self):
         self.store.saved = self.draft(1, 'choosing', parameter='gamma')
+        self.store.saved.selections = ['hidden_size']
         self.store.saved.config['model']['hidden_size'] = 96
         original = deepcopy(self.store.saved.config)
         self.conversation.side_effect = DecisionTimeExpired()
@@ -581,7 +607,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         await self.cycle()
         messages = {call.kwargs['parameter']: json.loads(call.args[4][0].to_json())['content']
                     for call in self.conversation.await_args_list}
-        for parameter in CHOICE_CHARTS:
+        for parameter in ('reward_pair', 'learning_rate', 'epsilon_pair'):
             content = messages[parameter]
             self.assertEqual([part['type'] for part in content], ['text', 'image_url'])
             self.assertIn('The chart shows the latest run.', content[0]['text'])

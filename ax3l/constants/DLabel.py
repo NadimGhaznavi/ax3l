@@ -20,6 +20,9 @@ class DLabel:
     REWARD_PAIR: Final[str] = "Food Reward: closer, further"
     CLOSER_TO_FOOD: Final[str] = "Food Reward: closer"
     FURTHER_FROM_FOOD: Final[str] = "Food Reward: further"
+    EMPTY: Final[str] = "Empty Space Reward"
+    SNAKE: Final[str] = "Snake Collision Reward"
+    WALL: Final[str] = "Wall Collision Reward"
     EPSILON_NICE_PAIR: Final[str] = "EpsilonNice: probability, steps"
     EPSILON_NICE_PROBABILITY: Final[str] = "EpsilonNice: probability"
     EPSILON_NICE_STEPS: Final[str] = "EpsilonNice: steps"
@@ -52,6 +55,12 @@ FIELD_TO_LABEL_MAP: Final[dict[str, str]] = {
     "game.rewards.closer_to_food": DLabel.CLOSER_TO_FOOD,
     "further_from_food": DLabel.FURTHER_FROM_FOOD,
     "game.rewards.further_from_food": DLabel.FURTHER_FROM_FOOD,
+    "empty": DLabel.EMPTY,
+    "game.rewards.empty": DLabel.EMPTY,
+    "snake": DLabel.SNAKE,
+    "game.rewards.snake": DLabel.SNAKE,
+    "wall": DLabel.WALL,
+    "game.rewards.wall": DLabel.WALL,
     "epsilon_nice_pair": DLabel.EPSILON_NICE_PAIR,
     "epsilon_nice.probability": DLabel.EPSILON_NICE_PROBABILITY,
     "epsilon_nice.steps": DLabel.EPSILON_NICE_STEPS,
@@ -73,6 +82,9 @@ FIELD_TO_DESCRIPTION_MAP: Final[dict[str, str]] = {
     "epsilon.decay": "Probability decay rate",
     "game.rewards.closer_to_food": "",
     "game.rewards.further_from_food": "",
+    "game.rewards.empty": "Reward for a move without food.",
+    "game.rewards.snake": "Penalty for colliding with the snake.",
+    "game.rewards.wall": "Penalty for colliding with a wall.",
     "epsilon_nice.probability": "Invocation probability",
     "epsilon_nice.steps": "Safe detour steps",
 }

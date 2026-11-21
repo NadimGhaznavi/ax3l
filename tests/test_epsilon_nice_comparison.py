@@ -38,7 +38,7 @@ class EpsilonNiceComparisonTests(unittest.TestCase):
             self.assertEqual(report['epsilon'], config['epsilon'])
             self.assertEqual(report['gold'], dict(probability=.005, steps=20, high_score=4))
         instructions = FirstContactEpsilonNicePair().to_md()
-        for text in ('probability', 'steps', 'positive', '500-episode', 'next move'):
+        for text in ('probability', 'steps', 'positive', '1500-episode', 'next move'):
             self.assertIn(text, instructions)
         self.assertIn('value_1 = start chance: number; above 0; at most 0.1.', instructions)
         self.assertIn('value_2 = moves per detour: whole number; at least 1; at most 50.', instructions)

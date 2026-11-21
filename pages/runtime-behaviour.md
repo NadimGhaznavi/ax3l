@@ -6,14 +6,14 @@ layout: single
 
 # Complete-configuration experiments
 
-Qwen chooses which settings to adjust and when to run one 500-episode SnakeLab
+Qwen chooses which settings to adjust and when to run one 1500-episode SnakeLab
 simulation. It can research measured data before selecting a setting, then
 receives a chart when it can inform the value choice.
 
 ## Initial startup
 
 With an empty experiment, Ax3l submits the schema defaults once. The baseline
-builds on SnakeLab 3.0.4's `transformer-epsilon-nice.json` sample and runs 500
+builds on SnakeLab 3.0.4's `transformer-epsilon-nice.json` sample and runs 1500
 episodes with required EpsilonNice:
 
 | Setting | Initial value |
@@ -114,15 +114,19 @@ assignment. Availability is recalculated against the current draft after each
 accepted change. A restart reopens selection if the pending assignment is exhausted.
 
 Qwen is asked to select a parameter and find a unique setting, or decide to run
-the current unique draft, within five minutes. Each data request is followed by
+the current unique draft, within seven minutes. Each data request is followed by
 an updated time remaining. Parameter selection and duplicate-value retries share
-the countdown; every accepted unique change resets it to five minutes for the
-next parameter or run decision. Expiry starts a grace period configured by
-`decision_grace_seconds` in `/opt/prod/ax3l/conf/ax3l.json`, defaulting to 300
-seconds (five minutes).
+the countdown; every accepted unique change resets it to seven minutes for the
+next parameter or run decision. Sending a prompt with a chart adds two minutes
+to the remaining decision budget and the displayed countdown. That allowance
+applies once for the prompt; tool reads and rejected values keep the extended
+deadline. Prompts without an image receive no extra time.
+Expiry starts a grace period configured by
+`decision_grace_seconds` in `/opt/prod/ax3l/conf/ax3l.json`, defaulting to 420
+seconds (seven minutes).
 Before the first unique change, the end of grace discards the tentative parameter
 selection and starts a fresh conversation from the initial prompt with a new
-five-minute budget. Earlier messages, research, reasoning, and rejected proposals
+seven-minute budget. Earlier messages, research, reasoning, and rejected proposals
 are not carried into the new context. With a saved unique draft, the end of grace
 submits that configuration through the normal simulation, comparison, and
 measurement cycle, then starts the next experiment.
@@ -138,7 +142,7 @@ current decision deadline. At zero it turns amber.
 With a saved unique draft, it switches to a **Simulation Start
 Countdown** with **Time remaining** below the number. Before the first unique
 change, it instead shows a **Conversation Reset Countdown**. Both use the
-configured grace period, which defaults to five minutes.
+configured grace period, which defaults to seven minutes.
 It resets after an accepted unique change and becomes inactive when the
 configuration is submitted. The table scrolls horizontally on its own, keeping
 the experiment details and countdown visible; refreshes retain its scroll position.

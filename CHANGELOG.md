@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.14.1] - 2026-11-20 @ 22:24
+
+### Summary
+
+Run 1,500-episode experiments with longer decision and grace countdowns.
+
+### Changed
+
+- Set the simulation epoch default and fixed experiment duration to 1,500,
+  and update the LLM prompts and local guides to match.
+- Increase the decision budget and default grace period from five to seven
+  minutes. Each prompt containing a chart adds two minutes to the decision
+  countdown, including its saved Experiment Status deadline; tool reads and
+  rejected attempts retain that deadline.
+
 ## [4.14.0] - 2026-11-20 @ 21:54
 
 ### Summary

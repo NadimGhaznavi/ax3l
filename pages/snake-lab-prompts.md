@@ -24,9 +24,10 @@ save changes using the limits in their tool descriptions. Ax3l binds the draft
 and setting identifiers. Duplicate proposals stay in the same conversation
 while untested values remain for that setting.
 
-`request_seed_change()` saves the next unused seed once per draft. After the
-run decision, golden runs first on the new seed and sets the baseline even if
-its score is lower. If other settings changed, Ax3l tests them on the new seed
+`select_parameter("seed")` immediately saves the next unused seed once per
+draft, without a separate seed confirmation conversation or tool call. After
+the run decision, golden runs first on the new seed and sets the baseline even
+if its score is lower. If other settings changed, Ax3l tests them on the new seed
 and requires a higher score to promote the draft.
 
 The internal seven-minute decision timer spans setting selection and value

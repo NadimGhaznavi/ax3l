@@ -1,6 +1,7 @@
 """Let Qwen choose a setting that has not yet been changed in the current draft."""
 
 from ax3l.app.snakelab.ExperimentDb import ExperimentDb
+from ax3l.app.snakelab.RequestSeedChangeHandler import RequestSeedChangeHandler
 from ax3l.app.snakelab.SubmitSingleValueHandler import SubmitSingleValueHandler
 from ax3l.constants.DChoice import CHOICE_LABELS
 from ax3l.entities.ConfigurationDraft import PARAMETER_ORDER
@@ -31,6 +32,8 @@ class SelectParameterHandler(SubmitSingleValueHandler):
                                   "seed and other draft settings. Choose another available setting, "
                                   "or run the unique configuration.")
             return {**result, "code": "parameter_space_exhausted"}
+        if parameter == "seed":
+            return RequestSeedChangeHandler(self._db).stage(experiments, draft)
         draft.parameter = parameter
         draft.phase = "choosing"
         experiments.save_draft(draft)

@@ -39,7 +39,7 @@ class SubmitSingleValueHandler:
             return self._reject("parameter must be a JSON spec key.")
 
         if parameter == "seed":
-            return self._reject("Use request_seed_change without a value; Ax3l increments the seed.")
+            return self._reject("Use select_parameter with seed and no value; Ax3l increments the seed immediately.")
         if parameter not in SINGLE_PARAMETERS:
             return self._reject(f"Parameter is not in the single-parameter search space: {parameter}.")
         path, _ = SINGLE_PARAMETERS[parameter]

@@ -48,7 +48,7 @@ chosen only once per experiment, including after a restart:
 | Batch Size | Number of sequences sampled for each training update. | Integers from 8 to 64, in multiples of 2. | Individually |
 | Learning Rate | Size of gradient updates during training. | Numbers from 0.0005 to 0.005. | Individually |
 | Gamma | Discount factor controlling the value of future rewards. | Numbers from 0.9 to 0.99. | Individually |
-| Random Seed | Request a different simulation seed. | Ax3l increments the seed, skipping already stored complete configurations. Qwen supplies no number. | Request only |
+| Random Seed | Change the simulation seed. | Ax3l increments the seed, skipping already stored complete configurations. Qwen supplies no number. | Immediately on selection |
 | Epsilon: initial | Starting probability of choosing a random action. | Numbers from 0.85 to 0.999. | Epsilon: decay |
 | Epsilon: decay | Multiplier applied to epsilon after each episode. | Numbers from 0.9 to 0.999. | Epsilon: initial |
 | Food Reward: closer | Reward for moving closer to the food. | 0, 0.1, 0.25, 0.5, 1, 2, 3, 4, 5. | Food Reward: further |
@@ -57,11 +57,12 @@ chosen only once per experiment, including after a restart:
 | EpsilonNice: steps | Duration of each detour, reset each episode. | Integers from 1 to 40. | EpsilonNice: probability |
 
 The epsilon settings, distance rewards, and EpsilonNice settings are chosen in
-pairs. The sum of the two distance rewards must be non-positive. Qwen can select
-`seed` and use `request_seed_change` with no arguments. Ax3l increments the draft
-seed until the complete configuration is unique across every stored run and
-status, preserving all other settings. Seed can be selected only once per
-experiment. Numeric seed proposals are rejected; schema-fixed settings remain
+pairs. The sum of the two distance rewards must be non-positive. Selecting
+`seed` immediately accepts the seed change; there is no separate seed
+confirmation conversation or tool call. Ax3l increments the draft seed until
+the complete configuration and its golden baseline are unique across every
+stored run and status, preserving all other settings. Seed can be selected only
+once per experiment. Numeric seed proposals are rejected; schema-fixed settings remain
 controlled by Ax3l.
 
 Ax3l loads the same short selection skill at the start of each choice. The
@@ -97,7 +98,8 @@ checks the complete draft for duplicates.
 At startup and after a unique change, Qwen can use `select_parameter` to choose
 a single or paired setting. `data_tool` and `kb_tool` are available while making that
 decision. Ax3l opens the selected setting's value conversation with the usual
-evidence and tools; other values stay saved. A duplicate proposal is rejected
+evidence and tools, or immediately saves the next unused seed when `seed` is
+selected; other values stay saved. A duplicate proposal is rejected
 without saving it. Qwen stays on the selected setting and must submit different
 values until the complete configuration is unique. After a unique change, Qwen can
 use `run_simulation` or select an unused setting. Used settings cannot be selected

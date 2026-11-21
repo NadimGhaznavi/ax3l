@@ -54,7 +54,7 @@ def analysis_rules_page(config: dict) -> str:
             parameters[".".join(path)] = {key: field[key] for key in constraints if key in field}
     return data_json("run", config["seed"], dict(
         parameters=parameters, reward_pair_rule="closer_to_food + further_from_food <= 0",
-        seed_change_rule="request_seed_change takes no arguments; Ax3l increments the seed and skips stored configurations"))
+        seed_change_rule="select_parameter with seed immediately saves the next unused seed, skipping stored configurations"))
 
 
 def index_page(draft: ConfigurationDraft) -> str:

@@ -17,7 +17,6 @@ from ax3l.app.snakelab.SubmitSingleValueHandler import SubmitSingleValueHandler
 from ax3l.app.snakelab.SubmitPairValuesHandler import SubmitPairValuesHandler
 from ax3l.app.snakelab.SelectParameterHandler import SelectParameterHandler
 from ax3l.app.snakelab.RunSimulationHandler import RunSimulationHandler
-from ax3l.app.snakelab.RequestSeedChangeHandler import RequestSeedChangeHandler
 from ax3l.constants.DChoice import CHOICE_CHARTS, CHOICE_LABELS, REVISION_PARAMETER
 from ax3l.constants.DAx3l import DAx3l
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
@@ -134,9 +133,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
                     payload['parameter'] = step
                 return handler.submit(payload)
             payload = {'draft_id': process_id}
-            if parameter == 'seed':
-                result = RequestSeedChangeHandler(db).submit(payload)
-            elif isinstance(value := self.values[parameter], tuple):
+            if isinstance(value := self.values[parameter], tuple):
                 payload.update(pair=parameter, value_1=value[0], value_2=value[1])
                 result = SubmitPairValuesHandler(db).submit(payload)
             else:
@@ -206,8 +203,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
                 evidence = json.loads(content[0]['text'].split('```json\n')[1].split('\n```')[0])
                 self.assertEqual(evidence['current'], {parameter: self.config['game']['rewards'][parameter]})
                 if parameter in ('snake', 'wall'):
-                    self.assertIn('percentages of all episodes', content[0]['text'])
-                    self.assertIn('whole percent', content[0]['text'])
+                    self.assertIn('Chart: latest.', content[0]['text'])
                     self.assertIn('/latest/endings', content[0]['text'])
                     measured = evidence['reference_runs']['latest']
                     self.assertEqual(measured['episodes'], 500)
@@ -229,7 +225,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.store.saved.selections, ['food'])
         content = json.loads(self.conversation.await_args_list[0].args[4][0].to_json())['content']
         self.assertEqual([part['type'] for part in content], ['text', 'image_url'])
-        self.assertIn('Use score spread', content[0]['text'])
+        self.assertIn('Chart: latest.', content[0]['text'])
         evidence = json.loads(content[0]['text'].split('```json\n')[1].split('\n```')[0])
         self.assertEqual(evidence['current'], {'food': 10})
         self.assertEqual(evidence['reference_runs']['latest']['settings'], {'food': 10})
@@ -641,9 +637,9 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         for parameter in ('reward_pair', 'learning_rate', 'epsilon_pair'):
             content = messages[parameter]
             self.assertEqual([part['type'] for part in content], ['text', 'image_url'])
-            self.assertIn('The chart shows the latest run.', content[0]['text'])
-        self.assertIn('Orange overlays the golden run', messages['learning_rate'][0]['text'])
-        self.assertIn('bold lines show trailing means', messages['learning_rate'][0]['text'])
+            if parameter != 'learning_rate':
+                self.assertIn('Chart: latest.', content[0]['text'])
+        self.assertIn('Compare latest with golden.', messages['learning_rate'][0]['text'])
         self.assertEqual([call.args[-1] for call in self.chart.call_args_list],
                          ['distribution', 'loss', 'scores'])
         data = json.loads(messages['epsilon_pair'][0]['text'].split('```json\n')[1].split('\n```')[0])
@@ -674,15 +670,15 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         await self.cycle()
         self.snake.get_analysis_episodes.assert_called_once_with(self.gold)
         self.assertIsNone(self.chart.call_args.kwargs['golden_episodes'])
-        self.assertIn('The chart shows the golden run.', self.prompts[1])
-        self.assertNotIn('Orange overlays', self.prompts[1])
+        self.assertIn('Chart: golden.', self.prompts[1])
+        self.assertNotIn('Compare golden with golden.', self.prompts[1])
 
     async def test_golden_without_recorded_loss_keeps_the_latest_loss_chart(self):
         self.store.analyses[self.gold].metrics['episodes_with_loss'] = 0
         await self.cycle()
         self.snake.get_analysis_episodes.assert_called_once_with(self.latest)
         self.assertIsNone(self.chart.call_args.kwargs['golden_episodes'])
-        self.assertIn('golden run has no recorded loss to overlay', self.prompts[1])
+        self.assertIn('Chart: latest. Golden has no recorded loss.', self.prompts[1])
 
     async def test_golden_supplies_chart_after_seed_change_and_missing_loss_skips_chart(self):
         self.decisions = ['learning_rate', 'epsilon_pair', 'run']
@@ -693,7 +689,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
                     for call in self.conversation.await_args_list}
         self.assertIsInstance(messages['learning_rate'], str)
         self.assertIn('/golden/activity', messages['learning_rate'])
-        self.assertIn('The chart shows the golden run.', messages['epsilon_pair'][0]['text'])
+        self.assertIn('Chart: golden.', messages['epsilon_pair'][0]['text'])
         self.assertEqual([call.args[-1] for call in self.chart.call_args_list], ['scores'])
         self.snake.get_analysis_episodes.assert_called_once_with(self.gold)
 
@@ -784,11 +780,12 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
     async def test_seed_only_change_runs_once_and_accepts_a_lower_local_baseline(self):
         self.decisions = ['seed', 'run']
         await self.cycle()
-        self.assertEqual(self.trace(), [REVISION_PARAMETER, 'seed', REVISION_PARAMETER])
+        self.assertEqual(self.trace(), [REVISION_PARAMETER, REVISION_PARAMETER])
         self.assertEqual(self.store.saved.selections, ['seed'])
         self.assertEqual(self.snake.submit_simulation.call_args.args[0], {**self.config, 'seed': 1971})
-        prompt = self.prompts[1]
-        self.assertIn('request_seed_change with no arguments', prompt)
+        prompt = self.prompts[0]
+        self.assertIn('immediately save the next unused seed', prompt)
+        self.assertNotIn('request_seed_change', prompt)
         self.assertNotIn('submit_single_value', prompt)
         self.assertIn('A seed-only draft ends there', prompt)
         self.assertEqual(self.rotation.await_count, 1)
@@ -874,6 +871,26 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.snake.submit_simulation.call_args.args[0]['seed'], 1971)
         self.assertEqual(self.store.saved.selections, ['seed'])
 
+    async def test_restart_completes_a_pending_seed_selection_without_a_seed_conversation(self):
+        self.store.saved = self.draft(phase='choosing', parameter='seed')
+        self.decisions = ['run']
+        await self.cycle()
+        self.assertEqual(self.trace(), [REVISION_PARAMETER])
+        self.assertEqual(self.store.saved.selections, ['seed'])
+        self.snake.submit_simulation.assert_called_once_with({**self.config, 'seed': 1971})
+        self.assertEqual(self.tools.call_count, 1)
+
+    async def test_restart_reopens_selection_if_a_pending_seed_change_is_rejected(self):
+        self.store.saved = self.draft(phase='choosing', parameter='seed')
+        self.store.saved.config['seed'] = SimulationConfiguration.field(('seed',))['maximum']
+        self.conversation.side_effect = asyncio.CancelledError()
+        await self.cycle()
+        self.assertEqual(self.trace(), [REVISION_PARAMETER])
+        self.assertEqual(self.store.saved.phase, 'selecting_parameter')
+        self.assertIsNone(self.store.saved.parameter)
+        self.assertEqual(self.store.saved.selections, [])
+        self.snake.submit_simulation.assert_not_called()
+
     async def test_repeated_seed_selections_refresh_choices_without_blocking_other_changes_or_running(self):
         self.decisions = ['seed', 'seed', 'layers', 'seed', 'run']
         choose = self.conversation.side_effect
@@ -888,9 +905,9 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.conversation.side_effect = select
         await self.cycle()
         self.assertEqual(rejections, ['parameter_space_exhausted'] * 2)
-        self.assertEqual(self.trace().count('seed'), 1)
+        self.assertNotIn('seed', self.trace())
         self.assertEqual(self.store.saved.selections, ['seed', 'layers'])
-        for parameter, prompt in zip(self.trace()[2:], self.prompts[2:]):
+        for parameter, prompt in zip(self.trace()[1:], self.prompts[1:]):
             if parameter == REVISION_PARAMETER:
                 self.assertIn('The seed can change only once per draft and is already set', prompt)
                 self.assertNotIn('Select seed to let Ax3l', prompt)
@@ -906,8 +923,8 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         await self.cycle()
         messages = {call.kwargs['parameter']: call.args[4][0].to_md()
                     for call in self.conversation.await_args_list}
-        self.assertIn('The chart shows the latest run.', messages['epsilon_pair'])
-        self.assertIn('The chart shows the golden run.', messages['learning_rate'])
+        self.assertIn('Chart: latest.', messages['epsilon_pair'])
+        self.assertIn('Chart: golden.', messages['learning_rate'])
         self.assertIn('different seed from the draft', messages['learning_rate'])
         evidence = json.loads(messages['learning_rate'].split('```json\n')[1].split('\n```')[0])
         self.assertFalse(evidence['reference_runs']['golden']['same_seed_as_draft'])

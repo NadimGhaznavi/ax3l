@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.14.1] - 2026-11-20 @ 22:24
+
 ### Summary
 
 Run 1,500-episode experiments with longer decision and grace countdowns.

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.20.0] - 2026-11-21 @ 11:51
+
 ### Summary
 
 Accept seed changes as soon as the LLM selects the seed option and keep image

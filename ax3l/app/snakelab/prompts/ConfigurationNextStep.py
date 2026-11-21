@@ -20,7 +20,7 @@ class ConfigurationNextStep(Prompt):
             instruction = "This draft already exists. Call select_parameter with a listed key to make it unique."
         else:
             instruction = "The draft starts from golden. Use the run data to choose a listed key with select_parameter."
-        text = [instruction, "Aim to beat golden's high score in 1500 episodes. Prefer same-seed evidence."]
+        text = [instruction, "Aim to beat golden's high score in 750 episodes. Prefer same-seed evidence."]
         if choices:
             text.append("Choose any subset in any order, at most once per setting. Change at least one value and "
                         "submit pairs together. Revise duplicates within the same setting.")

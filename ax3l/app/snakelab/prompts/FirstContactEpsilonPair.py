@@ -14,7 +14,7 @@ class FirstContactEpsilonPair(Prompt):
             "Initial controls the starting exploration probability. "
             "Decay controls how quickly exploration decreases across episodes; "
             "values closer to 1 preserve exploration longer. "
-            "Runs contain 1500 episodes. Epsilon snaps to zero below 0.001; "
+            "Runs contain 750 episodes. Epsilon snaps to zero below 0.001; "
             "EpsilonNice then becomes eligible. The defaults 0.96 and 0.97 make "
             "it eligible at episode 227. The full decay range remains available; "
             "slow decay may prevent Nice from activating during a run. "

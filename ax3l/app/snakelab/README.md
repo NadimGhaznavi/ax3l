@@ -11,7 +11,7 @@ a single value must differ, and at least one value in a pair must differ.
 The baseline builds on SnakeLab 3.0.4's `transformer-epsilon-nice.json` sample:
 a Transformer with hidden size 64, one encoder layer, four attention heads,
 and dropout 0.05. Training starts with four-frame sequences, batch size 64,
-learning rate 0.001, and target update rate (`tau`) 0.05. It runs 1500 episodes
+learning rate 0.001, and target update rate (`tau`) 0.05. It runs 750 episodes
 with required EpsilonNice starting at probability 0.05. The LLM chooses hidden
 sizes from 32 to 128 in multiples of 8, encoder depth from 1 to 3 layers, and
 dropout from 0 to 0.1 in steps of 0.01. Tau remains fixed at 0.05.

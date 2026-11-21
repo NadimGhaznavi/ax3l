@@ -13,7 +13,7 @@ from ax3l.app.snakelab.ParameterSpace import finite_choices
 class SimulationPolicyTests(unittest.TestCase):
     def test_required_defaults_and_independent_resolutions(self):
         config = SimulationConfiguration.defaults()
-        self.assertEqual(config['epochs'], 1500)
+        self.assertEqual(config['epochs'], 750)
         self.assertEqual(config['model']['type'], 'transformer')
         self.assertEqual(config['model']['heads'], 4)
         self.assertEqual(config['model']['hidden_size'], 64)

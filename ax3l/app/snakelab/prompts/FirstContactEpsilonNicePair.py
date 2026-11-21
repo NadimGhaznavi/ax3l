@@ -14,7 +14,7 @@ class FirstContactEpsilonNicePair(Prompt):
             "an immediately safe alternative to the model suggestion if one exists. "
             "EpsilonNice is required and its probability must remain positive. It only "
             "activates after ordinary epsilon expires; slow decay can leave it inactive "
-            "throughout a 1500-episode run. Choose an untested pair while keeping all "
+            "throughout a 750-episode run. Choose an untested pair while keeping all "
             "other settings fixed. Either value may remain unchanged. "
             'Call submit_pair_values with {"value_1": number, "value_2": integer}.'
         )

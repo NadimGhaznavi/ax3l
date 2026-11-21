@@ -68,7 +68,7 @@ class SimulationDataTests(unittest.TestCase):
         self.assertIn('Loss declined.', json.loads(pages['/latest/notes'])['summary'])
         self.assertEqual(json.loads(pages['/golden/training'])['training']['replay_max_frames'], 100000)
         self.assertIn('Different seed: historical context', pages['/best'])
-        self.assertEqual(json.loads(pages['/draft/game'])['epochs'], 1500)
+        self.assertEqual(json.loads(pages['/draft/game'])['epochs'], 750)
         self.assertEqual(json.loads(pages['/draft/exploration'])['epsilon_nice'], dict(probability=.05, steps=20))
         self.store.save_draft.assert_not_called()
         self.store.save_analysis.assert_not_called()

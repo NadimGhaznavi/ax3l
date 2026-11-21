@@ -6,14 +6,14 @@ layout: single
 
 # Complete-configuration experiments
 
-Qwen chooses which settings to adjust and when to run one 1500-episode SnakeLab
+Qwen chooses which settings to adjust and when to run one 750-episode SnakeLab
 simulation. It can research measured data before selecting a setting, then
 receives a chart when it can inform the value choice.
 
 ## Initial startup
 
 With an empty experiment, Ax3l submits the schema defaults once. The baseline
-builds on SnakeLab 3.0.4's `transformer-epsilon-nice.json` sample and runs 1500
+builds on SnakeLab 3.0.4's `transformer-epsilon-nice.json` sample and runs 750
 episodes with required EpsilonNice:
 
 | Setting | Initial value |

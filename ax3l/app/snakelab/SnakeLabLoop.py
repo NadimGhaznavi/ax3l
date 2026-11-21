@@ -217,7 +217,6 @@ async def optimize(llm, output, db, endpoint):
                     try:
                         await converse(llm, output, db, tools, [prompt],
                                        parameter=parameter, process_id=draft.draft_id,
-                                       decision_deadline=decision_deadline,
                                        conversation_deadline=decision_deadline + decision_grace_seconds,
                                        reset_on_expiry=not draft.selections)
                     except DecisionTimeExpired:

@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.15.0] - 2026-11-21 @ 05:06
+
+### Summary
+
+Keep LLM decision timing internal while preserving the Experiment Status countdown.
+
+### Removed
+
+- Remove timer instructions, remaining-time reminders, and expiry warnings from
+  LLM prompts. Keep decision and grace periods, automatic expiry actions, and
+  the web GUI countdown unchanged.
+
 ## [4.14.3] - 2026-11-21 @ 04:17
 
 ### Summary

@@ -74,11 +74,13 @@ contain scores, termination counts and percentages, activity counts, and
 settings. Notes from previously analyzed runs remain available.
 The data tool is available before the first parameter selection and during
 every next-step decision, so Qwen can research which setting to tweak.
-Qwen has a seven-minute budget to select a parameter and find values
+Ax3l internally allows seven minutes to select a parameter and find values
 that produce a unique configuration, or decide to run an already unique draft.
-After every data request, it receives the time remaining, including inference
-and lookup time. Rejected attempts keep the same countdown. An accepted unique
-change resets it to seven minutes for the next parameter or run decision.
+The timer includes inference and lookup time. Prompts and tool feedback do not
+mention the timer, remaining time, or expiry actions; the countdown remains
+visible in Experiment Status. Rejected attempts keep the same countdown.
+An accepted unique change resets it to seven minutes for the next parameter
+or run decision.
 Sending a choice prompt with a chart adds two minutes to the remaining decision
 budget and the Experiment Status deadline. This allowance is added once for
 that prompt; data reads and rejected values keep the extended deadline. A choice

@@ -24,7 +24,6 @@ class ConfigurationNextStep(Prompt):
         if choices:
             text.append("Choose any subset in any order, at most once per setting. Change at least one value and "
                         "submit pairs together. Revise duplicates within the same setting.")
-            text.append("The timer continues during value selection. A saved unique change resets it.")
         if "seed" in choices:
             text.append("Select seed to let Ax3l choose the next unused seed. On run, golden sets the new seed's "
                         "baseline even if it scores lower. Other changes run afterward against that baseline.")

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.15.0] - 2026-11-21 @ 05:06
+
 ### Summary
 
 Keep LLM decision timing internal while preserving the Experiment Status countdown.

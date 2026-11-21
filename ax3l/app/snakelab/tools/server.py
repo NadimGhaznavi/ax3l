@@ -51,7 +51,7 @@ async def submit_pair_values(value_1: StrictInt | StrictFloat,
     return await SubmitPairValues(endpoint).submit(draft_id, assigned_parameter, value_1, value_2)
 
 
-@mcp.tool(description="Select one parameter key from the prompt's available list.")
+@mcp.tool(description="Select one parameter key from the prompt's available list. Selecting seed immediately saves the next unused seed.")
 async def select_parameter(parameter: StrictStr) -> str:
     if assigned_parameter != REVISION_PARAMETER or not draft_id:
         raise ValueError("Ax3l must bind a parameter-selection conversation before choosing a setting")

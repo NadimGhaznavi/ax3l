@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.16.1] - 2026-11-21 @ 07:58
+
 ### Summary
 
 Align the bundled SnakeLab schema with signed empty move rewards.

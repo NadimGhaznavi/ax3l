@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Summary
 
-Shorten the live Snake Lab prompts for Qwen 3.5 9B.
+Shorten the live Snake Lab prompts for new Qwen 3.5 9B deployment.
 
 ### Changed
 

@@ -64,19 +64,14 @@ class ConfigurationChoice(Prompt):
             text.append(f"See {label} at /{chart_scope}/{page} in data_tool.")
         text.append("Use data_tool at /draft for saved choices or / for other runs.")
         if parameter == "seed":
-            text.append("Request a seed change using request_seed_change with no arguments. "
-                        "Ax3l increments the draft seed, skipping stored draft configurations and golden baselines. "
-                        "You do not choose a number. Other draft settings stay unchanged. "
-                        "The request saves the change without running a simulation or resetting the golden score. "
-                        "When the draft runs, Ax3l first runs golden with the new seed and accepts its score as the "
-                        "local golden baseline, even if lower. A seed-only draft stops there. Other saved changes "
-                        "then run on the new seed and must beat that baseline to become golden.")
+            text.append(f"Call {tool} with no arguments to save a seed change. "
+                        "Ax3l picks the next seed that avoids stored drafts and golden baselines. "
+                        "When you run the draft, Ax3l first reruns golden on the new seed. "
+                        "That score becomes the local baseline, even if lower. "
+                        "If you saved other changes, Ax3l then runs them against that baseline.")
         else:
-            text.append("Change at least one of this setting's current values to produce a unique complete configuration. "
-                        "If a proposal is a duplicate, submit different values for this same setting.")
-        text.append("This setting cannot be selected again in this experiment. "
-                    "After a unique choice, you can change another setting or run the configuration.")
-        text.append(f"Submit using {tool}.")
+            text.append(f"Use {tool} to change at least one value. "
+                        "If the full configuration already exists, try different values for this setting.")
         text.append(f"Measured data and current values:\n```json\n{json.dumps(evidence, allow_nan=False)}\n```")
         super().__init__("\n\n".join(text))
         self._png = png

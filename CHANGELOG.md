@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Shorten Qwen's Snake Lab configuration prompts.
+
+### Changed
+
+- Explain seed rotation when Qwen selects seed and keep the shared guide focused
+  on how to use run evidence.
+
 ## [4.11.4] - 2026-11-20 @ 05:03
 
 ### Summary

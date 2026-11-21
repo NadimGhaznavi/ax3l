@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
 from ax3l.app.Prompt import Prompt
-from ax3l.app.snakelab.ToolConversation import converse, DecisionTimeExpired, _time_reminder
+from ax3l.app.snakelab.ToolConversation import converse, DecisionTimeExpired
 from ax3l.app.snakelab.prompts.ConfigurationNextStep import ConfigurationNextStep
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
@@ -29,7 +29,7 @@ class ToolConversationTimingTests(unittest.IsolatedAsyncioTestCase):
                     reference=AsyncMock(return_value=dict(status='ok', page='Guide text.')),
                     data=AsyncMock())
 
-    async def test_countdown_updates_after_every_data_request_and_allows_decisions_after_expiry(self):
+    async def test_deadline_adds_no_timer_messages_during_research_or_rejections(self):
         tools, db = self.tools(), Mock()
         page = json.dumps(dict(high_score=20))
         tools.data.side_effect = [dict(status='ok', page=page),
@@ -42,25 +42,20 @@ class ToolConversationTimingTests(unittest.IsolatedAsyncioTestCase):
                                    reply('data_tool', {}),
                                    reply('data_tool', dict(url='/draft')),
                                    reply('select_parameter', dict(parameter='gamma'))]
-        with patch('ax3l.app.snakelab.ToolConversation.monotonic', side_effect=[100, 150.2, 240, 400, 450]):
-            result = await converse(llm, Path('/tmp'), db, tools, [Prompt('Research a setting.')],
-                                    parameter='revision', decision_deadline=400)
+        result = await converse(llm, Path('/tmp'), db, tools, [Prompt('Research a setting.')],
+                                parameter='revision', conversation_deadline=monotonic() + 300)
         self.assertEqual(result['status'], 'ok')
         self.assertEqual(tools.data.await_count, 3)
         tools.submit.assert_awaited_once_with(dict(parameter='gamma'))
         messages = json.loads(llm.complete.call_args.args[0])['messages']
-        reminders = [message['content'] for message in messages
-                     if message['role'] == 'user' and message['content'].startswith('Decision time remaining:')]
-        self.assertEqual([text.split('.')[0] for text in reminders], [
-            'Decision time remaining: 05:00', 'Decision time remaining: 04:10',
-            'Decision time remaining: 02:40', 'Decision time remaining: 00:00',
-            'Decision time remaining: 00:00'])
-        self.assertIn('Advisory budget expired', reminders[-1])
+        expected = ['Research a setting.', 'Unknown data path.',
+                    'Call data_tool with exactly these fields: url.']
+        self.assertEqual([message['content'] for message in messages if message['role'] == 'user'], expected)
         self.assertEqual([message['content'] for message in messages if message['role'] == 'tool'],
                          ['Guide text.', page, 'Rejected.', 'Rejected.', page])
         logged = [json.loads(call.args[3])['content'] for call in db.log.call_args_list
-                  if call.args[0] == 'prompt_sent' and call.kwargs['source_name'] == 'ToolConversation']
-        self.assertTrue(all(reminder in logged for reminder in reminders))
+                  if call.args[0] == 'prompt_sent']
+        self.assertEqual(logged, expected)
 
     async def test_conversations_without_a_deadline_receive_no_timer_messages(self):
         tools, llm = self.tools(), Mock(url='fixture')
@@ -73,33 +68,6 @@ class ToolConversationTimingTests(unittest.IsolatedAsyncioTestCase):
         messages = json.loads(llm.complete.call_args.args[0])['messages']
         self.assertEqual([message['content'] for message in messages if message['role'] == 'user'],
                          ['Initial prompt.'])
-
-    def test_unique_draft_reminders_show_the_five_minute_grace_period(self):
-        with patch('ax3l.app.snakelab.ToolConversation.monotonic', side_effect=[250, 400, 450, 700]):
-            reminders = [_time_reminder(400, 700)['content'] for _ in range(4)]
-        self.assertIn('Decision time remaining: 02:30', reminders[0])
-        self.assertIn('5-minute grace period', reminders[0])
-        self.assertIn('Grace time remaining: 05:00', reminders[1])
-        self.assertIn('Grace time remaining: 04:10', reminders[2])
-        self.assertIn('Grace time remaining: 00:00', reminders[3])
-        self.assertIn('run the saved unique draft', reminders[3])
-
-    def test_initial_reminders_explain_the_reset_without_offering_to_run_the_baseline(self):
-        with patch('ax3l.app.snakelab.ToolConversation.monotonic', side_effect=[100, 400, 700]):
-            reminders = [_time_reminder(400, 700, reset_on_expiry=True)['content'] for _ in range(3)]
-        self.assertIn('Decision time remaining: 05:00', reminders[0])
-        self.assertIn('5-minute grace period', reminders[0])
-        self.assertIn('Grace time remaining: 05:00', reminders[1])
-        self.assertIn('Grace time remaining: 00:00', reminders[2])
-        for reminder in reminders:
-            self.assertIn('restart the conversation and discard the pending choice', reminder)
-            self.assertNotIn('run the saved unique draft', reminder)
-
-    def test_reminders_derive_the_grace_duration_from_the_conversation_deadline(self):
-        with patch('ax3l.app.snakelab.ToolConversation.monotonic', side_effect=[100, 400]):
-            reminders = [_time_reminder(400, 490)['content'] for _ in range(2)]
-        self.assertIn('1.5-minute grace period', reminders[0])
-        self.assertIn('Grace time remaining: 01:30', reminders[1])
 
     async def test_initial_expiry_logs_a_reset_and_ignores_a_late_inference_reply(self):
         tools, llm, db = self.tools(), Mock(url='fixture'), Mock()
@@ -114,7 +82,7 @@ class ToolConversationTimingTests(unittest.IsolatedAsyncioTestCase):
         try:
             with self.assertRaises(DecisionTimeExpired):
                 await converse(llm, Path('/tmp'), db, tools, [Prompt('Research a setting.')],
-                               decision_deadline=now - 180, conversation_deadline=now + .03,
+                               conversation_deadline=now + .03,
                                reset_on_expiry=True)
         finally:
             release.set()
@@ -126,7 +94,7 @@ class ToolConversationTimingTests(unittest.IsolatedAsyncioTestCase):
         tools, llm, db = self.tools(), Mock(url='fixture'), Mock()
         with self.assertRaises(DecisionTimeExpired):
             await converse(llm, Path('/tmp'), db, tools, [Prompt('Decide.')],
-                           decision_deadline=0, conversation_deadline=0)
+                           conversation_deadline=0)
         llm.complete.assert_not_called()
         tools.submit.assert_not_awaited()
         self.assertEqual(db.log.call_args.args[2], 'INFO')
@@ -145,7 +113,7 @@ class ToolConversationTimingTests(unittest.IsolatedAsyncioTestCase):
         try:
             with self.assertRaises(DecisionTimeExpired):
                 await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('Decide.')],
-                               decision_deadline=now - 180, conversation_deadline=now + .03)
+                               conversation_deadline=now + .03)
         finally:
             release.set()
         tools.submit.assert_not_awaited()
@@ -161,7 +129,7 @@ class ToolConversationTimingTests(unittest.IsolatedAsyncioTestCase):
         now = monotonic()
         with self.assertRaises(DecisionTimeExpired):
             await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('Decide.')],
-                           decision_deadline=now - 180, conversation_deadline=now + .03)
+                           conversation_deadline=now + .03)
         tools.data.assert_awaited_once()
         tools.submit.assert_not_awaited()
 
@@ -171,7 +139,7 @@ class ToolConversationTimingTests(unittest.IsolatedAsyncioTestCase):
         now = monotonic()
         with self.assertRaisesRegex(TimeoutError, 'transport failed'):
             await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('Decide.')],
-                           decision_deadline=now + 300, conversation_deadline=now + 480)
+                           conversation_deadline=now + 480)
         tools.submit.assert_not_awaited()
 
     async def test_an_accepted_submission_finishes_without_cancellation_if_grace_expires_during_the_write(self):
@@ -187,18 +155,17 @@ class ToolConversationTimingTests(unittest.IsolatedAsyncioTestCase):
         tools.submit.side_effect = submit
         with patch('ax3l.app.snakelab.ToolConversation.monotonic', side_effect=lambda: current[0]):
             result = await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('Decide.')],
-                                    decision_deadline=300, conversation_deadline=480)
+                                    conversation_deadline=480)
         self.assertEqual(result['status'], 'ok')
         tools.submit.assert_awaited_once()
 
-    def test_next_step_prompts_explain_when_the_timer_resets_and_which_actions_are_available(self):
+    def test_next_step_prompts_explain_available_actions_without_mentioning_the_timer(self):
         draft = ConfigurationDraft('draft', 'gold', {}, SimulationConfiguration.defaults())
         for phase, selections in (('selecting_parameter', []), ('reviewing', ['gamma'])):
             draft.phase = phase
             draft.selections = selections
             text = ConfigurationNextStep(draft, [name for name in PARAMETER_ORDER if name not in selections]).to_md()
-            self.assertIn('The timer continues during value selection', text)
-            self.assertIn('A saved unique change resets it', text)
+            self.assertNotRegex(text.lower(), r'\b(timer|countdown|deadline|minutes?|seconds?|grace)\b')
             self.assertIn('select_parameter', text.split('\n\n')[0])
             self.assertEqual('run_simulation' in text, bool(selections))
             self.assertIn('Use data_tool at / for reference runs or /draft', text)

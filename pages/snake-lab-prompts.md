@@ -29,10 +29,11 @@ run decision, golden runs first on the new seed and sets the baseline even if
 its score is lower. If other settings changed, Ax3l tests them on the new seed
 and requires a higher score to promote the draft.
 
-The seven-minute decision timer spans setting selection and value choice. Ax3l
-shows the remaining time at the start and after each `data_tool` call. Saving
-a unique change resets the timer. A prompt with a chart adds two minutes to
-the remaining decision budget once; reads and rejected values keep that
+The internal seven-minute decision timer spans setting selection and value
+choice. Prompts and tool feedback do not mention the timer or its expiry actions.
+Experiment Status continues to display the countdown. Saving a unique change
+resets the timer. A prompt with a chart adds two minutes to the remaining
+decision budget once; reads and rejected values keep that
 extended deadline. After the configured grace period (seven minutes by default),
 Ax3l restarts the conversation if there is no saved change or runs the saved
 unique draft.

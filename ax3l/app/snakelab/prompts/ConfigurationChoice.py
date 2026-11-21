@@ -13,12 +13,12 @@ from ax3l.interface.KnowledgeBase import KnowledgeBase
 
 
 CHART_EVIDENCE = {
-    "loss": ("Faint lines show raw loss; bold lines show trailing means. "
-             "Gaps mean loss was unrecorded. Look for sustained rises and repeated spikes.",
+    "loss": ("Faint lines show raw loss and bold lines show trailing means. "
+             "Gaps mark missing loss. Look for sustained rises or repeated spikes.",
              ("episodes_with_loss",), "activity", "move and loss counts"),
-    "scores": ("Use the score trend to consider how quickly to reduce random moves.",
+    "scores": ("Use score trends to judge how quickly to reduce random moves.",
                ("mean_first_50_scores", "mean_last_50_scores", "epsilon_random_actions"), "scores", "score statistics"),
-    "distribution": ("Use the spread of scores to judge how reliably the snake found food.",
+    "distribution": ("Use score spread to judge how reliably the snake found food.",
                      ("median_score", "zero_score_episodes", "high_score_episodes"), "endings", "how episodes ended"),
 }
 
@@ -27,8 +27,16 @@ class ConfigurationChoice(Prompt):
     def __init__(self, draft: ConfigurationDraft, latest: SimulationAnalysis,
                  golden: SimulationAnalysis, chart_scope: str, png: bytes | None):
         parameter = draft.next_parameter
-        tool = ("request_seed_change" if parameter == "seed" else
-                "submit_pair_values" if parameter in PAIR_PARAMETERS else "submit_single_value")
+        if parameter == "seed":
+            text = ["Call request_seed_change with no arguments. Ax3l saves the next unused seed, skipping stored "
+                    "drafts and golden baselines. The draft still needs a run decision.",
+                    "When the draft runs, golden sets the new seed's baseline even if it scores lower. "
+                    "A seed-only draft ends there. Any other changes run on the new seed and must beat that baseline."]
+        else:
+            tool = "submit_pair_values" if parameter in PAIR_PARAMETERS else "submit_single_value"
+            text = [f"Change {CHOICE_LABELS[parameter]} with {tool}. Follow the tool's limits and change at least "
+                    "one value. If the complete draft is a duplicate, try different values for this setting.",
+                    KnowledgeBase().read("/selection")]
         seed = draft.config["seed"]
         references = {"golden": golden}
         if latest.run_id != golden.run_id:
@@ -43,7 +51,6 @@ class ConfigurationChoice(Prompt):
                 for scope, run in references.items()
             },
         }
-        text = [f"Choose {CHOICE_LABELS[parameter]}.", KnowledgeBase().read("/selection")]
         chart = CHOICE_CHARTS.get(parameter)
         if chart is not None:
             focus, fields, page, label = CHART_EVIDENCE[chart]
@@ -59,25 +66,10 @@ class ConfigurationChoice(Prompt):
                                 if golden.metrics["episodes_with_loss"] else
                                 "The golden run has no recorded loss to overlay.")
             if references[chart_scope].config["seed"] != seed:
-                text.append("This reference uses a different seed from the draft. "
-                            "Its measurements and chart are historical context for this choice.")
-            text.append(f"See {label} at /{chart_scope}/{page} in data_tool.")
-        text.append("Use data_tool at /draft for saved choices or / for other runs.")
-        if parameter == "seed":
-            text.append("Request a seed change using request_seed_change with no arguments. "
-                        "Ax3l increments the draft seed, skipping stored draft configurations and golden baselines. "
-                        "You do not choose a number. Other draft settings stay unchanged. "
-                        "The request saves the change without running a simulation or resetting the golden score. "
-                        "When the draft runs, Ax3l first runs golden with the new seed and accepts its score as the "
-                        "local golden baseline, even if lower. A seed-only draft stops there. Other saved changes "
-                        "then run on the new seed and must beat that baseline to become golden.")
-        else:
-            text.append("Change at least one of this setting's current values to produce a unique complete configuration. "
-                        "If a proposal is a duplicate, submit different values for this same setting.")
-        text.append("This setting cannot be selected again in this experiment. "
-                    "After a unique choice, you can change another setting or run the configuration.")
-        text.append(f"Submit using {tool}.")
-        text.append(f"Measured data and current values:\n```json\n{json.dumps(evidence, allow_nan=False)}\n```")
+                text.append("This reference uses a different seed from the draft. Treat it as historical context.")
+            text.append(f"Use data_tool at /{chart_scope}/{page} for {label}.")
+        text.append("Use data_tool at /draft for saved choices or / for reference runs.")
+        text.append(f"Measured data and current values\n```json\n{json.dumps(evidence, allow_nan=False)}\n```")
         super().__init__("\n\n".join(text))
         self._png = png
 

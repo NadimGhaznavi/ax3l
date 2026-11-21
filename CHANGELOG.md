@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.12.0] - 2026-11-20 @ 20:15
+
+### Summary
+
+Shorten the live Snake Lab prompts for new Qwen 3.5 9B deployment.
+
+### Changed
+
+- Lead with the current decision and trim repeated text from prompts, tool
+  descriptions, and countdown messages while keeping the evidence and tool
+  arguments intact.
+
 ## [4.11.4] - 2026-11-20 @ 05:03
 
 ### Summary

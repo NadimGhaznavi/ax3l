@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.16.0] - 2026-11-21 @ 07:42
+
 ### Summary
 
 Let the LLM tune empty space and collision rewards.

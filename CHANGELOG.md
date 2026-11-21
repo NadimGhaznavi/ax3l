@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.14.3] - 2026-11-21 @ 04:17
+
 ### Summary
 
 Fit the Score Distribution histogram's Y axis to its tallest bar.

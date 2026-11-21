@@ -4,7 +4,7 @@ from time import time
 
 from ax3l.app.snakelab.ParameterSpace import parameter_paths
 from ax3l.constants.DLabel import FIELD_TO_DESCRIPTION_MAP, FIELD_TO_LABEL_MAP
-from ax3l.constants.DChoice import REVISION_PARAMETER, DECISION_GRACE_SECONDS
+from ax3l.constants.DChoice import REVISION_PARAMETER
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
@@ -101,7 +101,7 @@ def _phase(draft: ConfigurationDraft, run: dict | None, comparison: dict | None,
 def experiment_status(draft: ConfigurationDraft | None, run: dict | None = None,
                       golden: dict | None = None, comparison: dict | None = None,
                       analysis: SimulationAnalysis | None = None,
-                      activity: dict[str, dict] | None = None) -> dict:
+                      activity: dict[str, dict] | None = None, *, decision_grace_seconds: int) -> dict:
     if draft is None:
         return {"draft": None}
     phase, detail = _phase(draft, run, comparison, analysis)
@@ -123,7 +123,7 @@ def experiment_status(draft: ConfigurationDraft | None, run: dict | None = None,
     countdown = None
     if draft.phase in ("choosing", "selecting_parameter", "reviewing") and draft.decision_expires_at is not None:
         countdown = dict(remaining_seconds=draft.decision_expires_at - time(),
-                         grace_seconds=DECISION_GRACE_SECONDS,
+                         grace_seconds=decision_grace_seconds,
                          expiry_action="run" if draft.selections else "reset")
     return dict(
         draft=draft, rows=rows, phase=phase, detail=detail, countdown=countdown,

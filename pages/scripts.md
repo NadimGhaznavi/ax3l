@@ -44,8 +44,8 @@ inference settings belong to LlamaSrv.
 
 Install and upgrade create `/opt/prod/ax3l/conf/ax3l.json` if missing and
 preserve valid existing files. The generated file contains both listener
-entries and the outbound `llamasrv_url`, whose default is
-`http://127.0.0.1:51001`. CMDB discovers the listener defaults in code;
+entries, the outbound `llamasrv_url` (default `http://127.0.0.1:51001`), and
+`decision_grace_seconds` (default `300`). CMDB discovers the listener defaults in code;
 LlamaSrv's ports belong to LlamaSrv's inventory.
 
 For example, use a shared LlamaSrv on Wintermute and override the report port:
@@ -53,6 +53,7 @@ For example, use a shared LlamaSrv on Wintermute and override the report port:
 ```json
 {
   "llamasrv_url": "http://wintermute:51001",
+  "decision_grace_seconds": 300,
   "network": {
     "report": {
       "port": 28871
@@ -67,6 +68,12 @@ defaults. `llamasrv_url` accepts an HTTP(S) base URL without credentials,
 path, query, or fragment; Ax3l appends `/v1/chat/completions`. Unknown settings,
 invalid addresses or ports, malformed URLs, and malformed JSON fail with a
 field-specific error.
+
+`decision_grace_seconds` must be a positive integer. It sets the grace countdown
+after the five-minute LLM decision budget, before Ax3l resets an initial
+conversation or runs a saved unique draft. The default grace period is five
+minutes, including for existing files that omit this setting. The optimizer and
+reporting service load it at startup; restart both services after changing it.
 
 Edit the configuration and apply it from the current release checkout:
 

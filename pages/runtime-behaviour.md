@@ -117,7 +117,9 @@ Qwen is asked to select a parameter and find a unique setting, or decide to run
 the current unique draft, within five minutes. Each data request is followed by
 an updated time remaining. Parameter selection and duplicate-value retries share
 the countdown; every accepted unique change resets it to five minutes for the
-next parameter or run decision. Expiry starts a three-minute grace period.
+next parameter or run decision. Expiry starts a grace period configured by
+`decision_grace_seconds` in `/opt/prod/ax3l/conf/ax3l.json`, defaulting to 300
+seconds (five minutes).
 Before the first unique change, the end of grace discards the tentative parameter
 selection and starts a fresh conversation from the initial prompt with a new
 five-minute budget. Earlier messages, research, reasoning, and rejected proposals
@@ -133,9 +135,10 @@ the experiment details and table. The countdown occupies the right side of that
 header, stacking below the title on small screens. The same header remains visible
 in active, inactive, and empty states. The timer ticks every second using the
 current decision deadline. At zero it turns amber.
-With a saved unique draft, it switches to a three-minute **Simulation Start
+With a saved unique draft, it switches to a **Simulation Start
 Countdown** with **Time remaining** below the number. Before the first unique
-change, it instead shows a three-minute **Conversation Reset Countdown**.
+change, it instead shows a **Conversation Reset Countdown**. Both use the
+configured grace period, which defaults to five minutes.
 It resets after an accepted unique change and becomes inactive when the
 configuration is submitted. The table scrolls horizontally on its own, keeping
 the experiment details and countdown visible; refreshes retain its scroll position.

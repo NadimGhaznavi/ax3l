@@ -37,6 +37,7 @@ class ConfigurationTests(unittest.TestCase):
         values = json.loads(self.path.read_text())
         self.assertEqual(set(values['network']), {'report', 'zmq'})
         self.assertEqual(values['llamasrv_url'], 'http://127.0.0.1:51001')
+        self.assertEqual(values['decision_grace_seconds'], 300)
         self.assertEqual(self.path.stat().st_mode & 0o777, 0o644)
         self.assertEqual(self.path.parent.stat().st_mode & 0o777, 0o755)
 
@@ -49,14 +50,23 @@ class ConfigurationTests(unittest.TestCase):
         self.assertEqual(self.read()['report'], ('127.0.0.2', 62000))
 
     def test_partial_overrides_and_missing_file_use_independent_defaults(self):
+        self.assertEqual(Configuration(self.path).decision_grace_seconds, 300)
         defaults = self.read()
         self.write({'network': {'report': {'port': 62000}}})
+        self.assertEqual(Configuration(self.path).decision_grace_seconds, 300)
         configured = self.read()
         self.assertEqual(configured['report'], ('0.0.0.0', 62000))
         self.assertEqual(defaults['report'], ('0.0.0.0', 28870))
         self.assertEqual(configured['zmq'], defaults['zmq'])
         configured['zmq'] = ('127.0.0.2', 12345)
         self.assertEqual(self.read()['zmq'], defaults['zmq'])
+
+    def test_decision_grace_override_is_loaded_and_preserved_on_reinstall(self):
+        self.write({'decision_grace_seconds': 90})
+        original = self.path.read_bytes()
+        Configuration.install()
+        self.assertEqual(self.path.read_bytes(), original)
+        self.assertEqual(Configuration(self.path).decision_grace_seconds, 90)
 
     def test_wildcard_binding_has_loopback_destinations(self):
         self.write({'network': {'zmq': {'interface': '0.0.0.0'}}})
@@ -85,6 +95,8 @@ class ConfigurationTests(unittest.TestCase):
             cases.append(({'network': {'report': {'interface': interface}}}, 'network.report.interface'))
         for port in (None, True, '1234', 0, -1, 65536, 1.5):
             cases.append(({'network': {'report': {'port': port}}}, 'network.report.port'))
+        for seconds in (None, True, False, '300', 0, -1, 1.5, [], {}):
+            cases.append(({'decision_grace_seconds': seconds}, 'decision_grace_seconds'))
         for values, field in cases:
             with self.subTest(values=values):
                 self.write(values)

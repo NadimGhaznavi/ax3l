@@ -76,7 +76,9 @@ that produce a unique configuration, or decide to run an already unique draft.
 After every data request, it receives the time remaining, including inference
 and lookup time. Rejected attempts keep the same countdown. An accepted unique
 change resets it to five minutes for the next parameter or run decision.
-Expiry gives Qwen a three-minute grace period. Before the first unique change,
+Expiry gives Qwen a grace period controlled by `decision_grace_seconds` in
+`/opt/prod/ax3l/conf/ax3l.json`, defaulting to 300 seconds (five minutes).
+Before the first unique change,
 the end of grace restarts from the initial prompt in a fresh conversation with
 a fresh five-minute budget. The tentative parameter selection, prior research,
 reasoning, and rejected proposals are discarded. Once a unique draft is saved,

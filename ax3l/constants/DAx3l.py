@@ -4,6 +4,7 @@ from typing import Final
 class DAx3l:
     RAW_LOGS_ENABLED: Final[bool] = False
     HTTP_TIMEOUT_SECONDS: Final[int] = 480
+    DECISION_GRACE_SECONDS: Final[int] = 5 * 60
 
     VERSION: Final[str] = "4.12.0"
     CMDB_SUBTYPE: Final[str] = "Lab Experiment"

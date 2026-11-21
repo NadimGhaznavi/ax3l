@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Make the LLM grace countdown configurable and extend its default to five minutes.
+
+### Changed
+
+- Read `decision_grace_seconds` from `conf/ax3l.json`, defaulting to 300 seconds,
+  for conversation resets and automatic simulation starts. Include the setting
+  in newly generated configuration files and use it for LLM reminders and the
+  Experiment Status countdown.
+
 ## [4.12.0] - 2026-11-20 @ 20:15
 
 ### Summary

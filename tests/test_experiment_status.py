@@ -4,6 +4,8 @@ from copy import deepcopy
 from datetime import datetime, timedelta
 import json
 import os
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from threading import Thread
 import unittest
 from unittest.mock import patch
@@ -13,6 +15,7 @@ from uuid import uuid4
 
 from ax3l.activity.ExperimentStatus import _elapsed, experiment_status
 from ax3l.constants.DChoice import REVISION_PARAMETER
+from ax3l.constants.DAx3l import DAx3l
 from ax3l.app.DbMgr import DbMgr
 from ax3l.app.snakelab.ExperimentDb import ExperimentDb
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
@@ -27,7 +30,7 @@ class ExperimentStatusTests(unittest.TestCase):
         self.golden = dict(status='completed', high_score=20, config=deepcopy(self.draft.config))
 
     def report(self, **kwargs):
-        return experiment_status(self.draft, golden=self.golden, **kwargs)
+        return experiment_status(self.draft, golden=self.golden, decision_grace_seconds=300, **kwargs)
 
     def test_elapsed_uses_minutes_and_seconds_until_one_hour(self):
         for seconds, expected in [
@@ -46,12 +49,12 @@ class ExperimentStatusTests(unittest.TestCase):
                 for now, remaining in ((850.5, 149.5), (1030, -30), (1180, -180)):
                     with patch('ax3l.activity.ExperimentStatus.time', return_value=now):
                         self.assertEqual(self.report()['countdown'], dict(
-                            remaining_seconds=remaining, grace_seconds=180, expiry_action='reset'))
+                            remaining_seconds=remaining, grace_seconds=300, expiry_action='reset'))
         self.draft.selections = ['layers']
         for now, remaining in ((850, 150), (1030, -30), (1180, -180)):
             with self.subTest(now=now), patch('ax3l.activity.ExperimentStatus.time', return_value=now):
                 self.assertEqual(self.report()['countdown'], dict(
-                    remaining_seconds=remaining, grace_seconds=180, expiry_action='run'))
+                    remaining_seconds=remaining, grace_seconds=300, expiry_action='run'))
 
     def test_countdown_is_inactive_outside_decisions_or_without_a_saved_deadline(self):
         self.assertIsNone(self.report()['countdown'])
@@ -251,6 +254,11 @@ class ExperimentStatusTests(unittest.TestCase):
 
 class ExperimentStatusHttpTests(unittest.TestCase):
     def setUp(self):
+        root = self.enterContext(TemporaryDirectory())
+        self.enterContext(patch.object(DAx3l, 'BASE_DIR', root))
+        configuration_path = Path(root) / DAx3l.CONFIG_FILE
+        configuration_path.parent.mkdir()
+        configuration_path.write_text(json.dumps({'decision_grace_seconds': 90}))
         self.db = self.enterContext(patch('ax3l.server.ReportingServer.DbMgr')).return_value
         self.experiments = self.enterContext(patch('ax3l.server.ReportingServer.ExperimentDb')).return_value
         self.snake = self.enterContext(patch('ax3l.server.ReportingServer.SnakeLab')).return_value
@@ -346,12 +354,12 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         self.assertLess(page.index('id="llm-countdown"'), page.index('<table class="status-checklist"'))
         self.assertIn('LLM countdown', page)
         self.assertEqual(json.loads(page.split("data-countdown='", 1)[1].split("'", 1)[0]),
-                         dict(remaining_seconds=100.5, grace_seconds=180, expiry_action='reset'))
+                         dict(remaining_seconds=100.5, grace_seconds=90, expiry_action='reset'))
         self.draft.phase, self.draft.selections = 'reviewing', ['layers']
         with patch('ax3l.activity.ExperimentStatus.time', return_value=1030.5):
             page = self.get()
         self.assertEqual(json.loads(page.split("data-countdown='", 1)[1].split("'", 1)[0]),
-                         dict(remaining_seconds=-30, grace_seconds=180, expiry_action='run'))
+                         dict(remaining_seconds=-30, grace_seconds=90, expiry_action='run'))
         self.draft.phase = 'ready'
         page = self.get()
         self.assertIn("data-countdown='null'", page)

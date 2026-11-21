@@ -40,8 +40,9 @@ def render_distribution(scores: dict[int, int | None]) -> bytes:
     all_counts = Counter(score for score in scores.values() if score is not None)
     low = min(all_counts, default=0) // 5 * 5
     high = (max(all_counts, default=0) + 4) // 5 * 5
-    y_step = tick_step(max(all_counts.values(), default=0), intervals=5)
-    ceiling = y_step * 5
+    maximum_count = max(all_counts.values(), default=0)
+    y_step = tick_step(maximum_count, intervals=5)
+    ceiling = max(y_step, (maximum_count + y_step - 1) // y_step * y_step)
     x_step = tick_step(high - low)
     fonts = {size: ImageFont.truetype(str(FONT), size) for size in (11, 12, 14, 15, 17)}
     left, top, right, bottom = PLOT
@@ -57,8 +58,7 @@ def render_distribution(scores: dict[int, int | None]) -> bytes:
         draw.text((24, 16), 'Score Distribution', font=fonts[17], fill='#d5dfeb')
         draw.text((24, 56), label, font=fonts[14], fill='#d5dfeb')
         draw.rectangle(PLOT, fill='#151f2b')
-        for tick in range(6):
-            value = tick * y_step
+        for value in range(0, ceiling + 1, y_step):
             y = bottom - (bottom - top) * value / ceiling
             draw.line((left, y, right, y), fill='#40566e')
             draw.text((left - 10, y), f'{value:,}', anchor='rm', font=fonts[11], fill='#a7b8cb')

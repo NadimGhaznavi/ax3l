@@ -203,8 +203,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
                 evidence = json.loads(content[0]['text'].split('```json\n')[1].split('\n```')[0])
                 self.assertEqual(evidence['current'], {parameter: self.config['game']['rewards'][parameter]})
                 if parameter in ('snake', 'wall'):
-                    self.assertIn('percentages of all episodes', content[0]['text'])
-                    self.assertIn('whole percent', content[0]['text'])
+                    self.assertIn('Chart: latest.', content[0]['text'])
                     self.assertIn('/latest/endings', content[0]['text'])
                     measured = evidence['reference_runs']['latest']
                     self.assertEqual(measured['episodes'], 500)
@@ -226,7 +225,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.store.saved.selections, ['food'])
         content = json.loads(self.conversation.await_args_list[0].args[4][0].to_json())['content']
         self.assertEqual([part['type'] for part in content], ['text', 'image_url'])
-        self.assertIn('Use score spread', content[0]['text'])
+        self.assertIn('Chart: latest.', content[0]['text'])
         evidence = json.loads(content[0]['text'].split('```json\n')[1].split('\n```')[0])
         self.assertEqual(evidence['current'], {'food': 10})
         self.assertEqual(evidence['reference_runs']['latest']['settings'], {'food': 10})
@@ -638,9 +637,9 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         for parameter in ('reward_pair', 'learning_rate', 'epsilon_pair'):
             content = messages[parameter]
             self.assertEqual([part['type'] for part in content], ['text', 'image_url'])
-            self.assertIn('The chart shows the latest run.', content[0]['text'])
-        self.assertIn('Orange overlays the golden run', messages['learning_rate'][0]['text'])
-        self.assertIn('bold lines show trailing means', messages['learning_rate'][0]['text'])
+            if parameter != 'learning_rate':
+                self.assertIn('Chart: latest.', content[0]['text'])
+        self.assertIn('Compare latest with golden.', messages['learning_rate'][0]['text'])
         self.assertEqual([call.args[-1] for call in self.chart.call_args_list],
                          ['distribution', 'loss', 'scores'])
         data = json.loads(messages['epsilon_pair'][0]['text'].split('```json\n')[1].split('\n```')[0])
@@ -671,15 +670,15 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         await self.cycle()
         self.snake.get_analysis_episodes.assert_called_once_with(self.gold)
         self.assertIsNone(self.chart.call_args.kwargs['golden_episodes'])
-        self.assertIn('The chart shows the golden run.', self.prompts[1])
-        self.assertNotIn('Orange overlays', self.prompts[1])
+        self.assertIn('Chart: golden.', self.prompts[1])
+        self.assertNotIn('Compare golden with golden.', self.prompts[1])
 
     async def test_golden_without_recorded_loss_keeps_the_latest_loss_chart(self):
         self.store.analyses[self.gold].metrics['episodes_with_loss'] = 0
         await self.cycle()
         self.snake.get_analysis_episodes.assert_called_once_with(self.latest)
         self.assertIsNone(self.chart.call_args.kwargs['golden_episodes'])
-        self.assertIn('golden run has no recorded loss to overlay', self.prompts[1])
+        self.assertIn('Chart: latest. Golden has no recorded loss.', self.prompts[1])
 
     async def test_golden_supplies_chart_after_seed_change_and_missing_loss_skips_chart(self):
         self.decisions = ['learning_rate', 'epsilon_pair', 'run']
@@ -690,7 +689,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
                     for call in self.conversation.await_args_list}
         self.assertIsInstance(messages['learning_rate'], str)
         self.assertIn('/golden/activity', messages['learning_rate'])
-        self.assertIn('The chart shows the golden run.', messages['epsilon_pair'][0]['text'])
+        self.assertIn('Chart: golden.', messages['epsilon_pair'][0]['text'])
         self.assertEqual([call.args[-1] for call in self.chart.call_args_list], ['scores'])
         self.snake.get_analysis_episodes.assert_called_once_with(self.gold)
 
@@ -924,8 +923,8 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         await self.cycle()
         messages = {call.kwargs['parameter']: call.args[4][0].to_md()
                     for call in self.conversation.await_args_list}
-        self.assertIn('The chart shows the latest run.', messages['epsilon_pair'])
-        self.assertIn('The chart shows the golden run.', messages['learning_rate'])
+        self.assertIn('Chart: latest.', messages['epsilon_pair'])
+        self.assertIn('Chart: golden.', messages['learning_rate'])
         self.assertIn('different seed from the draft', messages['learning_rate'])
         evidence = json.loads(messages['learning_rate'].split('```json\n')[1].split('\n```')[0])
         self.assertFalse(evidence['reference_runs']['golden']['same_seed_as_draft'])

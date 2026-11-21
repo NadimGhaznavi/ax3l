@@ -43,10 +43,7 @@ class LossPlot(DynamicPrompt):
         figure.update_xaxes(**axis_ticks(figure.data[0].x))
         png = figure.to_image(format="png", scale=DLossPlot.SCALE)
         self._image_url = "data:image/png;base64," + base64.b64encode(png).decode("ascii")
-        self._content = (
-            f"Per-episode training loss for simulation {self._run_id}. "
-            "Gaps indicate episodes without a recorded training loss."
-        )
+        self._content = f"Run: {self._run_id}."
 
     def to_json(self) -> str:
         return json.dumps({

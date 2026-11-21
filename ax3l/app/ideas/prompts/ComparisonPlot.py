@@ -36,8 +36,4 @@ class ComparisonPlot(LossPlot):
         figure.update_xaxes(**axis_ticks(value for trace in figure.data for value in trace.x))
         png = figure.to_image(format="png", scale=DLossPlot.SCALE)
         self._image_url = "data:image/png;base64," + base64.b64encode(png).decode("ascii")
-        self._content = (
-            f"Episode loss comparison: golden run {self._run_id} versus latest run {self._latest_run_id}. "
-            "The golden curve is the baseline from before this comparison, even if the latest run won. "
-            "Gaps indicate episodes without a recorded loss."
-        )
+        self._content = "Compare latest with golden."

@@ -114,7 +114,10 @@ Ax3l's reporting and ZeroMQ bindings are declared in `DAx3l.CMDB_NETWORK` and ov
 file once per process through `Network`. Installation and the network restart
 helper render Ax3l's service units from those same values. The outbound
 `llamasrv_url` is configured separately in the same file and read by the
-optimization process at startup. See [network configuration](/pages/scripts.html#network-configuration).
+optimization process at startup. The same file sets `decision_grace_seconds`,
+defaulting to 300 seconds, which the optimizer and reporting service load at
+startup to keep conversation deadlines and the displayed grace countdown aligned.
+See [network configuration](/pages/scripts.html#network-configuration).
 
 ## Watchdog service
 

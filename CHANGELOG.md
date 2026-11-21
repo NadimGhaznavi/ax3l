@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.16.1] - 2026-11-21 @ 07:58
+
+### Summary
+
+Align the bundled SnakeLab schema with signed empty move rewards.
+
+### Changed
+
+- Update the bundled server schema to accept empty rewards from -2 to +2 and
+  verify the new reward ranges against both Ax3l and SnakeLab validation.
+
 ## [4.16.0] - 2026-11-21 @ 07:42
 
 ### Summary

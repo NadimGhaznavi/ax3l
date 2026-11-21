@@ -125,6 +125,30 @@ class ScoreDistributionTests(unittest.TestCase):
             render_distribution(scores)
         self.assertEqual(ticks, [['0', '30', '60', '90', '120', '150']] * 23)
 
+    def test_y_axis_rounds_tallest_bar_count_up_to_a_tick(self):
+        original = ImageDraw.ImageDraw.text
+        for count, expected in ((0, ['0', '5']), (2, ['0', '5']), (5, ['0', '5']),
+                                (6, ['0', '5', '10']), (26, ['0', '10', '20', '30'])):
+            with self.subTest(count=count):
+                scores = {number: 35 for number in range(1, count + 1)}
+                ticks = []
+                def record(draw, xy, text, *args, **kwargs):
+                    if text == 'Score Distribution':
+                        ticks.append([])
+                    if xy[0] == PLOT[0] - 10:
+                        ticks[-1].append(text)
+                    return original(draw, xy, text, *args, **kwargs)
+                with patch.object(ImageDraw.ImageDraw, 'text', record):
+                    data = render_distribution(scores)
+                self.assertEqual(ticks, [expected] * 2)
+                if count:
+                    gif = Image.open(BytesIO(data))
+                    gif.seek(gif.n_frames - 1)
+                    image = gif.convert('RGB')
+                    x = int(PLOT[0] + (PLOT[2] - PLOT[0]) / 2)
+                    y = PLOT[3] - (PLOT[3] - PLOT[1]) // 4
+                    self.assertEqual(image.getpixel((x, y)), (76, 155, 232))
+
     def test_rare_scores_remain_visible_with_large_all_run_counts(self):
         scores = {number: 0 for number in range(1, 1001)}
         scores[1001] = 100

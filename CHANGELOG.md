@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.14.3] - 2026-11-21 @ 04:17
+
+### Summary
+
+Fit the Score Distribution histogram's Y axis to its tallest bar.
+
+### Fixed
+
+- Round the Y-axis maximum up to the first tick at or above the largest score count,
+  retaining the same scale across all animation frames and a minimum of five.
+
 ## [4.14.2] - 2026-11-20 @ 22:28
 
 ### Summary

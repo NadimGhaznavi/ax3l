@@ -14,6 +14,7 @@ For value choices, `choose-snake-setting` tells Qwen how to weigh the evidence.
 | --- | --- |
 | `ConfigurationNextStep` | Lists available keys and current values. Gives Qwen the option to run once the draft is unique. |
 | `ConfigurationChoice` | Names the submission tool and supplies current values, reference scores, and data paths. Learning rate, epsilon, and distance rewards can include a chart. |
+| `EpsilonNiceChoice` | Adds a compact definition of the custom EpsilonNice exploration rule when choosing its probability and steps. |
 | `InvalidValue` | Explains why Ax3l rejected a value. |
 | `NoDupes` | Identifies the duplicate proposal and asks Qwen to try different values for the same setting. |
 

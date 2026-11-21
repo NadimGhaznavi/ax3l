@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Explain the custom EpsilonNice exploration rule when choosing its pair.
+
+### Added
+
+- Add a specialized EpsilonNice choice prompt with a compact definition of
+  activation, detour probability and duration, safe moves, and episode resets.
+
 ## [4.13.0] - 2026-11-20 @ 21:12
 
 ### Summary

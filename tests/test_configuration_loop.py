@@ -185,6 +185,36 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.snake.is_config_unique.call_count, 1)
         self.snake.submit_simulation.assert_called_once()
 
+    async def test_epsilon_nice_choice_includes_custom_rule_and_pair_evidence(self):
+        self.decisions = ['epsilon_nice_pair', 'gamma', 'run']
+        await self.cycle()
+        prompts = {call.kwargs['parameter']: call.args[4][0]
+                   for call in self.conversation.await_args_list}
+        prompt = prompts['epsilon_nice_pair']
+        content = json.loads(prompt.to_json())['content']
+        self.assertEqual(prompt.source_name, 'EpsilonNiceChoice')
+        for text in ('custom exploration rule', 'after ordinary epsilon expires',
+                     'Probability (value_1)', 'eligible non-detour move', 'next move',
+                     'Steps (value_2)', 'duration in moves', 'immediately safe alternative',
+                     "model's suggestion if available", 'reset each episode', 'submit_pair_values'):
+            self.assertIn(text, content)
+        evidence = json.loads(content.split('```json\n')[1].split('\n```')[0])
+        self.assertEqual(evidence['current'], self.config['epsilon_nice'])
+        self.assertEqual(evidence['reference_runs']['golden']['settings'], self.config['epsilon_nice'])
+        self.assertEqual(evidence['reference_runs']['latest']['high_score'], 10)
+        self.assertNotIn('custom exploration rule', prompts['gamma'].to_md())
+        self.assertEqual(self.snake.submit_simulation.call_args.args[0]['epsilon_nice'],
+                         dict(probability=.01, steps=40))
+
+    async def test_resumed_epsilon_nice_choice_keeps_custom_rule_context(self):
+        self.store.saved = self.draft(phase='choosing', parameter='epsilon_nice_pair')
+        self.decisions = ['run']
+        await self.cycle()
+        self.assertEqual(self.trace(), ['epsilon_nice_pair', REVISION_PARAMETER])
+        prompt = self.conversation.await_args_list[0].args[4][0]
+        self.assertIn('custom exploration rule', json.loads(prompt.to_json())['content'])
+        self.assertEqual(self.store.saved.selections, ['epsilon_nice_pair'])
+
     async def test_configured_grace_applies_to_selection_values_and_run_decisions(self):
         self.configuration_path.parent.mkdir()
         self.configuration_path.write_text(json.dumps({'decision_grace_seconds': 90}))

@@ -19,8 +19,7 @@ dropout from 0 to 0.1 in steps of 0.01. Tau remains fixed at 0.05.
 Empty space rewards accept any number from -2 to +2, defaulting to 0.
 Snake and wall collision rewards each accept any number from -20 to 0,
 defaulting to -10. Food remains +10 and the move-limit penalty remains -10.
-The bundled SnakeLab 3.0.4 server schema limits empty rewards to zero or below;
-positive values require an updated SnakeLab server that accepts them.
+Positive empty rewards require deployment of SnakeLab's updated v2 schema.
 `SimulationConfiguration` owns defaults, schema validation, and the
 non-positive-sum reward-pair rule. Qwen requests seed changes without choosing
 a number; Ax3l increments the seed, skipping complete configurations stored in

@@ -99,6 +99,9 @@ class SimulationPolicyTests(unittest.TestCase):
                 SimulationConfiguration.value(('epsilon_nice', 'probability'), value)
 
     def test_move_and_collision_rewards_accept_boundaries_and_fractional_values(self):
+        root = Path(__file__).resolve().parents[1]
+        upstream = Draft202012Validator(json.loads(
+            (root / 'pages/snake-lab/simulation-config-v2.schema.json').read_text()))
         for field, values in (('empty', (-2, -1.25, 0, .25, 2)),
                               ('snake', (-20, -2.5, 0)), ('wall', (-20, -2.5, 0))):
             for value in values:
@@ -108,6 +111,7 @@ class SimulationPolicyTests(unittest.TestCase):
                     config = SimulationConfiguration.defaults()
                     config['game']['rewards'][field] = value
                     SimulationConfiguration.validate(config)
+                    upstream.validate(config)
 
     def test_reward_limits_apply_to_choices_and_complete_configurations(self):
         for field, values in (('empty', (-2.001, 2.001)),

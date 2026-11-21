@@ -11,7 +11,7 @@ a single value must differ, and at least one value in a pair must differ.
 The baseline builds on SnakeLab 3.0.4's `transformer-epsilon-nice.json` sample:
 a Transformer with hidden size 64, one encoder layer, four attention heads,
 and dropout 0.05. Training starts with four-frame sequences, batch size 64,
-learning rate 0.001, and target update rate (`tau`) 0.05. It runs 500 episodes
+learning rate 0.001, and target update rate (`tau`) 0.05. It runs 1500 episodes
 with required EpsilonNice starting at probability 0.05. The LLM chooses hidden
 sizes from 32 to 128 in multiples of 8, encoder depth from 1 to 3 layers, and
 dropout from 0 to 0.1 in steps of 0.01. Tau remains fixed at 0.05.
@@ -74,16 +74,21 @@ contain scores, termination counts and percentages, activity counts, and
 settings. Notes from previously analyzed runs remain available.
 The data tool is available before the first parameter selection and during
 every next-step decision, so Qwen can research which setting to tweak.
-Qwen has a five-minute budget to select a parameter and find values
+Qwen has a seven-minute budget to select a parameter and find values
 that produce a unique configuration, or decide to run an already unique draft.
 After every data request, it receives the time remaining, including inference
 and lookup time. Rejected attempts keep the same countdown. An accepted unique
-change resets it to five minutes for the next parameter or run decision.
+change resets it to seven minutes for the next parameter or run decision.
+Sending a choice prompt with a chart adds two minutes to the remaining decision
+budget and the Experiment Status deadline. This allowance is added once for
+that prompt; data reads and rejected values keep the extended deadline. A choice
+without an image receives no extra time, including learning rate when no loss
+is recorded.
 Expiry gives Qwen a grace period controlled by `decision_grace_seconds` in
-`/opt/prod/ax3l/conf/ax3l.json`, defaulting to 300 seconds (five minutes).
+`/opt/prod/ax3l/conf/ax3l.json`, defaulting to 420 seconds (seven minutes).
 Before the first unique change,
 the end of grace restarts from the initial prompt in a fresh conversation with
-a fresh five-minute budget. The tentative parameter selection, prior research,
+a fresh seven-minute budget. The tentative parameter selection, prior research,
 reasoning, and rejected proposals are discarded. Once a unique draft is saved,
 the end of grace submits that configuration through the normal simulation,
 comparison, and measurement cycle, and starts the next experiment.

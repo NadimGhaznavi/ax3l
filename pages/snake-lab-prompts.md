@@ -29,10 +29,13 @@ run decision, golden runs first on the new seed and sets the baseline even if
 its score is lower. If other settings changed, Ax3l tests them on the new seed
 and requires a higher score to promote the draft.
 
-The five-minute decision timer spans setting selection and value choice. Ax3l
+The seven-minute decision timer spans setting selection and value choice. Ax3l
 shows the remaining time at the start and after each `data_tool` call. Saving
-a unique change resets the timer. After three minutes of grace, Ax3l restarts
-the conversation if there is no saved change or runs the saved unique draft.
+a unique change resets the timer. A prompt with a chart adds two minutes to
+the remaining decision budget once; reads and rejected values keep that
+extended deadline. After the configured grace period (seven minutes by default),
+Ax3l restarts the conversation if there is no saved change or runs the saved
+unique draft.
 
 `data_tool(url)` reads one small page. Use `/draft` for saved and inherited
 values, `/` for the run menu, and direct paths such as `/latest/scores` or

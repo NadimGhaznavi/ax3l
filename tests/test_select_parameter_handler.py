@@ -18,6 +18,8 @@ class SelectParameterHandlerTests(unittest.TestCase):
         shared = 'ax3l.app.snakelab.SubmitSingleValueHandler.'
         self.snake = self.enterContext(patch(shared + 'SnakeLab')).return_value
         self.snake.available_parameters.side_effect = lambda config, parameters: parameters
+        self.snake.is_config_unique.return_value = True
+        self.snake.get_run_result.return_value = dict(config=SimulationConfiguration.defaults())
         self.experiments = self.enterContext(patch(shared + 'ExperimentDb')).return_value
         self.enterContext(patch('ax3l.app.snakelab.SelectParameterHandler.ExperimentDb',
                                 return_value=self.experiments))
@@ -33,7 +35,7 @@ class SelectParameterHandlerTests(unittest.TestCase):
         return self.handler.submit(dict(draft_id=draft_id, parameter=parameter))
 
     def test_every_unused_single_and_pair_can_be_selected_without_changing_values(self):
-        for parameter in PARAMETER_ORDER:
+        for parameter in (name for name in PARAMETER_ORDER if name != 'seed'):
             with self.subTest(parameter=parameter):
                 self.bind()
                 self.draft.selections = [name for name in PARAMETER_ORDER if name != parameter]
@@ -47,6 +49,68 @@ class SelectParameterHandlerTests(unittest.TestCase):
                 self.experiments.save_draft.assert_called_once_with(self.draft)
         self.snake.is_config_unique.assert_not_called()
         self.snake.submit_simulation.assert_not_called()
+
+    def test_selecting_seed_immediately_saves_the_change_without_another_confirmation(self):
+        for phase in ('selecting_parameter', 'reviewing'):
+            with self.subTest(phase=phase):
+                self.bind()
+                self.draft.phase = phase
+                if phase == 'reviewing':
+                    self.draft.selections = ['layers']
+                    self.draft.config['model']['layers'] = 2
+                self.draft.decision_expires_at = 1000
+                original = deepcopy(self.draft)
+                self.experiments.save_draft.reset_mock()
+                self.assertEqual(self.select('seed'),
+                                 dict(status='ok', draft_id='draft', phase='reviewing', seed=1971))
+                self.assertEqual(self.draft.config, {**original.config, 'seed': 1971})
+                self.assertEqual(self.draft.selections, original.selections + ['seed'])
+                self.assertEqual(self.draft.references, original.references)
+                self.assertEqual(self.draft.decision_expires_at, original.decision_expires_at)
+                self.assertIsNone(self.draft.next_parameter)
+                self.assertIsNone(self.draft.parameter)
+                self.experiments.save_draft.assert_called_once_with(self.draft)
+        self.snake.submit_simulation.assert_not_called()
+
+    def test_selecting_seed_skips_stored_drafts_and_golden_baselines(self):
+        self.draft.selections = ['layers']
+        self.draft.phase = 'reviewing'
+        self.draft.config['model']['layers'] = 2
+        stored = [{**self.draft.config, 'seed': 1971},
+                  {**SimulationConfiguration.defaults(), 'seed': 1972}]
+        self.snake.is_config_unique.side_effect = lambda config: config not in stored
+        self.assertEqual(self.select('seed')['seed'], 1973)
+        self.assertEqual(self.draft.config['model']['layers'], 2)
+        self.experiments.save_draft.assert_called_once_with(self.draft)
+        self.snake.submit_simulation.assert_not_called()
+
+    def test_seed_limit_rejects_selection_without_leaving_a_pending_confirmation(self):
+        self.draft.config['seed'] = SimulationConfiguration.field(('seed',))['maximum']
+        original = deepcopy(self.draft)
+        result = self.select('seed')
+        self.assertEqual(result['status'], 'rejected')
+        self.assertIn('Cannot increment the seed', result['reason'])
+        self.assertEqual(self.draft, original)
+        self.experiments.save_draft.assert_not_called()
+
+    def test_seed_lookup_errors_propagate_without_saving_a_partial_selection(self):
+        original = deepcopy(self.draft)
+        self.snake.is_config_unique.side_effect = RuntimeError('database unavailable')
+        with self.assertRaisesRegex(RuntimeError, 'database unavailable'):
+            self.select('seed')
+        self.assertEqual(self.draft, original)
+        self.experiments.save_draft.assert_not_called()
+
+    def test_accepted_seed_selection_cannot_increment_again_after_restart(self):
+        self.select('seed')
+        self.draft = ConfigurationDraft(**json.loads(json.dumps(asdict(self.draft))))
+        self.experiments.draft.return_value = self.draft
+        original = deepcopy(self.draft)
+        self.experiments.save_draft.reset_mock()
+        result = self.select('seed')
+        self.assertEqual(result['code'], 'parameter_space_exhausted')
+        self.assertEqual(self.draft, original)
+        self.experiments.save_draft.assert_not_called()
 
     def test_invalid_names_and_arguments_do_not_read_or_change_the_draft(self):
         for parameter in ('epochs', 'revision', 'probability', 'unknown', None, [], True):

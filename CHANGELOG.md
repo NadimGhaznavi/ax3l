@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Accept seed changes as soon as the LLM selects the seed option.
+
+### Changed
+
+- Save the next unused seed immediately on selection, skipping the separate
+  seed confirmation conversation. Resume pending seed selections the same way
+  after restart, while retaining the normal draft review and run decision.
+
 ## [4.19.0] - 2026-11-21 @ 11:28
 
 ### Summary

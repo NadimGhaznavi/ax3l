@@ -31,16 +31,10 @@ class ConfigurationChoice(Prompt):
     def __init__(self, draft: ConfigurationDraft, latest: SimulationAnalysis,
                  golden: SimulationAnalysis, chart_scope: str, png: bytes | None):
         parameter = draft.next_parameter
-        if parameter == "seed":
-            text = ["Call request_seed_change with no arguments. Ax3l saves the next unused seed, skipping stored "
-                    "drafts and golden baselines. The draft still needs a run decision.",
-                    "When the draft runs, golden sets the new seed's baseline even if it scores lower. "
-                    "A seed-only draft ends there. Any other changes run on the new seed and must beat that baseline."]
-        else:
-            tool = "submit_pair_values" if parameter in PAIR_PARAMETERS else "submit_single_value"
-            text = [f"Change {CHOICE_LABELS[parameter]} with {tool}. Follow the tool's limits and change at least "
-                    "one value. If the complete draft is a duplicate, try different values for this setting.",
-                    KnowledgeBase().read("/selection")]
+        tool = "submit_pair_values" if parameter in PAIR_PARAMETERS else "submit_single_value"
+        text = [f"Change {CHOICE_LABELS[parameter]} with {tool}. Follow the tool's limits and change at least "
+                "one value. If the complete draft is a duplicate, try different values for this setting.",
+                KnowledgeBase().read("/selection")]
         seed = draft.config["seed"]
         references = {"golden": golden}
         if latest.run_id != golden.run_id:

@@ -22,9 +22,10 @@ Snake and wall collision rewards each accept any number from -20 to 0,
 defaulting to -10. The move-limit penalty remains -10.
 Positive empty rewards require deployment of SnakeLab's updated v2 schema.
 `SimulationConfiguration` owns defaults, schema validation, and the
-non-positive-sum reward-pair rule. Qwen requests seed changes without choosing
-a number; Ax3l increments the seed, skipping complete configurations stored in
-any status. Fixed fields remain application-controlled.
+non-positive-sum reward-pair rule. Selecting `seed` immediately accepts the seed
+change without choosing a number or opening another conversation. Ax3l
+increments the seed, skipping complete configurations stored in any status.
+Fixed fields remain application-controlled.
 
 After every submitted value or pair, Ax3l checks the **whole configuration**
 against all stored runs. A duplicate is rejected without saving it; Qwen must
@@ -127,7 +128,7 @@ JSON data; transport envelopes and full identifiers remain internal.
 | `submit_pair_values` | `value_1`, `value_2` | Draft UUID and assigned pair |
 | `select_parameter` | `parameter` | Active draft UUID |
 | `run_simulation` | None | Unique draft UUID |
-| `request_seed_change` | None | Draft UUID and selected seed choice |
+| `request_seed_change` (legacy) | None | Draft UUID and selected seed choice |
 | `kb_tool` | `url` | Allowlisted local reference pages |
 | `data_tool` | `url` | Selection draft and frozen references |
 
@@ -166,9 +167,12 @@ Failed or cancelled runs mark their draft failed and stop the current loop;
 a later startup begins a new draft using the retained golden configuration.
 
 A completed configuration comparison counts as one experiment cycle. Qwen can
-select `seed` once per draft, research its references, then call
-`request_seed_change()` to stage the next unique seed while preserving other
-choices. Replaying the request after acceptance cannot increment it again.
+research its references, then select `seed` once per draft to immediately save
+the next unique seed while preserving other choices. There is no separate
+seed confirmation conversation or tool call. A pending seed selection saved
+by an older version is completed automatically on restart. The legacy
+`request_seed_change()` entry point remains supported; replaying it after
+acceptance cannot increment the seed again.
 Repeated seed selections or requests return `parameter_space_exhausted`, reopening
 the available choices and explaining that the seed cannot change again in this draft.
 The normal run decision and deadlines apply. When the draft runs, Ax3l first

@@ -81,7 +81,8 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(set(tools.definition['function']['parameters']['properties']), {'parameter'})
                 description = tools.definition['function']['description']
                 self.assertIn("prompt's available list", description)
-                for name in PARAMETER_ORDER:
+                self.assertIn('Selecting seed immediately saves the next unused seed', description)
+                for name in (parameter for parameter in PARAMETER_ORDER if parameter != 'seed'):
                     self.assertNotIn(name, description)
                 self.assertNotIn('private-draft', json.dumps(tools.definitions))
                 self.assertEqual((await tools.data(dict(url='/draft')))['page'], 'Saved draft values.')

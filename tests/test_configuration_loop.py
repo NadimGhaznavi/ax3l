@@ -17,7 +17,6 @@ from ax3l.app.snakelab.SubmitSingleValueHandler import SubmitSingleValueHandler
 from ax3l.app.snakelab.SubmitPairValuesHandler import SubmitPairValuesHandler
 from ax3l.app.snakelab.SelectParameterHandler import SelectParameterHandler
 from ax3l.app.snakelab.RunSimulationHandler import RunSimulationHandler
-from ax3l.app.snakelab.RequestSeedChangeHandler import RequestSeedChangeHandler
 from ax3l.constants.DChoice import CHOICE_CHARTS, CHOICE_LABELS, REVISION_PARAMETER
 from ax3l.constants.DAx3l import DAx3l
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
@@ -134,9 +133,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
                     payload['parameter'] = step
                 return handler.submit(payload)
             payload = {'draft_id': process_id}
-            if parameter == 'seed':
-                result = RequestSeedChangeHandler(db).submit(payload)
-            elif isinstance(value := self.values[parameter], tuple):
+            if isinstance(value := self.values[parameter], tuple):
                 payload.update(pair=parameter, value_1=value[0], value_2=value[1])
                 result = SubmitPairValuesHandler(db).submit(payload)
             else:
@@ -784,11 +781,12 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
     async def test_seed_only_change_runs_once_and_accepts_a_lower_local_baseline(self):
         self.decisions = ['seed', 'run']
         await self.cycle()
-        self.assertEqual(self.trace(), [REVISION_PARAMETER, 'seed', REVISION_PARAMETER])
+        self.assertEqual(self.trace(), [REVISION_PARAMETER, REVISION_PARAMETER])
         self.assertEqual(self.store.saved.selections, ['seed'])
         self.assertEqual(self.snake.submit_simulation.call_args.args[0], {**self.config, 'seed': 1971})
-        prompt = self.prompts[1]
-        self.assertIn('request_seed_change with no arguments', prompt)
+        prompt = self.prompts[0]
+        self.assertIn('immediately save the next unused seed', prompt)
+        self.assertNotIn('request_seed_change', prompt)
         self.assertNotIn('submit_single_value', prompt)
         self.assertIn('A seed-only draft ends there', prompt)
         self.assertEqual(self.rotation.await_count, 1)
@@ -874,6 +872,26 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.snake.submit_simulation.call_args.args[0]['seed'], 1971)
         self.assertEqual(self.store.saved.selections, ['seed'])
 
+    async def test_restart_completes_a_pending_seed_selection_without_a_seed_conversation(self):
+        self.store.saved = self.draft(phase='choosing', parameter='seed')
+        self.decisions = ['run']
+        await self.cycle()
+        self.assertEqual(self.trace(), [REVISION_PARAMETER])
+        self.assertEqual(self.store.saved.selections, ['seed'])
+        self.snake.submit_simulation.assert_called_once_with({**self.config, 'seed': 1971})
+        self.assertEqual(self.tools.call_count, 1)
+
+    async def test_restart_reopens_selection_if_a_pending_seed_change_is_rejected(self):
+        self.store.saved = self.draft(phase='choosing', parameter='seed')
+        self.store.saved.config['seed'] = SimulationConfiguration.field(('seed',))['maximum']
+        self.conversation.side_effect = asyncio.CancelledError()
+        await self.cycle()
+        self.assertEqual(self.trace(), [REVISION_PARAMETER])
+        self.assertEqual(self.store.saved.phase, 'selecting_parameter')
+        self.assertIsNone(self.store.saved.parameter)
+        self.assertEqual(self.store.saved.selections, [])
+        self.snake.submit_simulation.assert_not_called()
+
     async def test_repeated_seed_selections_refresh_choices_without_blocking_other_changes_or_running(self):
         self.decisions = ['seed', 'seed', 'layers', 'seed', 'run']
         choose = self.conversation.side_effect
@@ -888,9 +906,9 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.conversation.side_effect = select
         await self.cycle()
         self.assertEqual(rejections, ['parameter_space_exhausted'] * 2)
-        self.assertEqual(self.trace().count('seed'), 1)
+        self.assertNotIn('seed', self.trace())
         self.assertEqual(self.store.saved.selections, ['seed', 'layers'])
-        for parameter, prompt in zip(self.trace()[2:], self.prompts[2:]):
+        for parameter, prompt in zip(self.trace()[1:], self.prompts[1:]):
             if parameter == REVISION_PARAMETER:
                 self.assertIn('The seed can change only once per draft and is already set', prompt)
                 self.assertNotIn('Select seed to let Ax3l', prompt)

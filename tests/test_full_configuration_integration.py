@@ -91,8 +91,7 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
             def complete(self, payload, *, timeout_seconds=None):
                 request = json.loads(payload)
                 tool = request['tools'][0]['function']['name']
-                self_test.assertIn(tool, ('select_parameter', 'submit_single_value', 'submit_pair_values',
-                                          'request_seed_change'))
+                self_test.assertIn(tool, ('select_parameter', 'submit_single_value', 'submit_pair_values'))
                 self_test.assertEqual(calls, [])
                 content = request['messages'][0]['content']
                 text = content[0]['text'] if isinstance(content, list) else content
@@ -112,9 +111,11 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
                         else:
                             if step in selections:
                                 repeated_selections.append(step)
+                            if step == 'seed':
+                                selections.append(step)
                             arguments = dict(parameter=step)
                 else:
-                    parameter = next(name for name in PARAMETER_ORDER if f'Choose {CHOICE_LABELS[name]}.' in text)
+                    parameter = next(name for name in PARAMETER_ORDER if f'Change {CHOICE_LABELS[name]} with' in text)
                     duplicate_retry = any(message['role'] == 'user' and 'configuration that already exists' in message['content']
                                           for message in request['messages'])
                     evidence = json.loads(text.split('```json\n')[1].split('\n```')[0])
@@ -133,12 +134,9 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
                         duplicate_attempts.append(parameter)
                     else:
                         selections.append(parameter)
-                    if parameter == 'seed':
-                        arguments = {}
-                    else:
-                        value = (.25, -.5) if duplicate_retry else values[parameter]
-                        arguments = ({'value_1': value[0], 'value_2': value[1]} if isinstance(value, tuple)
-                                     else {'value': value})
+                    value = (.25, -.5) if duplicate_retry else values[parameter]
+                    arguments = ({'value_1': value[0], 'value_2': value[1]} if isinstance(value, tuple)
+                                 else {'value': value})
                 self_test.assertNotIn(baseline_id.split('-')[0], text)
                 return self.reply(tool, arguments)
 

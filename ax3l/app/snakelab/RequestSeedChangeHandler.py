@@ -6,6 +6,7 @@ from jsonschema import ValidationError
 
 from ax3l.app.snakelab.ExperimentDb import ExperimentDb
 from ax3l.app.snakelab.SubmitSingleValueHandler import SubmitSingleValueHandler
+from ax3l.entities.ConfigurationDraft import ConfigurationDraft
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 
 
@@ -26,6 +27,10 @@ class RequestSeedChangeHandler(SubmitSingleValueHandler):
             return {**result, "code": "parameter_space_exhausted"}
         if draft.next_parameter != "seed":
             return self._reject("This draft is not waiting for a seed change.")
+        return self.stage(experiments, draft)
+
+    def stage(self, experiments: ExperimentDb, draft: ConfigurationDraft) -> dict:
+        """Save the seed change accepted by selecting seed or by a legacy request."""
         candidate = deepcopy(draft.config)
         baseline = self._snake.get_run_result(draft.golden_run_id)["config"]
         while True:

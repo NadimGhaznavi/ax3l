@@ -25,8 +25,9 @@ class ConfigurationNextStep(Prompt):
             text.append("Choose any subset in any order, at most once per setting. Change at least one value and "
                         "submit pairs together. Revise duplicates within the same setting.")
         if "seed" in choices:
-            text.append("Select seed to let Ax3l choose the next unused seed. On run, golden sets the new seed's "
-                        "baseline even if it scores lower. Other changes run afterward against that baseline.")
+            text.append("Select seed to let Ax3l immediately save the next unused seed; no further seed confirmation "
+                        "is needed. On run, golden sets the new seed's baseline even if it scores lower. "
+                        "A seed-only draft ends there. Other changes run afterward against that baseline.")
         elif "seed" in draft.selections:
             text.append("The seed can change only once per draft and is already set.")
         text.append("Use data_tool at / for reference runs or /draft for current values.")

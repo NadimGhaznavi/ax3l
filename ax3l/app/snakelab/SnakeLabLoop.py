@@ -13,6 +13,7 @@ from ax3l.app.snakelab.ToolConversation import converse, DecisionTimeExpired
 from ax3l.app.snakelab.SeedRotation import resume_seed_rotation, rotate_draft_seed
 from ax3l.app.snakelab.AnalyzeRun import record_run_metrics
 from ax3l.app.snakelab.ExperimentDb import ExperimentDb
+from ax3l.app.snakelab.RequestSeedChangeHandler import RequestSeedChangeHandler
 from ax3l.app.snakelab.prompts.ConfigurationChoice import ConfigurationChoice
 from ax3l.app.snakelab.prompts.ConfigurationNextStep import ConfigurationNextStep
 from ax3l.constants.DAx3l import DAx3l
@@ -167,6 +168,13 @@ async def optimize(llm, output, db, endpoint):
             draft = ConfigurationDraft(str(uuid4()), golden_id, references,
                                        deepcopy(baseline["config"]), phase="preparing")
             experiments.save_draft(draft)
+        if draft.next_parameter == "seed":
+            result = RequestSeedChangeHandler(db).submit({"draft_id": draft.draft_id})
+            draft = experiments.draft(draft.draft_id)
+            if result["status"] == "rejected":
+                draft.parameter = None
+                draft.phase = "reviewing" if draft.selections else "selecting_parameter"
+                experiments.save_draft(draft)
         if draft.phase in ("preparing", "choosing", "selecting_parameter", "reviewing"):
             references = {run_id: record_run_metrics(snake, experiments, run_id)
                           for run_id in dict.fromkeys(draft.references.values())}

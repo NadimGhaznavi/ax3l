@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Updated Ax3l logo.
+
 ## [4.16.1] - 2026-11-21 @ 07:58
 
 ### Summary

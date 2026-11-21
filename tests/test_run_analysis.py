@@ -144,6 +144,42 @@ class RunAnalysisTests(unittest.TestCase):
         self.assertEqual(list(figure.data[1].y), [None] * 5)
         self.assertEqual(figure.layout.annotations[0].text, 'No training losses recorded')
 
+    def test_endings_keep_all_episodes_as_denominator_and_only_round_display_labels(self):
+        outcomes = ['snake'] * 528 + ['wall'] * 270 + ['max_moves'] * 194 + ['board_filled'] * 3 + [None] * 5
+        episodes = [dict(self.episodes[0], episode=index, outcome=outcome)
+                    for index, outcome in enumerate(outcomes, 1)]
+        original = deepcopy(episodes)
+        figure = self.render('endings', episodes)
+        self.assertEqual(len(figure.data), 1)
+        bars = figure.data[0]
+        self.assertEqual(bars.orientation, 'h')
+        self.assertEqual(list(bars.y), ['Snake collision', 'Wall collision', 'Max moves'])
+        self.assertEqual(figure.layout.yaxis.autorange, 'reversed')
+        self.assertEqual(list(figure.layout.yaxis.categoryarray), list(bars.y))
+        self.assertEqual(list(bars.x), [52.8, 27, 19.4])
+        self.assertEqual(list(bars.text), ['53% (528 episodes)', '27% (270 episodes)', '19% (194 episodes)'])
+        self.assertFalse(bars.showlegend)
+        self.assertIn('all 1000 episodes', figure.layout.annotations[0].text)
+        self.assertIn('3 board filled; 5 unrecorded or other', figure.layout.annotations[0].text)
+        self.assertEqual(episodes, original)
+
+    def test_endings_keep_zero_reasons_and_a_fixed_percent_axis_even_for_empty_runs(self):
+        for episodes, values in (([], [0, 0, 0]), (self.episodes[:1], [0, 100, 0])):
+            with self.subTest(episodes=len(episodes)):
+                figure = self.render('endings', episodes)
+                self.assertEqual(list(figure.data[0].x), values)
+                self.assertEqual(len(figure.data[0].y), 3)
+                self.assertEqual(figure.data[0].text[0], '0% (0 episodes)')
+                self.assertEqual(list(figure.layout.xaxis.range), [0, 100])
+                self.assertEqual(figure.layout.xaxis.dtick, 20)
+                self.assertEqual(figure.layout.xaxis.ticksuffix, '%')
+                self.assertEqual(figure.layout.xaxis.tickformat, '.0f')
+                self.assertEqual(figure.data[0].textposition, 'outside')
+                self.assertFalse(figure.data[0].cliponaxis)
+                self.assertNotIn('Not shown:', figure.layout.annotations[0].text)
+                if not episodes:
+                    self.assertEqual(figure.layout.annotations[0].text, 'No episodes recorded.')
+
 
 class SummarySubmissionTests(unittest.TestCase):
     def setUp(self):

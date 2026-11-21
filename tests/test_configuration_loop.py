@@ -65,7 +65,11 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
                 config['seed'] += 1
             metrics = dict(high_score=score, episodes=500, episodes_with_loss=480,
                            mean_first_50_scores=.1, mean_last_50_scores=.2, epsilon_random_actions=95,
-                           median_score=0, zero_score_episodes=463, high_score_episodes=1)
+                           median_score=0, zero_score_episodes=463, high_score_episodes=1,
+                           termination_reasons={name: dict(count=count, percent=100 * count / 500)
+                                                for name, count in (('snake', 264), ('wall', 180),
+                                                                    ('max_moves', 40), ('board_filled', 6),
+                                                                    ('unrecorded_or_other', 10))})
             self.store.analyses[run_id] = SimulationAnalysis(run_id, config, metrics, 'Previous notes.')
         self.snake = Mock()
         self.snake.is_simulation_running.return_value = False
@@ -201,7 +205,18 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual([part['type'] for part in content], ['text', 'image_url'])
                 evidence = json.loads(content[0]['text'].split('```json\n')[1].split('\n```')[0])
                 self.assertEqual(evidence['current'], {parameter: self.config['game']['rewards'][parameter]})
-        self.assertEqual([call.args[-1] for call in self.chart.call_args_list], ['distribution'] * 3)
+                if parameter in ('snake', 'wall'):
+                    self.assertIn('percentages of all episodes', content[0]['text'])
+                    self.assertIn('whole percent', content[0]['text'])
+                    self.assertIn('/latest/endings', content[0]['text'])
+                    measured = evidence['reference_runs']['latest']
+                    self.assertEqual(measured['episodes'], 500)
+                    self.assertEqual(measured['termination_reasons'],
+                                     self.store.analyses[self.latest].metrics['termination_reasons'])
+                    self.assertEqual(measured['termination_reasons']['snake']['percent'], 52.8)
+        self.assertEqual([call.args[-1] for call in self.chart.call_args_list],
+                         ['distribution', 'endings', 'endings'])
+        self.assertTrue(any(call.args[3] == 'Game-ending reasons' for call in self.db.log.call_args_list))
 
     async def test_resumed_empty_reward_choice_can_stage_a_positive_reward(self):
         self.store.saved = self.draft(phase='choosing', parameter='empty')

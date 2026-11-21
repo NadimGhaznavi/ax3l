@@ -37,7 +37,7 @@ class SimulationUnsuccessful(RuntimeError):
 async def prepare_chart(db, draft_id, parameter, section, run, episodes, target, *,
                         golden_episodes: list[dict] | None = None):
     category = Events.Configuration
-    title = DSimulationAnalysis.SECTIONS[section]
+    title = DSimulationAnalysis.CHART_LABELS[section]
     fields = dict(process_id=draft_id, parameter=parameter)
     db.log(category.CHART_STARTED, category.CATEGORY, "INFO", title, **fields)
     try:

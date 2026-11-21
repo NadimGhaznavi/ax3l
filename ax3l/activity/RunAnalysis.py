@@ -9,6 +9,28 @@ from ax3l.activity.PlotTicks import axis_ticks
 
 
 _LOSS_MEAN_WINDOW = 20
+_ENDING_LABELS = {"snake": "Snake collision", "wall": "Wall collision", "max_moves": "Max moves"}
+
+
+def _add_ending_bars(figure: go.Figure, metrics: dict) -> None:
+    endings = metrics["termination_reasons"]
+    rows = [endings[name] for name in _ENDING_LABELS]
+    figure.add_trace(go.Bar(
+        x=[row["percent"] for row in rows], y=list(_ENDING_LABELS.values()), orientation="h",
+        text=[f"{row['percent']:.0f}% ({row['count']} episodes)" for row in rows],
+        textposition="outside", textfont=dict(size=20), cliponaxis=False,
+        marker_color="#4477aa", showlegend=False,
+    ))
+    note = (f"Percent of all {metrics['episodes']} episodes; labels rounded to whole percent."
+            if metrics["episodes"] else "No episodes recorded.")
+    omitted = [(label, endings[name]["count"]) for name, label in (
+        ("board_filled", "board filled"), ("unrecorded_or_other", "unrecorded or other"))
+        if endings[name]["count"]]
+    if omitted:
+        note += "<br>Not shown: " + "; ".join(f"{count} {label}" for label, count in omitted) + "."
+    figure.add_annotation(text=note, x=0, y=-.22, xref="paper", yref="paper",
+                          xanchor="left", yanchor="top", align="left", showarrow=False,
+                          font=dict(size=16))
 
 
 def _add_loss_traces(figure: go.Figure, episodes: list[dict], label: str, color: str) -> None:
@@ -88,15 +110,26 @@ def render_analysis(config: dict, episodes: list[dict], metrics: dict,
         if not metrics["episodes_with_loss"]:
             figure.add_annotation(text="No training losses recorded", x=.5, y=.5,
                                   xref="x domain", yref="y domain", showarrow=False)
+    elif section == "endings":
+        title = "Game-ending Reasons"
+        x_label, y_label = "Percentage of all episodes", ""
+        _add_ending_bars(figure, metrics)
     else:
         raise ValueError(f"Unknown analysis section: {section}")
-    figure.update_xaxes(title_text=x_label, **axis_ticks(value for trace in figure.data for value in trace.x))
-    figure.update_yaxes(title_text=y_label, rangemode="tozero")
-    if section != "loss":
-        values = [value for trace in figure.data for value in trace.y]
-        if section == "scores":
-            values.append(target_score)
-        figure.update_yaxes(**axis_ticks(values))
+    if section == "endings":
+        figure.update_xaxes(title_text=x_label, range=[0, 100], tickmode="linear", tick0=0,
+                            dtick=20, ticksuffix="%", tickformat=".0f")
+        figure.update_yaxes(title_text=y_label, categoryorder="array",
+                            categoryarray=list(_ENDING_LABELS.values()), autorange="reversed",
+                            ticklabelstandoff=12)
+    else:
+        figure.update_xaxes(title_text=x_label, **axis_ticks(value for trace in figure.data for value in trace.x))
+        figure.update_yaxes(title_text=y_label, rangemode="tozero")
+        if section != "loss":
+            values = [value for trace in figure.data for value in trace.y]
+            if section == "scores":
+                values.append(target_score)
+            figure.update_yaxes(**axis_ticks(values))
     figure.update_layout(
         title=dict(text=f"{title}<br>"
                    f"<sup>Goal: improve the simulation high score | Seed {config['seed']} | "
@@ -105,4 +138,6 @@ def render_analysis(config: dict, episodes: list[dict], metrics: dict,
         margin=dict(l=110, r=65, t=145, b=70),
         legend=dict(orientation="h", y=1.10, x=0),
     )
+    if section == "endings":
+        figure.update_layout(margin=dict(l=190, r=235, t=145, b=140), bargap=.45)
     return figure.to_image(format="png", scale=1)

@@ -5,7 +5,7 @@ import json
 
 from ax3l.app.DbMgr import DbMgr
 from ax3l.constants.DEventCategory import DEventCategory as Events
-from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
+from ax3l.entities.ConfigurationDraft import ConfigurationDraft
 from ax3l.entities.AnalysisTask import AnalysisTask
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
 
@@ -14,7 +14,8 @@ def _restore_draft(data: dict) -> ConfigurationDraft:
     """Resume snapshots saved before Qwen chose the parameter order."""
     if "parameter" not in data:
         data = dict(data)
-        legacy_parameters = [parameter for parameter in PARAMETER_ORDER if parameter != "seed"]
+        legacy_parameters = ("hidden_size", "layers", "dropout", "sequence_length", "batch_size",
+                             "learning_rate", "gamma", "epsilon_pair", "reward_pair", "epsilon_nice_pair")
         if data["phase"] == "choosing":
             data["parameter"] = next(parameter for parameter in legacy_parameters if parameter not in data["selections"])
         elif data["phase"] == "preparing" and data["selections"] and len(data["selections"]) < len(legacy_parameters):

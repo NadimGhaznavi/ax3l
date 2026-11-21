@@ -166,10 +166,13 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
                 ('hidden_size', 96, 'at least 32; at most 128; multiple of 8'),
                 ('layers', 3, 'one of 1, 2, 3'),
                 ('dropout', .02, 'one of 0.0, 0.01, 0.02'),
+                ('empty', 2, 'at least -2; at most 2'),
+                ('snake', -2.5, 'at least -20; at most 0'),
+                ('wall', -5, 'at least -20; at most 0'),
             ):
                 async with SnakeLabTools(server.endpoint, parameter, draft_id='draft') as tools:
                     self.assertEqual(set(tools.definition['function']['parameters']['properties']), {'value'})
-                    self.assertIn('without running a simulation', tools.definition['function']['description'])
+                    self.assertIn('Save a changed value in the draft.', tools.definition['function']['description'])
                     self.assertIn(rule, tools.definition['function']['description'])
                     self.assertEqual((await tools.submit({'value': value}))['draft_id'], 'draft')
                     self.assertEqual(requests[-1].payload, {'draft_id': 'draft', 'parameter': parameter, 'value': value})

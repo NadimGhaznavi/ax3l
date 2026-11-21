@@ -5,6 +5,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from ax3l.app.snakelab.SubmitSingleValueHandler import SubmitSingleValueHandler
+from ax3l.app.snakelab.SingleParameters import SINGLE_PARAMETERS
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 
@@ -35,7 +36,10 @@ class SubmitSingleValueHandlerTests(unittest.TestCase):
         for parameter, value in (('seed', 1), ('epochs', 500), ('initial', .95), ('unknown', 1),
                                  ('batch_size', 25), ('hidden_size', 24), ('hidden_size', 136),
                                  ('hidden_size', 33), ('layers', 0), ('layers', 4), ('layers', 1.5),
-                                 ('dropout', -.01), ('dropout', .11), ('dropout', .005)):
+                                 ('dropout', -.01), ('dropout', .11), ('dropout', .005),
+                                 ('empty', -2.01), ('empty', 2.01), ('empty', True), ('empty', '1'),
+                                 ('snake', -20.01), ('snake', .1), ('wall', -20.01), ('wall', .1),
+                                 ('food', 5), ('max_moves', -5)):
             self.assertEqual(self.submit(parameter, value)['code'], 'invalid_value')
         self.assertEqual(self.submit(extra=1)['code'], 'invalid_value')
         self.assertEqual(self.handler.submit({})['code'], 'invalid_value')
@@ -58,7 +62,8 @@ class SubmitSingleValueHandlerTests(unittest.TestCase):
         self.snake.submit_simulation.assert_not_called()
 
     def test_unchanged_values_are_rejected_even_when_the_complete_draft_is_unique(self):
-        for parameter, value in (('learning_rate', .001), ('layers', 1.0), ('dropout', .05)):
+        for parameter, value in (('learning_rate', .001), ('layers', 1.0), ('dropout', .05),
+                                 ('empty', 0), ('snake', -10), ('wall', -10)):
             with self.subTest(parameter=parameter):
                 self.bind(parameter)
                 self.draft.config['model']['hidden_size'] = 96
@@ -73,11 +78,22 @@ class SubmitSingleValueHandlerTests(unittest.TestCase):
     def test_all_single_parameters_are_staged(self):
         for name, value in (('hidden_size', 32), ('layers', 3), ('dropout', .02),
                              ('sequence_length', 12), ('batch_size', 26),
-                             ('learning_rate', .003), ('gamma', .97)):
+                             ('learning_rate', .003), ('gamma', .97),
+                             ('empty', -2), ('empty', .25), ('empty', 2),
+                             ('snake', -20), ('snake', -2.5), ('snake', 0),
+                             ('wall', -20), ('wall', -2.5), ('wall', 0)):
             with self.subTest(parameter=name):
                 self.bind(name)
+                expected = deepcopy(self.baseline)
+                path, _ = SINGLE_PARAMETERS[name]
+                node = expected
+                for key in path[:-1]:
+                    node = node[key]
+                node[path[-1]] = value
                 self.assertEqual(self.submit(name, value)['status'], 'ok')
                 self.assertEqual(self.draft.selections[-1], name)
+                self.assertEqual(self.draft.config, expected)
+                self.snake.is_config_unique.assert_called_with(expected)
         self.snake.submit_simulation.assert_not_called()
 
     def test_stale_draft_and_wrong_parameter_cannot_change_the_active_draft(self):

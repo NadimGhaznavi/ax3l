@@ -56,6 +56,9 @@ class DraftRecoveryTests(unittest.TestCase):
         self.assertEqual(restored.next_parameter, 'sequence_length')
         data['phase'] = 'ready'
         self.assertEqual(self.restore(data).phase, 'reviewing')
+        data.update(phase='choosing', selections=['hidden_size', 'layers', 'dropout', 'sequence_length',
+                                                 'batch_size', 'learning_rate', 'gamma'])
+        self.assertEqual(self.restore(data).next_parameter, 'epsilon_pair')
         for phase in ('submitting', 'submitted', 'completed'):
             data['phase'] = phase
             self.assertEqual(self.restore(data).phase, phase)
@@ -63,7 +66,9 @@ class DraftRecoveryTests(unittest.TestCase):
     def test_fully_selected_legacy_draft_does_not_infer_a_seed_choice(self):
         data = asdict(self.draft)
         del data['parameter']
-        data.update(phase='preparing', selections=[name for name in PARAMETER_ORDER if name != 'seed'])
+        data.update(phase='preparing', selections=['hidden_size', 'layers', 'dropout', 'sequence_length',
+                                                 'batch_size', 'learning_rate', 'gamma',
+                                                 'epsilon_pair', 'reward_pair', 'epsilon_nice_pair'])
         restored = self.restore(data)
         self.assertEqual(restored.phase, 'preparing')
         self.assertIsNone(restored.parameter)

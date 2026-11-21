@@ -23,6 +23,7 @@ from ax3l.constants.DEventCategory import DEventCategory as Events
 from ax3l.constants.DSimulationAnalysis import DSimulationAnalysis
 from ax3l.constants.DSnakeLab import DSnakeLab
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
+from ax3l.entities.EpsilonNiceChoice import EpsilonNiceChoice
 from ax3l.interface.Configuration import Configuration
 from ax3l.interface.SnakeLab import SnakeLab, SimulationUnavailable
 from ax3l.interface.SnakeLabTools import SnakeLabTools
@@ -204,7 +205,8 @@ async def optimize(llm, output, db, endpoint):
                         draft.config, [name for name in PARAMETER_ORDER if name not in draft.selections])
                     prompt = ConfigurationNextStep(draft, parameters)
                 else:
-                    prompt = ConfigurationChoice(draft, latest, golden, chart_scope, png)
+                    choice = EpsilonNiceChoice if parameter == "epsilon_nice_pair" else ConfigurationChoice
+                    prompt = choice(draft, latest, golden, chart_scope, png)
                 selected_count = len(draft.selections)
                 async with SnakeLabTools(endpoint, parameter, draft_id=draft.draft_id,
                                          allow_run=draft.phase == "reviewing") as tools:

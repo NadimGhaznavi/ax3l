@@ -74,26 +74,32 @@ class ToolConversationTimingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([message['content'] for message in messages if message['role'] == 'user'],
                          ['Initial prompt.'])
 
-    def test_unique_draft_reminders_show_the_three_minute_grace_period(self):
-        with patch('ax3l.app.snakelab.ToolConversation.monotonic', side_effect=[250, 400, 450, 600]):
-            reminders = [_time_reminder(400, 580)['content'] for _ in range(4)]
+    def test_unique_draft_reminders_show_the_five_minute_grace_period(self):
+        with patch('ax3l.app.snakelab.ToolConversation.monotonic', side_effect=[250, 400, 450, 700]):
+            reminders = [_time_reminder(400, 700)['content'] for _ in range(4)]
         self.assertIn('Decision time remaining: 02:30', reminders[0])
-        self.assertIn('3-minute grace period', reminders[0])
-        self.assertIn('Grace time remaining: 03:00', reminders[1])
-        self.assertIn('Grace time remaining: 02:10', reminders[2])
+        self.assertIn('5-minute grace period', reminders[0])
+        self.assertIn('Grace time remaining: 05:00', reminders[1])
+        self.assertIn('Grace time remaining: 04:10', reminders[2])
         self.assertIn('Grace time remaining: 00:00', reminders[3])
         self.assertIn('run the saved unique draft', reminders[3])
 
     def test_initial_reminders_explain_the_reset_without_offering_to_run_the_baseline(self):
-        with patch('ax3l.app.snakelab.ToolConversation.monotonic', side_effect=[100, 400, 580]):
-            reminders = [_time_reminder(400, 580, reset_on_expiry=True)['content'] for _ in range(3)]
+        with patch('ax3l.app.snakelab.ToolConversation.monotonic', side_effect=[100, 400, 700]):
+            reminders = [_time_reminder(400, 700, reset_on_expiry=True)['content'] for _ in range(3)]
         self.assertIn('Decision time remaining: 05:00', reminders[0])
-        self.assertIn('3-minute grace period', reminders[0])
-        self.assertIn('Grace time remaining: 03:00', reminders[1])
+        self.assertIn('5-minute grace period', reminders[0])
+        self.assertIn('Grace time remaining: 05:00', reminders[1])
         self.assertIn('Grace time remaining: 00:00', reminders[2])
         for reminder in reminders:
             self.assertIn('restart the conversation and discard the pending choice', reminder)
             self.assertNotIn('run the saved unique draft', reminder)
+
+    def test_reminders_derive_the_grace_duration_from_the_conversation_deadline(self):
+        with patch('ax3l.app.snakelab.ToolConversation.monotonic', side_effect=[100, 400]):
+            reminders = [_time_reminder(400, 490)['content'] for _ in range(2)]
+        self.assertIn('1.5-minute grace period', reminders[0])
+        self.assertIn('Grace time remaining: 01:30', reminders[1])
 
     async def test_initial_expiry_logs_a_reset_and_ignores_a_late_inference_reply(self):
         tools, llm, db = self.tools(), Mock(url='fixture'), Mock()

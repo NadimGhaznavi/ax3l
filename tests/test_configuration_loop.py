@@ -4,6 +4,7 @@ import asyncio
 from copy import deepcopy
 import json
 from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 from uuid import uuid4
@@ -18,6 +19,7 @@ from ax3l.app.snakelab.SelectParameterHandler import SelectParameterHandler
 from ax3l.app.snakelab.RunSimulationHandler import RunSimulationHandler
 from ax3l.app.snakelab.RequestSeedChangeHandler import RequestSeedChangeHandler
 from ax3l.constants.DChoice import CHOICE_CHARTS, CHOICE_LABELS, REVISION_PARAMETER
+from ax3l.constants.DAx3l import DAx3l
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
@@ -50,6 +52,9 @@ class MemoryExperiments:
 
 class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        root = self.enterContext(TemporaryDirectory())
+        self.enterContext(patch.object(DAx3l, 'BASE_DIR', root))
+        self.configuration_path = Path(root) / DAx3l.CONFIG_FILE
         self.gold, self.latest, self.best, self.run = [str(uuid4()) for _ in range(4)]
         self.seed_run = str(uuid4())
         self.config = SimulationConfiguration.defaults()
@@ -180,6 +185,14 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.snake.is_config_unique.call_count, 1)
         self.snake.submit_simulation.assert_called_once()
 
+    async def test_configured_grace_applies_to_selection_values_and_run_decisions(self):
+        self.configuration_path.parent.mkdir()
+        self.configuration_path.write_text(json.dumps({'decision_grace_seconds': 90}))
+        await self.cycle()
+        self.assertEqual(self.trace(), [REVISION_PARAMETER, 'learning_rate', REVISION_PARAMETER])
+        for call in self.conversation.await_args_list:
+            self.assertEqual(call.kwargs['conversation_deadline'] - call.kwargs['decision_deadline'], 90)
+
     async def test_exhausted_parameters_are_omitted_and_rechecked_against_the_changed_draft(self):
         def available(config, parameters):
             return [parameter for parameter in parameters if parameter != 'layers'
@@ -300,7 +313,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([call.kwargs['decision_deadline'] for call in self.conversation.await_args_list],
                          [400, 400, 750])
         self.assertEqual([call.kwargs['conversation_deadline'] for call in self.conversation.await_args_list],
-                         [580, 580, 930])
+                         [700, 700, 1050])
         self.assertEqual([call.kwargs['reset_on_expiry'] for call in self.conversation.await_args_list],
                          [True, True, False])
         candidate = self.snake.submit_simulation.call_args.args[0]
@@ -329,7 +342,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.conversation.side_effect = DecisionTimeExpired()
         with patch('ax3l.app.snakelab.SnakeLabLoop.monotonic', return_value=100):
             await self.cycle()
-        self.assertEqual(self.conversation.await_args.kwargs['conversation_deadline'], 580)
+        self.assertEqual(self.conversation.await_args.kwargs['conversation_deadline'], 700)
         self.snake.submit_simulation.assert_called_once_with(original.config)
         self.wait.assert_awaited_once_with(self.snake, self.db, self.run)
         self.assertIn('configuration_compared', [call.args[0] for call in self.db.log.call_args_list])
@@ -351,7 +364,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.conversation.side_effect = asyncio.CancelledError()
         with patch('ax3l.app.snakelab.SnakeLabLoop.monotonic', return_value=100):
             await self.cycle()
-        self.assertEqual(self.conversation.await_args.kwargs['conversation_deadline'], 580)
+        self.assertEqual(self.conversation.await_args.kwargs['conversation_deadline'], 700)
         self.assertTrue(self.conversation.await_args.kwargs['reset_on_expiry'])
         self.snake.submit_simulation.assert_not_called()
 
@@ -387,7 +400,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
             nonlocal now, reads
             reads += 1
             if reads == 2:
-                now = 581
+                now = 701
             return dict(status='ok', page='Research from the expired conversation.')
 
         def session(endpoint, parameter, *, draft_id, allow_run):
@@ -442,7 +455,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.store.saved.phase, 'selecting_parameter')
         self.assertIsNone(self.store.saved.parameter)
         self.assertEqual(self.store.saved.selections, [])
-        self.assertEqual(self.store.saved.decision_expires_at, 1781)
+        self.assertEqual(self.store.saved.decision_expires_at, 1901)
         self.assertEqual(self.store.saved.config, self.config)
         self.snake.submit_simulation.assert_not_called()
         outcomes = [call.args[3] for call in self.db.log.call_args_list if call.args[0] == 'conversation_ended']

@@ -8,7 +8,6 @@ from time import monotonic
 from uuid import uuid4
 
 from ax3l.constants.DAx3l import DAx3l
-from ax3l.constants.DChoice import DECISION_GRACE_SECONDS
 from ax3l.constants.DEventCategory import DEventCategory as Events
 
 
@@ -47,7 +46,8 @@ def _time_reminder(deadline: float, conversation_deadline: float | None = None, 
     minutes, remainder = divmod(seconds, 60)
     content = f"Decision time remaining: {minutes:02}:{remainder:02}."
     if conversation_deadline is not None:
-        content += f" After the {DECISION_GRACE_SECONDS // 60}-minute grace period, Ax3l will {action}."
+        grace_minutes = (conversation_deadline - deadline) / 60
+        content += f" After the {grace_minutes:g}-minute grace period, Ax3l will {action}."
     elif not seconds:
         content += " Advisory budget expired. Decide now."
     return {"role": "user", "content": content}

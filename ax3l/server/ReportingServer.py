@@ -36,6 +36,7 @@ from ax3l.constants.DReportMgr import DReportMgr
 from ax3l.constants.DAx3l import DAx3l
 from ax3l.constants.DLabel import FIELD_TO_LABEL_MAP
 from ax3l.interface.SnakeLab import SnakeLab
+from ax3l.interface.Configuration import Configuration
 from ax3l.interface.Network import Network
 
 
@@ -43,6 +44,7 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
                 gif_duration_ms: int = DReportMgr.GIF_DURATION_MS) -> HTTPServer:
     if gif_duration_ms < 10:
         raise ValueError("GIF frame duration must be at least 10 ms")
+    decision_grace_seconds = Configuration().decision_grace_seconds
     gifs = SimulationGifStore(gif_directory, SimulationAnimation.VERSION, gif_duration_ms)
     background = ReportBackground(gifs, gif_duration_ms)
     background_lock = Lock()
@@ -201,7 +203,8 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
                     run = snake.get_run_result(draft.run_id) if draft and draft.run_id else None
                     golden = snake.get_run_result(draft.golden_run_id) if draft else None
                     body = templates.get_template("experiment_status.html").render(
-                        view=view, **experiment_status(draft, run, golden, comparison, analysis, activity)
+                        view=view, **experiment_status(draft, run, golden, comparison, analysis, activity,
+                                                      decision_grace_seconds=decision_grace_seconds)
                     ).encode("utf-8")
                     content_type = "text/html; charset=utf-8"
                 except Exception:

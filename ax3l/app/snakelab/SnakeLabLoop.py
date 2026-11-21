@@ -17,12 +17,13 @@ from ax3l.app.snakelab.prompts.ConfigurationChoice import ConfigurationChoice
 from ax3l.app.snakelab.prompts.ConfigurationNextStep import ConfigurationNextStep
 from ax3l.constants.DAx3l import DAx3l
 from ax3l.constants.DChoice import (
-    CHOICE_CHARTS, PARAMETER_SELECTION_SECONDS, REVISION_PARAMETER, DECISION_GRACE_SECONDS,
+    CHOICE_CHARTS, PARAMETER_SELECTION_SECONDS, REVISION_PARAMETER,
 )
 from ax3l.constants.DEventCategory import DEventCategory as Events
 from ax3l.constants.DSimulationAnalysis import DSimulationAnalysis
 from ax3l.constants.DSnakeLab import DSnakeLab
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
+from ax3l.interface.Configuration import Configuration
 from ax3l.interface.SnakeLab import SnakeLab, SimulationUnavailable
 from ax3l.interface.SnakeLabTools import SnakeLabTools
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
@@ -147,6 +148,7 @@ def complete_comparison(snake, db, experiments: ExperimentDb, draft: Configurati
 
 
 async def optimize(llm, output, db, endpoint):
+    decision_grace_seconds = Configuration().decision_grace_seconds
     snake = SnakeLab()
     experiments = ExperimentDb(db)
     while snake.is_simulation_running():
@@ -210,7 +212,7 @@ async def optimize(llm, output, db, endpoint):
                         await converse(llm, output, db, tools, [prompt],
                                        parameter=parameter, process_id=draft.draft_id,
                                        decision_deadline=decision_deadline,
-                                       conversation_deadline=decision_deadline + DECISION_GRACE_SECONDS,
+                                       conversation_deadline=decision_deadline + decision_grace_seconds,
                                        reset_on_expiry=not draft.selections)
                     except DecisionTimeExpired:
                         draft = experiments.draft(draft.draft_id)

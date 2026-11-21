@@ -33,4 +33,4 @@ class KnowledgeBaseTests(unittest.TestCase):
         text = KnowledgeBase().read('/selection')
         self.assertLess(len(text.split()), 70)
         self.assertNotIn('description:', text)
-        self.assertIn('500 episodes', text)
+        self.assertIn('1500 episodes', text)

@@ -223,6 +223,39 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         for call in self.conversation.await_args_list:
             self.assertEqual(call.kwargs['conversation_deadline'] - call.kwargs['decision_deadline'], 90)
 
+    async def test_only_prompts_with_images_extend_the_decision_and_report_deadlines(self):
+        for parameter, has_loss, extra in (
+            ('learning_rate', True, 120), ('epsilon_pair', True, 120),
+            ('reward_pair', True, 120), ('gamma', True, 0), ('learning_rate', False, 0),
+        ):
+            with self.subTest(parameter=parameter, has_loss=has_loss):
+                self.store.saved = self.draft(phase='choosing', parameter=parameter)
+                for analysis in self.store.analyses.values():
+                    analysis.metrics['episodes_with_loss'] = 480 if has_loss else 0
+                self.decisions = ['run']
+                self.conversation.reset_mock()
+                self.snake.submit_simulation.reset_mock()
+                choose = self.conversation.side_effect
+                reported_deadlines = []
+
+                async def record(*args, **kwargs):
+                    reported_deadlines.append(self.store.saved.decision_expires_at)
+                    return await choose(*args, **kwargs)
+
+                self.conversation.side_effect = record
+                with patch('ax3l.app.snakelab.SnakeLabLoop.monotonic', side_effect=[100, 350]), \
+                        patch('ax3l.app.snakelab.SnakeLabLoop.time', side_effect=[1000, 1250]):
+                    await self.cycle()
+                self.conversation.side_effect = choose
+                self.assertEqual(self.trace(), [parameter, REVISION_PARAMETER])
+                self.assertEqual(reported_deadlines, [1420 + extra, 1670])
+                self.assertEqual([call.kwargs['decision_deadline'] for call in self.conversation.await_args_list],
+                                 [520 + extra, 770])
+                self.assertEqual([call.kwargs['conversation_deadline'] for call in self.conversation.await_args_list],
+                                 [940 + extra, 1190])
+                content = json.loads(self.conversation.await_args_list[0].args[4][0].to_json())['content']
+                self.assertEqual(isinstance(content, list), bool(extra))
+
     async def test_exhausted_parameters_are_omitted_and_rechecked_against_the_changed_draft(self):
         def available(config, parameters):
             return [parameter for parameter in parameters if parameter != 'layers'
@@ -292,8 +325,8 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
                     await self.cycle()
                 self.assertEqual(self.trace(), ['layers', REVISION_PARAMETER])
                 self.assertEqual([call.kwargs['decision_deadline'] for call in self.conversation.await_args_list],
-                                 [400, 400])
-                self.assertEqual(self.store.saved.decision_expires_at, 1300)
+                                 [520, 520])
+                self.assertEqual(self.store.saved.decision_expires_at, 1420)
                 self.assertEqual(self.store.saved.config, original.config)
                 self.assertEqual(self.store.saved.selections, original.selections)
                 self.assertEqual(self.store.saved.phase, 'reviewing' if count else 'selecting_parameter')
@@ -330,7 +363,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
                 if result['status'] == 'rejected':
                     self.assertEqual(self.store.saved.next_parameter, 'layers')
                     self.assertEqual(self.store.saved.config['model']['layers'], 1)
-                    self.assertEqual(self.store.saved.decision_expires_at, 1300)
+                    self.assertEqual(self.store.saved.decision_expires_at, 1420)
                     self.snake.submit_simulation.assert_not_called()
             return result
 
@@ -338,12 +371,12 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         with patch('ax3l.app.snakelab.SnakeLabLoop.monotonic', side_effect=[100, 450]), \
                 patch('ax3l.app.snakelab.SnakeLabLoop.time', side_effect=[1000, 1350]):
             await self.cycle()
-        self.assertEqual(reported_deadlines, [1300, 1300, 1650])
+        self.assertEqual(reported_deadlines, [1420, 1420, 1770])
         self.assertEqual(self.trace(), [REVISION_PARAMETER, 'layers', REVISION_PARAMETER])
         self.assertEqual([call.kwargs['decision_deadline'] for call in self.conversation.await_args_list],
-                         [400, 400, 750])
+                         [520, 520, 870])
         self.assertEqual([call.kwargs['conversation_deadline'] for call in self.conversation.await_args_list],
-                         [700, 700, 1050])
+                         [940, 940, 1290])
         self.assertEqual([call.kwargs['reset_on_expiry'] for call in self.conversation.await_args_list],
                          [True, True, False])
         candidate = self.snake.submit_simulation.call_args.args[0]
@@ -372,7 +405,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.conversation.side_effect = DecisionTimeExpired()
         with patch('ax3l.app.snakelab.SnakeLabLoop.monotonic', return_value=100):
             await self.cycle()
-        self.assertEqual(self.conversation.await_args.kwargs['conversation_deadline'], 700)
+        self.assertEqual(self.conversation.await_args.kwargs['conversation_deadline'], 940)
         self.snake.submit_simulation.assert_called_once_with(original.config)
         self.wait.assert_awaited_once_with(self.snake, self.db, self.run)
         self.assertIn('configuration_compared', [call.args[0] for call in self.db.log.call_args_list])
@@ -394,7 +427,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.conversation.side_effect = asyncio.CancelledError()
         with patch('ax3l.app.snakelab.SnakeLabLoop.monotonic', return_value=100):
             await self.cycle()
-        self.assertEqual(self.conversation.await_args.kwargs['conversation_deadline'], 700)
+        self.assertEqual(self.conversation.await_args.kwargs['conversation_deadline'], 940)
         self.assertTrue(self.conversation.await_args.kwargs['reset_on_expiry'])
         self.snake.submit_simulation.assert_not_called()
 
@@ -410,13 +443,13 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
                     await self.cycle()
                 self.assertEqual(self.trace(), [parameter or REVISION_PARAMETER, REVISION_PARAMETER])
                 self.assertEqual([call.kwargs['decision_deadline'] for call in self.conversation.await_args_list],
-                                 [400, 900])
+                                 [520, 1020])
                 self.assertEqual(self.store.saved.draft_id, original.draft_id)
                 self.assertEqual(self.store.saved.config, original.config)
                 self.assertEqual(self.store.saved.phase, 'selecting_parameter')
                 self.assertIsNone(self.store.saved.parameter)
                 self.assertEqual(self.store.saved.selections, [])
-                self.assertEqual(self.store.saved.decision_expires_at, 1800)
+                self.assertEqual(self.store.saved.decision_expires_at, 1920)
                 self.assertIn('The draft starts from golden', self.conversation.await_args.args[4][0].to_md())
         self.snake.is_config_unique.assert_not_called()
         self.snake.submit_simulation.assert_not_called()
@@ -430,7 +463,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
             nonlocal now, reads
             reads += 1
             if reads == 2:
-                now = 701
+                now = 941
             return dict(status='ok', page='Research from the expired conversation.')
 
         def session(endpoint, parameter, *, draft_id, allow_run):
@@ -485,7 +518,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.store.saved.phase, 'selecting_parameter')
         self.assertIsNone(self.store.saved.parameter)
         self.assertEqual(self.store.saved.selections, [])
-        self.assertEqual(self.store.saved.decision_expires_at, 1901)
+        self.assertEqual(self.store.saved.decision_expires_at, 2261)
         self.assertEqual(self.store.saved.config, self.config)
         self.snake.submit_simulation.assert_not_called()
         outcomes = [call.args[3] for call in self.db.log.call_args_list if call.args[0] == 'conversation_ended']

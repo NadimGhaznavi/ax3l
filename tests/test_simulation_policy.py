@@ -13,7 +13,7 @@ from ax3l.app.snakelab.ParameterSpace import finite_choices
 class SimulationPolicyTests(unittest.TestCase):
     def test_required_defaults_and_independent_resolutions(self):
         config = SimulationConfiguration.defaults()
-        self.assertEqual(config['epochs'], 500)
+        self.assertEqual(config['epochs'], 1500)
         self.assertEqual(config['model']['type'], 'transformer')
         self.assertEqual(config['model']['heads'], 4)
         self.assertEqual(config['model']['hidden_size'], 64)
@@ -27,7 +27,7 @@ class SimulationPolicyTests(unittest.TestCase):
     def test_fixed_architecture_duration_and_required_nice(self):
         for path, value in ((('model', 'type'), 'rnn'), (('model', 'heads'), 8),
                             (('training', 'tau'), .001),
-                            (('epochs',), 1500), (('epsilon_nice', 'probability'), 0)):
+                            (('epochs',), 500), (('epsilon_nice', 'probability'), 0)):
             config = SimulationConfiguration.defaults()
             node = config
             for key in path[:-1]:

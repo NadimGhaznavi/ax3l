@@ -17,7 +17,7 @@ from ax3l.app.snakelab.prompts.ConfigurationChoice import ConfigurationChoice
 from ax3l.app.snakelab.prompts.ConfigurationNextStep import ConfigurationNextStep
 from ax3l.constants.DAx3l import DAx3l
 from ax3l.constants.DChoice import (
-    CHOICE_CHARTS, PARAMETER_SELECTION_SECONDS, REVISION_PARAMETER,
+    CHOICE_CHARTS, IMAGE_PROMPT_EXTRA_SECONDS, PARAMETER_SELECTION_SECONDS, REVISION_PARAMETER,
 )
 from ax3l.constants.DEventCategory import DEventCategory as Events
 from ax3l.constants.DSimulationAnalysis import DSimulationAnalysis
@@ -207,6 +207,10 @@ async def optimize(llm, output, db, endpoint):
                 else:
                     choice = EpsilonNiceChoice if parameter == "epsilon_nice_pair" else ConfigurationChoice
                     prompt = choice(draft, latest, golden, chart_scope, png)
+                if png is not None:
+                    decision_deadline += IMAGE_PROMPT_EXTRA_SECONDS
+                    draft.decision_expires_at += IMAGE_PROMPT_EXTRA_SECONDS
+                    experiments.save_draft(draft)
                 selected_count = len(draft.selections)
                 async with SnakeLabTools(endpoint, parameter, draft_id=draft.draft_id,
                                          allow_run=draft.phase == "reviewing") as tools:

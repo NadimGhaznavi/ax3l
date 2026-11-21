@@ -37,7 +37,7 @@ class ConfigurationTests(unittest.TestCase):
         values = json.loads(self.path.read_text())
         self.assertEqual(set(values['network']), {'report', 'zmq'})
         self.assertEqual(values['llamasrv_url'], 'http://127.0.0.1:51001')
-        self.assertEqual(values['decision_grace_seconds'], 300)
+        self.assertEqual(values['decision_grace_seconds'], 420)
         self.assertEqual(self.path.stat().st_mode & 0o777, 0o644)
         self.assertEqual(self.path.parent.stat().st_mode & 0o777, 0o755)
 
@@ -50,10 +50,10 @@ class ConfigurationTests(unittest.TestCase):
         self.assertEqual(self.read()['report'], ('127.0.0.2', 62000))
 
     def test_partial_overrides_and_missing_file_use_independent_defaults(self):
-        self.assertEqual(Configuration(self.path).decision_grace_seconds, 300)
+        self.assertEqual(Configuration(self.path).decision_grace_seconds, 420)
         defaults = self.read()
         self.write({'network': {'report': {'port': 62000}}})
-        self.assertEqual(Configuration(self.path).decision_grace_seconds, 300)
+        self.assertEqual(Configuration(self.path).decision_grace_seconds, 420)
         configured = self.read()
         self.assertEqual(configured['report'], ('0.0.0.0', 62000))
         self.assertEqual(defaults['report'], ('0.0.0.0', 28870))

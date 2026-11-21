@@ -1,6 +1,6 @@
 # Model and input features
 
-Ax3l uses Snake Lab to train a Transformer with four attention heads for 500
+Ax3l uses Snake Lab to train a Transformer with four attention heads for 1500
 episodes. The LLM chooses hidden width from 32 to 128 in steps of 8, encoder
 depth from 1 to 3 layers, and dropout from 0 to 0.1 in steps of 0.01. The
 defaults are width 64, one encoder layer, and dropout 0.05. The target update

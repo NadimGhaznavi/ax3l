@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.14.2] - 2026-11-20 @ 22:28
+
+### Summary
+
+Run 750-episode experiments.
+
+### Changed
+
+- Reduce the simulation epoch default and fixed experiment duration from 1,500
+  to 750, and update the LLM prompts and local guides to match.
+
 ## [4.14.1] - 2026-11-20 @ 22:24
 
 ### Summary

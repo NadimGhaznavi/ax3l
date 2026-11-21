@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.16.0] - 2026-11-21 @ 07:42
+
+### Summary
+
+Let the LLM tune empty space and collision rewards.
+
+### Added
+
+- Offer empty space rewards from -2 to +2 and separate snake and wall collision
+  rewards from -20 to 0 through the existing single-value tuning workflow,
+  with score-distribution evidence and readable status labels. Keep defaults
+  at 0, -10, and -10. Positive empty space rewards require a SnakeLab server
+  whose configuration schema accepts them.
+
+### Fixed
+
+- Preserve the original parameter order when restoring legacy experiment drafts
+  and remove fixed-reward assumptions from the LLM reward guidance.
+
+### Changed
+
+- Keep LLM data pages compact as the tuning menu grows.
+
 ## [4.15.0] - 2026-11-21 @ 05:06
 
 ### Summary

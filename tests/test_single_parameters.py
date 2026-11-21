@@ -9,7 +9,8 @@ from ax3l.app.snakelab.prompts.ComparisonSingle import ComparisonSingle
 
 class SingleParameterTests(unittest.TestCase):
     def test_prompts_offer_only_tunable_single_parameters_with_schema_rules(self):
-        expected = {'hidden_size', 'layers', 'dropout', 'sequence_length', 'batch_size', 'learning_rate', 'gamma'}
+        expected = {'hidden_size', 'layers', 'dropout', 'sequence_length', 'batch_size', 'learning_rate', 'gamma',
+                    'empty', 'snake', 'wall'}
         self.assertEqual(set(SINGLE_PARAMETERS), expected)
         for parameter in expected:
             for prompt in (FirstContactSingle(parameter), ComparisonSingle(parameter)):

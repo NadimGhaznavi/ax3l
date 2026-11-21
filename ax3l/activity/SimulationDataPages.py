@@ -30,7 +30,8 @@ PAGE_LABELS = {
 
 
 def data_json(scope: str, seed: int, data: dict) -> str:
-    return json.dumps(dict(scope=scope, seed=seed, **data), ensure_ascii=False, allow_nan=False, indent=2)
+    return json.dumps(dict(scope=scope, seed=seed, **data), ensure_ascii=False, allow_nan=False,
+                      separators=(",", ":"))
 
 
 def links(scope: str, pages: tuple[str, ...]) -> str:

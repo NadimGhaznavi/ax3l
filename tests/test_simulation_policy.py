@@ -21,6 +21,8 @@ class SimulationPolicyTests(unittest.TestCase):
         self.assertEqual(config['model']['dropout'], .05)
         self.assertEqual(config['epsilon_nice'], {'probability': .05, 'steps': 20})
         self.assertEqual(config['epsilon'], {'initial': .96, 'minimum': 0, 'decay': .97})
+        self.assertEqual({key: config['game']['rewards'][key] for key in ('empty', 'snake', 'wall')},
+                         {'empty': 0, 'snake': -10, 'wall': -10})
         config['epsilon_nice']['probability'] = 0
         self.assertEqual(SimulationConfiguration.defaults()['epsilon_nice']['probability'], .05)
 
@@ -95,3 +97,29 @@ class SimulationPolicyTests(unittest.TestCase):
         for value in (True, '.01', float('nan'), float('inf')):
             with self.subTest(value=value), self.assertRaises(ValidationError):
                 SimulationConfiguration.value(('epsilon_nice', 'probability'), value)
+
+    def test_move_and_collision_rewards_accept_boundaries_and_fractional_values(self):
+        for field, values in (('empty', (-2, -1.25, 0, .25, 2)),
+                              ('snake', (-20, -2.5, 0)), ('wall', (-20, -2.5, 0))):
+            for value in values:
+                with self.subTest(field=field, value=value):
+                    path = ('game', 'rewards', field)
+                    self.assertEqual(SimulationConfiguration.value(path, value), value)
+                    config = SimulationConfiguration.defaults()
+                    config['game']['rewards'][field] = value
+                    SimulationConfiguration.validate(config)
+
+    def test_reward_limits_apply_to_choices_and_complete_configurations(self):
+        for field, values in (('empty', (-2.001, 2.001)),
+                              ('snake', (-20.001, .001)), ('wall', (-20.001, .001)),
+                              ('food', (5,)), ('max_moves', (-5,))):
+            for value in values:
+                with self.subTest(field=field, value=value):
+                    path = ('game', 'rewards', field)
+                    with self.assertRaises(ValidationError):
+                        SimulationConfiguration.value(path, value)
+                    config = SimulationConfiguration.defaults()
+                    config['game']['rewards'][field] = value
+                    with self.assertRaises(ValidationError) as error:
+                        SimulationConfiguration.validate(config)
+                    self.assertEqual(tuple(error.exception.absolute_path), path)

@@ -201,6 +201,11 @@ class AnalysisRunDataTests(unittest.TestCase):
         self.assertEqual(parameters['model.hidden_size']['multipleOf'], 8)
         self.assertEqual(parameters['model.layers']['enum'], [1, 2, 3])
         self.assertEqual(parameters['model.dropout']['enum'], [n / 100 for n in range(11)])
+        self.assertEqual(parameters['game.rewards.empty'], dict(type='number', minimum=-2, maximum=2))
+        for field in ('snake', 'wall'):
+            self.assertEqual(parameters[f'game.rewards.{field}'], dict(type='number', minimum=-20, maximum=0))
+        self.assertNotIn('game.rewards.food', parameters)
+        self.assertNotIn('game.rewards.max_moves', parameters)
         self.assertNotIn('seed', parameters)
         self.assertNotIn('epochs', parameters)
         self.assertNotIn('model.heads', parameters)

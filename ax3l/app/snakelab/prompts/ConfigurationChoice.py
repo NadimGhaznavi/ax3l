@@ -20,6 +20,10 @@ CHART_EVIDENCE = {
                ("mean_first_50_scores", "mean_last_50_scores", "epsilon_random_actions"), "scores", "score statistics"),
     "distribution": ("Use score spread to judge how reliably the snake found food.",
                      ("median_score", "zero_score_episodes", "high_score_episodes"), "endings", "how episodes ended"),
+    "endings": ("Bars show snake collisions, wall collisions, and max moves as percentages of all episodes. "
+                "Labels round to whole percent and give exact counts. Other outcomes are noted below the bars. "
+                "Use ending reasons with food scores to judge collision rewards.",
+                ("termination_reasons",), "endings", "how episodes ended"),
 }
 
 

@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.18.0] - 2026-11-21 @ 10:57
+
+### Summary
+
+Show how games ended when choosing snake and wall collision rewards.
+
+### Added
+
+- Add a game-ending chart with fixed-order horizontal bars for snake collisions,
+  wall collisions, and max moves, a 0–100% axis, whole-percent labels, and exact
+  episode counts. All episodes remain in the denominator; omitted outcomes are
+  noted below the bars.
+
+### Changed
+
+- Use ending-reason charts and exact JSON measurements in snake and wall reward
+  prompts, with a short interpretation guide. Stored percentages retain full precision.
+
 ## [4.17.0] - 2026-11-21 @ 08:10
 
 ### Changed

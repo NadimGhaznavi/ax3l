@@ -29,6 +29,6 @@ CHOICE_CHARTS = {
     "epsilon_pair": "scores",
     "reward_pair": "distribution",
     "empty": "distribution",
-    "snake": "distribution",
-    "wall": "distribution",
+    "snake": "endings",
+    "wall": "endings",
 }

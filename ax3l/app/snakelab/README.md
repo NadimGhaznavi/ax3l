@@ -59,8 +59,11 @@ assignment calls for it:
   appear in orange when recorded. Missing losses are excluded from the means
   and remain gaps in both traces.
 - The epsilon pair uses the score trend.
-- The distance-reward pair and the empty space, snake collision, and wall
-  collision rewards use the score distribution.
+- The distance-reward pair and the empty space reward use the score distribution.
+- Snake and wall collision rewards use three horizontal bars for snake collisions,
+  wall collisions, and max moves. Labels show whole percentages and exact counts.
+  All episodes remain in the denominator, with other outcomes noted below the bars.
+  The prompt's JSON retains full measured precision.
 
 EpsilonNice choices use `EpsilonNiceChoice`, which adds a compact definition of
 the custom exploration rule, its probability and duration, and episode resets.

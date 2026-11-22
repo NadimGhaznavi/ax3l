@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.21.1] - 2026-11-22 @ 11:23
+
 ### Summary
 
 Return complete draft and reference-run snapshots in one browser read, and

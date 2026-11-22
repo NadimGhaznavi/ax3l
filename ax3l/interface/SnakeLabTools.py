@@ -16,7 +16,7 @@ from mcp.client.stdio import StdioServerParameters
 
 class SnakeLabTools:
     def __init__(self, endpoint: str, parameter: str, *, draft_id: str | None = None,
-                 run_id: str | None = None, section: str | None = None, allow_run: bool = False):
+                 run_id: str | None = None, section: str | None = None):
         if (parameter not in SINGLE_PARAMETERS and parameter not in PAIR_PARAMETERS
                 and parameter not in ("seed", "simulation_summary", REVISION_PARAMETER)):
             raise ValueError(f"Unknown conversation parameter: {parameter}")
@@ -24,14 +24,12 @@ class SnakeLabTools:
                            "select_parameter" if parameter == REVISION_PARAMETER else
                            "request_seed_change" if parameter == "seed" else
                            "submit_pair_values" if parameter in PAIR_PARAMETERS else "submit_single_value")
-        self._allow_run = allow_run
+        self._configuration_session = draft_id is not None and parameter != "simulation_summary"
         root = Path(__file__).resolve().parents[2]
         environment = {"PYTHONPATH": str(root), "AX3L_ZMQ_ENDPOINT": endpoint,
                        "AX3L_CONVERSATION_PARAMETER": parameter, "PYTHONDONTWRITEBYTECODE": "1"}
         if draft_id is not None:
             environment["AX3L_CONFIGURATION_DRAFT"] = draft_id
-        if allow_run:
-            environment["AX3L_ALLOW_RUN"] = "1"
         if run_id is not None:
             environment["AX3L_ANALYSIS_RUN"] = run_id
         if section is not None:
@@ -47,7 +45,7 @@ class SnakeLabTools:
             tools = await self._client.list_tools()
             by_name = {tool.name: tool for tool in tools.tools}
             names = [self._tool_name]
-            if self._allow_run:
+            if self._configuration_session:
                 names.append("run_simulation")
             names.append("kb_tool")
             self.definitions = [{"type": "function", "function": {

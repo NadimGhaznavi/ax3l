@@ -1,20 +1,25 @@
 """Private MCP sessions bind identifiers and forward choices through real ZMQ."""
 
 import json
+from copy import deepcopy
 from pathlib import Path
 import sys
 from threading import Event
 from time import monotonic
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from mcp import Client
 from mcp.client.stdio import StdioServerParameters
 
 from ax3l.app.Prompt import Prompt
 from ax3l.app.snakelab.ToolConversation import converse, DecisionTimeExpired
+from ax3l.app.snakelab.RunSimulationHandler import RunSimulationHandler
+from ax3l.app.snakelab.SelectParameterHandler import SelectParameterHandler
+from ax3l.app.snakelab.prompts.ConfigurationNextStep import ConfigurationNextStep
 from ax3l.constants.DChoice import REVISION_PARAMETER
-from ax3l.entities.ConfigurationDraft import PARAMETER_ORDER
+from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
+from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 from ax3l.interface.SnakeLabTools import SnakeLabTools
 from ax3l.zmq.ZMQServer import ZMQServer
 
@@ -36,7 +41,7 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
         llm.complete.return_value = (200, '', json.dumps({'choices': [{'message': dict(role='assistant', tool_calls=[
             dict(id='data', type='function', function=dict(name='kb_tool', arguments='{"url":"/draft"}'))])}]}).encode())
         with ZMQServer('tcp://127.0.0.1:*', handle) as server:
-            async with SnakeLabTools(server.endpoint, REVISION_PARAMETER, draft_id='draft', allow_run=True) as tools:
+            async with SnakeLabTools(server.endpoint, REVISION_PARAMETER, draft_id='draft') as tools:
                 now = monotonic()
                 try:
                     with self.assertRaises(DecisionTimeExpired):
@@ -78,7 +83,7 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
         with ZMQServer('tcp://127.0.0.1:*', handle) as server:
             async with SnakeLabTools(server.endpoint, REVISION_PARAMETER, draft_id='private-draft') as tools:
                 self.assertEqual([definition['function']['name'] for definition in tools.definitions],
-                                 ['select_parameter', 'kb_tool'])
+                                 ['select_parameter', 'run_simulation', 'kb_tool'])
                 self.assertEqual(set(tools.definition['function']['parameters']['properties']), {'parameter'})
                 description = tools.definition['function']['description']
                 self.assertIn("prompt's available list", description)
@@ -94,7 +99,6 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
                     with self.assertRaises(RuntimeError):
                         await tools.submit(arguments)
                 self.assertTrue((await tools._client.call_tool('submit_single_value', dict(value=72))).is_error)
-                self.assertTrue((await tools._client.call_tool('run_simulation', {})).is_error)
                 self.assertTrue((await tools._client.call_tool('request_seed_change', {})).is_error)
                 self.assertEqual(len(requests), 2)
             async with SnakeLabTools(server.endpoint, 'layers', draft_id='private-draft') as tools:
@@ -150,7 +154,7 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
 
         with ZMQServer('tcp://127.0.0.1:*', handle) as server:
             async with SnakeLabTools(server.endpoint, REVISION_PARAMETER,
-                                     draft_id='private-draft', allow_run=True) as tools:
+                                     draft_id='private-draft') as tools:
                 self.assertEqual([definition['function']['name'] for definition in tools.definitions],
                                  ['select_parameter', 'run_simulation', 'kb_tool'])
                 for action, arguments, phase in (('run_simulation', {}, 'ready'),
@@ -161,6 +165,54 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
                                      phase)
                     self.assertEqual(requests[-1].method, action)
                     self.assertEqual(requests[-1].payload, dict(draft_id='private-draft', **arguments))
+
+    async def test_duplicate_run_returns_to_the_screen_and_preserves_research(self):
+        requests, db, store, snake = [], Mock(), Mock(), Mock()
+        draft = ConfigurationDraft('private-draft', 'gold', {}, SimulationConfiguration.defaults())
+        original_config = deepcopy(draft.config)
+        store.draft.return_value = draft
+        snake.is_config_unique.return_value = False
+        snake.available_parameters.side_effect = lambda config, parameters: parameters
+
+        def reply(name, arguments):
+            return 200, '', json.dumps({'choices': [{'message': dict(role='assistant', tool_calls=[
+                dict(id=name, type='function', function=dict(name=name, arguments=json.dumps(arguments)))])}]}).encode()
+
+        with patch('ax3l.app.snakelab.RunSimulationHandler.ExperimentDb', return_value=store), \
+                patch('ax3l.app.snakelab.SelectParameterHandler.ExperimentDb', return_value=store), \
+                patch('ax3l.app.snakelab.SubmitSingleValueHandler.SnakeLab', return_value=snake):
+            run, select = RunSimulationHandler(db), SelectParameterHandler(db)
+
+            def handle(message):
+                requests.append(message)
+                if message.method == 'read_simulation_data':
+                    return dict(status='ok', page='Previously read experiment data.')
+                return (run if message.method == 'run_simulation' else select).submit(message.payload)
+
+            screen = ConfigurationNextStep(draft, PARAMETER_ORDER)
+            llm = Mock(url='fixture')
+            llm.complete.side_effect = [reply('kb_tool', dict(url='/latest')),
+                                       reply('run_simulation', {}),
+                                       reply('select_parameter', dict(parameter='gamma'))]
+            with ZMQServer('tcp://127.0.0.1:*', handle) as server:
+                async with SnakeLabTools(server.endpoint, REVISION_PARAMETER, draft_id=draft.draft_id) as tools:
+                    result = await converse(llm, Path('/tmp'), db, tools, [screen],
+                                            conversation_deadline=monotonic() + 300)
+        self.assertEqual(result['phase'], 'choosing')
+        self.assertEqual([request.method for request in requests],
+                         ['read_simulation_data', 'run_simulation', 'select_parameter'])
+        messages = json.loads(llm.complete.call_args.args[0])['messages']
+        self.assertIn('Previously read experiment data.', [message.get('content') for message in messages])
+        feedback = [message['content'] for message in messages if message['role'] == 'user'][-1]
+        self.assertIn('configuration already exists', feedback)
+        self.assertTrue(feedback.endswith(screen.to_md()))
+        self.assertNotIn('private-draft', json.dumps(messages))
+        self.assertEqual(draft.config, original_config)
+        self.assertEqual(draft.selections, [])
+        self.assertEqual(draft.parameter, 'gamma')
+        store.save_draft.assert_called_once_with(draft)
+        snake.is_config_unique.assert_called_once_with(original_config)
+        snake.submit_simulation.assert_not_called()
 
     async def test_single_choices_bind_the_draft_and_parameter_outside_model_arguments(self):
         requests = []
@@ -177,6 +229,7 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
                 ('wall', -5, 'at least -20; at most 0'),
             ):
                 async with SnakeLabTools(server.endpoint, parameter, draft_id='draft') as tools:
+                    self.assertIn('run_simulation', [definition['function']['name'] for definition in tools.definitions])
                     self.assertEqual(set(tools.definition['function']['parameters']['properties']), {'value'})
                     self.assertIn('Save a changed value in the draft.', tools.definition['function']['description'])
                     self.assertIn(rule, tools.definition['function']['description'])
@@ -210,7 +263,7 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
         with ZMQServer('tcp://127.0.0.1:*', handle) as server:
             async with SnakeLabTools(server.endpoint, 'seed', draft_id='private-draft') as tools:
                 self.assertEqual([definition['function']['name'] for definition in tools.definitions],
-                                 ['request_seed_change', 'kb_tool'])
+                                 ['request_seed_change', 'run_simulation', 'kb_tool'])
                 self.assertEqual(tools.definition['function']['parameters']['properties'], {})
                 self.assertNotIn('private-draft', json.dumps(tools.definitions))
                 self.assertTrue((await tools._client.call_tool('submit_single_value', {'value': 99})).is_error)
@@ -251,6 +304,7 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
             return {'status': 'ok', 'analysis_run_id': 'bound-run'}
         with ZMQServer('tcp://127.0.0.1:*', handle) as server:
             async with SnakeLabTools(server.endpoint, 'simulation_summary', run_id='bound-run', section='loss') as tools:
+                self.assertNotIn('run_simulation', [definition['function']['name'] for definition in tools.definitions])
                 self.assertEqual(set(tools.definition['function']['parameters']['properties']), {'summary'})
                 text = 'Scores rose during training. Most games ended at walls.'
                 self.assertEqual((await tools.submit({'summary': text}))['analysis_run_id'], 'bound-run')

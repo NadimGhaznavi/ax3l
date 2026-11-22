@@ -30,9 +30,11 @@ Fixed fields remain application-controlled.
 After every submitted value or pair, Ax3l checks the **whole configuration**
 against all stored runs. A duplicate is rejected without saving it; Qwen must
 submit different values for the same selected setting in the same conversation.
-It cannot switch parameters or run until the setting produces a unique draft.
-A unique configuration gives Qwen both `select_parameter` and
-`run_simulation`: change an unused setting or run now. Each parameter can be
+`run_simulation` remains available throughout configuration setup. It checks
+the saved whole configuration for duplicates, including when no settings have
+changed. A rejection redisplays the current screen without discarding research
+or resetting the decision timer. An accepted run uses saved values and clears
+any pending setting assignment. Each parameter can be
 selected only once within a draft, including after a restart. Used parameters
 are omitted from the next selection prompt and rejected by the selection tool.
 There is no fixed parameter order or requirement to change every setting.
@@ -169,13 +171,13 @@ JSON data; transport envelopes and full identifiers remain internal.
 | `submit_single_value` | `value` | Draft UUID and assigned parameter |
 | `submit_pair_values` | `value_1`, `value_2` | Draft UUID and assigned pair |
 | `select_parameter` | `parameter` | Active draft UUID |
-| `run_simulation` | None | Unique draft UUID |
+| `run_simulation` | None | Active draft UUID |
 | `request_seed_change` (legacy) | None | Draft UUID and selected seed choice |
 | `kb_tool` | `url` | Local guides, selection draft and frozen references, or analysis run |
 
 `AX3L_CONVERSATION_PARAMETER` identifies the single or pair.
-It is `revision` while Qwen chooses the next step. `AX3L_ALLOW_RUN=1` exposes
-the run action only after the configuration passes its uniqueness check.
+It is `revision` while Qwen chooses the next step. The run action is exposed
+in every configuration session; chart-summary sessions cannot run simulations.
 `AX3L_CONFIGURATION_DRAFT` binds the selection session. Numeric inputs reject
 strings, booleans, nonfinite values, and schema violations. The model cannot
 replace the bound identifiers in its tool arguments.

@@ -14,8 +14,8 @@ actions, leaving the analysis method to Qwen.
 
 | Prompt | Purpose |
 | --- | --- |
-| `ConfigurationNextStep` | Presents the experiment menu, draft status, and available settings in JSON. Offers Run next simulation once the draft is unique. |
-| `ConfigurationChoice` | Presents the selected setting, its save action, reference links, and JSON evidence. Learning rate, epsilon, and distance rewards can include a chart. |
+| `ConfigurationNextStep` | Presents the experiment menu, draft status, and available settings in JSON. Always offers Run next simulation. |
+| `ConfigurationChoice` | Presents the selected setting, save and run actions, reference links, and JSON evidence. Learning rate, epsilon, and distance rewards can include a chart. |
 | `EpsilonNiceChoice` | Adds a compact definition of the custom EpsilonNice exploration rule when choosing its probability and steps. |
 | `InvalidValue` | Explains why Ax3l rejected a value. |
 | `NoDupes` | Identifies the duplicate proposal and asks Qwen to try different values for the same setting. |
@@ -25,6 +25,13 @@ once per draft, in any order. `submit_single_value` and `submit_pair_values`
 save changes using the limits in their tool descriptions. Ax3l binds the draft
 and setting identifiers. Duplicate proposals stay in the same conversation
 while untested values remain for that setting.
+
+Run next simulation stays visible throughout setup. The screen says, "Choose
+the Run next simulation option when you are done making changes to the
+configuration." Saved changes are labelled Changes saved. Running checks the
+saved configuration for duplicates. A rejected run returns to the same screen
+and preserves the conversation and its decision timer. Unsaved values are not
+included in an accepted run.
 
 `select_parameter("seed")` immediately saves the next unused seed once per
 draft, without a separate seed confirmation conversation or tool call. After

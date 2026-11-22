@@ -1,4 +1,4 @@
-{% from "navigation.md.jinja" import lab, reference_labels %}
+{% from "navigation.md.jinja" import lab, reference_labels, run_action %}
 {{ lab("Change " ~ label) }}
 
 {{ selection }}
@@ -26,6 +26,8 @@ Chart: {{ chart_scope }}.
 - [{{ reference_labels[chart_scope] }}](/{{ chart_scope }})
 
 {% endif %}
+{{ run_action() }}
+
 Open menu URLs with kb_tool.
 
 ## Current values and reference data

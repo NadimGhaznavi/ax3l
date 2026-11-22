@@ -167,7 +167,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(candidate['epsilon_nice'], self.config['epsilon_nice'])
         self.assertEqual(set(self.store.saved.selections), {'gamma', 'layers'})
         self.assertEqual(len(self.store.saved.selections), 2)
-        self.assertEqual(self.snake.is_config_unique.call_count, 2)
+        self.assertEqual(self.snake.is_config_unique.call_count, 3)
         self.snake.submit_simulation.assert_called_once()
         self.wait.assert_awaited_once_with(self.snake, self.db, self.run)
         self.assertEqual(self.store.saved.phase, 'completed')
@@ -175,16 +175,15 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
             prompt = call.args[4][0].to_md()
             self.assertIn('kb_tool', prompt)
             self.assertIn('/draft', prompt)
+            self.assertIn('Run next simulation', prompt)
             for run_id in (self.gold, self.latest, self.best):
                 self.assertNotIn(run_id.split('-')[0], prompt)
-        self.assertFalse(self.tools.call_args_list[0].kwargs['allow_run'])
-        self.assertTrue(self.tools.call_args_list[-1].kwargs['allow_run'])
 
     async def test_one_change_can_run_without_choosing_the_other_settings(self):
         await self.cycle()
         self.assertEqual(self.trace(), [REVISION_PARAMETER, 'learning_rate', REVISION_PARAMETER])
         self.assertEqual(self.store.saved.selections, ['learning_rate'])
-        self.assertEqual(self.snake.is_config_unique.call_count, 1)
+        self.assertEqual(self.snake.is_config_unique.call_count, 2)
         self.snake.submit_simulation.assert_called_once()
 
     async def test_qwen_can_tune_food_move_and_collision_rewards_independently(self):
@@ -407,7 +406,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.rotation.await_count, 1)
 
     async def test_duplicates_keep_the_parameter_and_reset_the_budget_only_after_unique_acceptance(self):
-        self.snake.is_config_unique.side_effect = [False, True]
+        self.snake.is_config_unique.side_effect = [False, True, True]
         self.decisions = ['layers', 'run']
         choose = self.conversation.side_effect
         reported_deadlines = []
@@ -443,9 +442,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(candidate['model']['layers'], 3)
         self.assertEqual(candidate['game']['rewards'], self.config['game']['rewards'])
         self.assertEqual(candidate['epsilon_nice'], self.config['epsilon_nice'])
-        self.assertEqual(self.snake.is_config_unique.call_count, 2)
-        self.assertEqual([call.kwargs['allow_run'] for call in self.tools.call_args_list],
-                         [False, False, True])
+        self.assertEqual(self.snake.is_config_unique.call_count, 3)
         self.snake.submit_simulation.assert_called_once()
 
     async def test_expired_unique_draft_completes_the_normal_cycle_and_starts_a_new_experiment(self):
@@ -526,7 +523,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
                 now = 941
             return dict(status='ok', page='Research from the expired conversation.')
 
-        def session(endpoint, parameter, *, draft_id, allow_run):
+        def session(endpoint, parameter, *, draft_id):
             name, field = (('select_parameter', 'parameter') if parameter == REVISION_PARAMETER
                            else ('submit_single_value', 'value'))
             definitions = [dict(function=dict(name=tool, parameters=dict(properties={argument: {}})))
@@ -615,7 +612,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         await self.cycle()
         self.assertEqual(self.trace(), [REVISION_PARAMETER])
         self.assertIn('run_simulation', self.prompts[0])
-        self.snake.is_config_unique.assert_not_called()
+        self.snake.is_config_unique.assert_called_once()
         self.snake.submit_simulation.assert_called_once()
 
     async def test_interrupted_reference_preparation_preserves_each_decision(self):

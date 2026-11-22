@@ -130,6 +130,8 @@ async def converse(llm, output, db, tools, prompts, *, parameter: str | None = N
                              "content": result["page"] if result["status"] == "ok" else "Rejected."})
             if result["status"] == "rejected":
                 feedback = result["prompt"]
+                if called_name == "run_simulation":
+                    feedback = {**feedback, "content": feedback["content"] + "\n\n" + prompts[-1].to_md()}
                 messages.append(feedback)
                 log(Events.Conversation, Events.Conversation.PROMPT, json.dumps(feedback, ensure_ascii=False),
                     source_name=result.get("source_name", "ToolConversation"))

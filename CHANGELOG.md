@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Restart interrupted experiment setups without erasing simulation history, and
+make the per-setting submission tool and arguments explicit.
+
+### Added
+
+- Add `scripts/wipe-experiment-workspace.sh` to stop Ax3l services, clear the
+  current unsubmitted draft and its setup conversations, and restart with a
+  fresh experiment from golden. Preserve completed runs, baseline history,
+  and saved analyses. Refuse submitted experiments and active seed rotations.
+- Delete the selected workspace and associated tool receipts in one transaction,
+  with cascading event-detail cleanup and rollback on failure.
+
+### Changed
+
+- State `submit_single_value(value)` or `submit_pair_values(value_1, value_2)`
+  on each setting screen, identifying the paired fields in argument order.
+
 ## [4.21.5] - 2026-11-22 @ 14:48
 
 ### Summary

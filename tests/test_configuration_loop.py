@@ -196,6 +196,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         await self.cycle()
         self.assertEqual(self.trace(), [REVISION_PARAMETER, 'learning_rate', REVISION_PARAMETER])
         self.assertEqual(self.store.saved.selections, ['learning_rate'])
+        self.assertIn('Submit learning rate with submit_single_value using the numeric value argument.', self.prompts[1])
         self.assertEqual(self.snake.is_config_unique.call_count, 2)
         self.snake.submit_simulation.assert_called_once()
 
@@ -311,6 +312,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         prompt = prompts['epsilon_nice_pair']
         content = json.loads(prompt.to_json())['content']
         self.assertEqual(prompt.source_name, 'EpsilonNiceChoice')
+        self.assertIn('submit_pair_values: value_1 is the new probability, and value_2 is the new steps.', content)
         for text in ('EpsilonNice applies after ordinary epsilon exploration ends',
                      'value_1', 'eligible move outside a detour', 'next move',
                      'value_2 moves', 'immediately safe alternative',

@@ -56,6 +56,28 @@ class ExperimentDb:
         self._db.log(Events.Configuration.DRAFT_SAVED, Events.Configuration.CATEGORY,
                      "INFO", json.dumps(asdict(draft), allow_nan=False), process_id=draft.draft_id)
 
+    def wipe_workspace(self) -> tuple[str, int] | None:
+        """Delete the current unsubmitted setup while Ax3l services are stopped."""
+        with self._db.transaction():
+            draft = self.draft()
+            if draft is None or draft.phase in ("completed", "failed"):
+                return None
+            if (draft.phase not in ("preparing", "selecting_parameter", "choosing", "reviewing", "ready")
+                    or draft.run_id is not None):
+                raise ValueError(f"Cannot wipe an experiment in phase {draft.phase!r} with run {draft.run_id!r}. "
+                                 "Only an unsubmitted setup can be cleared.")
+            # Server-side tool receipt events have no process_id; their payload
+            # identifies the draft. Other runs' analyses and golden events remain.
+            selected = """e.process_id = %s OR
+                (e.category = %s AND e.name = %s
+                 AND JSON_UNQUOTE(JSON_EXTRACT(m.content, '$.payload.draft_id')) = %s)"""
+            params = (draft.draft_id, Events.Tool.CATEGORY, Events.Tool.RECEIVED, draft.draft_id)
+            self._db.execute(f"""UPDATE events e JOIN event_messages m USING (event_id)
+                SET e.parent_event_id = NULL WHERE {selected}""", params)
+            count = self._db.execute(f"""DELETE e FROM events e JOIN event_messages m USING (event_id)
+                WHERE {selected}""", params)
+            return draft.draft_id, count
+
     def analysis(self, run_id: str) -> SimulationAnalysis | None:
         data = self._latest(Events.SnakeLab.CATEGORY, Events.SnakeLab.ANALYZED, run_id)
         return SimulationAnalysis(**data) if data is not None else None

@@ -4,6 +4,7 @@ import asyncio
 from copy import deepcopy
 import json
 import os
+import re
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -94,10 +95,11 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
                 self_test.assertEqual(calls, [])
                 content = request['messages'][0]['content']
                 text = content[0]['text'] if isinstance(content, list) else content
-                evidence = json.loads(text.split('```json\n')[1].split('\n```')[0])
+                evidence = {key: value for block in re.findall(r'```json\n(.*?)\n```', text, re.DOTALL)
+                            for key, value in json.loads(block).items()}
                 self_test.assertEqual(evidence['runs']['golden']['high_score'], 10)
                 if tool == 'select_parameter':
-                    eligible = evidence['settings']
+                    eligible = {key for key, setting in evidence['settings'].items() if setting['editable']}
                     self_test.assertTrue(set(eligible).isdisjoint(selections))
                     names = [definition['function']['name'] for definition in request['tools']]
                     self_test.assertIn('run_simulation', names)

@@ -35,6 +35,20 @@ class JsonMarkdownTests(unittest.TestCase):
             self.assertIn(f'>{value}</', html)
         self.assertEqual(html.count('<table>'), 1)
 
+    def test_grouped_configuration_settings_render_as_rows_in_status_previews(self):
+        data = dict(settings={
+            'learning_rate': dict(label='learning rate', values=dict(golden=.001, draft=.003), editable=False),
+            'gamma': dict(label='gamma', values=dict(golden=.96, draft=.96), editable=True),
+        })
+        html = self.render(json.dumps(data))
+        self.assertIn('<h3>settings</h3>', html)
+        self.assertIn('<th>editable</th>', html)
+        self.assertIn('<td>learning rate</td>', html)
+        self.assertNotIn('<th>learning rate</th>', html)
+        self.assertIn('golden: 0.001; draft: 0.003', html)
+        self.assertIn('<td>false</td>', html)
+        self.assertIn('<td>true</td>', html)
+
     def test_actual_draft_json_block_is_compact_and_keeps_every_setting(self):
         config = SimulationConfiguration.defaults()
         draft = ConfigurationDraft('draft', 'gold', {}, config)

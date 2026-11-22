@@ -43,7 +43,7 @@ def json_markdown(value: Any) -> str:
     """Handle the nested settings, scalar lists, and record lists used in reports."""
     if isinstance(value, dict) and value:
         records = list(value.values())
-        if (all(isinstance(record, dict) and record for record in records)
+        if (len(records) > 1 and all(isinstance(record, dict) and record for record in records)
                 and all(record.keys() == records[0].keys() for record in records)):
             keys = list(records[0])
             return _table(["Field", *(key.replace("_", " ") for key in keys)],

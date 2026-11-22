@@ -53,3 +53,14 @@ class PageBrowserTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual((await browser.read(url))["status"], "rejected")
         with self.assertRaisesRegex(ValueError, "bind a conversation"):
             await browser.read("/draft")
+
+    async def test_definitions_use_local_reference_pages_without_data_reads(self):
+        read = AsyncMock()
+        browser = PageBrowser(read)
+        for name in ('best', 'golden', 'latest', 'draft'):
+            page = await browser.read(f'/definitions/{name}.md')
+            self.assertEqual(page['status'], 'ok')
+            self.assertIn("Don't show your reasoning in the prompt.", page['page'])
+        for url in ('/definitions/missing.md', '/definitions/../model.md', '/definitions/draft.md?x=1'):
+            self.assertEqual((await browser.read(url))['status'], 'rejected')
+        read.assert_not_awaited()

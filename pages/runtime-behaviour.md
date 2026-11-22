@@ -67,8 +67,10 @@ controlled by Ax3l.
 
 Ax3l loads the same short selection skill at the start of each choice. The
 setup and choice prompts include best, golden, latest, and draft values in
-JSON, together with complete reference-run configurations, results, saved
-observations, and the saved draft. Qwen receives at most one chart per choice.
+JSON for configurable settings, together with reference-run results and saved
+observations. The main page keeps saved draft values visible and marks which
+settings are editable. Historical results omit repeated configurations and
+redundant run roles. Qwen receives at most one chart per choice.
 
 | Choice | Chart | Measured facts alongside it |
 | --- | --- | --- |
@@ -86,8 +88,11 @@ after a seed change, runs on other seeds are labeled as historical context.
 Ax3l records the completed simulation's
 measurements directly from episode data.
 
-English directions in the prompt lead to `/guides` through `kb_tool` when
-Qwen wants lab reference. Configuration and run data are already in the screen;
+English definition links open through `kb_tool` and return to the main
+configuration page. Saving a setting returns to a freshly rendered main page
+with the updated draft values. Definition pages include "Don't show your
+reasoning in the prompt." `/guides` remains available for lab reference.
+Configuration and run data are already in the screen;
 the menus no longer offer separate draft and reference-run reads. Older data
 URLs remain readable. Navigation uses English
 and experiment values use JSON. Guide and data pages, prompt wording, and tool

@@ -1,7 +1,6 @@
 """Prepare experiment values independently of their page presentation."""
 
 from ax3l.app.snakelab.ParameterSpace import parameter_paths
-from ax3l.constants.DChoice import REFERENCE_LABELS
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
@@ -41,14 +40,16 @@ def config_values(scope: str, page: str, config: dict) -> dict:
     return scoped_values(scope, config["seed"], data)
 
 
-def run_snapshot_values(scope: str, draft: ConfigurationDraft, analysis: SimulationAnalysis, target: int) -> dict:
-    labels = [REFERENCE_LABELS[role] for role, run_id in draft.references.items()
-              if run_id == analysis.run_id]
+def run_result_values(scope: str, draft: ConfigurationDraft, analysis: SimulationAnalysis, target: int) -> dict:
     score = analysis.metrics["high_score"]
     return scoped_values(scope, analysis.config["seed"], dict(
-        roles=labels, high_score=score, golden_target_score=target, score_difference=score - target,
+        high_score=score, golden_target_score=target, score_difference=score - target,
         same_seed_as_draft=analysis.config["seed"] == draft.config["seed"],
-        config=analysis.config, metrics=analysis.metrics, summary=analysis.summary))
+        metrics=analysis.metrics, summary=analysis.summary))
+
+
+def run_snapshot_values(scope: str, draft: ConfigurationDraft, analysis: SimulationAnalysis, target: int) -> dict:
+    return dict(run_result_values(scope, draft, analysis, target), config=analysis.config)
 
 
 def run_values(scope: str, page: str, analysis: SimulationAnalysis) -> dict:

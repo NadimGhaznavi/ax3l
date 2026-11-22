@@ -2,7 +2,7 @@
 
 from ax3l.app.snakelab.ParameterSpace import parameter_values
 from ax3l.app.snakelab.PairParameters import PAIR_PARAMETERS
-from ax3l.activity.SimulationDataValues import draft_values, run_snapshot_values
+from ax3l.activity.SimulationDataValues import run_result_values
 from ax3l.constants.DChoice import CHOICE_CHARTS, CHOICE_LABELS
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
@@ -23,8 +23,7 @@ def configuration_evidence(draft: ConfigurationDraft, parameters: list[str],
         settings[parameter] = dict(label=CHOICE_LABELS[parameter], values=values)
     target = runs["golden"].metrics["high_score"]
     return dict(settings=settings,
-                runs={scope: run_snapshot_values(scope, draft, run, target) for scope, run in runs.items()},
-                draft=draft_values(draft))
+                runs={scope: run_result_values(scope, draft, run, target) for scope, run in runs.items()})
 
 
 def choice_context(draft: ConfigurationDraft, references: dict[str, SimulationAnalysis],

@@ -63,7 +63,9 @@
             {% if row.selected is false %}<span class="pending-label">{{ 'Pending' if row.current else '—' }}</span>
             {% else %}<span class="parameter-value">{{ row.value }}</span>{% endif %}
           </td>
-          <td></td><td></td><td></td>
+          <td class="item-elapsed">{% if row.steps %}<strong>{{ row.totals.elapsed }}</strong>{% endif %}</td>
+          <td class="item-tokens">{% if row.steps %}<strong>{{ '{:,}'.format(row.totals.input_tokens) }}</strong>{% endif %}</td>
+          <td class="item-tokens">{% if row.steps %}<strong>{{ '{:,}'.format(row.totals.output_tokens) }}</strong>{% endif %}</td>
         </tr>
       </tbody>
       {% if row.steps %}

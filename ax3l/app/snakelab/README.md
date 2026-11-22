@@ -212,6 +212,14 @@ calling SnakeLab. If interrupted during submission, Ax3l reconciles by the full
 configuration and monitors the existing run; it never automatically sends an
 ambiguous submission again. A missing matching run raises an explicit error.
 Recorded comparisons and promotions are recovered before the next draft starts.
+
+To discard an interrupted setup rather than resume it, run
+[`scripts/wipe-experiment-workspace.sh`](../../../scripts/wipe-experiment-workspace.sh)
+as root from the current checkout. It stops Ax3l services, deletes only the
+current unsubmitted draft's events and linked tool receipts in one transaction,
+and restarts services. The next draft starts from golden. Completed runs,
+golden history, and analyses are preserved. Submissions and seed rotations
+already in progress are refused.
 Failed or cancelled runs mark their draft failed and stop the current loop;
 a later startup begins a new draft using the retained golden configuration.
 

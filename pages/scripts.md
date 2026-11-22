@@ -26,12 +26,37 @@ service. Ax3l's helpers manage only `ax3l-server.service`,
 | `services.sh` | Starts or stops Ax3l services in dependency order. | `sudo scripts/services.sh start` or `sudo scripts/services.sh stop` |
 | `uninstall.sh` | Removes Ax3l service units, installation, credentials, database/account, and Linux account/group. **Deletes Ax3l data.** | `sudo scripts/uninstall.sh` |
 | `backup-db.sh` | Dumps the configured Ax3l database to a private timestamped file. | `sudo scripts/backup-db.sh` |
+| [wipe-experiment-workspace.sh](../scripts/wipe-experiment-workspace.sh) | Clears the current unsubmitted setup and restarts Ax3l from golden, preserving simulation history. | `sudo scripts/wipe-experiment-workspace.sh` |
 | `wipe-db.sh` | Deletes Ax3l events and SnakeLab simulations, preserves schemas, and leaves services stopped. | `sudo scripts/wipe-db.sh` |
 
 MariaDB must already be running for database setup/removal. These operations
 use local root socket authentication. Installation requires Python's venv/pip
 support and package-index access. Model binaries, weights, GPU drivers, and
 inference settings belong to LlamaSrv.
+
+## Restart an interrupted experiment setup
+
+From the current project checkout on the server, run:
+
+```sh
+sudo scripts/wipe-experiment-workspace.sh
+```
+
+The helper checks database access using the installed Python environment and
+the credentials in `/etc/ax3l/database.env`. It reads the credentials literally
+and does not execute their contents. It then stops watchdog, Ax3l, and reporting
+before clearing the current unsubmitted draft, saved edits (including any staged
+seed change), conversations, and related tool and chart events. Event details
+are deleted with their parent events in one transaction.
+
+Golden, completed simulations, prior experiment history, and saved run analyses
+remain available. Ax3l services start again afterward and prepare a fresh draft
+from golden. SnakeLab and shared inference keep running. The helper runs code
+from the checkout, so the helper itself does not require reinstalling Ax3l.
+
+An experiment whose submission or seed rotation has started is refused. If
+clearing fails, Ax3l services remain stopped and the deletion is rolled back.
+Resolve the reported error before starting services again.
 
 ## Network configuration
 

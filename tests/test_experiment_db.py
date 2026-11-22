@@ -9,6 +9,8 @@ import unittest
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
+from pymysql import IntegrityError
+
 from ax3l.app.DbMgr import DbMgr
 from ax3l.activity.ExperimentActivity import item_activity
 from ax3l.app.snakelab.ExperimentDb import ExperimentDb
@@ -17,6 +19,7 @@ from ax3l.app.snakelab.SubmitSimulationSummaryHandler import SubmitSimulationSum
 from ax3l.app.snakelab.RequestSeedChangeHandler import RequestSeedChangeHandler
 from ax3l.app.snakelab.SelectParameterHandler import SelectParameterHandler
 from ax3l.constants.DSimulationAnalysis import DSimulationAnalysis
+from ax3l.constants.DEventCategory import DEventCategory as Events
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
 from ax3l.entities.AnalysisTask import AnalysisTask
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
@@ -72,6 +75,97 @@ class DraftRecoveryTests(unittest.TestCase):
         restored = self.restore(data)
         self.assertEqual(restored.phase, 'preparing')
         self.assertIsNone(restored.parameter)
+
+
+@unittest.skipUnless(os.environ.get('AX3L_TEST_DB') == '1', 'requires disposable MariaDB test database')
+class WorkspaceResetDatabaseTests(unittest.TestCase):
+    def setUp(self):
+        self.assertEqual(os.environ['DB_NAME'], 'ax3l_test')
+        self.db = DbMgr()
+        self.addCleanup(self.db.close)
+        self.ids = []
+        self.addCleanup(self.cleanup)
+        self.store = ExperimentDb(self.db)
+        self.draft_id, self.completed_id, self.gold, self.other = [str(uuid4()) for _ in range(4)]
+        self.config = SimulationConfiguration.defaults()
+
+    def cleanup(self):
+        if self.ids:
+            slots = ', '.join(['%s'] * len(self.ids))
+            self.db.execute(f'UPDATE events SET parent_event_id = NULL WHERE event_id IN ({slots})', self.ids)
+            self.db.execute(f'DELETE FROM events WHERE event_id IN ({slots})', self.ids)
+
+    def event(self, category, name, content, *, process_id=None, parent_event_id=None, **kwargs):
+        event_id = self.db.log(name, category, 'INFO', content, process_id=process_id,
+                               parent_event_id=parent_event_id, **kwargs)
+        self.ids.append(event_id)
+        return event_id
+
+    def snapshot(self, draft):
+        return self.event(Events.Configuration.CATEGORY, Events.Configuration.DRAFT_SAVED,
+                          json.dumps(asdict(draft)), process_id=draft.draft_id)
+
+    def test_wipe_removes_only_the_active_setup_and_its_cascaded_details(self):
+        golden = self.event('Configuration', 'golden_config_created', 'Keep baseline.', process_id=self.gold,
+                            experiment_score=dict(simulations=3, score=20, seed=self.config['seed']))
+        analysis = SimulationAnalysis(self.gold, self.config, dict(high_score=20), 'Keep observations.')
+        analyzed = self.event('SnakeLab', 'simulation_analyzed', json.dumps(asdict(analysis)), process_id=self.gold)
+        completed = ConfigurationDraft(self.completed_id, self.gold, {}, self.config,
+                                       phase='completed', run_id=self.gold)
+        completed_event = self.snapshot(completed)
+        draft = ConfigurationDraft(self.draft_id, self.gold, {}, deepcopy(self.config),
+                                   ['seed', 'learning_rate'], 'choosing', parameter='food', decision_expires_at=1234)
+        draft.config['seed'] += 1
+        draft.config['training']['learning_rate'] = .003
+        self.snapshot(draft)
+        for _ in range(4):
+            chat = self.event('Conversation', 'conversation_started', 'Interrupted setup.', process_id=self.draft_id)
+            prompt = self.event('Conversation', 'prompt_sent', 'Old prompt.', process_id=self.draft_id,
+                                parent_event_id=chat)
+            self.event('Conversation', 'conversation_ended', 'Stopped.', process_id=self.draft_id,
+                       parent_event_id=chat)
+        self.db.execute('INSERT INTO event_key_values VALUES (%s, %s, %s)', (prompt, 'test', 'detail'))
+        self.db.execute('INSERT INTO event_list_items VALUES (%s, %s, %s)', (prompt, 0, 'detail'))
+        receipt = self.event('Tool', 'tool_request_received', json.dumps(dict(payload=dict(draft_id=self.draft_id))))
+        unrelated = self.event('Tool', 'tool_request_received', json.dumps(dict(payload=dict(draft_id=self.other))))
+        count = self.db.query('SELECT COUNT(*) AS n FROM events WHERE process_id = %s', (self.draft_id,))[0]['n']
+        self.assertEqual(self.store.wipe_workspace(), (self.draft_id, count + 1))
+        self.assertEqual(self.store.draft(), completed)
+        self.assertIsNone(self.store.draft(self.draft_id))
+        self.assertEqual(self.store.analysis(self.gold), analysis)
+        remaining = {row['event_id'] for row in self.db.query('SELECT event_id FROM events WHERE event_id IN (%s, %s, %s, %s, %s)',
+                                                             (golden, analyzed, completed_event, receipt, unrelated))}
+        self.assertEqual(remaining, {golden, analyzed, completed_event, unrelated})
+        self.assertEqual(self.db.query('SELECT score FROM experiment_highscores WHERE event_id = %s', (golden,)),
+                         [dict(score=20)])
+        for table in ('event_messages', 'event_key_values', 'event_list_items'):
+            self.assertEqual(self.db.query(f'SELECT COUNT(*) AS n FROM {table} WHERE event_id = %s', (prompt,)),
+                             [dict(n=0)])
+        other = DbMgr(initialize_event_tables=False)
+        try:
+            self.assertEqual(ExperimentDb(other).draft(), completed)
+        finally:
+            other.close()
+
+    def test_foreign_reference_failure_rolls_back_the_entire_wipe(self):
+        draft = ConfigurationDraft(self.draft_id, self.gold, {}, self.config)
+        saved = self.snapshot(draft)
+        child = self.event('Conversation', 'prompt_sent', 'Keep parent link.', process_id=self.draft_id,
+                           parent_event_id=saved)
+        self.event('Other', 'external_reference', 'Block deletion.', process_id=self.other, parent_event_id=child)
+        with self.assertRaises(IntegrityError):
+            self.store.wipe_workspace()
+        self.assertEqual(self.store.draft(), draft)
+        self.assertEqual(self.db.query('SELECT parent_event_id FROM events WHERE event_id = %s', (child,)),
+                         [dict(parent_event_id=saved)])
+
+    def test_first_setup_wipe_keeps_golden_and_leaves_no_draft_to_resume(self):
+        golden = self.event('Configuration', 'golden_config_created', 'Keep baseline.', process_id=self.gold)
+        self.snapshot(ConfigurationDraft(self.draft_id, self.gold, {}, self.config, ['seed'], 'reviewing'))
+        self.assertEqual(self.store.wipe_workspace(), (self.draft_id, 1))
+        self.assertIsNone(self.store.draft())
+        self.assertEqual(self.db.query('SELECT process_id FROM events WHERE event_id = %s', (golden,)),
+                         [dict(process_id=self.gold)])
 
 
 @unittest.skipUnless(os.environ.get('AX3L_TEST_DB') == '1', 'requires disposable MariaDB test database')

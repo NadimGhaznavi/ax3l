@@ -1,5 +1,6 @@
 """Short reference pages are reachable only through explicit internal URLs."""
 
+import json
 import re
 import unittest
 
@@ -18,6 +19,9 @@ class KnowledgeBaseTests(unittest.TestCase):
             visited.add(url)
             page = kb.read(url)
             self.assertLessEqual(len(page.split()), 220, url)
+            self.assertNotRegex(page, r'(?m)^\s*\|')
+            for payload in re.findall(r'```json\n(.*?)\n```', page, re.DOTALL):
+                json.loads(payload)
             for target in re.findall(r'\]\(([^)]+)\)', page):
                 self.assertIn(target, kb.PAGES)
                 pending.append(target)

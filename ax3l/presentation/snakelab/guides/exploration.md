@@ -1,17 +1,27 @@
-# Exploration
+# Exploration implementation
 
-Ordinary epsilon is the chance of a random action. The initial value and
-per-episode decay multiplier are chosen together. A larger decay multiplier
-keeps random exploration active longer. The minimum is fixed at zero.
+```json
+{
+  "epsilon": {
+    "initial": "initial random-action probability",
+    "decay": "per-episode probability multiplier",
+    "zero_threshold": 0.001,
+    "value_below_threshold": 0
+  },
+  "epsilon_nice": {
+    "label": "safe detours",
+    "eligible_when": "ordinary epsilon is zero and no detour is active",
+    "probability": "chance per eligible move of starting a detour on the next move",
+    "steps": "detour duration in moves",
+    "action": "an immediately safe alternative to the model's pick, if available",
+    "reset_each_episode": true
+  },
+  "activity_metrics": {
+    "epsilon_random_actions": "recorded ordinary epsilon injections",
+    "nice_overrides": "recorded EpsilonNice injections"
+  }
+}
+```
 
-Safe detours (EpsilonNice) are required after ordinary epsilon ends. The start
-chance applies per eligible move and must be above zero and at most 10% (0.1).
-Each detour lasts between 1 and 50 moves.
-Detours begin on the next move and reset at episode boundaries. Safety covers
-immediate collisions; a detour can still enter a trap.
-
-Exact exploration counts and termination outcomes accompany saved run analyses.
-They are observations, not proof that exploration caused a score pattern.
-
-- [Choosing one setting](/guides/selection)
-- [Reference index](/guides)
+- [Experiment rules](/guides/selection)
+- [Lab reference](/guides)

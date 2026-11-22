@@ -1,7 +1,10 @@
 ---
 name: choose-snake-setting
-description: Choose the assigned setting or pair for an Ax3l Snake Lab experiment.
+description: Configuration rules for Patrick Loeber's AI Snake Lab.
 ---
 
-Beat golden's high score in 750 episodes. Prefer same-seed results. Use other
-seeds as historical context. Compare exact metrics and use charts for trends.
+Objective: beat golden's high score in 750 episodes.
+
+A draft inherits golden's configuration. Select any subset of available
+settings, at most once per setting. Change at least one value and submit pairs
+together. The complete draft must be unique.

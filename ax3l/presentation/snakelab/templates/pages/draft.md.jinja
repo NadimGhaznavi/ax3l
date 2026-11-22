@@ -1,6 +1,9 @@
-{% from "navigation.md.jinja" import links %}
-The draft shows chosen and baseline values; settings can be left at baseline.
+{% from "navigation.md.jinja" import lab, links %}
+{{ lab("Inspect current draft") }}
+
 ```json
 {{ data | json }}
 ```
+## Configuration menu
+
 {{ links("draft", pages) }}

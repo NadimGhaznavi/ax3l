@@ -1,6 +1,2 @@
-[Current draft](/draft)
-{% for labels in groups %}
-[{{ labels | join(", ") }}](/{{ labels[0] }})
-{% endfor %}
-Latest is the most recent run. Golden is the score to beat. Best is the all-time high score.
-Runs on other seeds are historical context.
+{% from "navigation.md.jinja" import experiment_links %}
+{{ experiment_links(groups) }}

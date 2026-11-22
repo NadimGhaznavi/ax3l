@@ -1,29 +1,31 @@
-# Model and input features
+# Model implementation
 
-Ax3l uses Snake Lab to train a Transformer with four attention heads for 750
-episodes. The LLM chooses hidden width from 32 to 128 in steps of 8, encoder
-depth from 1 to 3 layers, and dropout from 0 to 0.1 in steps of 0.01. The
-defaults are width 64, one encoder layer, and dropout 0.05. The target update
-rate (`tau`) is fixed at 0.05.
-Actions are left, straight, and right relative to the current heading.
+The model's 24-value feature vector and training units:
 
-Its 24-value feature vector contains:
+```json
+{
+  "architecture": "Transformer",
+  "heads": 4,
+  "actions": ["left", "straight", "right"],
+  "action_frame": "relative to current heading",
+  "features": [
+    {"indices": [0, 1, 2], "meaning": "body danger: left, straight, right"},
+    {"indices": [3, 4, 5], "meaning": "wall danger: left, straight, right"},
+    {"indices": [6, 7, 8, 9], "meaning": "heading: left, right, up, down"},
+    {"indices": [10, 11, 12, 13], "meaning": "food direction: left, right, up, down"},
+    {"indices": [14, 15], "meaning": "food alignment: X, Y"},
+    {"indices": [16, 17, 18, 19, 20, 21, 22], "meaning": "snake length: big-endian bits, saturated at 127"},
+    {"indices": [23], "meaning": "remaining move-budget fraction"}
+  ],
+  "full_board_input": false,
+  "food_distance_input": false,
+  "sequence_length_unit": "consecutive frames",
+  "batch_size_unit": "sampled sequences",
+  "move_limit": "max_moves_multiplier * current_snake_length"
+}
+```
 
-- 0–2: body danger left, straight, right.
-- 3–5: wall danger left, straight, right.
-- 6–9: heading left, right, up, down.
-- 10–13: food direction left, right, up, down.
-- 14–15: food alignment on X and Y.
-- 16–22: seven big-endian length bits, saturating at 127.
-- 23: remaining move-budget fraction.
+Current values are on the configuration pages. Submission tools provide allowed values.
 
-There is no full-board view or food-distance measurement. Sequence length
-controls how many consecutive frames training uses. Hidden size controls
-Transformer width; batch size counts sampled sequences. Learning rate controls
-update size, and gamma discounts future rewards. Choice rules are in your
-submission tool.
-
-The move limit is max_moves_multiplier times the current snake length.
-
-- [Choosing one setting](/guides/selection)
-- [Reference index](/guides)
+- [Experiment rules](/guides/selection)
+- [Lab reference](/guides)

@@ -6,14 +6,16 @@ layout: single
 
 # Snake Lab Prompts
 
-Qwen starts with golden's configuration and chooses which settings to change
-before running a simulation. Each prompt opens with the available decision.
-For value choices, `choose-snake-setting` tells Qwen how to weigh the evidence.
+Qwen works as the Data Scientist in **Patrick Loeber's AI Snake Lab**, an ongoing
+experiment. Prompts show the current task, draft status, and an English menu.
+Menu links keep the existing URL system; measurements and configuration values
+remain JSON. The presentation supplies implementation details and available
+actions, leaving the analysis method to Qwen.
 
 | Prompt | Purpose |
 | --- | --- |
-| `ConfigurationNextStep` | Lists available keys and current values. Gives Qwen the option to run once the draft is unique. |
-| `ConfigurationChoice` | Names the submission tool and supplies current values, reference scores, and data paths. Learning rate, epsilon, and distance rewards can include a chart. |
+| `ConfigurationNextStep` | Presents the experiment menu, draft status, and available settings in JSON. Offers Run next simulation once the draft is unique. |
+| `ConfigurationChoice` | Presents the selected setting, its save action, reference links, and JSON evidence. Learning rate, epsilon, and distance rewards can include a chart. |
 | `EpsilonNiceChoice` | Adds a compact definition of the custom EpsilonNice exploration rule when choosing its probability and steps. |
 | `InvalidValue` | Explains why Ax3l rejected a value. |
 | `NoDupes` | Identifies the duplicate proposal and asks Qwen to try different values for the same setting. |
@@ -44,6 +46,9 @@ values, `/` for the shared browser menu, and direct paths such as `/latest/score
 `/golden/activity` for details. Navigation uses English. Values are JSON
 and missing statistics are null. Previously saved observations remain
 available through a run's notes page. Short local guides start at `/guides`.
+The reference menu covers experiment rules, model inputs, exploration and reward
+implementation, and metric and chart definitions. It supplies no prescribed
+analysis sequence or hyperparameter tuning strategy.
 
 Presentation lives under `ax3l/presentation/snakelab`: `guides` contains static
 Markdown, and `templates` contains Markdown templates for pages, prompts, and

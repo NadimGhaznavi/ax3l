@@ -129,7 +129,7 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
         payload = json.loads(llm.complete.call_args.args[0])
         pages = [message['content'] for message in payload['messages'] if message['role'] == 'tool']
         self.assertEqual(len(pages), 3)
-        self.assertIn('[Guides](/guides)', pages[0])
+        self.assertIn('[Open lab reference](/guides)', pages[0])
         self.assertIn('24-value feature vector', pages[1])
         self.assertEqual([message['content'] for message in payload['messages'] if message['role'] == 'user'],
                          ['Research a setting.'])
@@ -322,7 +322,7 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
             async with SnakeLabTools(server.endpoint, 'hidden_size', draft_id='private-draft') as tools:
                 definition = next(d for d in tools.definitions if d['function']['name'] == 'kb_tool')
                 self.assertEqual(set(definition['function']['parameters']['properties']), {'url'})
-                self.assertIn('JSON null means unrecorded', definition['function']['description'])
+                self.assertIn('null means unrecorded', definition['function']['description'])
                 result = await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('Choose hidden size.')])
                 before = len(requests)
                 with self.assertRaises(RuntimeError):

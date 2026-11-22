@@ -1,14 +1,18 @@
-# Rewards
+# Reward implementation
 
-Distance shaping uses Manhattan progress toward food. Choose closer-to-food
-reward and farther-from-food penalty together from the supplied domains.
-Their sum must be non-positive.
+```json
+{
+  "distance_shaping": {
+    "metric": "Manhattan progress toward food",
+    "paired_settings": ["closer_to_food", "further_from_food"],
+    "constraint": "closer_to_food + further_from_food <= 0"
+  },
+  "independent_settings": ["food", "empty", "snake", "wall"],
+  "fixed_rewards": {"max_moves": -10}
+}
+```
 
-Choose food reward (0 to +20, default +10), empty space reward (-2 to +2),
-snake collision reward (-20 to 0), or wall collision reward (-20 to 0)
-separately. Positive empty rewards can favor survival without food.
-The move-limit penalty stays -10.
-Judge rewards by food scores, not total reward or loss scale.
+Current rewards are on the configuration pages. Submission tools provide allowed values.
 
-- [Choosing one setting](/guides/selection)
-- [Reference index](/guides)
+- [Experiment rules](/guides/selection)
+- [Lab reference](/guides)

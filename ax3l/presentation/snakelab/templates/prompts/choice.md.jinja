@@ -1,6 +1,14 @@
-Change {{ label }} with {{ tool }}. Follow the tool's limits and change at least one value. If the complete draft is a duplicate, try different values for this setting.
+{% from "navigation.md.jinja" import lab %}
+{{ lab("Change " ~ label) }}
 
 {{ selection }}
+
+## Experiment menu
+
+- [Inspect current draft](/draft)
+- [Review reference runs](/)
+- [Open lab reference](/guides)
+- Save {{ label }}: call {{ tool }}.
 
 {% if chart is not none %}
 {% if has_image %}
@@ -15,17 +23,14 @@ Chart: {{ chart_scope }}.
 {% endif %}
 
 {% endif %}
-{% if not same_seed %}
-This reference uses a different seed from the draft. Treat it as historical context.
+{% set labels = {"activity": "training activity", "scores": "score statistics", "endings": "episode endings"} %}
+- [Review {{ chart_scope }} {{ labels[data_page] }}](/{{ chart_scope }}/{{ data_page }})
 
 {% endif %}
-{% set labels = {"activity": "move and loss counts", "scores": "score statistics", "endings": "how episodes ended"} %}
-Use kb_tool at /{{ chart_scope }}/{{ data_page }} for {{ labels[data_page] }}.
+Open menu URLs with kb_tool.
 
-{% endif %}
-Use kb_tool at /draft for saved choices or / for reference runs.
+## Current values and reference data
 
-Measured data and current values
 ```json
 {{ evidence | json(compact=false) }}
 ```

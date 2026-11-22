@@ -1,8 +1,17 @@
 # Score trends
 
-The first and last 50-episode means compare the start and end of the run.
-The orange line shows the trailing mean over up to 20 episodes. The vertical
-marker shows where ordinary epsilon reached zero, when observed. Look at
-scores before and after that marker when deciding how long to explore.
+```json
+{
+  "high_score": "recorded run high score",
+  "mean_first_50_scores": "mean score over the first 50 recorded episodes, or all if fewer",
+  "mean_last_50_scores": "mean score over the last 50 recorded episodes, or all if fewer",
+  "zero_score_episodes": "number of recorded episodes with score zero",
+  "high_score_episodes": "number of recorded episodes matching the run high score",
+  "chart": {
+    "orange_line": "trailing mean over up to 20 episodes",
+    "vertical_marker": "first recorded episode with ordinary epsilon zero, when present"
+  }
+}
+```
 
-- [Chart guides](/guides/analysis/)
+- [Recorded metrics and charts](/guides/analysis/)

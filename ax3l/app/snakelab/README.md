@@ -113,6 +113,13 @@ Run IDs and draft IDs are bound privately to the conversation.
 
 ## Presentation boundaries
 
+Qwen sees **Patrick Loeber's AI Snake Lab**, with the role Data Scientist and
+an experiment menu. Navigation uses English labels and existing URLs. Settings,
+measurements, and saved observations remain JSON, including numbers and nulls.
+Prompts display the current task and available actions; the lab reference holds
+implementation details and experiment rules. Domain tutorials and prescribed
+analysis strategies are omitted.
+
 The [`presentation/snakelab`](../../presentation/snakelab) package owns the
 Markdown guides and Jinja Markdown templates. Its `templates/pages` directory
 controls data-page wording, layout, and navigation; `templates/prompts` controls

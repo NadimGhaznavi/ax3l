@@ -1,7 +1,7 @@
 # Training loss
 
-Look for sustained rises or repeated spikes in the recorded mean Smooth L1
-loss. A gap means loss was unrecorded, not zero. Reward changes can change
-the loss scale. Use the high score to judge game performance.
+The chart records per-episode Smooth L1 loss. The smoothed line averages recorded
+losses within a trailing window of up to 20 episodes. A gap means loss was
+unrecorded, not zero. An additional golden trace appears when supplied.
 
-- [Chart guides](/guides/analysis/)
+- [Recorded metrics and charts](/guides/analysis/)

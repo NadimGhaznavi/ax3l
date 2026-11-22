@@ -1,11 +1,9 @@
-{% from "navigation.md.jinja" import links %}
-{{ data.scope }} run
+{% from "navigation.md.jinja" import lab, links, reference_labels %}
+{{ lab(reference_labels[data.scope]) }}
+
 ```json
 {{ data | json }}
 ```
-{% if data.same_seed_as_draft %}
-Same seed as draft.
-{% else %}
-Different seed: historical context, not a controlled comparison.
-{% endif %}
+## Simulation menu
+
 {{ links(data.scope, pages) }}

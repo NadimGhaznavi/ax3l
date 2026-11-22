@@ -160,14 +160,17 @@ class ToolConversationTimingTests(unittest.IsolatedAsyncioTestCase):
 
     def test_next_step_prompts_explain_available_actions_without_mentioning_the_timer(self):
         draft = ConfigurationDraft('draft', 'gold', {}, SimulationConfiguration.defaults())
-        for phase, selections in (('selecting_parameter', []), ('reviewing', ['gamma'])):
+        for phase, selections in (('selecting_parameter', []), ('selecting_parameter', ['gamma']),
+                                  ('reviewing', ['gamma'])):
             draft.phase = phase
             draft.selections = selections
             text = ConfigurationNextStep(draft, [name for name in PARAMETER_ORDER if name not in selections]).to_md()
             self.assertNotRegex(text.lower(), r'\b(timer|countdown|deadline|minutes?|seconds?|grace)\b')
-            self.assertIn('select_parameter', text.split('\n\n')[0])
-            self.assertEqual('run_simulation' in text, bool(selections))
-            self.assertIn('Use kb_tool at / for reference runs or /draft', text)
+            self.assertIn('Your role: Data Scientist', text)
+            self.assertIn('Change configuration: call select_parameter', text)
+            self.assertEqual('run_simulation' in text, phase == 'reviewing')
+            self.assertIn('[Inspect current draft](/draft)', text)
+            self.assertIn('Open menu URLs with kb_tool.', text)
 
     def test_next_step_prompt_lists_only_unused_parameters_and_offers_run_when_all_are_used(self):
         draft = ConfigurationDraft('draft', 'gold', {}, SimulationConfiguration.defaults(),
@@ -175,10 +178,10 @@ class ToolConversationTimingTests(unittest.IsolatedAsyncioTestCase):
         text = ConfigurationNextStep(draft, [name for name in PARAMETER_ORDER if name not in draft.selections]).to_md()
         choices = json.loads(text.split('```json\n')[1].split('\n```')[0])
         self.assertEqual(set(choices), set(PARAMETER_ORDER) - set(draft.selections))
-        self.assertIn('at most once per setting', text)
-        self.assertIn('Change at least one value and submit pairs together', text)
+        self.assertIn('Change configuration: call select_parameter', text)
+        self.assertIn('Run next simulation: call run_simulation', text)
         draft.selections = PARAMETER_ORDER.copy()
         text = ConfigurationNextStep(draft, []).to_md()
         self.assertEqual(json.loads(text.split('```json\n')[1].split('\n```')[0]), {})
-        self.assertTrue(text.startswith('Call run_simulation.'))
+        self.assertIn('Run next simulation: call run_simulation', text)
         self.assertNotIn('select_parameter', text)

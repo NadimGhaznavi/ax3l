@@ -1,10 +1,9 @@
-# Ax3l reference
+# Patrick Loeber's AI Snake Lab
 
-Open only the page needed for your assigned task. Follow links to drill down;
-there is no need to read every page.
+## Lab reference
 
-- [Chart interpretation](/guides/analysis/)
-- [Choosing one setting](/guides/selection)
-- [Model and input features](/guides/model)
-- [Exploration and EpsilonNice](/guides/exploration)
-- [Rewards](/guides/rewards)
+- [Experiment rules](/guides/selection)
+- [Model implementation and input features](/guides/model)
+- [Exploration implementation and EpsilonNice](/guides/exploration)
+- [Reward implementation](/guides/rewards)
+- [Recorded metrics and charts](/guides/analysis/)

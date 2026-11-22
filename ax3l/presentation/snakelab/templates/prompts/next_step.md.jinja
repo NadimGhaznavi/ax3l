@@ -1,29 +1,31 @@
+{% from "navigation.md.jinja" import lab, experiment_links %}
+{{ lab("Prepare the next simulation") }}
+
 {% if action == "run" %}
-Call run_simulation. The draft is unique and no untested changes remain.
+Draft status: Ready to run; no untested changes remain.
 {% elif action == "review" %}
-Call run_simulation for this unique draft, or select_parameter with a listed key.
+Draft status: Ready to run.
 {% elif action == "revise" %}
-This draft already exists. Call select_parameter with a listed key to make it unique.
+Draft status: Duplicate configuration. Change a setting to make it unique.
 {% else %}
-The draft starts from golden. Use the run data to choose a listed key with select_parameter.
+Draft status: Inherited from golden.
 {% endif %}
 
-Aim to beat golden's high score in 750 episodes. Prefer same-seed evidence.
+## Experiment menu
 
+{{ experiment_links() }}
 {% if choices %}
-Choose any subset in any order, at most once per setting. Change at least one value and submit pairs together. Revise duplicates within the same setting.
-
+- Change configuration: call select_parameter with an available key.
 {% endif %}
-{% if "seed" in choices %}
-Select seed to let Ax3l immediately save the next unused seed; no further seed confirmation is needed. On run, golden sets the new seed's baseline even if it scores lower. A seed-only draft ends there. Other changes run afterward against that baseline.
-
-{% elif seed_selected %}
-The seed can change only once per draft and is already set.
-
+{% if action in ("run", "review") %}
+- Run next simulation: call run_simulation.
 {% endif %}
-Use kb_tool at / for reference runs or /draft for current values.
+- [Open lab reference](/guides)
 
-Available keys and current values
+Open menu URLs with kb_tool.
+
+## Available settings and current values
+
 ```json
 {{ choices | json(compact=false) }}
 ```

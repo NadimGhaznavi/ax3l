@@ -14,7 +14,7 @@ class PageBrowserTests(unittest.IsolatedAsyncioTestCase):
         read = AsyncMock(return_value=dict(status="ok", page="[Current draft](/draft)\n[Golden](/golden)"))
         browser = PageBrowser(read)
         home = await browser.read("/")
-        self.assertEqual(re.findall(r"\]\(([^)]+)\)", home["page"]), ["/guides", "/draft", "/golden"])
+        self.assertEqual(re.findall(r"\]\(([^)]+)\)", home["page"]), ["/draft", "/golden", "/guides"])
         read.assert_awaited_once_with("/")
         pending, visited = ["/guides"], set()
         while pending:
@@ -43,7 +43,9 @@ class PageBrowserTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_unbound_browser_can_read_guides_but_cannot_read_experiment_data(self):
         browser = PageBrowser()
-        self.assertEqual((await browser.read("/"))["page"], "[Guides](/guides)")
+        home = (await browser.read("/"))["page"]
+        self.assertIn("Patrick Loeber's AI Snake Lab", home)
+        self.assertEqual(re.findall(r"\]\(([^)]+)\)", home), ["/guides"])
         self.assertIn("750 episodes", (await browser.read("/guides/selection"))["page"])
         self.assertNotIn("description:", (await browser.read("/guides/selection"))["page"])
         for url in ("/guides/missing", "/guides/../../etc/passwd", "/guides/model?x=1", "/guides/model#fragment"):

@@ -1,0 +1,11 @@
+{% set labels = {
+    "scores": "Score statistics", "endings": "How episodes ended",
+    "activity": "Moves, exploration and loss counts", "notes": "Saved notes",
+    "model": "Model settings", "training": "Training settings", "exploration": "Exploration settings",
+    "rewards": "Reward settings", "game": "Board settings", "config": "All settings", "rules": "Allowed values"
+} %}
+{% macro links(scope, pages) -%}
+{% for page in pages %}
+[{{ labels[page] }}](/{{ scope }}/{{ page }}){{ "\n" if not loop.last else "" }}
+{%- endfor %}
+{%- endmacro %}

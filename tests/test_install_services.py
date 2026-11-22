@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -140,7 +141,7 @@ exec /usr/bin/systemd-analyze "$@"
                                'interface/SimulationGifStore.py', 'interface/SimulationConfiguration.py',
                                'activity/RunAnalysis.py', 'entities/ConfigurationDraft.py',
                                'entities/SimulationAnalysis.py', 'app/snakelab/AnalyzeRun.py',
-                               'app/snakelab/ExperimentDb.py', 'app/snakelab/knowledge/choose-snake-setting/SKILL.md',
+                               'app/snakelab/ExperimentDb.py', 'presentation/snakelab/guides/choose-snake-setting/SKILL.md',
                                'app/snakelab/prompts/ConfigurationChoice.py',
                                'entities/EpsilonNiceChoice.py',
                                'app/snakelab/SubmitSimulationSummaryHandler.py',
@@ -150,16 +151,18 @@ exec /usr/bin/systemd-analyze "$@"
                                'app/snakelab/RequestSeedChangeHandler.py', 'app/snakelab/tools/RequestSeedChange.py',
                                'app/snakelab/prompts/ConfigurationNextStep.py',
                                'app/snakelab/prompts/NoDupes.py',
-                               'interface/KnowledgeBase.py', 'constants/DSimulationAnalysis.py',
+                               'interface/KnowledgeBase.py', 'interface/MarkdownTemplates.py',
+                               'app/snakelab/PageBrowser.py', 'activity/ConfigurationEvidence.py',
+                               'presentation/snakelab/Templates.py', 'constants/DSimulationAnalysis.py',
                                'constants/DScoreDistribution.py',
-                               'interface/SimulationData.py', 'activity/SimulationDataPages.py',
+                               'interface/SimulationData.py', 'activity/SimulationDataValues.py', 'presentation/snakelab/DataPages.py',
                                'activity/ParameterRules.py', 'constants/DChoice.py',
                                'app/snakelab/tools/ReadSimulationData.py',
-                               'app/snakelab/knowledge/index.md',
-                               'app/snakelab/knowledge/analysis/index.md',
-                               'app/snakelab/knowledge/analysis/scores.md',
-                               'app/snakelab/knowledge/analysis/distribution.md',
-                               'app/snakelab/knowledge/analysis/loss.md',
+                               'presentation/snakelab/guides/index.md',
+                               'presentation/snakelab/guides/analysis/index.md',
+                               'presentation/snakelab/guides/analysis/scores.md',
+                               'presentation/snakelab/guides/analysis/distribution.md',
+                               'presentation/snakelab/guides/analysis/loss.md',
                                'app/snakelab/prompts/FirstContactEpsilonNicePair.py',
                                'app/snakelab/prompts/ComparisonEpsilonNicePair.py', 'app/ReportBackground.py'):
                     self.assertTrue((self.app / 'ax3l' / module).is_file(), module)
@@ -168,6 +171,19 @@ exec /usr/bin/systemd-analyze "$@"
                 self.assertIn('--port 28870', reporting)
                 self.assertIn(f'ReadWritePaths={self.app}/games', reporting)
                 self.assertTrue((self.app / 'games').is_dir())
+                for asset in (ROOT / 'ax3l/presentation/snakelab').rglob('*'):
+                    if asset.is_file() and asset.suffix in ('.md', '.jinja'):
+                        installed = self.app / 'ax3l/presentation/snakelab' / asset.relative_to(ROOT / 'ax3l/presentation/snakelab')
+                        self.assertEqual(installed.read_bytes(), asset.read_bytes(), str(asset))
+                smoke = subprocess.run([sys.executable, '-c', '''
+from ax3l.interface.KnowledgeBase import KnowledgeBase
+from ax3l.interface.SimulationConfiguration import SimulationConfiguration
+from ax3l.presentation.snakelab.DataPages import config_page
+assert '24-value feature vector' in KnowledgeBase().read('/guides/model')
+assert '"hidden_size":64' in config_page('draft', 'model', SimulationConfiguration.defaults())
+'''], cwd=self.app, env=dict(os.environ, PYTHONPATH=str(self.app), PYTHONDONTWRITEBYTECODE='1'),
+                    capture_output=True, text=True, timeout=10)
+                self.assertEqual(smoke.returncode, 0, smoke.stderr)
                 application = (self.units / 'ax3l-server.service').read_text()
                 self.assertIn('--zmq-endpoint tcp://127.0.0.1:61970', application)
                 self.assertIn('--output /var/lib/ax3l/snakelab', application)

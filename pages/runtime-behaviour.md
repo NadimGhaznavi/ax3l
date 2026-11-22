@@ -85,10 +85,11 @@ after a seed change, runs on other seeds are labeled as historical context.
 Ax3l records the completed simulation's
 measurements directly from episode data.
 
-English directions in the prompt lead to relevant `data_tool` pages when
-Qwen needs more detail. The tool menu at `/` links to `draft`, `latest`,
-`golden`, and `best`. Navigation uses English and experiment values use
-JSON. `kb_tool` serves optional background. Choice rules appear in the
+English directions in the prompt lead to relevant `kb_tool` pages when
+Qwen needs more detail. The shared menu at `/` links to `draft`, `latest`,
+`golden`, `best`, and `/guides` for optional background. Navigation uses English
+and experiment values use JSON. Guide and data pages, prompt wording, and tool
+descriptions use a dedicated Markdown presentation package. Choice rules appear in the
 submission tool description. Accepted choices are saved without starting a
 simulation. A selected setting must change its current value, or at least one
 value for a pair. Submitting all the same values is rejected before the uniqueness
@@ -96,7 +97,7 @@ check. After every submitted change, Ax3l
 checks the complete draft for duplicates.
 
 At startup and after a unique change, Qwen can use `select_parameter` to choose
-a single or paired setting. `data_tool` and `kb_tool` are available while making that
+a single or paired setting. `kb_tool` is available while making that
 decision. Ax3l opens the selected setting's value conversation with the usual
 evidence and tools, or immediately saves the next unused seed when `seed` is
 selected; other values stay saved. A duplicate proposal is rejected

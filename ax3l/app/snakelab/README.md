@@ -51,7 +51,7 @@ or run decision.
 
 Ax3l freezes the latest, golden, and all-time best references when it opens a
 draft. It records missing measurements directly from completed runs. The
-`choose-snake-setting/SKILL.md` under `knowledge/` gives each choice the
+[`choose-snake-setting/SKILL.md`](../../presentation/snakelab/guides/choose-snake-setting/SKILL.md) gives each choice the
 same short procedure. The prompt supplies the assigned setting's current
 values and reference results in JSON. Ax3l prepares one chart when the
 assignment calls for it:
@@ -78,7 +78,7 @@ context. It also supplies measured facts from the chart's source run. The all-ti
 through the data tool. Reference runs sharing several roles appear once in
 the run menu. All-time score ties resolve to the earliest stored run.
 
-`data_tool(url)` opens a small page. Use `/draft` for current values,
+`kb_tool(url)` opens a small guide or data page. Use `/draft` for current values,
 `/` for the run menu, or a direct path such as `/golden/activity` for a
 specific result. English labels explain each path. Data is JSON. Run pages
 contain scores, termination counts and percentages, activity counts, and
@@ -108,14 +108,43 @@ comparison, and measurement cycle, and starts the next experiment.
 A pending edit is not included unless its changed values were accepted.
 Restarting the optimizer begins a fresh budget.
 
-`kb_tool(url)` opens one short local guide. Use `/` for the guide list.
+Use `/` for the shared browser home and `/guides` for short local guides.
 Run IDs and draft IDs are bound privately to the conversation.
+
+## Presentation boundaries
+
+The [`presentation/snakelab`](../../presentation/snakelab) package owns the
+Markdown guides and Jinja Markdown templates. Its `templates/pages` directory
+controls data-page wording, layout, and navigation; `templates/prompts` controls
+choice, next-step, and EpsilonNice guidance; `templates/tools` controls MCP tool
+descriptions. JSON values are inserted with the `json` filter, preserving numbers,
+nulls, and quoted text. Template values are strict: missing values fail clearly.
+Templates are read on every render so presentation edits take effect on the next
+read or newly constructed prompt; MCP descriptions are rendered at session startup.
+
+[`SimulationDataValues`](../../activity/SimulationDataValues.py) and
+[`ConfigurationEvidence`](../../activity/ConfigurationEvidence.py) prepare values
+without composing prose. [`DataPages`](../../presentation/snakelab/DataPages.py)
+connects those values to page templates. Each settings or measurement page has
+its own template under `templates/pages/config` or `templates/pages/run`, initially
+including the shared JSON layout. Customize an individual page by editing its
+template, or edit the shared layout to change all data pages together.
+[`PageBrowser`](PageBrowser.py) joins allowlisted guide pages under `/guides`
+with the current conversation's data reader and adds the shared home page.
+Only the requested page is loaded.
+
+The prompt classes select the applicable instruction and evidence, then render
+templates. Experiment sequencing, available actions, acceptance rules, and timers
+remain application decisions. Templates do not query databases, select runs, or
+save choices. The data reader still uses frozen references and the original
+chart run. These boundaries let wording and layout change independently of
+querying and conversation control.
 
 ## MCP tools
 
 The stdio entry point is `python -m ax3l.app.snakelab.tools`. Ax3l starts a private
 MCP session for each conversation and sends the assigned submission tool plus
-`kb_tool` and `data_tool` to LlamaSrv. Submission
+`kb_tool` to LlamaSrv. Submission
 and data functions forward requests over ZeroMQ; Ax3l owns validation,
 persistence, and reads through `ExperimentDb` and the shared `DbMgr`.
 KB reads use only the explicitly addressed local page. Reads never save choices
@@ -129,8 +158,7 @@ JSON data; transport envelopes and full identifiers remain internal.
 | `select_parameter` | `parameter` | Active draft UUID |
 | `run_simulation` | None | Unique draft UUID |
 | `request_seed_change` (legacy) | None | Draft UUID and selected seed choice |
-| `kb_tool` | `url` | Allowlisted local reference pages |
-| `data_tool` | `url` | Selection draft and frozen references |
+| `kb_tool` | `url` | Local guides, selection draft and frozen references, or analysis run |
 
 `AX3L_CONVERSATION_PARAMETER` identifies the single or pair.
 It is `revision` while Qwen chooses the next step. `AX3L_ALLOW_RUN=1` exposes

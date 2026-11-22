@@ -1,0 +1,11 @@
+{% from "navigation.md.jinja" import links %}
+{{ data.scope }} run
+```json
+{{ data | json }}
+```
+{% if data.same_seed_as_draft %}
+Same seed as draft.
+{% else %}
+Different seed: historical context, not a controlled comparison.
+{% endif %}
+{{ links(data.scope, pages) }}

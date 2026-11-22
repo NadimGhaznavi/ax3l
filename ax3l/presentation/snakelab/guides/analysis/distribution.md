@@ -5,4 +5,4 @@ how often the snake found food. Use the count at the high score to see how
 often its best result repeated. The chart groups episodes by score and does
 not show when they occurred.
 
-- [Chart guides](/analysis/)
+- [Chart guides](/guides/analysis/)

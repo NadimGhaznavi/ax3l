@@ -1,0 +1,31 @@
+Change {{ label }} with {{ tool }}. Follow the tool's limits and change at least one value. If the complete draft is a duplicate, try different values for this setting.
+
+{{ selection }}
+
+{% if chart is not none %}
+{% if has_image %}
+{% if chart == "loss" and chart_scope != "golden" %}
+{% if golden_has_loss %}
+Compare {{ chart_scope }} with golden.
+{% else %}
+Chart: {{ chart_scope }}. Golden has no recorded loss.
+{% endif %}
+{% else %}
+Chart: {{ chart_scope }}.
+{% endif %}
+
+{% endif %}
+{% if not same_seed %}
+This reference uses a different seed from the draft. Treat it as historical context.
+
+{% endif %}
+{% set labels = {"activity": "move and loss counts", "scores": "score statistics", "endings": "how episodes ended"} %}
+Use kb_tool at /{{ chart_scope }}/{{ data_page }} for {{ labels[data_page] }}.
+
+{% endif %}
+Use kb_tool at /draft for saved choices or / for reference runs.
+
+Measured data and current values
+```json
+{{ evidence | json(compact=false) }}
+```

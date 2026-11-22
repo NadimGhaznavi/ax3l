@@ -102,7 +102,7 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
                     names = [definition['function']['name'] for definition in request['tools']]
                     self_test.assertEqual('run_simulation' in names, bool(selections))
                     if not pages:
-                        tool, arguments = 'data_tool', dict(url='/golden/scores')
+                        tool, arguments = 'kb_tool', dict(url='/golden/scores')
                     else:
                         self_test.assertEqual(json.loads(pages[0])['high_score'], 10)
                         step = decisions.pop(0)
@@ -121,7 +121,7 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
                     evidence = json.loads(text.split('```json\n')[1].split('\n```')[0])
                     self_test.assertEqual(evidence['reference_runs']['golden']['high_score'], 10)
                     if not pages and parameter == 'learning_rate':
-                        return self.reply('data_tool', dict(url='/golden/activity'))
+                        return self.reply('kb_tool', dict(url='/golden/activity'))
                     if parameter in CHOICE_CHARTS:
                         self_test.assertEqual([part['type'] for part in content], ['text', 'image_url'])
                         if not duplicate_retry:

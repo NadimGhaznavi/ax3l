@@ -117,7 +117,7 @@ def choice_activity(events: list[dict]) -> dict[str, dict]:
                        reasoning_event_id=event["event_id"] if event["has_reasoning"] else None)
             elif name == tool.STARTED:
                 function = json.loads(detail)["function"]
-                label = {"data_tool": "Read data", "kb_tool": "Read guide"}.get(function["name"], "Submit choice")
+                label = {"data_tool": "Read data", "kb_tool": "Read page"}.get(function["name"], "Submit choice")
                 target = None
                 if function["name"] in ("data_tool", "kb_tool"):
                     arguments = json.loads(function["arguments"])

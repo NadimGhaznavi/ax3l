@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Separate SnakeLab conversation presentation from data preparation and expose
+guides and experiment data through one browser tool, preserving experiment rules.
+
+### Changed
+
+- Extend `kb_tool(url)` to browse both guides and context-bound data from one
+  home page. Move guide URLs under `/guides` and remove the separate `data_tool`.
+- Move guide assets, data page layouts, choice and next-step prompts, EpsilonNice
+  guidance, and MCP tool descriptions into a dedicated Markdown presentation
+  package. Keep measured values, schema constraints, persistence, and workflow
+  decisions in their existing application layers.
+- Update installation and Experiment Status reads for the combined browser,
+  retaining display support for historical data-tool events.
+
 ## [4.20.1] - 2026-11-22 @ 05:59
 
 ### Summary

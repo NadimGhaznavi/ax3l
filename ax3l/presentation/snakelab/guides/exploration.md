@@ -13,5 +13,5 @@ immediate collisions; a detour can still enter a trap.
 Exact exploration counts and termination outcomes accompany saved run analyses.
 They are observations, not proof that exploration caused a score pattern.
 
-- [Choosing one setting](/selection)
-- [Reference index](/)
+- [Choosing one setting](/guides/selection)
+- [Reference index](/guides)

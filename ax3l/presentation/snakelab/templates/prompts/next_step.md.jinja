@@ -1,0 +1,29 @@
+{% if action == "run" %}
+Call run_simulation. The draft is unique and no untested changes remain.
+{% elif action == "review" %}
+Call run_simulation for this unique draft, or select_parameter with a listed key.
+{% elif action == "revise" %}
+This draft already exists. Call select_parameter with a listed key to make it unique.
+{% else %}
+The draft starts from golden. Use the run data to choose a listed key with select_parameter.
+{% endif %}
+
+Aim to beat golden's high score in 750 episodes. Prefer same-seed evidence.
+
+{% if choices %}
+Choose any subset in any order, at most once per setting. Change at least one value and submit pairs together. Revise duplicates within the same setting.
+
+{% endif %}
+{% if "seed" in choices %}
+Select seed to let Ax3l immediately save the next unused seed; no further seed confirmation is needed. On run, golden sets the new seed's baseline even if it scores lower. A seed-only draft ends there. Other changes run afterward against that baseline.
+
+{% elif seed_selected %}
+The seed can change only once per draft and is already set.
+
+{% endif %}
+Use kb_tool at / for reference runs or /draft for current values.
+
+Available keys and current values
+```json
+{{ choices | json(compact=false) }}
+```

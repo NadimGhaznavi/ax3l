@@ -10,5 +10,5 @@ separately. Positive empty rewards can favor survival without food.
 The move-limit penalty stays -10.
 Judge rewards by food scores, not total reward or loss scale.
 
-- [Choosing one setting](/selection)
-- [Reference index](/)
+- [Choosing one setting](/guides/selection)
+- [Reference index](/guides)

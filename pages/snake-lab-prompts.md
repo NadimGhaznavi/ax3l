@@ -39,12 +39,16 @@ extended deadline. After the configured grace period (seven minutes by default),
 Ax3l restarts the conversation if there is no saved change or runs the saved
 unique draft.
 
-`data_tool(url)` reads one small page. Use `/draft` for saved and inherited
-values, `/` for the run menu, and direct paths such as `/latest/scores` or
+`kb_tool(url)` reads one small guide or data page. Use `/draft` for saved and inherited
+values, `/` for the shared browser menu, and direct paths such as `/latest/scores` or
 `/golden/activity` for details. Navigation uses English. Values are JSON
 and missing statistics are null. Previously saved observations remain
-available through a run's notes page. `kb_tool(url)` serves short local
-guides, starting at `/`.
+available through a run's notes page. Short local guides start at `/guides`.
+
+Presentation lives under `ax3l/presentation/snakelab`: `guides` contains static
+Markdown, and `templates` contains Markdown templates for pages, prompts, and
+tool descriptions. Prepared values are inserted with a JSON filter. The Python
+application retains evidence selection, validation, and conversation sequencing.
 
 A read continues the conversation. An accepted submission finishes the
 choice. Prompt events preserve the exact text, JSON evidence, and PNG that

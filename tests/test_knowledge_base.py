@@ -10,7 +10,7 @@ class KnowledgeBaseTests(unittest.TestCase):
     def test_pages_stay_small_and_every_link_resolves(self):
         kb = KnowledgeBase()
         visited = set()
-        pending = ['/']
+        pending = ['/guides']
         while pending:
             url = pending.pop()
             if url in visited:
@@ -24,13 +24,13 @@ class KnowledgeBaseTests(unittest.TestCase):
         self.assertEqual(visited, set(kb.PAGES))
 
     def test_unknown_external_and_traversal_urls_cannot_read_files(self):
-        for url in ('/../selection', '/analysis/../../model', '/model.md', 'https://example.com',
-                    '//model', '/model?x=1', '/model#fragment', '/%2e%2e/model'):
+        for url in ('/guides/../selection', '/guides/analysis/../../model', '/guides/model.md', 'https://example.com',
+                    '//guides/model', '/guides/model?x=1', '/guides/model#fragment', '/guides/%2e%2e/model'):
             with self.subTest(url=url), self.assertRaises(ValueError):
                 KnowledgeBase().read(url)
 
     def test_selection_skill_loads_only_instructions(self):
-        text = KnowledgeBase().read('/selection')
+        text = KnowledgeBase().read('/guides/selection')
         self.assertLess(len(text.split()), 70)
         self.assertNotIn('description:', text)
         self.assertIn('750 episodes', text)

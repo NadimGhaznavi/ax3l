@@ -173,7 +173,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.store.saved.phase, 'completed')
         for call in self.conversation.await_args_list:
             prompt = call.args[4][0].to_md()
-            self.assertIn('data_tool', prompt)
+            self.assertIn('kb_tool', prompt)
             self.assertIn('/draft', prompt)
             for run_id in (self.gold, self.latest, self.best):
                 self.assertNotIn(run_id.split('-')[0], prompt)
@@ -530,7 +530,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
             name, field = (('select_parameter', 'parameter') if parameter == REVISION_PARAMETER
                            else ('submit_single_value', 'value'))
             definitions = [dict(function=dict(name=tool, parameters=dict(properties={argument: {}})))
-                           for tool, argument in ((name, field), ('data_tool', 'url'), ('kb_tool', 'url'))]
+                           for tool, argument in ((name, field), ('kb_tool', 'url'))]
 
             async def submit(arguments):
                 if parameter == REVISION_PARAMETER:
@@ -539,16 +539,16 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
                     dict(draft_id=draft_id, parameter=parameter, **arguments))
 
             tools = Mock(definition=definitions[0], definitions=definitions,
-                         submit=AsyncMock(side_effect=submit), data=AsyncMock(side_effect=data))
+                         submit=AsyncMock(side_effect=submit), read=AsyncMock(side_effect=data))
             context = AsyncMock()
             context.__aenter__.return_value = tools
             context.__aexit__.return_value = False
             return context
 
         responses = iter([('select_parameter', dict(parameter='gamma')),
-                          ('data_tool', dict(url='/golden/scores')),
+                          ('kb_tool', dict(url='/golden/scores')),
                           ('submit_single_value', dict(value=.97)),
-                          ('data_tool', dict(url='/draft'))])
+                          ('kb_tool', dict(url='/draft'))])
 
         def complete(payload, *, timeout_seconds):
             requests.append(json.loads(payload))

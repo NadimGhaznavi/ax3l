@@ -14,5 +14,5 @@ Use it with food scores when choosing collision rewards. Fewer collisions
 alone do not establish better food-finding performance; check whether more
 episodes simply reached max moves.
 
-- [Reward settings](/rewards)
-- [Chart interpretation](/analysis/)
+- [Reward settings](/guides/rewards)
+- [Chart interpretation](/guides/analysis/)

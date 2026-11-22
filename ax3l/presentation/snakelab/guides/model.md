@@ -25,5 +25,5 @@ submission tool.
 
 The move limit is max_moves_multiplier times the current snake length.
 
-- [Choosing one setting](/selection)
-- [Reference index](/)
+- [Choosing one setting](/guides/selection)
+- [Reference index](/guides)

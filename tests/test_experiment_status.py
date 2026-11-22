@@ -614,8 +614,8 @@ class ExperimentStatusHttpTests(unittest.TestCase):
             message = preview.split('id="message-content"', 1)[1].split('</div>', 1)[0]
             self.assertIn("Patrick Loeber's AI Snake Lab", message)
             self.assertIn('Your role: Data Scientist', message)
-            self.assertIn('/guides', message)
-            self.assertNotIn('/draft', message)
+            self.assertTrue('/definitions/golden.md' in message or '/guides' in message)
+            self.assertNotIn('href="/draft"', message)
             self.assertIn('<td>learning rate</td>', message)
             self.assertNotIn('<a ', message)
         for event_id, title in ((83, "Patrick Loeber's AI Snake Lab"), (84, 'Current draft')):

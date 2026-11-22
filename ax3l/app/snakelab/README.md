@@ -76,17 +76,21 @@ The chart comes from the latest run on the draft seed, or from the current
 golden run if the latest run used a different seed. The prompt supplies
 each reference's seed and whether it matches the draft. Chart sources are
 selected again after seed changes; measurements from other seeds are historical
-context. It also supplies measured facts from the chart's source run. The all-time best is available
-through the data tool. Reference runs sharing several roles appear once in
-the run menu. All-time score ties resolve to the earliest stored run.
+context. It also supplies measured facts from the chart's source run. All-time
+score ties resolve to the earliest stored run.
 
-`kb_tool(url)` opens a small guide or data page. Use `/draft` for current values,
-`/` for the run menu, or a direct path such as `/golden/activity` for a
-specific result. English labels explain each path. Data is JSON. Run pages
-contain scores, termination counts and percentages, activity counts, and
-settings. Notes from previously analyzed runs remain available.
-The data tool is available before the first parameter selection and during
-every next-step decision, so Qwen can research which setting to tweak.
+The main configuration page compares best, golden, latest, and draft values
+for every configurable setting. Saved edits remain visible, with `editable`
+indicating which settings can currently be selected. Historical results and
+saved observations appear in a separate JSON block without repeated
+configurations or redundant roles.
+
+`kb_tool(url)` opens the linked definitions or optional lab reference. Reading
+a definition from the main page redisplays that page afterward in the same
+conversation. Definition pages include "Don't show your reasoning in the
+prompt." Saving a setting returns to the main page with updated draft values.
+Older draft and run data URLs remain readable. Navigation uses English and
+payloads use JSON.
 Ax3l internally allows seven minutes to select a parameter and find values
 that produce a unique configuration, or decide to run an already unique draft.
 The timer includes inference and lookup time. Prompts and tool feedback do not

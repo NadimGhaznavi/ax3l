@@ -1,28 +1,36 @@
 {% from "navigation.md.jinja" import lab, run_action %}
-{{ lab("Set new configuration values for the next simulation" if choices else "Review configuration changes") }}
+{{ lab() }}
 
-{% if action == "run" %}
-Draft status: Changes saved; no untested changes remain.
-{% elif action == "review" %}
-Draft status: Changes saved.
-{% elif action == "revise" %}
-Draft status: Duplicate configuration. Change a setting to make it unique.
-{% else %}
-Starting values: golden.
+{% if can_edit %}
+- Use the select_parameter tool to change the configuration values for the next simulation run. Choose a setting whose editable value is true.
+  - When you have finished editing a configuration value, you will be returned to this page.
+  - Changes you make are shown in the [draft](/definitions/draft.md) configuration below.
 {% endif %}
 
-## Experiment menu
+- The initial values for the draft configuration are based on the [golden](/definitions/golden.md) configuration.
 
-{% if choices %}
-- Edit a configuration element: call select_parameter with its key from settings.
+- You can change more than one configuration value before running the next simulation.
+
+{% if settings.seed.editable %}
+- You can also request a seed change for the next simulation run.
+  - The current [golden](/definitions/golden.md) configuration will be run with the new seed value.
+  - Your configuration changes will be tested with the same new seed value.
 {% endif %}
-- [Open lab reference](/guides)
+
 {{ run_action() }}
 
-Open menu URLs with kb_tool.
+Open definition URLs with kb_tool.
 
-## Configuration comparison and run data
+# Simulation Configuration Values
+
+The configuration values for the [best](/definitions/best.md), [golden](/definitions/golden.md), [latest](/definitions/latest.md), and [draft](/definitions/draft.md) run data are shown below.
 
 ```json
-{{ evidence | json }}
+{{ {"settings": settings} | json }}
+```
+
+# Historical Simulation Results
+
+```json
+{{ {"runs": runs} | json }}
 ```

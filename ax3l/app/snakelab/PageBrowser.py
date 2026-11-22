@@ -17,7 +17,7 @@ class PageBrowser:
             if result["status"] == "ok":
                 return {"status": "ok", "page": templates.render("pages/home.md.jinja", data_page=result["page"])}
             return result
-        if url == "/guides" or url.startswith("/guides/"):
+        if url == "/guides" or url.startswith(("/guides/", "/definitions/")):
             try:
                 return {"status": "ok", "page": self._guides.read(url)}
             except ValueError as error:

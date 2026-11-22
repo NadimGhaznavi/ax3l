@@ -3,6 +3,7 @@
 import asyncio
 from copy import deepcopy
 import json
+import re
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -22,6 +23,11 @@ from ax3l.constants.DAx3l import DAx3l
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
+
+
+def prompt_data(text):
+    return {key: value for block in re.findall(r'```json\n(.*?)\n```', text, re.DOTALL)
+            for key, value in json.loads(block).items()}
 
 
 class MemoryExperiments:
@@ -174,7 +180,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         for call in self.conversation.await_args_list:
             prompt = call.args[4][0].to_md()
             self.assertIn('kb_tool', prompt)
-            self.assertIn('[Open lab reference](/guides)', prompt)
+            self.assertTrue('/definitions/golden.md' in prompt or '[Open lab reference](/guides)' in prompt)
             self.assertNotRegex(prompt, r'\]\(/(?:latest|golden|best|draft)\)')
             self.assertIn('Run next simulation', prompt)
             for run_id in (self.gold, self.latest, self.best):
@@ -196,32 +202,38 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.conversation.side_effect = asyncio.CancelledError()
         await self.cycle()
         prompt = self.conversation.await_args.args[4][0].to_md()
-        data = json.loads(prompt.split('```json\n')[1].split('\n```')[0])
+        data = prompt_data(prompt)
+        blocks = [json.loads(block) for block in re.findall(r'```json\n(.*?)\n```', prompt, re.DOTALL)]
+        self.assertEqual([set(block) for block in blocks], [{'settings'}, {'runs'}])
         rate = self.config['training']['learning_rate']
         self.assertEqual(data['settings']['learning_rate']['values'],
                          dict(best=.003, golden=rate, latest=.002, draft=rate))
         self.assertEqual(data['settings']['epsilon_pair']['values']['best'], dict(initial=.91, decay=.95))
         for scope, run_id in (('best', self.best), ('golden', self.gold), ('latest', self.latest)):
             analysis = self.store.analyses[run_id]
-            self.assertEqual(data['runs'][scope]['config'], analysis.config)
+            self.assertNotIn('config', data['runs'][scope])
+            self.assertNotIn('roles', data['runs'][scope])
             self.assertEqual(data['runs'][scope]['metrics'], analysis.metrics)
             self.assertEqual(data['runs'][scope]['summary'], analysis.summary)
             self.assertNotIn(run_id, prompt)
-        self.assertEqual(data['draft']['config'], self.config)
+        self.assertNotIn('draft', data)
+        self.assertNotIn('board_width', prompt)
         self.assertEqual(set(data['settings']), set(PARAMETER_ORDER))
         self.assertNotRegex(prompt, r'\]\(/(?:latest|golden|best|draft)\)')
         self.assertNotRegex(prompt, r'(?m)^\s*\|')
-        self.assertIn('Current task: Set new configuration values for the next simulation', prompt)
+        self.assertNotIn('Current task:', prompt)
+        self.assertIn('When you have finished editing a configuration value, you will be returned to this page.', prompt)
         self.snake.submit_simulation.assert_not_called()
 
     async def test_inline_draft_includes_saved_edits_without_changing_reference_runs(self):
         await self.cycle()
         prompt = self.conversation.await_args_list[-1].args[4][0].to_md()
-        data = json.loads(prompt.split('```json\n')[1].split('\n```')[0])
-        self.assertEqual(data['draft']['config']['training']['learning_rate'], .003)
-        self.assertEqual(data['draft']['saved_settings'], ['learning_rate'])
-        self.assertNotIn('learning_rate', data['settings'])
-        self.assertEqual(data['runs']['golden']['config'], self.config)
+        data = prompt_data(prompt)
+        self.assertEqual(data['settings']['learning_rate']['values']['draft'], .003)
+        self.assertEqual(data['settings']['learning_rate']['values']['golden'], self.config['training']['learning_rate'])
+        self.assertFalse(data['settings']['learning_rate']['editable'])
+        self.assertTrue(data['settings']['gamma']['editable'])
+        self.assertNotIn('config', data['runs']['golden'])
 
     async def test_qwen_can_tune_food_move_and_collision_rewards_independently(self):
         self.decisions = ['food', 'empty', 'snake', 'wall', 'run']
@@ -236,7 +248,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
             content = json.loads(call.args[4][0].to_json())['content']
             if parameter != REVISION_PARAMETER:
                 self.assertEqual([part['type'] for part in content], ['text', 'image_url'])
-                evidence = json.loads(content[0]['text'].split('```json\n')[1].split('\n```')[0])
+                evidence = prompt_data(content[0]['text'])
                 self.assertEqual(evidence['settings'][parameter]['values']['draft'], self.config['game']['rewards'][parameter])
                 if parameter in ('snake', 'wall'):
                     self.assertIn('Chart: latest.', content[0]['text'])
@@ -262,7 +274,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         content = json.loads(self.conversation.await_args_list[0].args[4][0].to_json())['content']
         self.assertEqual([part['type'] for part in content], ['text', 'image_url'])
         self.assertIn('Chart: latest.', content[0]['text'])
-        evidence = json.loads(content[0]['text'].split('```json\n')[1].split('\n```')[0])
+        evidence = prompt_data(content[0]['text'])
         self.assertEqual(evidence['settings']['food']['values']['draft'], 10)
         self.assertEqual(evidence['settings']['food']['values']['latest'], 10)
 
@@ -286,7 +298,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
                      'value_2 moves', 'immediately safe alternative',
                      "model's pick if one exists", 'Each episode starts with no active detour', 'submit_pair_values'):
             self.assertIn(text, content)
-        evidence = json.loads(content.split('```json\n')[1].split('\n```')[0])
+        evidence = prompt_data(content)
         self.assertEqual(evidence['settings']['epsilon_nice_pair']['values']['draft'], self.config['epsilon_nice'])
         self.assertEqual(evidence['settings']['epsilon_nice_pair']['values']['golden'], self.config['epsilon_nice'])
         self.assertEqual(evidence['runs']['latest']['high_score'], 10)
@@ -353,7 +365,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
                 content = json.loads(self.conversation.await_args_list[0].args[4][0].to_json())['content']
                 self.assertEqual(isinstance(content, list), bool(extra))
 
-    async def test_exhausted_parameters_are_omitted_and_rechecked_against_the_changed_draft(self):
+    async def test_exhausted_parameters_remain_visible_and_editability_is_rechecked_against_the_changed_draft(self):
         def available(config, parameters):
             return [parameter for parameter in parameters if parameter != 'layers'
                     or config['training']['learning_rate'] != self.config['training']['learning_rate']]
@@ -363,11 +375,11 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         await self.cycle()
         prompts = [call.args[4][0].to_md() for call in self.conversation.await_args_list
                    if call.kwargs['parameter'] == REVISION_PARAMETER]
-        choices = [json.loads(prompt.split('```json\n')[1].split('\n```')[0])['settings'] for prompt in prompts]
-        self.assertNotIn('layers', choices[0])
-        self.assertIn('layers', choices[1])
-        self.assertNotIn('learning_rate', choices[1])
-        self.assertNotIn('layers', choices[2])
+        choices = [prompt_data(prompt)['settings'] for prompt in prompts]
+        self.assertFalse(choices[0]['layers']['editable'])
+        self.assertTrue(choices[1]['layers']['editable'])
+        self.assertFalse(choices[1]['learning_rate']['editable'])
+        self.assertFalse(choices[2]['layers']['editable'])
         candidate = self.snake.submit_simulation.call_args.args[0]
         self.assertEqual(candidate['training']['learning_rate'], .003)
         self.assertEqual(candidate['model']['layers'], 3)
@@ -379,8 +391,8 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.decisions = ['run']
         await self.cycle()
         self.assertEqual(self.trace(), [REVISION_PARAMETER])
-        self.assertIn('no untested changes remain', self.prompts[0])
-        self.assertEqual(json.loads(self.prompts[0].split('```json\n')[1].split('\n```')[0])['settings'], {})
+        self.assertFalse(any(setting['editable'] for setting in prompt_data(self.prompts[0])['settings'].values()))
+        self.assertIn('Run next simulation', self.prompts[0])
         self.snake.submit_simulation.assert_called_once()
 
     async def test_restart_reopens_selection_when_the_pending_parameter_is_exhausted(self):
@@ -429,7 +441,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(self.store.saved.phase, 'reviewing' if count else 'selecting_parameter')
                 self.assertIsNone(self.store.saved.parameter)
                 prompt = self.conversation.await_args.args[4][0].to_md()
-                self.assertNotIn('layers', json.loads(prompt.split('```json\n')[1].split('\n```')[0])['settings'])
+                self.assertFalse(prompt_data(prompt)['settings']['layers']['editable'])
         self.snake.submit_simulation.assert_not_called()
 
     async def test_restart_resumes_the_explicit_setting_and_preserves_other_choices(self):
@@ -544,7 +556,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIsNone(self.store.saved.parameter)
                 self.assertEqual(self.store.saved.selections, [])
                 self.assertEqual(self.store.saved.decision_expires_at, 1920)
-                self.assertIn('Starting values: golden', self.conversation.await_args.args[4][0].to_md())
+                self.assertIn('The initial values for the draft configuration are based on the [golden]', self.conversation.await_args.args[4][0].to_md())
         self.snake.is_config_unique.assert_not_called()
         self.snake.submit_simulation.assert_not_called()
 
@@ -676,7 +688,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('Compare latest with golden.', messages['learning_rate'][0]['text'])
         self.assertEqual([call.args[-1] for call in self.chart.call_args_list],
                          ['distribution', 'loss', 'scores'])
-        data = json.loads(messages['epsilon_pair'][0]['text'].split('```json\n')[1].split('\n```')[0])
+        data = prompt_data(messages['epsilon_pair'][0]['text'])
         self.assertEqual(data['runs']['golden']['high_score'], 20)
         self.assertEqual(data['runs']['latest']['metrics']['mean_last_50_scores'], .2)
         self.assertEqual(data['settings']['epsilon_pair']['values']['draft'], {key: self.config['epsilon'][key] for key in ('initial', 'decay')})
@@ -695,7 +707,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([call.args[0] for call in self.snake.get_analysis_episodes.call_args_list],
                          [self.latest, self.gold])
         prompt = self.conversation.await_args_list[1].args[4][0].to_md()
-        evidence = json.loads(prompt.split('```json\n')[1].split('\n```')[0])
+        evidence = prompt_data(prompt)
         for scope in ('latest', 'golden'):
             self.assertEqual(evidence['runs'][scope]['metrics']['episodes_with_loss'], 480)
 
@@ -808,7 +820,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.store.saved.golden_run_id, self.best)
         self.assertEqual(self.store.saved.config['seed'], self.config['seed'] + 1)
         prompt = self.conversation.await_args.args[4][-1].to_md()
-        self.assertIn('Starting values: golden', prompt)
+        self.assertIn('The initial values for the draft configuration are based on the [golden]', prompt)
         self.assertIn('select_parameter', prompt)
 
     async def test_seed_only_change_runs_once_and_accepts_a_lower_local_baseline(self):
@@ -942,8 +954,8 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         for parameter, prompt in zip(self.trace()[1:], self.prompts[1:]):
             if parameter == REVISION_PARAMETER:
                 self.assertNotIn('Select seed to let Ax3l', prompt)
-                choices = json.loads(prompt.split('```json\n')[1].split('\n```')[0])['settings']
-                self.assertNotIn('seed', choices)
+                choices = prompt_data(prompt)['settings']
+                self.assertFalse(choices['seed']['editable'])
         baseline, candidate = [call.args[0] for call in self.snake.submit_simulation.call_args_list]
         self.assertEqual(baseline, {**self.config, 'seed': 1971})
         self.assertEqual(candidate['seed'], 1971)

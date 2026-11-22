@@ -128,6 +128,13 @@ async def converse(llm, output, db, tools, prompts, *, parameter: str | None = N
             # Explicit validation rejections are safe to correct. Transport failures are not retried.
             messages.append({"role": "tool", "tool_call_id": call["id"],
                              "content": result["page"] if result["status"] == "ok" else "Rejected."})
+            if (result["status"] == "ok" and called_name == "kb_tool"
+                    and tool_name == "select_parameter" and arguments["url"].startswith("/definitions/")):
+                screen = prompts[-1]
+                feedback = json.loads(screen.to_json())
+                messages.append(feedback)
+                log(Events.Conversation, Events.Conversation.PROMPT, json.dumps(feedback, ensure_ascii=False),
+                    source_name=screen.source_name)
             if result["status"] == "rejected":
                 feedback = result["prompt"]
                 if called_name == "run_simulation":

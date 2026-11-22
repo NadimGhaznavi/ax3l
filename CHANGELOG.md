@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Make the configuration page the main screen for setup, with linked definitions,
+visible saved edits, and separate configuration comparisons and run results.
+
+### Changed
+
+- Use the revised first prompt to explain selecting settings, returning after
+  saving, multiple edits, and seed changes. Keep Run next simulation available.
+- Show all configurable settings with best, golden, latest, and current draft
+  values. Mark whether each setting is editable so saved changes remain visible.
+  Remove repeated full configurations from inline historical data and remove
+  redundant run roles.
+- Return to the configuration page after reading a linked definition, keeping
+  the conversation and decision deadline. Saved edits return to a freshly
+  rendered page with the updated draft values.
+
+### Added
+
+- Linked definitions for best, golden, latest, and draft. Each includes the
+  instruction, "Don't show your reasoning in the prompt."
+
+### Fixed
+
+- Render grouped JSON settings as rows in Experiment Status previews so
+  separate configuration and historical-results blocks stay readable.
+
 ## [4.21.2] - 2026-11-22 @ 12:45
 
 ### Summary

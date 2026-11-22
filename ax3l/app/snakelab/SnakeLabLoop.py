@@ -180,6 +180,8 @@ async def optimize(llm, output, db, endpoint):
                           for run_id in dict.fromkeys(draft.references.values())}
             golden = references[draft.golden_run_id]
             latest = references[draft.references["latest"]]
+            reference_runs = {"best": references[draft.references["all_time_best"]],
+                              "golden": golden, "latest": latest}
             chart_episodes = {}
             if draft.phase == "preparing":
                 draft.phase = "selecting_parameter"
@@ -211,10 +213,10 @@ async def optimize(llm, output, db, endpoint):
                 if parameter == REVISION_PARAMETER:
                     parameters = snake.available_parameters(
                         draft.config, [name for name in PARAMETER_ORDER if name not in draft.selections])
-                    prompt = ConfigurationNextStep(draft, parameters)
+                    prompt = ConfigurationNextStep(draft, parameters, reference_runs)
                 else:
                     choice = EpsilonNiceChoice if parameter == "epsilon_nice_pair" else ConfigurationChoice
-                    prompt = choice(draft, latest, golden, chart_scope, png)
+                    prompt = choice(draft, reference_runs, chart_scope, png)
                 if png is not None:
                     decision_deadline += IMAGE_PROMPT_EXTRA_SECONDS
                     draft.decision_expires_at += IMAGE_PROMPT_EXTRA_SECONDS

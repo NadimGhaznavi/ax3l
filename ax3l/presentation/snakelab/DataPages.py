@@ -2,7 +2,7 @@
 
 from ax3l.activity.SimulationDataValues import (
     CONFIG_PAGES, config_values, draft_values, parameter_rules,
-    reference_groups, run_snapshot_values, run_values, scoped_values,
+    run_snapshot_values, run_values, scoped_values,
 )
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
@@ -21,8 +21,8 @@ def analysis_rules_page(config: dict) -> str:
     return templates.render("pages/rules.md.jinja", seed=config["seed"], parameters=parameter_rules())
 
 
-def index_page(draft: ConfigurationDraft) -> str:
-    return templates.render("pages/references.md.jinja", groups=reference_groups(draft))
+def index_page() -> str:
+    return templates.render("pages/references.md.jinja")
 
 
 def draft_page(draft: ConfigurationDraft) -> str:

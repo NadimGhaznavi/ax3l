@@ -41,7 +41,7 @@ class SimulationData:
             return self._reject("This draft is unavailable.")
         scope, page = pages[url]
         if not scope:
-            text = index_page(draft)
+            text = index_page()
         elif scope == "draft":
             text = config_page(scope, page, draft.config) if page else draft_page(draft)
         else:

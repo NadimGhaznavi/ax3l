@@ -23,13 +23,6 @@ def scoped_values(scope: str, seed: int, data: dict) -> dict:
     return dict(scope=scope, seed=seed, **data)
 
 
-def reference_groups(draft: ConfigurationDraft) -> list[list[str]]:
-    roles = {}
-    for role, run_id in draft.references.items():
-        roles.setdefault(run_id, []).append(REFERENCE_LABELS[role])
-    return list(roles.values())
-
-
 def draft_values(draft: ConfigurationDraft) -> dict:
     return scoped_values("draft", draft.config["seed"], dict(
         phase=draft.phase, saved_settings=draft.selections,

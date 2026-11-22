@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.22.0] - 2026-11-22 @ 15:09
+
 ### Summary
 
 Restart interrupted experiment setups without erasing simulation history, and

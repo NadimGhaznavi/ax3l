@@ -82,8 +82,10 @@ score ties resolve to the earliest stored run.
 The main configuration page compares best, golden, latest, and draft values
 for every configurable setting. Saved edits remain visible, with `editable`
 indicating which settings can currently be selected. Historical results and
-saved observations appear in a separate JSON block without repeated
-configurations or redundant roles.
+saved observations appear in a separate JSON block by metric, with best,
+golden, and latest values together. Nested metrics place the reference values
+after the metric path. Report previews show these comparisons in columns,
+without repeated configurations or redundant roles.
 
 `kb_tool(url)` opens the linked definitions or optional lab reference. Reading
 a definition from the main page redisplays that page afterward in the same

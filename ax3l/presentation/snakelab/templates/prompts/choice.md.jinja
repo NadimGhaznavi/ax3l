@@ -26,8 +26,14 @@ Chart: {{ chart_scope }}.
 
 Open menu URLs with kb_tool.
 
-## Configuration comparison and run data
+## Simulation Configuration Values
 
 ```json
-{{ evidence | json }}
+{{ {"settings": evidence.settings} | json }}
+```
+
+## Historical Simulation Results
+
+```json
+{{ evidence.results | json }}
 ```

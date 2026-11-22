@@ -152,6 +152,7 @@ exec /usr/bin/systemd-analyze "$@"
                                'app/snakelab/prompts/ConfigurationNextStep.py',
                                'app/snakelab/prompts/NoDupes.py',
                                'interface/KnowledgeBase.py', 'interface/MarkdownTemplates.py',
+                               'activity/PresentationValues.py',
                                'app/snakelab/PageBrowser.py', 'activity/ConfigurationEvidence.py',
                                'presentation/snakelab/Templates.py', 'constants/DSimulationAnalysis.py',
                                'constants/DScoreDistribution.py',

@@ -134,12 +134,15 @@ class SimulationDataTests(unittest.TestCase):
             self.assertEqual(snapshot['config'], analysis.config)
             self.assertEqual(snapshot['metrics'], analysis.metrics)
 
-    def test_json_preserves_numbers_percentages_and_observation_text(self):
+    def test_json_rounds_display_numbers_without_changing_measurements_or_observation_text(self):
         metrics = self.analyses[self.latest].metrics
         metrics['mean_score'] = 1 / 3
         metrics['termination_reasons']['wall']['percent'] = 100 / 3
-        self.assertEqual(self.payload('/latest/scores')['mean_score'], 1 / 3)
-        self.assertEqual(self.payload('/latest/endings')['termination_reasons'], metrics['termination_reasons'])
+        displayed = deepcopy(metrics)
+        displayed['mean_score'] = .33333
+        displayed['termination_reasons']['wall']['percent'] = 33.33333
+        self.assertEqual(self.payload('/latest/scores')['mean_score'], .33333)
+        self.assertEqual(self.payload('/latest/endings')['termination_reasons'], displayed['termination_reasons'])
         for page, key in (('model', 'model'), ('training', 'training'), ('exploration', 'epsilon_nice')):
             self.assertEqual(self.payload(f'/latest/{page}')[key], self.config[key])
         self.assertEqual(self.payload('/latest/rewards')['rewards'], self.config['game']['rewards'])
@@ -148,9 +151,11 @@ class SimulationDataTests(unittest.TestCase):
             'Score trends: "flat".\nTraining loss: missing — path \\loss.')
         self.assertEqual(self.payload('/latest/notes')['summary'], self.analyses[self.latest].summary)
         snapshot = self.payload('/latest')
-        self.assertEqual(snapshot['metrics'], metrics)
+        self.assertEqual(snapshot['metrics'], displayed)
         self.assertEqual(snapshot['summary'], self.analyses[self.latest].summary)
         self.assertIs(self.payload('/best')['same_seed_as_draft'], False)
+        self.assertEqual(metrics['mean_score'], 1 / 3)
+        self.assertEqual(metrics['termination_reasons']['wall']['percent'], 100 / 3)
 
 
 class AnalysisRunDataTests(unittest.TestCase):

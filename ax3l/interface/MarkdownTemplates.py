@@ -5,6 +5,8 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
+from ax3l.activity.PresentationValues import presentation_values
+
 
 class MarkdownTemplates:
     def __init__(self, root: Path):
@@ -18,7 +20,7 @@ class MarkdownTemplates:
     @staticmethod
     def _json(value, compact: bool = True) -> str:
         options = {"separators": (",", ":")} if compact else {}
-        return json.dumps(value, ensure_ascii=False, allow_nan=False, **options)
+        return json.dumps(presentation_values(value), ensure_ascii=False, allow_nan=False, **options)
 
     def render(self, name: str, **values) -> str:
         return self._environment.get_template(name).render(**values).strip()

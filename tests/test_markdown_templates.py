@@ -23,7 +23,9 @@ class MarkdownTemplatesTests(unittest.TestCase):
             after = renderer.render("page.md.jinja", data=values)
             self.assertTrue(before.startswith("Measured values\n"))
             self.assertTrue(after.startswith("Settings\n"))
-            self.assertEqual(json.loads(after.split("```json\n")[1].split("\n```")[0]), values)
+            self.assertEqual(json.loads(after.split("```json\n")[1].split("\n```")[0]),
+                             {**values, 'fraction': .33333})
+            self.assertEqual(values['fraction'], 1 / 3)
             path.write_text('{{ heading }}\n{{ data | json }}', encoding="utf-8")
             with self.assertRaises(UndefinedError):
                 renderer.render("page.md.jinja", data=values)

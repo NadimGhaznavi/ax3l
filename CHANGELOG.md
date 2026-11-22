@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.21.3] - 2026-11-22 @ 14:17
+
 ### Summary
 
 Make the configuration page the main screen for setup, with linked definitions,

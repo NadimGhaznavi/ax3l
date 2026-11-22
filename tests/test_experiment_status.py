@@ -79,8 +79,30 @@ class ExperimentStatusTests(unittest.TestCase):
                 dict(seconds=3600, input_tokens=1350, output_tokens=50),
             ]),
         }
-        self.assertEqual(self.report(activity=activity)['totals'], dict(
+        report = self.report(activity=activity)
+        self.assertEqual(report['totals'], dict(
             elapsed='01:00:01', input_tokens=2584, output_tokens=371, tokens=2955))
+        rows = {row['path']: row for row in report['rows']}
+        self.assertEqual(rows['epsilon.initial']['steps'], [])
+        self.assertEqual(rows['epsilon.decay']['totals'], dict(
+            elapsed='00:00', input_tokens=1234, output_tokens=321, tokens=1555))
+        self.assertEqual(rows['game.rewards.further_from_food']['totals'], dict(
+            elapsed='01:00:00', input_tokens=1350, output_tokens=50, tokens=1400))
+
+    def test_food_reward_row_totals_sum_its_steps_and_skip_unrecorded_usage(self):
+        activity = {'food': dict(image_event_id=None, steps=[
+            dict(seconds=1, input_tokens=None, output_tokens=None),
+            dict(seconds=None, input_tokens=None, output_tokens=None),
+            dict(seconds=205, input_tokens=1803, output_tokens=1794),
+            dict(seconds=0, input_tokens=None, output_tokens=None),
+            dict(seconds=47, input_tokens=3735, output_tokens=439),
+            dict(seconds=0, input_tokens=0, output_tokens=0),
+        ])}
+        report = self.report(activity=activity)
+        food = next(row for row in report['rows'] if row['path'] == 'game.rewards.food')
+        self.assertEqual(food['totals'], dict(
+            elapsed='04:13', input_tokens=5538, output_tokens=2233, tokens=7771))
+        self.assertEqual(report['totals'], food['totals'])
 
     def test_saved_values_and_current_pair_follow_qwens_explicit_selection(self):
         self.assertEqual(self.report()['phase'], 'Choosing a setting')
@@ -182,6 +204,7 @@ class ExperimentStatusTests(unittest.TestCase):
         self.assertIsNone(report['rows'][-1]['inherited_value'])
         self.assertFalse(report['rows'][-1]['changed'])
         self.assertEqual(report['totals'], dict(elapsed='00:12', input_tokens=100, output_tokens=20, tokens=120))
+        self.assertEqual(report['rows'][-1]['totals'], report['totals'])
         self.draft.selections.remove('layers')
         self.draft.phase = 'choosing'
         self.draft.parameter = 'layers'
@@ -442,11 +465,22 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         self.assertIn('class="item-tokens">371</td>', footer)
         self.assertIn('>Total tokens</th>', footer)
         self.assertIn('class="item-tokens" colspan="2">2,955</td>', footer)
+        row = page.split('data-parameter="epsilon.decay"', 1)[1].split('</tr>', 1)[0]
+        self.assertIn('class="item-elapsed"><strong>06:26</strong></td>', row)
+        self.assertIn('class="item-tokens"><strong>2,584</strong></td>', row)
+        self.assertIn('class="item-tokens"><strong>371</strong></td>', row)
+        self.assertIn('aria-expanded="false"', row)
+        self.assertIn('id="tasks-epsilon.decay" class="status-subtasks" hidden', page)
+        empty_row = page.split('data-parameter="epsilon.initial"', 1)[1].split('</tr>', 1)[0]
+        self.assertIn('class="item-elapsed"></td>', empty_row)
+        self.assertEqual(empty_row.count('class="item-tokens"></td>'), 2)
         self.assertEqual(page.count('>Qwen request</th>'), 3)
         for recorded in self.experiments.choice_events.return_value:
             recorded['observed_at'] += timedelta(seconds=5)
         page = self.get()
         self.assertIn('class="item-elapsed">06:31</td>', page)
+        row = page.split('data-parameter="epsilon.decay"', 1)[1].split('</tr>', 1)[0]
+        self.assertIn('class="item-elapsed"><strong>06:31</strong></td>', row)
         self.experiments.choice_events.return_value.append(
             event(12, 'reply_received', 405, parent=3,
                   detail=json.dumps(dict(prompt_tokens=2000, completion_tokens=400))))
@@ -456,6 +490,9 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         self.assertIn('class="item-tokens">4,584</td>', footer)
         self.assertIn('class="item-tokens">771</td>', footer)
         self.assertIn('class="item-tokens" colspan="2">5,355</td>', footer)
+        row = page.split('data-parameter="epsilon.decay"', 1)[1].split('</tr>', 1)[0]
+        self.assertIn('class="item-tokens"><strong>4,584</strong></td>', row)
+        self.assertIn('class="item-tokens"><strong>771</strong></td>', row)
         for recorded in self.experiments.choice_events.return_value:
             recorded['observed_at'] += timedelta(seconds=5)
         self.assertIn('class="item-elapsed">06:31</td>', self.get())

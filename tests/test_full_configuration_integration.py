@@ -97,7 +97,7 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
                 text = content[0]['text'] if isinstance(content, list) else content
                 evidence = {key: value for block in re.findall(r'```json\n(.*?)\n```', text, re.DOTALL)
                             for key, value in json.loads(block).items()}
-                self_test.assertEqual(evidence['runs']['golden']['high_score'], 10)
+                self_test.assertEqual(evidence['high_score']['golden'], 10)
                 if tool == 'select_parameter':
                     eligible = {key for key, setting in evidence['settings'].items() if setting['editable']}
                     self_test.assertTrue(set(eligible).isdisjoint(selections))
@@ -122,7 +122,7 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
                             chart_choices.append(parameter)
                     else:
                         self_test.assertIsInstance(content, str)
-                    self_test.assertEqual(evidence['runs']['golden']['metrics']['episodes_with_loss'], 9)
+                    self_test.assertEqual(evidence['episodes_with_loss']['golden'], 9)
                     if parameter == 'reward_pair' and not duplicate_retry:
                         duplicate_attempts.append(parameter)
                     else:

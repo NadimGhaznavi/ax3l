@@ -617,6 +617,11 @@ class ExperimentStatusHttpTests(unittest.TestCase):
             self.assertTrue('/definitions/golden.md' in message or '/guides' in message)
             self.assertNotIn('href="/draft"', message)
             self.assertIn('<td>learning rate</td>', message)
+            self.assertIn('<th>best</th>', message)
+            self.assertIn('<th>golden</th>', message)
+            self.assertIn('<th>latest</th>', message)
+            self.assertIn('<td>episodes</td>', message)
+            self.assertNotIn('<th>metrics</th>', message)
             self.assertNotIn('<a ', message)
         for event_id, title in ((83, "Patrick Loeber's AI Snake Lab"), (84, 'Current draft')):
             page = self.get(f'/tool-results/{event_id}')

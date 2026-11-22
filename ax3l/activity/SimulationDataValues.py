@@ -52,6 +52,22 @@ def run_snapshot_values(scope: str, draft: ConfigurationDraft, analysis: Simulat
     return dict(run_result_values(scope, draft, analysis, target), config=analysis.config)
 
 
+def _compare_values(values: dict) -> dict:
+    first = next(iter(values.values()))
+    if isinstance(first, dict):
+        return {field: _compare_values({scope: record[field] for scope, record in values.items()})
+                for field in first}
+    return values
+
+
+def run_comparison_values(draft: ConfigurationDraft, references: dict[str, SimulationAnalysis]) -> dict:
+    target = references["golden"].metrics["high_score"]
+    context = ("seed", "golden_target_score", "score_difference", "same_seed_as_draft", "summary")
+    snapshots = {scope: run_result_values(scope, draft, run, target) for scope, run in references.items()}
+    return _compare_values({scope: {**snapshot["metrics"], **{key: snapshot[key] for key in context}}
+                            for scope, snapshot in snapshots.items()})
+
+
 def run_values(scope: str, page: str, analysis: SimulationAnalysis) -> dict:
     if page in CONFIG_PAGES:
         return config_values(scope, page, analysis.config)

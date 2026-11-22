@@ -5,6 +5,8 @@ import json
 import re
 from typing import Any
 
+from ax3l.activity.PresentationValues import presentation_values
+
 
 def _text(value: Any) -> str:
     if isinstance(value, dict) and value:
@@ -13,7 +15,7 @@ def _text(value: Any) -> str:
         return ", ".join(_text(item) for item in value)
     if isinstance(value, str):
         return value or '""'
-    return json.dumps(value, ensure_ascii=False, allow_nan=False)
+    return json.dumps(presentation_values(value), ensure_ascii=False, allow_nan=False)
 
 
 def _cell(value: Any) -> str:
@@ -39,16 +41,31 @@ def _fields(value: dict, prefix: str = "") -> list[list[Any]]:
     return rows
 
 
+def _records(value: dict, prefix: str = "") -> list[tuple[str, dict]]:
+    rows = []
+    for key, record in value.items():
+        label = f"{prefix} / {key}" if prefix else key
+        if all(isinstance(item, dict) and item for item in record.values()):
+            rows.extend(_records(record, label))
+        else:
+            rows.append((label, record))
+    return rows
+
+
 def json_markdown(value: Any) -> str:
     """Handle the nested settings, scalar lists, and record lists used in reports."""
     if isinstance(value, dict) and value:
         records = list(value.values())
-        if (len(records) > 1 and all(isinstance(record, dict) and record for record in records)
-                and all(record.keys() == records[0].keys() for record in records)):
-            keys = list(records[0])
-            return _table(["Field", *(key.replace("_", " ") for key in keys)],
-                          [[key.replace("_", " "), *(record[field] for field in keys)]
-                           for key, record in value.items()])
+        if len(records) > 1 and all(isinstance(record, dict) and record for record in records):
+            rows = _records(value)
+            keys = list(rows[0][1])
+            if all(record.keys() == rows[0][1].keys() for _, record in rows):
+                if any(all(record[field] == name for name, record in rows) for field in keys):
+                    return _table([key.replace("_", " ") for key in keys],
+                                  [[record[field] for field in keys] for _, record in rows])
+                return _table(["Field", *(key.replace("_", " ") for key in keys)],
+                              [[name.replace("_", " "), *(record[field] for field in keys)]
+                               for name, record in rows])
         simple = {key: item for key, item in value.items() if not isinstance(item, (dict, list)) or not item}
         sections = [_table(["Field", "Value"], _fields(simple))] if simple else []
         for key, item in value.items():

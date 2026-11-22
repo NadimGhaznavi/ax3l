@@ -14,4 +14,4 @@ class ConfigurationNextStep(Prompt):
         for parameter, setting in evidence["settings"].items():
             setting["editable"] = parameter in parameters
         super().__init__(templates.render("prompts/next_step.md.jinja", can_edit=bool(parameters),
-                                         settings=evidence["settings"], runs=evidence["runs"]))
+                                         settings=evidence["settings"], results=evidence["results"]))

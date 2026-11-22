@@ -49,6 +49,42 @@ class JsonMarkdownTests(unittest.TestCase):
         self.assertIn('<td>false</td>', html)
         self.assertIn('<td>true</td>', html)
 
+    def test_reference_rows_do_not_repeat_the_scope_in_a_field_column(self):
+        data = dict(runs={name: dict(scope=name, seed=2017, high_score=score)
+                          for name, score in (('best', 30), ('golden', 20), ('latest', 15))})
+        html = self.render(json.dumps(data))
+        self.assertIn('<th>scope</th>', html)
+        self.assertNotIn('<th>Field</th>', html)
+        for scope in ('best', 'golden', 'latest'):
+            self.assertEqual(html.count(f'<td>{scope}</td>'), 1)
+
+    def test_nested_measurements_display_at_most_five_decimal_places(self):
+        data = dict(metrics=dict(mean_score=8.009333333333334, episodes=750,
+                                 termination_reasons=dict(max_moves=dict(percent=4.266666666666667))),
+                    recorded=[24.933333333333334, None, True], notes='Recorded: 8.009333333333334')
+        html = self.render(json.dumps(data))
+        for expected in ('8.00933', '4.26667', '24.93333', '750', 'null', 'true'):
+            self.assertIn(f'<td>{expected}</td>', html)
+        self.assertNotIn('4.266666666666667', html)
+        self.assertIn('Recorded: 8.009333333333334', html)
+
+    def test_nested_metric_comparisons_keep_reference_values_in_columns(self):
+        data = dict(episodes=dict(best=750, golden=750, latest=750),
+                    mean_score=dict(best=8.009333333333334, golden=4.5, latest=None),
+                    termination_reasons=dict(wall=dict(
+                        count=dict(best=187, golden=200, latest=225),
+                        percent=dict(best=24.933333333333334, golden=26.666666666666668, latest=30))))
+        html = self.render(json.dumps(data))
+        for scope in ('best', 'golden', 'latest'):
+            self.assertIn(f'<th>{scope}</th>', html)
+            self.assertNotIn(f'<td>{scope}</td>', html)
+        self.assertIn('<td>episodes</td>', html)
+        self.assertIn('<td>termination reasons / wall / count</td>', html)
+        self.assertIn('<td>termination reasons / wall / percent</td>', html)
+        self.assertRegex(html, r'<td>mean score</td>\s*<td>8.00933</td>\s*<td>4.5</td>\s*<td>null</td>')
+        self.assertRegex(html, r'<td>termination reasons / wall / count</td>\s*<td>187</td>\s*<td>200</td>\s*<td>225</td>')
+        self.assertEqual(html.count('<table>'), 1)
+
     def test_actual_draft_json_block_is_compact_and_keeps_every_setting(self):
         config = SimulationConfiguration.defaults()
         draft = ConfigurationDraft('draft', 'gold', {}, config)

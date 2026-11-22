@@ -52,6 +52,7 @@ class SimulationDataTests(unittest.TestCase):
             self.assertEqual(result['status'], 'ok', url)
             page = pages[url] = result['page']
             self.assertLessEqual(len(page.split()), 160, url)
+            self.assertNotRegex(page, r'(?m)^\s*\|')
             for run_id in (*self.analyses, self.draft.draft_id):
                 self.assertNotIn(run_id.split('-')[0], page)
             if url.count('/') == 2:
@@ -67,7 +68,7 @@ class SimulationDataTests(unittest.TestCase):
         self.assertEqual(json.loads(pages['/latest/activity'])['nice_overrides'], 3)
         self.assertIn('Loss declined.', json.loads(pages['/latest/notes'])['summary'])
         self.assertEqual(json.loads(pages['/golden/training'])['training']['replay_max_frames'], 100000)
-        self.assertIn('Different seed: historical context', pages['/best'])
+        self.assertIs(self.payload('/best')['same_seed_as_draft'], False)
         self.assertEqual(json.loads(pages['/draft/game'])['epochs'], 750)
         self.assertEqual(json.loads(pages['/draft/exploration'])['epsilon_nice'], dict(probability=.05, steps=20))
         self.store.save_draft.assert_not_called()
@@ -99,13 +100,13 @@ class SimulationDataTests(unittest.TestCase):
     def test_shared_reference_runs_have_one_index_entry_and_all_aliases_work(self):
         self.draft.references = dict.fromkeys(self.draft.references, self.gold)
         index = self.read('/')['page']
-        self.assertIn('[latest, golden, best](/latest)', index)
+        self.assertEqual(re.findall(r'\]\(([^)]+)\)', index), ['/latest', '/draft'])
         self.assertEqual(len(re.findall(r'\]\(', index)), 2)
         for label in ('latest', 'golden', 'best'):
             page = self.read(f'/{label}')['page']
             self.assertEqual(self.payload(f'/{label}')['roles'], ['latest', 'golden', 'best'])
             self.assertIs(self.payload(f'/{label}')['same_seed_as_draft'], True)
-            self.assertIn('Same seed as draft.', page)
+            self.assertIn('Simulation menu', page)
 
     def test_bad_paths_and_arguments_are_rejected_before_reading_data(self):
         for url in ('/../golden', '/latest/../../draft', 'https://example.com', '/best?x=1',

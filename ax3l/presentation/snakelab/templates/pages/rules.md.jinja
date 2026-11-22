@@ -1,0 +1,4 @@
+{{ {"scope": "run", "seed": seed, "parameters": parameters,
+    "reward_pair_rule": "closer_to_food + further_from_food <= 0",
+    "seed_change_rule": "select_parameter with seed immediately saves the next unused seed, skipping stored configurations"
+} | json }}

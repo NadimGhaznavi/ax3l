@@ -4,20 +4,13 @@ import base64
 import json
 
 from ax3l.app.Prompt import Prompt
+from ax3l.activity.ConfigurationEvidence import choice_context
 from ax3l.app.snakelab.PairParameters import PAIR_PARAMETERS
-from ax3l.app.snakelab.ParameterSpace import parameter_values
-from ax3l.constants.DChoice import CHOICE_CHARTS, CHOICE_LABELS
+from ax3l.constants.DChoice import CHOICE_LABELS
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
 from ax3l.interface.KnowledgeBase import KnowledgeBase
-
-
-CHART_EVIDENCE = {
-    "loss": (("episodes_with_loss",), "activity", "move and loss counts"),
-    "scores": (("mean_first_50_scores", "mean_last_50_scores", "epsilon_random_actions"), "scores", "score statistics"),
-    "distribution": (("median_score", "zero_score_episodes", "high_score_episodes"), "endings", "how episodes ended"),
-    "endings": (("termination_reasons",), "endings", "how episodes ended"),
-}
+from ax3l.presentation.snakelab.Templates import templates
 
 
 class ConfigurationChoice(Prompt):
@@ -25,44 +18,10 @@ class ConfigurationChoice(Prompt):
                  golden: SimulationAnalysis, chart_scope: str, png: bytes | None):
         parameter = draft.next_parameter
         tool = "submit_pair_values" if parameter in PAIR_PARAMETERS else "submit_single_value"
-        text = [f"Change {CHOICE_LABELS[parameter]} with {tool}. Follow the tool's limits and change at least "
-                "one value. If the complete draft is a duplicate, try different values for this setting.",
-                KnowledgeBase().read("/selection")]
-        seed = draft.config["seed"]
-        references = {"golden": golden}
-        if latest.run_id != golden.run_id:
-            references["latest"] = latest
-        evidence = {
-            "seed": seed,
-            "current": parameter_values(draft.config, parameter),
-            "reference_runs": {
-                scope: {"seed": run.config["seed"], "high_score": run.metrics["high_score"],
-                        "same_seed_as_draft": run.config["seed"] == seed,
-                        "settings": parameter_values(run.config, parameter)}
-                for scope, run in references.items()
-            },
-        }
-        chart = CHOICE_CHARTS.get(parameter)
-        if chart is not None:
-            fields, page, label = CHART_EVIDENCE[chart]
-            metrics = references[chart_scope].metrics
-            evidence["reference_runs"][chart_scope].update(
-                {field: metrics[field] for field in ("episodes", *fields)})
-            if png is not None:
-                if chart == "loss" and chart_scope != "golden":
-                    evidence["reference_runs"]["golden"].update(
-                        {field: golden.metrics[field] for field in ("episodes", *fields)})
-                    text.append(f"Compare {chart_scope} with golden."
-                                if golden.metrics["episodes_with_loss"] else
-                                f"Chart: {chart_scope}. Golden has no recorded loss.")
-                else:
-                    text.append(f"Chart: {chart_scope}.")
-            if references[chart_scope].config["seed"] != seed:
-                text.append("This reference uses a different seed from the draft. Treat it as historical context.")
-            text.append(f"Use data_tool at /{chart_scope}/{page} for {label}.")
-        text.append("Use data_tool at /draft for saved choices or / for reference runs.")
-        text.append(f"Measured data and current values\n```json\n{json.dumps(evidence, allow_nan=False)}\n```")
-        super().__init__("\n\n".join(text))
+        context = choice_context(draft, latest, golden, chart_scope, png is not None)
+        super().__init__(templates.render("prompts/choice.md.jinja", **context,
+                                         label=CHOICE_LABELS[parameter], tool=tool,
+                                         selection=KnowledgeBase().read("/guides/selection")))
         self._png = png
 
     def to_json(self) -> str:

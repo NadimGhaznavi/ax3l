@@ -9,10 +9,7 @@ counts. JSON retains the full measured precision. Board-filled and
 unrecorded or other outcomes appear in a note when present. They remain in the
 denominator, so the three bars need not add up to 100%.
 
-This chart summarizes the whole run; it does not show when endings occurred.
-Use it with food scores when choosing collision rewards. Fewer collisions
-alone do not establish better food-finding performance; check whether more
-episodes simply reached max moves.
+This chart summarizes the whole run, without episode order.
 
-- [Reward settings](/rewards)
-- [Chart interpretation](/analysis/)
+- [Reward settings](/guides/rewards)
+- [Recorded metrics and charts](/guides/analysis/)

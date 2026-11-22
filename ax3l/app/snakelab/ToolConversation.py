@@ -106,9 +106,7 @@ async def converse(llm, output, db, tools, prompts, *, parameter: str | None = N
                                   + ", ".join(sorted(argument_names)) + "."}}
                 else:
                     if called_name == "kb_tool":
-                        result = await _before_deadline(lambda: tools.reference(arguments), conversation_deadline)
-                    elif called_name == "data_tool":
-                        result = await _before_deadline(lambda: tools.data(arguments), conversation_deadline)
+                        result = await _before_deadline(lambda: tools.read(arguments), conversation_deadline)
                     else:
                         if conversation_deadline is not None and monotonic() >= conversation_deadline:
                             raise DecisionTimeExpired()
@@ -125,7 +123,7 @@ async def converse(llm, output, db, tools, prompts, *, parameter: str | None = N
             if result.get("code") == Events.Configuration.PARAMETER_SPACE_EXHAUSTED:
                 outcome = result["reason"]
                 return result
-            if result["status"] == "ok" and called_name not in ("kb_tool", "data_tool"):
+            if result["status"] == "ok" and called_name != "kb_tool":
                 return result
             # Explicit validation rejections are safe to correct. Transport failures are not retried.
             messages.append({"role": "tool", "tool_call_id": call["id"],

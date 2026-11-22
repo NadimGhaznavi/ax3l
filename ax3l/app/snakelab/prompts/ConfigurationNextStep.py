@@ -1,11 +1,10 @@
 """Ask Qwen which parameter to change or whether to run a unique draft."""
 
-import json
-
 from ax3l.app.Prompt import Prompt
 from ax3l.app.snakelab.ParameterSpace import parameter_values
 from ax3l.constants.DChoice import CHOICE_LABELS
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft
+from ax3l.presentation.snakelab.Templates import templates
 
 
 class ConfigurationNextStep(Prompt):
@@ -13,23 +12,12 @@ class ConfigurationNextStep(Prompt):
         choices = {parameter: dict(label=CHOICE_LABELS[parameter], values=parameter_values(draft.config, parameter))
                    for parameter in parameters}
         if draft.phase == "reviewing" and not choices:
-            instruction = "Call run_simulation. The draft is unique and no untested changes remain."
+            action = "run"
         elif draft.phase == "reviewing":
-            instruction = "Call run_simulation for this unique draft, or select_parameter with a listed key."
+            action = "review"
         elif draft.selections:
-            instruction = "This draft already exists. Call select_parameter with a listed key to make it unique."
+            action = "revise"
         else:
-            instruction = "The draft starts from golden. Use the run data to choose a listed key with select_parameter."
-        text = [instruction, "Aim to beat golden's high score in 750 episodes. Prefer same-seed evidence."]
-        if choices:
-            text.append("Choose any subset in any order, at most once per setting. Change at least one value and "
-                        "submit pairs together. Revise duplicates within the same setting.")
-        if "seed" in choices:
-            text.append("Select seed to let Ax3l immediately save the next unused seed; no further seed confirmation "
-                        "is needed. On run, golden sets the new seed's baseline even if it scores lower. "
-                        "A seed-only draft ends there. Other changes run afterward against that baseline.")
-        elif "seed" in draft.selections:
-            text.append("The seed can change only once per draft and is already set.")
-        text.append("Use data_tool at / for reference runs or /draft for current values.")
-        text.append(f"Available keys and current values\n```json\n{json.dumps(choices, allow_nan=False)}\n```")
-        super().__init__("\n\n".join(text))
+            action = "select"
+        super().__init__(templates.render("prompts/next_step.md.jinja", action=action,
+                                         choices=choices, seed_selected="seed" in draft.selections))

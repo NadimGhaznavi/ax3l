@@ -2,8 +2,9 @@
 
 from uuid import UUID
 
-from ax3l.activity.SimulationDataPages import (
-    CONFIG_PAGES, RUN_PAGES, analysis_index_page, analysis_rules_page,
+from ax3l.activity.SimulationDataValues import CONFIG_PAGES, RUN_PAGES
+from ax3l.presentation.snakelab.DataPages import (
+    analysis_index_page, analysis_rules_page,
     config_page, data_json, draft_page, index_page, run_overview, run_page,
 )
 from ax3l.app.DbMgr import DbMgr

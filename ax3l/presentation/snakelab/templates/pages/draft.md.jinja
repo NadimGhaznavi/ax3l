@@ -1,0 +1,9 @@
+{% from "navigation.md.jinja" import lab, links %}
+{{ lab("Inspect current draft") }}
+
+```json
+{{ data | json }}
+```
+## Configuration menu
+
+{{ links("draft", pages) }}

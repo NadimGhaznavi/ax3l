@@ -541,7 +541,7 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         events = [event(2, 'prompt_sent', parameter='revision')]
         for start, name, path, end, status in (
                 (3, 'data_tool', '/draft', 4, 'ok'), (5, 'data_tool', '/', 6, 'ok'),
-                (7, 'data_tool', '/golden/model', 8, 'ok'), (9, 'kb_tool', '/', 10, 'ok'),
+                (7, 'kb_tool', '/golden/model', 8, 'ok'), (9, 'kb_tool', '/guides', 10, 'ok'),
                 (11, 'data_tool', '/missing', 12, 'rejected'), (13, 'data_tool', '/draft', 14, 'failed')):
             events.extend([
                 event(start, 'tool_execution_started', json.dumps(dict(function=dict(
@@ -550,9 +550,9 @@ class ExperimentStatusHttpTests(unittest.TestCase):
             ])
         self.experiments.choice_events.return_value = events
         page = self.get()
-        for result, path in ((4, '/draft'), (6, '/'), (8, '/golden/model'), (10, '/'), (12, '/missing'), (14, '/draft')):
+        for result, path in ((4, '/draft'), (6, '/'), (8, '/golden/model'), (10, '/guides'), (12, '/missing'), (14, '/draft')):
             self.assertIn(f'href="/tool-results/{result}">{path}</a>', page)
-        self.assertIn('Read guide <a', page)
+        self.assertIn('Read page <a', page)
         events.append(event(15, 'tool_execution_started', json.dumps(dict(function=dict(
             name='data_tool', arguments=json.dumps(dict(url='/draft')))))))
         pending = self.get().split('>Read data', 1)[1]

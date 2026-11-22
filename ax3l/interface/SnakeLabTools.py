@@ -49,7 +49,7 @@ class SnakeLabTools:
             names = [self._tool_name]
             if self._allow_run:
                 names.append("run_simulation")
-            names.extend(("kb_tool", "data_tool"))
+            names.append("kb_tool")
             self.definitions = [{"type": "function", "function": {
                 "name": tool.name, "description": tool.description, "parameters": deepcopy(tool.input_schema),
             }} for tool in (by_name[name] for name in names)]
@@ -65,11 +65,8 @@ class SnakeLabTools:
     async def submit(self, arguments: dict, *, name: str | None = None) -> dict:
         return await self._call(name or self._tool_name, arguments)
 
-    async def reference(self, arguments: dict) -> dict:
+    async def read(self, arguments: dict) -> dict:
         return await self._call("kb_tool", arguments)
-
-    async def data(self, arguments: dict) -> dict:
-        return await self._call("data_tool", arguments)
 
     async def _call(self, name: str, arguments: dict) -> dict:
         result = await self._client.call_tool(name, arguments)

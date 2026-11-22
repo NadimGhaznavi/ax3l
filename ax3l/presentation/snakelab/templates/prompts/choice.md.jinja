@@ -1,0 +1,36 @@
+{% from "navigation.md.jinja" import lab %}
+{{ lab("Change " ~ label) }}
+
+{{ selection }}
+
+## Experiment menu
+
+- [Inspect current draft](/draft)
+- [Review reference runs](/)
+- [Open lab reference](/guides)
+- Save {{ label }}: call {{ tool }}.
+
+{% if chart is not none %}
+{% if has_image %}
+{% if chart == "loss" and chart_scope != "golden" %}
+{% if golden_has_loss %}
+Compare {{ chart_scope }} with golden.
+{% else %}
+Chart: {{ chart_scope }}. Golden has no recorded loss.
+{% endif %}
+{% else %}
+Chart: {{ chart_scope }}.
+{% endif %}
+
+{% endif %}
+{% set labels = {"activity": "training activity", "scores": "score statistics", "endings": "episode endings"} %}
+- [Review {{ chart_scope }} {{ labels[data_page] }}](/{{ chart_scope }}/{{ data_page }})
+
+{% endif %}
+Open menu URLs with kb_tool.
+
+## Current values and reference data
+
+```json
+{{ evidence | json(compact=false) }}
+```

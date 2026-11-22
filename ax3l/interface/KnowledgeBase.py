@@ -10,7 +10,9 @@ class KnowledgeBase:
              "/guides/analysis/distribution": "analysis/distribution.md",
              "/guides/analysis/endings": "analysis/endings.md",
              "/guides/analysis/loss": "analysis/loss.md", "/guides/selection": "choose-snake-setting/SKILL.md",
-             "/guides/model": "model.md", "/guides/exploration": "exploration.md", "/guides/rewards": "rewards.md"}
+             "/guides/model": "model.md", "/guides/exploration": "exploration.md", "/guides/rewards": "rewards.md",
+             "/definitions/best.md": "definitions/best.md", "/definitions/golden.md": "definitions/golden.md",
+             "/definitions/latest.md": "definitions/latest.md", "/definitions/draft.md": "definitions/draft.md"}
 
     def read(self, url: str) -> str:
         if url not in self.PAGES:

@@ -14,6 +14,7 @@ from ax3l.app.snakelab.ToolConversation import converse, DecisionTimeExpired
 from ax3l.app.snakelab.prompts.ConfigurationNextStep import ConfigurationNextStep
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
+from ax3l.interface.KnowledgeBase import KnowledgeBase
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 
 
@@ -73,6 +74,34 @@ class ToolConversationTimingTests(unittest.IsolatedAsyncioTestCase):
         messages = json.loads(llm.complete.call_args.args[0])['messages']
         self.assertEqual([message['content'] for message in messages if message['role'] == 'user'],
                          ['Initial prompt.'])
+
+    async def test_definition_read_returns_to_the_configuration_page_with_saved_edits(self):
+        tools, llm, db = self.tools(), Mock(url='fixture'), Mock()
+        draft = ConfigurationDraft('draft', 'gold', {}, SimulationConfiguration.defaults(),
+                                   ['learning_rate'], 'reviewing')
+        references = self.references(draft)
+        draft.config['training']['learning_rate'] = .003
+        screen = ConfigurationNextStep(draft, [name for name in PARAMETER_ORDER if name not in draft.selections],
+                                       references)
+        definition = KnowledgeBase().read('/definitions/golden.md')
+        tools.read.return_value = dict(status='ok', page=definition)
+        llm.complete.side_effect = [reply('kb_tool', dict(url='/definitions/golden.md')),
+                                   reply('select_parameter', dict(parameter='gamma'))]
+        await converse(llm, Path('/tmp'), db, tools, [screen], conversation_deadline=monotonic() + 300)
+        messages = json.loads(llm.complete.call_args.args[0])['messages']
+        self.assertEqual([message['content'] for message in messages if message['role'] == 'user'],
+                         [screen.to_md(), screen.to_md()])
+        self.assertEqual([message['content'] for message in messages if message['role'] == 'tool'], [definition])
+        self.assertIn("Don't show your reasoning in the prompt.", definition)
+        setting = json.loads(messages[-1]['content'].split('```json\n')[1].split('\n```')[0])['settings']['learning_rate']
+        self.assertEqual(setting['values']['draft'], .003)
+        self.assertEqual(setting['values']['golden'], .001)
+        self.assertFalse(setting['editable'])
+        tools.read.assert_awaited_once_with(dict(url='/definitions/golden.md'))
+        tools.submit.assert_awaited_once_with(dict(parameter='gamma'))
+        returned = [call for call in db.log.call_args_list if call.args[0] == 'prompt_sent']
+        self.assertEqual(len(returned), 2)
+        self.assertTrue(all(call.kwargs['source_name'] == 'ConfigurationNextStep' for call in returned))
 
     async def test_rejected_run_returns_to_the_screen_without_losing_research(self):
         tools, llm, db = self.tools(), Mock(url='fixture'), Mock()
@@ -200,24 +229,27 @@ class ToolConversationTimingTests(unittest.IsolatedAsyncioTestCase):
                                          self.references(draft)).to_md()
             self.assertNotRegex(text.lower(), r'\b(timer|countdown|deadline|minutes?|seconds?|grace)\b')
             self.assertIn('Your role: Data Scientist', text)
-            self.assertIn('Edit a configuration element: call select_parameter with its key from settings', text)
+            self.assertIn('Use the select_parameter tool to change the configuration values', text)
             self.assertIn('Run next simulation: call run_simulation', text)
             self.assertIn('Choose the Run next simulation option when you are done making changes to the configuration.', text)
             self.assertNotIn('Ready to run', text)
             self.assertNotRegex(text, r'\]\(/(?:latest|golden|best|draft)\)')
-            self.assertIn('Open menu URLs with kb_tool.', text)
+            self.assertIn('Open definition URLs with kb_tool.', text)
 
-    def test_next_step_prompt_lists_only_unused_parameters_and_offers_run_when_all_are_used(self):
+    def test_next_step_prompt_keeps_saved_values_visible_and_offers_run_when_all_are_used(self):
         draft = ConfigurationDraft('draft', 'gold', {}, SimulationConfiguration.defaults(),
                                     ['learning_rate', 'epsilon_pair'], 'reviewing')
         text = ConfigurationNextStep(draft, [name for name in PARAMETER_ORDER if name not in draft.selections],
                                      self.references(draft)).to_md()
         choices = json.loads(text.split('```json\n')[1].split('\n```')[0])['settings']
-        self.assertEqual(set(choices), set(PARAMETER_ORDER) - set(draft.selections))
-        self.assertIn('Edit a configuration element: call select_parameter with its key from settings', text)
+        self.assertEqual(set(choices), set(PARAMETER_ORDER))
+        self.assertEqual({name for name, setting in choices.items() if setting['editable']},
+                         set(PARAMETER_ORDER) - set(draft.selections))
+        self.assertIn('Use the select_parameter tool to change the configuration values', text)
         self.assertIn('Run next simulation: call run_simulation', text)
         draft.selections = PARAMETER_ORDER.copy()
         text = ConfigurationNextStep(draft, [], self.references(draft)).to_md()
-        self.assertEqual(json.loads(text.split('```json\n')[1].split('\n```')[0])['settings'], {})
+        self.assertFalse(any(setting['editable'] for setting in
+                             json.loads(text.split('```json\n')[1].split('\n```')[0])['settings'].values()))
         self.assertIn('Run next simulation: call run_simulation', text)
         self.assertNotIn('select_parameter', text)

@@ -192,7 +192,7 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
             references = dict.fromkeys(('best', 'golden', 'latest'), golden)
             screen = ConfigurationNextStep(draft, PARAMETER_ORDER, references)
             llm = Mock(url='fixture')
-            llm.complete.side_effect = [reply('kb_tool', dict(url='/guides/model')),
+            llm.complete.side_effect = [reply('kb_tool', dict(url='/definitions/golden.md')),
                                        reply('run_simulation', {}),
                                        reply('select_parameter', dict(parameter='gamma'))]
             with ZMQServer('tcp://127.0.0.1:*', handle) as server:
@@ -203,8 +203,10 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([request.method for request in requests],
                          ['run_simulation', 'select_parameter'])
         messages = json.loads(llm.complete.call_args.args[0])['messages']
-        self.assertTrue(any('24-value feature vector' in (message.get('content') or '')
+        self.assertTrue(any("Don't show your reasoning in the prompt." in (message.get('content') or '')
                             for message in messages if message['role'] == 'tool'))
+        user_messages = [message['content'] for message in messages if message['role'] == 'user']
+        self.assertEqual(user_messages[:2], [screen.to_md(), screen.to_md()])
         feedback = [message['content'] for message in messages if message['role'] == 'user'][-1]
         self.assertIn('configuration already exists', feedback)
         self.assertTrue(feedback.endswith(screen.to_md()))

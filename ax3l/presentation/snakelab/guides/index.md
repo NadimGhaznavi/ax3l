@@ -2,6 +2,10 @@
 
 ## Lab reference
 
+- [Best](/definitions/best.md)
+- [Golden](/definitions/golden.md)
+- [Latest](/definitions/latest.md)
+- [Draft](/definitions/draft.md)
 - [Experiment rules](/guides/selection)
 - [Model implementation and input features](/guides/model)
 - [Exploration implementation and EpsilonNice](/guides/exploration)

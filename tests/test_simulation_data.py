@@ -93,7 +93,7 @@ class SimulationDataTests(unittest.TestCase):
         self.assertEqual(re.findall(r'\]\(([^)]+)\)', index), [])
         for label in ('latest', 'golden', 'best'):
             page = self.read(f'/{label}')['page']
-            self.assertEqual(self.payload(f'/{label}')['roles'], ['latest', 'golden', 'best'])
+            self.assertNotIn('roles', self.payload(f'/{label}'))
             self.assertIs(self.payload(f'/{label}')['same_seed_as_draft'], True)
             self.assertEqual(re.findall(r'\]\(([^)]+)\)', page), ['/'])
 

@@ -38,3 +38,12 @@ class KnowledgeBaseTests(unittest.TestCase):
         self.assertLess(len(text.split()), 70)
         self.assertNotIn('description:', text)
         self.assertIn('750 episodes', text)
+
+    def test_definitions_include_the_requested_reasoning_instruction(self):
+        kb = KnowledgeBase()
+        for name in ('best', 'golden', 'latest', 'draft'):
+            with self.subTest(name=name):
+                text = kb.read(f'/definitions/{name}.md')
+                self.assertTrue(text.startswith(f'# {name.title()}'))
+                self.assertIn("Don't show your reasoning in the prompt.", text)
+        self.assertNotIn("Don't show your reasoning in the prompt.", kb.read('/guides/model'))

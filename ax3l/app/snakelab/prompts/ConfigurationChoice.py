@@ -4,24 +4,20 @@ import base64
 import json
 
 from ax3l.app.Prompt import Prompt
-from ax3l.activity.ConfigurationEvidence import choice_context
-from ax3l.app.snakelab.PairParameters import PAIR_PARAMETERS
+from ax3l.activity.ConfigurationEvidence import configuration_evidence
 from ax3l.constants.DChoice import CHOICE_LABELS
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
-from ax3l.interface.KnowledgeBase import KnowledgeBase
 from ax3l.presentation.snakelab.Templates import templates
 
 
 class ConfigurationChoice(Prompt):
     def __init__(self, draft: ConfigurationDraft, references: dict[str, SimulationAnalysis],
-                 chart_scope: str, png: bytes | None):
+                 png: bytes | None):
         parameter = draft.next_parameter
-        tool = "submit_pair_values" if parameter in PAIR_PARAMETERS else "submit_single_value"
-        context = choice_context(draft, references, chart_scope, png is not None)
-        super().__init__(templates.render("prompts/choice.md.jinja", **context,
-                                         label=CHOICE_LABELS[parameter], tool=tool,
-                                         selection=KnowledgeBase().read("/guides/selection")))
+        evidence = configuration_evidence(draft, [parameter], references)
+        super().__init__(templates.render("prompts/choice.md.jinja", evidence=evidence,
+                                         label=CHOICE_LABELS[parameter]))
         self._png = png
 
     def to_json(self) -> str:

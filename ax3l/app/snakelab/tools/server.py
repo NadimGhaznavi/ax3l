@@ -27,6 +27,8 @@ assigned_parameter = os.environ.get("AX3L_CONVERSATION_PARAMETER")
 draft_id = os.environ.get("AX3L_CONFIGURATION_DRAFT")
 run_id = os.environ.get("AX3L_ANALYSIS_RUN")
 section = os.environ.get("AX3L_ANALYSIS_SECTION")
+configuration_session = (assigned_parameter in SINGLE_PARAMETERS or assigned_parameter in PAIR_PARAMETERS
+                         or assigned_parameter in ("seed", REVISION_PARAMETER))
 description = templates.render("tools/submit_single_value.md.jinja",
                                rules=parameter_instructions(assigned_parameter)
                                if assigned_parameter in SINGLE_PARAMETERS else None)
@@ -63,8 +65,8 @@ async def select_parameter(parameter: StrictStr) -> str:
 
 @mcp.tool(description=templates.render("tools/run_simulation.md.jinja"))
 async def run_simulation() -> str:
-    if assigned_parameter != REVISION_PARAMETER or not draft_id or os.environ.get("AX3L_ALLOW_RUN") != "1":
-        raise ValueError("Ax3l must bind a unique configuration before Qwen can choose to run it")
+    if not configuration_session or not draft_id:
+        raise ValueError("Ax3l must bind a configuration draft before Qwen can choose to run it")
     return await RunSimulation(os.environ.get("AX3L_ZMQ_ENDPOINT")).submit(draft_id)
 
 
@@ -88,8 +90,7 @@ async def _read_data(url: str) -> dict:
         if not run_id or section not in DSimulationAnalysis.SECTIONS:
             raise ValueError("Ax3l must bind a completed run and chart before settings lookup")
         return await ReadSimulationData(os.environ.get("AX3L_ZMQ_ENDPOINT")).read_run(run_id, url)
-    if (assigned_parameter not in SINGLE_PARAMETERS and assigned_parameter not in PAIR_PARAMETERS
-            and assigned_parameter not in ("seed", REVISION_PARAMETER)) or not draft_id:
+    if not configuration_session or not draft_id:
         raise ValueError("Ax3l must bind a configuration choice before data lookup")
     return await ReadSimulationData(os.environ.get("AX3L_ZMQ_ENDPOINT")).read(draft_id, url)
 

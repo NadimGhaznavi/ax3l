@@ -1,10 +1,10 @@
-{% from "navigation.md.jinja" import lab, experiment_links %}
+{% from "navigation.md.jinja" import lab, experiment_links, run_action %}
 {{ lab("Prepare the next simulation") }}
 
 {% if action == "run" %}
-Draft status: Ready to run; no untested changes remain.
+Draft status: Changes saved; no untested changes remain.
 {% elif action == "review" %}
-Draft status: Ready to run.
+Draft status: Changes saved.
 {% elif action == "revise" %}
 Draft status: Duplicate configuration. Change a setting to make it unique.
 {% else %}
@@ -17,10 +17,8 @@ Draft status: Inherited from golden.
 {% if choices %}
 - Change configuration: call select_parameter with an available key.
 {% endif %}
-{% if action in ("run", "review") %}
-- Run next simulation: call run_simulation.
-{% endif %}
 - [Open lab reference](/guides)
+{{ run_action() }}
 
 Open menu URLs with kb_tool.
 

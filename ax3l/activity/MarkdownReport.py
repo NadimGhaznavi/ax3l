@@ -25,4 +25,8 @@ def markdown_html(text: str) -> str:
                       flags=re.MULTILINE | re.DOTALL)
     else:
         text = json_markdown(data)
-    return MarkdownIt("commonmark", {"html": False}).enable("table").disable("image").render(text)
+    markdown = MarkdownIt("commonmark", {"html": False}).enable("table").disable("image")
+    validate_link = markdown.validateLink
+    # Captured browser paths belong to the LLM's menu, not the reporting server.
+    markdown.validateLink = lambda url: (not url.startswith("/") or url.startswith("//")) and validate_link(url)
+    return markdown.render(text)

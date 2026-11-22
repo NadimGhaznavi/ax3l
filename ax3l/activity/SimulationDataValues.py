@@ -1,6 +1,6 @@
 """Prepare experiment values independently of their page presentation."""
 
-from ax3l.app.snakelab.ParameterSpace import parameter_paths, parameter_values
+from ax3l.app.snakelab.ParameterSpace import parameter_paths
 from ax3l.constants.DChoice import REFERENCE_LABELS
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
@@ -31,11 +31,9 @@ def reference_groups(draft: ConfigurationDraft) -> list[list[str]]:
 
 
 def draft_values(draft: ConfigurationDraft) -> dict:
-    choices = {}
-    for parameter in PARAMETER_ORDER:
-        state = "choosing" if parameter == draft.next_parameter else "chosen" if parameter in draft.selections else "baseline"
-        choices[parameter] = dict(state=state, values=parameter_values(draft.config, parameter))
-    return scoped_values("draft", draft.config["seed"], dict(choices=choices))
+    return scoped_values("draft", draft.config["seed"], dict(
+        phase=draft.phase, saved_settings=draft.selections,
+        current_setting=draft.next_parameter, config=draft.config))
 
 
 def config_values(scope: str, page: str, config: dict) -> dict:
@@ -50,13 +48,14 @@ def config_values(scope: str, page: str, config: dict) -> dict:
     return scoped_values(scope, config["seed"], data)
 
 
-def overview_values(scope: str, draft: ConfigurationDraft, analysis: SimulationAnalysis, target: int) -> dict:
+def run_snapshot_values(scope: str, draft: ConfigurationDraft, analysis: SimulationAnalysis, target: int) -> dict:
     labels = [REFERENCE_LABELS[role] for role, run_id in draft.references.items()
               if run_id == analysis.run_id]
     score = analysis.metrics["high_score"]
     return scoped_values(scope, analysis.config["seed"], dict(
         roles=labels, high_score=score, golden_target_score=target, score_difference=score - target,
-        same_seed_as_draft=analysis.config["seed"] == draft.config["seed"]))
+        same_seed_as_draft=analysis.config["seed"] == draft.config["seed"],
+        config=analysis.config, metrics=analysis.metrics, summary=analysis.summary))
 
 
 def run_values(scope: str, page: str, analysis: SimulationAnalysis) -> dict:

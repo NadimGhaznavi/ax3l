@@ -1,8 +1,8 @@
 """Present prepared experiment values through editable Markdown templates."""
 
 from ax3l.activity.SimulationDataValues import (
-    CONFIG_PAGES, RUN_PAGES, config_values, draft_values, overview_values,
-    parameter_rules, reference_groups, run_values, scoped_values,
+    CONFIG_PAGES, config_values, draft_values, parameter_rules,
+    reference_groups, run_snapshot_values, run_values, scoped_values,
 )
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
@@ -26,7 +26,7 @@ def index_page(draft: ConfigurationDraft) -> str:
 
 
 def draft_page(draft: ConfigurationDraft) -> str:
-    return templates.render("pages/draft.md.jinja", data=draft_values(draft), pages=CONFIG_PAGES)
+    return templates.render("pages/draft.md.jinja", data=draft_values(draft))
 
 
 def config_page(scope: str, page: str, config: dict) -> str:
@@ -34,8 +34,7 @@ def config_page(scope: str, page: str, config: dict) -> str:
 
 
 def run_overview(scope: str, draft: ConfigurationDraft, analysis: SimulationAnalysis, target: int) -> str:
-    pages = tuple(page for page in RUN_PAGES if page != "notes" or analysis.summary)
-    return templates.render("pages/run.md.jinja", data=overview_values(scope, draft, analysis, target), pages=pages)
+    return templates.render("pages/run.md.jinja", data=run_snapshot_values(scope, draft, analysis, target))
 
 
 def run_page(scope: str, page: str, analysis: SimulationAnalysis) -> str:

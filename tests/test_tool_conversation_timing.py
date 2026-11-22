@@ -68,6 +68,32 @@ class ToolConversationTimingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([message['content'] for message in messages if message['role'] == 'user'],
                          ['Initial prompt.'])
 
+    async def test_rejected_run_returns_to_the_screen_without_losing_research(self):
+        tools, llm, db = self.tools(), Mock(url='fixture'), Mock()
+        tools.definitions.append(dict(function=dict(name='run_simulation', parameters=dict(properties={}))))
+        tools.read.return_value = dict(status='ok', page='Recorded run data.')
+        tools.submit.side_effect = [
+            dict(status='rejected', code='duplicate_configuration', source_name='RunSimulationHandler',
+                 prompt=dict(role='user', content='This configuration already exists.')),
+            dict(status='ok', phase='choosing'),
+        ]
+        draft = ConfigurationDraft('draft', 'gold', {}, SimulationConfiguration.defaults())
+        screen = ConfigurationNextStep(draft, PARAMETER_ORDER)
+        llm.complete.side_effect = [reply('kb_tool', dict(url='/latest')),
+                                   reply('run_simulation', {}),
+                                   reply('select_parameter', dict(parameter='gamma'))]
+        deadline = monotonic() + 300
+        result = await converse(llm, Path('/tmp'), db, tools, [screen], conversation_deadline=deadline)
+        self.assertEqual(result['phase'], 'choosing')
+        messages = json.loads(llm.complete.call_args.args[0])['messages']
+        self.assertIn('Recorded run data.', [message.get('content') for message in messages])
+        feedback = [message['content'] for message in messages if message['role'] == 'user'][-1]
+        self.assertEqual(feedback, 'This configuration already exists.\n\n' + screen.to_md())
+        self.assertIn('Run next simulation', feedback)
+        self.assertEqual(llm.complete.call_count, 3)
+        tools.submit.assert_any_await({}, name='run_simulation')
+        tools.submit.assert_any_await(dict(parameter='gamma'))
+
     async def test_initial_expiry_logs_a_reset_and_ignores_a_late_inference_reply(self):
         tools, llm, db = self.tools(), Mock(url='fixture'), Mock()
         release = Event()
@@ -168,7 +194,9 @@ class ToolConversationTimingTests(unittest.IsolatedAsyncioTestCase):
             self.assertNotRegex(text.lower(), r'\b(timer|countdown|deadline|minutes?|seconds?|grace)\b')
             self.assertIn('Your role: Data Scientist', text)
             self.assertIn('Change configuration: call select_parameter', text)
-            self.assertEqual('run_simulation' in text, phase == 'reviewing')
+            self.assertIn('Run next simulation: call run_simulation', text)
+            self.assertIn('Choose the Run next simulation option when you are done making changes to the configuration.', text)
+            self.assertNotIn('Ready to run', text)
             self.assertIn('[Inspect current draft](/draft)', text)
             self.assertIn('Open menu URLs with kb_tool.', text)
 

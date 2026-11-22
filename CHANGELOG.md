@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.21.5] - 2026-11-22 @ 14:48
+
 ### Summary
 
 Keep per-item configuration prompts focused on the selected setting and its data.

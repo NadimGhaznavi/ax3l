@@ -1,0 +1,27 @@
+{% set labels = {
+    "scores": "Review score statistics", "endings": "Review episode endings",
+    "activity": "Review training activity", "notes": "Read saved observations",
+    "model": "Inspect model configuration", "training": "Inspect training configuration",
+    "exploration": "Inspect exploration configuration", "rewards": "Inspect reward configuration",
+    "game": "Inspect game configuration", "config": "Inspect full configuration", "rules": "Inspect allowed values"
+} %}
+{% set reference_labels = {
+    "latest": "Review latest simulation", "golden": "Review golden baseline", "best": "Review best run"
+} %}
+{% macro lab(task=none) -%}
+# Patrick Loeber's AI Snake Lab
+
+Your role: Data Scientist
+Experiment: In progress{{ ("\nCurrent task: " ~ task) if task else "" }}
+{%- endmacro %}
+{% macro experiment_links(groups=(("latest",), ("golden",), ("best",))) -%}
+{% for group in groups %}
+- [{% for scope in group %}{{ reference_labels[scope] }}{{ " / " if not loop.last else "" }}{% endfor %}](/{{ group[0] }})
+{% endfor %}
+- [Inspect current draft](/draft)
+{%- endmacro %}
+{% macro links(scope, pages) -%}
+{% for page in pages %}
+- [{{ labels[page] }}](/{{ scope }}/{{ page }}){{ "\n" if not loop.last else "" }}
+{%- endfor %}
+{%- endmacro %}

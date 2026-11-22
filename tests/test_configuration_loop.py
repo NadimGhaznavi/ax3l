@@ -173,7 +173,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.store.saved.phase, 'completed')
         for call in self.conversation.await_args_list:
             prompt = call.args[4][0].to_md()
-            self.assertIn('data_tool', prompt)
+            self.assertIn('kb_tool', prompt)
             self.assertIn('/draft', prompt)
             for run_id in (self.gold, self.latest, self.best):
                 self.assertNotIn(run_id.split('-')[0], prompt)
@@ -245,16 +245,16 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         prompt = prompts['epsilon_nice_pair']
         content = json.loads(prompt.to_json())['content']
         self.assertEqual(prompt.source_name, 'EpsilonNiceChoice')
-        for text in ('custom exploration rule', 'after ordinary epsilon expires',
-                     'Probability (value_1)', 'eligible non-detour move', 'next move',
-                     'Steps (value_2)', 'duration in moves', 'immediately safe alternative',
-                     "model's suggestion if available", 'reset each episode', 'submit_pair_values'):
+        for text in ('EpsilonNice applies after ordinary epsilon exploration ends',
+                     'value_1', 'eligible move outside a detour', 'next move',
+                     'value_2 moves', 'immediately safe alternative',
+                     "model's pick if one exists", 'Each episode starts with no active detour', 'submit_pair_values'):
             self.assertIn(text, content)
         evidence = json.loads(content.split('```json\n')[1].split('\n```')[0])
         self.assertEqual(evidence['current'], self.config['epsilon_nice'])
         self.assertEqual(evidence['reference_runs']['golden']['settings'], self.config['epsilon_nice'])
         self.assertEqual(evidence['reference_runs']['latest']['high_score'], 10)
-        self.assertNotIn('custom exploration rule', prompts['gamma'].to_md())
+        self.assertNotIn('EpsilonNice applies', prompts['gamma'].to_md())
         self.assertEqual(self.snake.submit_simulation.call_args.args[0]['epsilon_nice'],
                          dict(probability=.01, steps=40))
 
@@ -264,7 +264,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         await self.cycle()
         self.assertEqual(self.trace(), ['epsilon_nice_pair', REVISION_PARAMETER])
         prompt = self.conversation.await_args_list[0].args[4][0]
-        self.assertIn('custom exploration rule', json.loads(prompt.to_json())['content'])
+        self.assertIn('EpsilonNice applies', json.loads(prompt.to_json())['content'])
         self.assertEqual(self.store.saved.selections, ['epsilon_nice_pair'])
 
     async def test_configured_grace_applies_to_selection_values_and_run_decisions(self):
@@ -510,7 +510,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIsNone(self.store.saved.parameter)
                 self.assertEqual(self.store.saved.selections, [])
                 self.assertEqual(self.store.saved.decision_expires_at, 1920)
-                self.assertIn('The draft starts from golden', self.conversation.await_args.args[4][0].to_md())
+                self.assertIn('Draft status: Inherited from golden', self.conversation.await_args.args[4][0].to_md())
         self.snake.is_config_unique.assert_not_called()
         self.snake.submit_simulation.assert_not_called()
 
@@ -530,7 +530,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
             name, field = (('select_parameter', 'parameter') if parameter == REVISION_PARAMETER
                            else ('submit_single_value', 'value'))
             definitions = [dict(function=dict(name=tool, parameters=dict(properties={argument: {}})))
-                           for tool, argument in ((name, field), ('data_tool', 'url'), ('kb_tool', 'url'))]
+                           for tool, argument in ((name, field), ('kb_tool', 'url'))]
 
             async def submit(arguments):
                 if parameter == REVISION_PARAMETER:
@@ -539,16 +539,16 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
                     dict(draft_id=draft_id, parameter=parameter, **arguments))
 
             tools = Mock(definition=definitions[0], definitions=definitions,
-                         submit=AsyncMock(side_effect=submit), data=AsyncMock(side_effect=data))
+                         submit=AsyncMock(side_effect=submit), read=AsyncMock(side_effect=data))
             context = AsyncMock()
             context.__aenter__.return_value = tools
             context.__aexit__.return_value = False
             return context
 
         responses = iter([('select_parameter', dict(parameter='gamma')),
-                          ('data_tool', dict(url='/golden/scores')),
+                          ('kb_tool', dict(url='/golden/scores')),
                           ('submit_single_value', dict(value=.97)),
-                          ('data_tool', dict(url='/draft'))])
+                          ('kb_tool', dict(url='/draft'))])
 
         def complete(payload, *, timeout_seconds):
             requests.append(json.loads(payload))
@@ -774,7 +774,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.store.saved.golden_run_id, self.best)
         self.assertEqual(self.store.saved.config['seed'], self.config['seed'] + 1)
         prompt = self.conversation.await_args.args[4][-1].to_md()
-        self.assertIn('The draft starts from golden', prompt)
+        self.assertIn('Draft status: Inherited from golden', prompt)
         self.assertIn('select_parameter', prompt)
 
     async def test_seed_only_change_runs_once_and_accepts_a_lower_local_baseline(self):
@@ -784,10 +784,8 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.store.saved.selections, ['seed'])
         self.assertEqual(self.snake.submit_simulation.call_args.args[0], {**self.config, 'seed': 1971})
         prompt = self.prompts[0]
-        self.assertIn('immediately save the next unused seed', prompt)
         self.assertNotIn('request_seed_change', prompt)
         self.assertNotIn('submit_single_value', prompt)
-        self.assertIn('A seed-only draft ends there', prompt)
         self.assertEqual(self.rotation.await_count, 1)
         self.snake.submit_simulation.assert_called_once()
         self.wait.assert_awaited_once_with(self.snake, self.db, self.seed_run)
@@ -909,7 +907,6 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.store.saved.selections, ['seed', 'layers'])
         for parameter, prompt in zip(self.trace()[1:], self.prompts[1:]):
             if parameter == REVISION_PARAMETER:
-                self.assertIn('The seed can change only once per draft and is already set', prompt)
                 self.assertNotIn('Select seed to let Ax3l', prompt)
                 choices = json.loads(prompt.split('```json\n')[1].split('\n```')[0])
                 self.assertNotIn('seed', choices)
@@ -925,7 +922,6 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
                     for call in self.conversation.await_args_list}
         self.assertIn('Chart: latest.', messages['epsilon_pair'])
         self.assertIn('Chart: golden.', messages['learning_rate'])
-        self.assertIn('different seed from the draft', messages['learning_rate'])
         evidence = json.loads(messages['learning_rate'].split('```json\n')[1].split('\n```')[0])
         self.assertFalse(evidence['reference_runs']['golden']['same_seed_as_draft'])
         self.assertEqual([call.args[0]['seed'] for call in self.chart.call_args_list], [1970, 1970])

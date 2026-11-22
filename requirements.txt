@@ -3,7 +3,7 @@ mcp>=2,<3
 PyMySQL>=1.1,<2
 pyzmq>=26,<28
 jsonschema>=4.18,<5
-# Nadim-facing Reporting
+# Reporting and model-facing Markdown presentation.
 Jinja2>=3.1,<4
 # Render recorded tool pages and generated JSON tables safely.
 markdown-it-py>=3,<4

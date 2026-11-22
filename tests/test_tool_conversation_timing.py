@@ -23,33 +23,32 @@ def reply(name, arguments):
 class ToolConversationTimingTests(unittest.IsolatedAsyncioTestCase):
     def tools(self):
         definitions = [dict(function=dict(name=name, parameters=dict(properties={field: {}})))
-                       for name, field in (('select_parameter', 'parameter'), ('data_tool', 'url'), ('kb_tool', 'url'))]
+                       for name, field in (('select_parameter', 'parameter'), ('kb_tool', 'url'))]
         return Mock(definition=definitions[0], definitions=definitions,
                     submit=AsyncMock(return_value=dict(status='ok', phase='choosing')),
-                    reference=AsyncMock(return_value=dict(status='ok', page='Guide text.')),
-                    data=AsyncMock())
+                    read=AsyncMock())
 
     async def test_deadline_adds_no_timer_messages_during_research_or_rejections(self):
         tools, db = self.tools(), Mock()
         page = json.dumps(dict(high_score=20))
-        tools.data.side_effect = [dict(status='ok', page=page),
+        tools.read.side_effect = [dict(status='ok', page='Guide text.'), dict(status='ok', page=page),
                                   dict(status='rejected', prompt=dict(role='user', content='Unknown data path.')),
                                   dict(status='ok', page=page)]
         llm = Mock(url='fixture')
         llm.complete.side_effect = [reply('kb_tool', dict(url='/')),
-                                   reply('data_tool', dict(url='/golden/scores')),
-                                   reply('data_tool', dict(url='/missing')),
-                                   reply('data_tool', {}),
-                                   reply('data_tool', dict(url='/draft')),
+                                   reply('kb_tool', dict(url='/golden/scores')),
+                                   reply('kb_tool', dict(url='/missing')),
+                                   reply('kb_tool', {}),
+                                   reply('kb_tool', dict(url='/draft')),
                                    reply('select_parameter', dict(parameter='gamma'))]
         result = await converse(llm, Path('/tmp'), db, tools, [Prompt('Research a setting.')],
                                 parameter='revision', conversation_deadline=monotonic() + 300)
         self.assertEqual(result['status'], 'ok')
-        self.assertEqual(tools.data.await_count, 3)
+        self.assertEqual(tools.read.await_count, 4)
         tools.submit.assert_awaited_once_with(dict(parameter='gamma'))
         messages = json.loads(llm.complete.call_args.args[0])['messages']
         expected = ['Research a setting.', 'Unknown data path.',
-                    'Call data_tool with exactly these fields: url.']
+                    'Call kb_tool with exactly these fields: url.']
         self.assertEqual([message['content'] for message in messages if message['role'] == 'user'], expected)
         self.assertEqual([message['content'] for message in messages if message['role'] == 'tool'],
                          ['Guide text.', page, 'Rejected.', 'Rejected.', page])
@@ -59,8 +58,8 @@ class ToolConversationTimingTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_conversations_without_a_deadline_receive_no_timer_messages(self):
         tools, llm = self.tools(), Mock(url='fixture')
-        tools.data.return_value = dict(status='ok', page='Data page.')
-        llm.complete.side_effect = [reply('data_tool', dict(url='/')),
+        tools.read.return_value = dict(status='ok', page='Data page.')
+        llm.complete.side_effect = [reply('kb_tool', dict(url='/')),
                                    reply('select_parameter', dict(parameter='gamma'))]
         with patch('ax3l.app.snakelab.ToolConversation.monotonic') as clock:
             await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('Initial prompt.')])
@@ -120,17 +119,17 @@ class ToolConversationTimingTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_expiry_can_interrupt_data_reads(self):
         tools, llm = self.tools(), Mock(url='fixture')
-        llm.complete.return_value = reply('data_tool', dict(url='/draft'))
+        llm.complete.return_value = reply('kb_tool', dict(url='/draft'))
 
         async def read(arguments):
             await asyncio.Event().wait()
 
-        tools.data.side_effect = read
+        tools.read.side_effect = read
         now = monotonic()
         with self.assertRaises(DecisionTimeExpired):
             await converse(llm, Path('/tmp'), Mock(), tools, [Prompt('Decide.')],
                            conversation_deadline=now + .03)
-        tools.data.assert_awaited_once()
+        tools.read.assert_awaited_once()
         tools.submit.assert_not_awaited()
 
     async def test_transport_timeouts_remain_failures_before_the_grace_deadline(self):
@@ -161,14 +160,17 @@ class ToolConversationTimingTests(unittest.IsolatedAsyncioTestCase):
 
     def test_next_step_prompts_explain_available_actions_without_mentioning_the_timer(self):
         draft = ConfigurationDraft('draft', 'gold', {}, SimulationConfiguration.defaults())
-        for phase, selections in (('selecting_parameter', []), ('reviewing', ['gamma'])):
+        for phase, selections in (('selecting_parameter', []), ('selecting_parameter', ['gamma']),
+                                  ('reviewing', ['gamma'])):
             draft.phase = phase
             draft.selections = selections
             text = ConfigurationNextStep(draft, [name for name in PARAMETER_ORDER if name not in selections]).to_md()
             self.assertNotRegex(text.lower(), r'\b(timer|countdown|deadline|minutes?|seconds?|grace)\b')
-            self.assertIn('select_parameter', text.split('\n\n')[0])
-            self.assertEqual('run_simulation' in text, bool(selections))
-            self.assertIn('Use data_tool at / for reference runs or /draft', text)
+            self.assertIn('Your role: Data Scientist', text)
+            self.assertIn('Change configuration: call select_parameter', text)
+            self.assertEqual('run_simulation' in text, phase == 'reviewing')
+            self.assertIn('[Inspect current draft](/draft)', text)
+            self.assertIn('Open menu URLs with kb_tool.', text)
 
     def test_next_step_prompt_lists_only_unused_parameters_and_offers_run_when_all_are_used(self):
         draft = ConfigurationDraft('draft', 'gold', {}, SimulationConfiguration.defaults(),
@@ -176,10 +178,10 @@ class ToolConversationTimingTests(unittest.IsolatedAsyncioTestCase):
         text = ConfigurationNextStep(draft, [name for name in PARAMETER_ORDER if name not in draft.selections]).to_md()
         choices = json.loads(text.split('```json\n')[1].split('\n```')[0])
         self.assertEqual(set(choices), set(PARAMETER_ORDER) - set(draft.selections))
-        self.assertIn('at most once per setting', text)
-        self.assertIn('Change at least one value and submit pairs together', text)
+        self.assertIn('Change configuration: call select_parameter', text)
+        self.assertIn('Run next simulation: call run_simulation', text)
         draft.selections = PARAMETER_ORDER.copy()
         text = ConfigurationNextStep(draft, []).to_md()
         self.assertEqual(json.loads(text.split('```json\n')[1].split('\n```')[0]), {})
-        self.assertTrue(text.startswith('Call run_simulation.'))
+        self.assertIn('Run next simulation: call run_simulation', text)
         self.assertNotIn('select_parameter', text)

@@ -4,13 +4,13 @@ from pathlib import Path
 
 
 class KnowledgeBase:
-    ROOT = Path(__file__).resolve().parents[1] / "app/snakelab/knowledge"
-    PAGES = {"/": "index.md", "/analysis/": "analysis/index.md",
-             "/analysis/scores": "analysis/scores.md",
-             "/analysis/distribution": "analysis/distribution.md",
-             "/analysis/endings": "analysis/endings.md",
-             "/analysis/loss": "analysis/loss.md", "/selection": "choose-snake-setting/SKILL.md",
-             "/model": "model.md", "/exploration": "exploration.md", "/rewards": "rewards.md"}
+    ROOT = Path(__file__).resolve().parents[1] / "presentation/snakelab/guides"
+    PAGES = {"/guides": "index.md", "/guides/analysis/": "analysis/index.md",
+             "/guides/analysis/scores": "analysis/scores.md",
+             "/guides/analysis/distribution": "analysis/distribution.md",
+             "/guides/analysis/endings": "analysis/endings.md",
+             "/guides/analysis/loss": "analysis/loss.md", "/guides/selection": "choose-snake-setting/SKILL.md",
+             "/guides/model": "model.md", "/guides/exploration": "exploration.md", "/guides/rewards": "rewards.md"}
 
     def read(self, url: str) -> str:
         if url not in self.PAGES:

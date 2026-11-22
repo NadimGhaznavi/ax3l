@@ -1,0 +1,10 @@
+{% from "navigation.md.jinja" import lab %}
+{{ lab() }}
+
+## Experiment menu
+{% if data_page %}
+
+{{ data_page }}
+{% endif %}
+
+- [Open lab reference](/guides)

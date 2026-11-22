@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Return complete draft and reference-run snapshots in one browser read, and
+keep Experiment Status previews compatible with the lab menus and JSON payloads.
+
+### Changed
+
+- Combine each reference run's configuration, measured results, and saved
+  observations on `/latest`, `/golden`, or `/best`. Show the full draft
+  configuration with saved and current setting names on `/draft`, without
+  repeating values for every choice. Remove section menus and direct choice
+  prompts to complete run pages; keep older section URLs readable.
+
+### Fixed
+
+- Display captured LLM menu paths as text in report previews so they do not
+  navigate to unrelated reporting routes. Preserve the original prompts and
+  tool results, and keep external reference links clickable.
+- Update reporting checks for the branded draft presentation.
+
 ## [4.21.0] - 2026-11-22 @ 10:32
 
 ### Summary

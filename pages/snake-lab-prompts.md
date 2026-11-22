@@ -41,11 +41,13 @@ extended deadline. After the configured grace period (seven minutes by default),
 Ax3l restarts the conversation if there is no saved change or runs the saved
 unique draft.
 
-`kb_tool(url)` reads one small guide or data page. Use `/draft` for saved and inherited
-values, `/` for the shared browser menu, and direct paths such as `/latest/scores` or
-`/golden/activity` for details. Navigation uses English. Values are JSON
-and missing statistics are null. Previously saved observations remain
-available through a run's notes page. Short local guides start at `/guides`.
+`kb_tool(url)` reads one guide or complete data snapshot. `/latest`, `/golden`,
+and `/best` each include the run's full configuration, measured results, and
+saved observations. `/draft` includes its full configuration, saved setting
+names, and current setting. `/` is the shared browser menu. Navigation uses
+English; payloads use JSON and missing statistics are null. The data pages
+do not advertise section reads. Existing section URLs remain readable.
+Local guides start at `/guides`.
 The reference menu covers experiment rules, model inputs, exploration and reward
 implementation, and metric and chart definitions. It supplies no prescribed
 analysis sequence or hyperparameter tuning strategy.

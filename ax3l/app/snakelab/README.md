@@ -120,6 +120,12 @@ Prompts display the current task and available actions; the lab reference holds
 implementation details and experiment rules. Domain tutorials and prescribed
 analysis strategies are omitted.
 
+`/latest`, `/golden`, and `/best` each return the complete run configuration,
+measured results, and saved observations in one JSON snapshot. `/draft` returns
+the full current configuration, saved setting names, and the active setting.
+These pages link back to the experiment menu rather than to individual data
+sections. Older section URLs remain readable for existing conversations.
+
 The [`presentation/snakelab`](../../presentation/snakelab) package owns the
 Markdown guides and Jinja Markdown templates. Its `templates/pages` directory
 controls data-page wording, layout, and navigation; `templates/prompts` controls

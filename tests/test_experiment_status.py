@@ -18,9 +18,13 @@ from ax3l.constants.DChoice import REVISION_PARAMETER
 from ax3l.constants.DAx3l import DAx3l
 from ax3l.app.DbMgr import DbMgr
 from ax3l.app.snakelab.ExperimentDb import ExperimentDb
+from ax3l.app.snakelab.prompts.ConfigurationChoice import ConfigurationChoice
+from ax3l.app.snakelab.prompts.ConfigurationNextStep import ConfigurationNextStep
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
+from ax3l.presentation.snakelab.DataPages import draft_page, index_page
+from ax3l.presentation.snakelab.Templates import templates as lab_templates
 from ax3l.server.ReportingServer import make_server
 
 
@@ -583,6 +587,43 @@ class ExperimentStatusHttpTests(unittest.TestCase):
         self.assertNotIn('Assistant answer', reasoning)
         self.assertNotIn('<script>', reasoning)
         self.assertIn('```json', self.get('/events/82/reason'))
+
+    def test_lab_prompts_and_browser_results_keep_their_captured_content_in_previews(self):
+        self.draft.references = dict.fromkeys(('latest', 'golden', 'all_time_best'), self.draft.golden_run_id)
+        opening = ConfigurationNextStep(self.draft, PARAMETER_ORDER)
+        choice_draft = deepcopy(self.draft)
+        choice_draft.phase, choice_draft.parameter = 'choosing', 'learning_rate'
+        golden = SimulationAnalysis(self.draft.golden_run_id, deepcopy(self.draft.config),
+                                   dict(high_score=20, episodes=750, episodes_with_loss=730), '')
+        choice = ConfigurationChoice(choice_draft, golden, golden, 'golden', None)
+        records = {event_id: dict(event_id=event_id, category='Conversation', name='prompt_sent',
+                                 source_name=prompt.source_name, content=prompt.to_json())
+                   for event_id, prompt in ((81, opening), (82, choice))}
+        home = lab_templates.render('pages/home.md.jinja', data_page=index_page(self.draft))
+        for event_id, page in ((83, home), (84, draft_page(choice_draft))):
+            records[event_id] = dict(event_id=event_id, category='Tool', name='tool_execution_completed',
+                                     content=json.dumps(dict(status='ok', page=page)))
+        original = deepcopy(records)
+        event_log = self.enterContext(patch('ax3l.server.ReportingServer.EventLogDb')).return_value
+        event_log.get.side_effect = records.get
+        for event_id in (81, 82):
+            raw = self.get(f'/events/{event_id}')
+            self.assertIn('```json', raw)
+            preview = self.get(f'/events/{event_id}?preview=1')
+            message = preview.split('id="message-content"', 1)[1].split('</div>', 1)[0]
+            self.assertIn("Patrick Loeber's AI Snake Lab", message)
+            self.assertIn('Your role: Data Scientist', message)
+            self.assertIn('/draft', message)
+            self.assertIn('<td>learning rate</td>', message)
+            self.assertNotIn('<a ', message)
+        for event_id, title in ((83, "Patrick Loeber's AI Snake Lab"), (84, 'Current draft')):
+            page = self.get(f'/tool-results/{event_id}')
+            captured = page.split('<main id="tool-result"', 1)[1].split('</main>', 1)[0]
+            self.assertIn(title, captured)
+            self.assertIn('Experiment menu', captured)
+            self.assertNotIn('<a ', captured)
+        self.assertEqual(records, original)
+        self.snake.get_run_result.assert_not_called()
 
     def test_recorded_result_endpoint_formats_json_and_rejects_unrelated_events(self):
         event_log = self.enterContext(patch('ax3l.server.ReportingServer.EventLogDb')).return_value

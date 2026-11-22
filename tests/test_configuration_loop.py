@@ -204,7 +204,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(evidence['current'], {parameter: self.config['game']['rewards'][parameter]})
                 if parameter in ('snake', 'wall'):
                     self.assertIn('Chart: latest.', content[0]['text'])
-                    self.assertIn('/latest/endings', content[0]['text'])
+                    self.assertIn('](/latest)', content[0]['text'])
                     measured = evidence['reference_runs']['latest']
                     self.assertEqual(measured['episodes'], 500)
                     self.assertEqual(measured['termination_reasons'],
@@ -688,7 +688,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         messages = {call.kwargs['parameter']: json.loads(call.args[4][0].to_json())['content']
                     for call in self.conversation.await_args_list}
         self.assertIsInstance(messages['learning_rate'], str)
-        self.assertIn('/golden/activity', messages['learning_rate'])
+        self.assertIn('](/golden)', messages['learning_rate'])
         self.assertIn('Chart: golden.', messages['epsilon_pair'][0]['text'])
         self.assertEqual([call.args[-1] for call in self.chart.call_args_list], ['scores'])
         self.snake.get_analysis_episodes.assert_called_once_with(self.gold)

@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Compare reference runs by metric, with five-place decimal rounding and no
+duplicate reference labels in report tables.
+
+### Changed
+
+- Present historical results by metric with best, golden, and latest values
+  side by side, including nested episode-ending counts and percentages.
+  Use the same comparison layout on the main and parameter screens and in
+  Experiment Status previews.
+- Round decimal values to at most five places in model-facing JSON and report
+  previews, preserving the precision of stored configuration and measurements.
+- Remove the Field column from keyed record tables when a data column already
+  contains the row labels, so best, golden, and latest each appear once per row.
+
 ## [4.21.3] - 2026-11-22 @ 14:17
 
 ### Summary

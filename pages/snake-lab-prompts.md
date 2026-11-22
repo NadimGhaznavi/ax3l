@@ -57,10 +57,18 @@ field names. Edited and currently exhausted settings remain visible with
 `editable: false`. After saving, the main page is rendered again from the saved
 draft, updating these values and flags.
 
-The second JSON block contains `runs`: measured results, saved observations,
-and seed context for best, golden, and latest. It omits repeated configurations
-and redundant roles. Missing statistics and observations remain null. Reference
-values come from the draft's frozen references; no data read is needed.
+Decimal values display at most five places; stored values keep their precision.
+
+The second JSON block starts with metric names, each containing `best`,
+`golden`, and `latest` values, for example
+`"episodes": {"best": 750, "golden": 750, "latest": 750}`. Nested metrics keep
+their structure before those reference values:
+`termination_reasons.wall.percent.best` is best's percentage of wall endings.
+Seed context and saved observations use the same layout. The parameter screen
+uses these same two JSON blocks. Report previews show metrics as rows and
+reference runs as columns. Repeated configurations and redundant roles are
+omitted. Missing statistics and observations remain null. Reference values
+come from the draft's frozen references; no data read is needed.
 
 `kb_tool(url)` opens the linked definitions under `/definitions/`. Best, golden,
 latest, and draft each have a short definition including "Don't show your

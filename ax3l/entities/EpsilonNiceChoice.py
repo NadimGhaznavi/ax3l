@@ -10,10 +10,9 @@ class EpsilonNiceChoice(ConfigurationChoice):
     def __init__(
         self,
         draft: ConfigurationDraft,
-        latest: SimulationAnalysis,
-        golden: SimulationAnalysis,
+        references: dict[str, SimulationAnalysis],
         chart_scope: str,
         png: bytes | None,
     ):
-        super().__init__(draft, latest, golden, chart_scope, png)
+        super().__init__(draft, references, chart_scope, png)
         self._content += "\n\n" + templates.render("prompts/epsilon_nice.md.jinja")

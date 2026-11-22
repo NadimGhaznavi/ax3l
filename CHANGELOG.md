@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.21.2] - 2026-11-22 @ 12:45
+
+### Summary
+
+Put configuration comparisons and reference-run data directly in the setup
+screens so Qwen can prepare the next simulation without separate data reads.
+
+### Changed
+
+- Include best, golden, latest, and draft values for each available setting
+  in the setup screen's JSON, alongside complete reference-run results and
+  observations and the saved draft. Keep the same data available when setting
+  a value.
+- Remove the latest, golden, best, and draft read options from setup menus
+  and browser guidance. Keep existing data URLs readable for older sessions.
+- State the configuration-editing task and the select, set, and save actions
+  explicitly. Preserve lab-reference navigation, run availability, duplicate
+  rejection, and decision timing.
+
 ## [4.21.1] - 2026-11-22 @ 11:23
 
 ### Summary

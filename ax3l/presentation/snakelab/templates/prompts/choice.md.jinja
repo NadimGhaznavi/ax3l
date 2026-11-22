@@ -1,14 +1,12 @@
-{% from "navigation.md.jinja" import lab, reference_labels, run_action %}
-{{ lab("Change " ~ label) }}
+{% from "navigation.md.jinja" import lab, run_action %}
+{{ lab("Set " ~ label) }}
 
 {{ selection }}
 
 ## Experiment menu
 
-- [Inspect current draft](/draft)
-- [Review reference runs](/)
 - [Open lab reference](/guides)
-- Save {{ label }}: call {{ tool }}.
+- Set and save {{ label }}: call {{ tool }}.
 
 {% if chart is not none %}
 {% if has_image %}
@@ -23,15 +21,13 @@ Chart: {{ chart_scope }}.
 {% endif %}
 
 {% endif %}
-- [{{ reference_labels[chart_scope] }}](/{{ chart_scope }})
-
 {% endif %}
 {{ run_action() }}
 
 Open menu URLs with kb_tool.
 
-## Current values and reference data
+## Configuration comparison and run data
 
 ```json
-{{ evidence | json(compact=false) }}
+{{ evidence | json }}
 ```

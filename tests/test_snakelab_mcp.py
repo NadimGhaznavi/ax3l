@@ -19,6 +19,7 @@ from ax3l.app.snakelab.SelectParameterHandler import SelectParameterHandler
 from ax3l.app.snakelab.prompts.ConfigurationNextStep import ConfigurationNextStep
 from ax3l.constants.DChoice import REVISION_PARAMETER
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
+from ax3l.entities.SimulationAnalysis import SimulationAnalysis
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 from ax3l.interface.SnakeLabTools import SnakeLabTools
 from ax3l.zmq.ZMQServer import ZMQServer
@@ -86,7 +87,7 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
                                  ['select_parameter', 'run_simulation', 'kb_tool'])
                 self.assertEqual(set(tools.definition['function']['parameters']['properties']), {'parameter'})
                 description = tools.definition['function']['description']
-                self.assertIn("prompt's available list", description)
+                self.assertIn('exact key from settings', description)
                 self.assertIn('Selecting seed immediately saves the next unused seed', description)
                 for name in (parameter for parameter in PARAMETER_ORDER if parameter != 'seed'):
                     self.assertNotIn(name, description)
@@ -185,13 +186,13 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
 
             def handle(message):
                 requests.append(message)
-                if message.method == 'read_simulation_data':
-                    return dict(status='ok', page='Previously read experiment data.')
                 return (run if message.method == 'run_simulation' else select).submit(message.payload)
 
-            screen = ConfigurationNextStep(draft, PARAMETER_ORDER)
+            golden = SimulationAnalysis('gold', deepcopy(draft.config), dict(high_score=20), None)
+            references = dict.fromkeys(('best', 'golden', 'latest'), golden)
+            screen = ConfigurationNextStep(draft, PARAMETER_ORDER, references)
             llm = Mock(url='fixture')
-            llm.complete.side_effect = [reply('kb_tool', dict(url='/latest')),
+            llm.complete.side_effect = [reply('kb_tool', dict(url='/guides/model')),
                                        reply('run_simulation', {}),
                                        reply('select_parameter', dict(parameter='gamma'))]
             with ZMQServer('tcp://127.0.0.1:*', handle) as server:
@@ -200,9 +201,10 @@ class SnakeLabMCPTests(unittest.IsolatedAsyncioTestCase):
                                             conversation_deadline=monotonic() + 300)
         self.assertEqual(result['phase'], 'choosing')
         self.assertEqual([request.method for request in requests],
-                         ['read_simulation_data', 'run_simulation', 'select_parameter'])
+                         ['run_simulation', 'select_parameter'])
         messages = json.loads(llm.complete.call_args.args[0])['messages']
-        self.assertIn('Previously read experiment data.', [message.get('content') for message in messages])
+        self.assertTrue(any('24-value feature vector' in (message.get('content') or '')
+                            for message in messages if message['role'] == 'tool'))
         feedback = [message['content'] for message in messages if message['role'] == 'user'][-1]
         self.assertIn('configuration already exists', feedback)
         self.assertTrue(feedback.endswith(screen.to_md()))

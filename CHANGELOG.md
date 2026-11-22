@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.21.2] - 2026-11-22 @ 12:45
+
 ### Summary
 
 Put configuration comparisons and reference-run data directly in the setup

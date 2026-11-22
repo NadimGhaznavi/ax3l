@@ -6,6 +6,8 @@ import unittest
 
 from ax3l.activity.JsonMarkdown import json_markdown
 from ax3l.activity.MarkdownReport import markdown_html
+from ax3l.app.snakelab.prompts.ConfigurationNextStep import ConfigurationNextStep
+from ax3l.app.snakelab.ParameterSpace import parameter_paths
 from ax3l.presentation.snakelab.DataPages import config_page, draft_page
 from ax3l.activity.ToolResult import tool_result_html
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
@@ -40,11 +42,13 @@ class JsonMarkdownTests(unittest.TestCase):
         html = self.render(draft_page(draft))
         self.assertEqual(html.count('<table>'), 2)
         self.assertNotIn('<pre>', html)
-        self.assertIn('The draft shows chosen and baseline values', html)
+        self.assertIn('<h1>Current draft</h1>', html)
         for parameter in PARAMETER_ORDER:
-            self.assertIn(f'<td>{parameter.replace("_", " ")}</td>', html)
-        self.assertIn('initial: 0.96; decay: 0.97', html)
-        self.assertIn('<td>baseline</td>', html)
+            for path in parameter_paths(parameter):
+                label = ' / '.join(field.replace('_', ' ') for field in path)
+                self.assertIn(f'<td>{label}</td>', html)
+        self.assertIn('<td>saved settings</td>', html)
+        self.assertIn('<td>current setting</td>', html)
         html = self.render(config_page('golden', 'model', config))
         self.assertIn('<td>transformer</td>', html)
 
@@ -55,6 +59,22 @@ class JsonMarkdownTests(unittest.TestCase):
         self.assertNotIn('<a ', html)
         self.assertIn('&lt;script&gt;alert(1)&lt;/script&gt; | *literal* [link](javascript:alert(1)) ↵ next', html)
         self.assertEqual(html.count('<td>'), 2)
+
+    def test_lab_menu_paths_remain_visible_without_linking_to_report_routes(self):
+        draft = ConfigurationDraft('draft', 'gold', {}, SimulationConfiguration.defaults())
+        prompt = ConfigurationNextStep(draft, PARAMETER_ORDER).to_md()
+        html = markdown_html(prompt)
+        for path in ('/latest', '/golden', '/best', '/draft', '/guides'):
+            self.assertIn(path, html)
+            self.assertNotIn(f'href="{path}"', html)
+        self.assertIn('Review latest simulation', html)
+        self.assertIn('<td>learning rate</td>', html)
+        self.assertIn('[Review latest simulation](/latest)', prompt)
+        html = markdown_html('[Source](https://example.com/docs) [External](//example.com/docs) '
+                             '[Unsafe](javascript:alert(1))')
+        self.assertIn('<a href="https://example.com/docs">Source</a>', html)
+        self.assertIn('<a href="//example.com/docs">External</a>', html)
+        self.assertNotIn('href="javascript:', html)
 
     def test_plain_markdown_rejected_and_failed_results_are_readable(self):
         html = self.render('# Guide\n\nUse **evidence**.\n\n<script>alert(1)</script>')

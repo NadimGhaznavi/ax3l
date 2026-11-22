@@ -1,9 +1,8 @@
-{% from "navigation.md.jinja" import lab, links, reference_labels %}
-{{ lab(reference_labels[data.scope]) }}
+{% from "navigation.md.jinja" import reference_labels %}
+# {{ reference_labels[data.scope] }}
 
 ```json
 {{ data | json }}
 ```
-## Simulation menu
 
-{{ links(data.scope, pages) }}
+[Experiment menu](/)

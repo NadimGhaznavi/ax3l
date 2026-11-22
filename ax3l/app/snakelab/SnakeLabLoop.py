@@ -220,8 +220,7 @@ async def optimize(llm, output, db, endpoint):
                     draft.decision_expires_at += IMAGE_PROMPT_EXTRA_SECONDS
                     experiments.save_draft(draft)
                 selected_count = len(draft.selections)
-                async with SnakeLabTools(endpoint, parameter, draft_id=draft.draft_id,
-                                         allow_run=draft.phase == "reviewing") as tools:
+                async with SnakeLabTools(endpoint, parameter, draft_id=draft.draft_id) as tools:
                     try:
                         await converse(llm, output, db, tools, [prompt],
                                        parameter=parameter, process_id=draft.draft_id,

@@ -100,7 +100,7 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
                     eligible = json.loads(text.split('```json\n')[1].split('\n```')[0])
                     self_test.assertTrue(set(eligible).isdisjoint(selections))
                     names = [definition['function']['name'] for definition in request['tools']]
-                    self_test.assertEqual('run_simulation' in names, bool(selections))
+                    self_test.assertIn('run_simulation', names)
                     if not pages:
                         tool, arguments = 'kb_tool', dict(url='/golden/scores')
                     else:

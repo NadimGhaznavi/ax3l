@@ -590,16 +590,17 @@ class ExperimentStatusHttpTests(unittest.TestCase):
 
     def test_lab_prompts_and_browser_results_keep_their_captured_content_in_previews(self):
         self.draft.references = dict.fromkeys(('latest', 'golden', 'all_time_best'), self.draft.golden_run_id)
-        opening = ConfigurationNextStep(self.draft, PARAMETER_ORDER)
         choice_draft = deepcopy(self.draft)
         choice_draft.phase, choice_draft.parameter = 'choosing', 'learning_rate'
         golden = SimulationAnalysis(self.draft.golden_run_id, deepcopy(self.draft.config),
                                    dict(high_score=20, episodes=750, episodes_with_loss=730), '')
-        choice = ConfigurationChoice(choice_draft, golden, golden, 'golden', None)
+        references = dict.fromkeys(('best', 'golden', 'latest'), golden)
+        opening = ConfigurationNextStep(self.draft, PARAMETER_ORDER, references)
+        choice = ConfigurationChoice(choice_draft, references, 'golden', None)
         records = {event_id: dict(event_id=event_id, category='Conversation', name='prompt_sent',
                                  source_name=prompt.source_name, content=prompt.to_json())
                    for event_id, prompt in ((81, opening), (82, choice))}
-        home = lab_templates.render('pages/home.md.jinja', data_page=index_page(self.draft))
+        home = lab_templates.render('pages/home.md.jinja', data_page=index_page())
         for event_id, page in ((83, home), (84, draft_page(choice_draft))):
             records[event_id] = dict(event_id=event_id, category='Tool', name='tool_execution_completed',
                                      content=json.dumps(dict(status='ok', page=page)))
@@ -613,7 +614,8 @@ class ExperimentStatusHttpTests(unittest.TestCase):
             message = preview.split('id="message-content"', 1)[1].split('</div>', 1)[0]
             self.assertIn("Patrick Loeber's AI Snake Lab", message)
             self.assertIn('Your role: Data Scientist', message)
-            self.assertIn('/draft', message)
+            self.assertIn('/guides', message)
+            self.assertNotIn('/draft', message)
             self.assertIn('<td>learning rate</td>', message)
             self.assertNotIn('<a ', message)
         for event_id, title in ((83, "Patrick Loeber's AI Snake Lab"), (84, 'Current draft')):

@@ -14,12 +14,6 @@
 Your role: Data Scientist
 Experiment: In progress{{ ("\nCurrent task: " ~ task) if task else "" }}
 {%- endmacro %}
-{% macro experiment_links(groups=(("latest",), ("golden",), ("best",))) -%}
-{% for group in groups %}
-- [{% for scope in group %}{{ reference_labels[scope] }}{{ " / " if not loop.last else "" }}{% endfor %}](/{{ group[0] }})
-{% endfor %}
-- [Inspect current draft](/draft)
-{%- endmacro %}
 {% macro links(scope, pages) -%}
 {% for page in pages %}
 - [{{ labels[page] }}](/{{ scope }}/{{ page }}){{ "\n" if not loop.last else "" }}

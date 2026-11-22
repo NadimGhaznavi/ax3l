@@ -1,6 +1,7 @@
 """Decision countdowns bound a conversation's decision budget and grace period."""
 
 import asyncio
+from copy import deepcopy
 import json
 from pathlib import Path
 from threading import Event
@@ -12,6 +13,7 @@ from ax3l.app.Prompt import Prompt
 from ax3l.app.snakelab.ToolConversation import converse, DecisionTimeExpired
 from ax3l.app.snakelab.prompts.ConfigurationNextStep import ConfigurationNextStep
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
+from ax3l.entities.SimulationAnalysis import SimulationAnalysis
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 
 
@@ -21,6 +23,10 @@ def reply(name, arguments):
 
 
 class ToolConversationTimingTests(unittest.IsolatedAsyncioTestCase):
+    def references(self, draft):
+        golden = SimulationAnalysis(draft.golden_run_id, deepcopy(draft.config), dict(high_score=20), None)
+        return dict.fromkeys(('best', 'golden', 'latest'), golden)
+
     def tools(self):
         definitions = [dict(function=dict(name=name, parameters=dict(properties={field: {}})))
                        for name, field in (('select_parameter', 'parameter'), ('kb_tool', 'url'))]
@@ -78,7 +84,7 @@ class ToolConversationTimingTests(unittest.IsolatedAsyncioTestCase):
             dict(status='ok', phase='choosing'),
         ]
         draft = ConfigurationDraft('draft', 'gold', {}, SimulationConfiguration.defaults())
-        screen = ConfigurationNextStep(draft, PARAMETER_ORDER)
+        screen = ConfigurationNextStep(draft, PARAMETER_ORDER, self.references(draft))
         llm.complete.side_effect = [reply('kb_tool', dict(url='/latest')),
                                    reply('run_simulation', {}),
                                    reply('select_parameter', dict(parameter='gamma'))]
@@ -190,26 +196,28 @@ class ToolConversationTimingTests(unittest.IsolatedAsyncioTestCase):
                                   ('reviewing', ['gamma'])):
             draft.phase = phase
             draft.selections = selections
-            text = ConfigurationNextStep(draft, [name for name in PARAMETER_ORDER if name not in selections]).to_md()
+            text = ConfigurationNextStep(draft, [name for name in PARAMETER_ORDER if name not in selections],
+                                         self.references(draft)).to_md()
             self.assertNotRegex(text.lower(), r'\b(timer|countdown|deadline|minutes?|seconds?|grace)\b')
             self.assertIn('Your role: Data Scientist', text)
-            self.assertIn('Change configuration: call select_parameter', text)
+            self.assertIn('Edit a configuration element: call select_parameter with its key from settings', text)
             self.assertIn('Run next simulation: call run_simulation', text)
             self.assertIn('Choose the Run next simulation option when you are done making changes to the configuration.', text)
             self.assertNotIn('Ready to run', text)
-            self.assertIn('[Inspect current draft](/draft)', text)
+            self.assertNotRegex(text, r'\]\(/(?:latest|golden|best|draft)\)')
             self.assertIn('Open menu URLs with kb_tool.', text)
 
     def test_next_step_prompt_lists_only_unused_parameters_and_offers_run_when_all_are_used(self):
         draft = ConfigurationDraft('draft', 'gold', {}, SimulationConfiguration.defaults(),
                                     ['learning_rate', 'epsilon_pair'], 'reviewing')
-        text = ConfigurationNextStep(draft, [name for name in PARAMETER_ORDER if name not in draft.selections]).to_md()
-        choices = json.loads(text.split('```json\n')[1].split('\n```')[0])
+        text = ConfigurationNextStep(draft, [name for name in PARAMETER_ORDER if name not in draft.selections],
+                                     self.references(draft)).to_md()
+        choices = json.loads(text.split('```json\n')[1].split('\n```')[0])['settings']
         self.assertEqual(set(choices), set(PARAMETER_ORDER) - set(draft.selections))
-        self.assertIn('Change configuration: call select_parameter', text)
+        self.assertIn('Edit a configuration element: call select_parameter with its key from settings', text)
         self.assertIn('Run next simulation: call run_simulation', text)
         draft.selections = PARAMETER_ORDER.copy()
-        text = ConfigurationNextStep(draft, []).to_md()
-        self.assertEqual(json.loads(text.split('```json\n')[1].split('\n```')[0]), {})
+        text = ConfigurationNextStep(draft, [], self.references(draft)).to_md()
+        self.assertEqual(json.loads(text.split('```json\n')[1].split('\n```')[0])['settings'], {})
         self.assertIn('Run next simulation: call run_simulation', text)
         self.assertNotIn('select_parameter', text)

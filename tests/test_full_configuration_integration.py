@@ -14,8 +14,7 @@ from ax3l.app.DbMgr import DbMgr
 from ax3l.app.EventLogDb import EventLogDb
 from ax3l.app.snakelab.ExperimentDb import ExperimentDb
 from ax3l.app.snakelab.SnakeLabLoop import optimize
-from ax3l.entities.ConfigurationDraft import PARAMETER_ORDER
-from ax3l.constants.DChoice import CHOICE_CHARTS, CHOICE_LABELS
+from ax3l.constants.DChoice import CHOICE_CHARTS
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 from ax3l.server.ToolHandler import handle_tool
 from ax3l.zmq.ZMQServer import ZMQServer
@@ -23,7 +22,7 @@ from ax3l.zmq.ZMQServer import ZMQServer
 
 @unittest.skipUnless(os.environ.get('AX3L_TEST_DB') == '1', 'requires disposable MariaDB test database')
 class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
-    async def test_qwen_researches_retries_duplicates_and_cannot_reselect_a_changed_setting(self):
+    async def test_qwen_uses_inline_data_retries_duplicates_and_cannot_reselect_a_changed_setting(self):
         self.assertEqual(os.environ['DB_NAME'], 'ax3l_test')
         db = DbMgr()
         self.addCleanup(db.close)
@@ -95,41 +94,33 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
                 self_test.assertEqual(calls, [])
                 content = request['messages'][0]['content']
                 text = content[0]['text'] if isinstance(content, list) else content
-                pages = [message['content'] for message in request['messages'] if message['role'] == 'tool']
+                evidence = json.loads(text.split('```json\n')[1].split('\n```')[0])
+                self_test.assertEqual(evidence['runs']['golden']['high_score'], 10)
                 if tool == 'select_parameter':
-                    eligible = json.loads(text.split('```json\n')[1].split('\n```')[0])
+                    eligible = evidence['settings']
                     self_test.assertTrue(set(eligible).isdisjoint(selections))
                     names = [definition['function']['name'] for definition in request['tools']]
                     self_test.assertIn('run_simulation', names)
-                    if not pages:
-                        tool, arguments = 'kb_tool', dict(url='/golden/scores')
+                    step = decisions.pop(0)
+                    if step == 'run':
+                        tool, arguments = 'run_simulation', {}
                     else:
-                        self_test.assertEqual(json.loads(pages[0])['high_score'], 10)
-                        step = decisions.pop(0)
-                        if step == 'run':
-                            tool, arguments = 'run_simulation', {}
-                        else:
-                            if step in selections:
-                                repeated_selections.append(step)
-                            if step == 'seed':
-                                selections.append(step)
-                            arguments = dict(parameter=step)
+                        if step in selections:
+                            repeated_selections.append(step)
+                        if step == 'seed':
+                            selections.append(step)
+                        arguments = dict(parameter=step)
                 else:
-                    parameter = next(name for name in PARAMETER_ORDER if f'Change {CHOICE_LABELS[name]} with' in text)
-                    duplicate_retry = any(message['role'] == 'user' and 'configuration that already exists' in message['content']
+                    parameter, = evidence['settings']
+                    duplicate_retry = any(message['role'] == 'user' and 'Duplicate draft with' in message['content']
                                           for message in request['messages'])
-                    evidence = json.loads(text.split('```json\n')[1].split('\n```')[0])
-                    self_test.assertEqual(evidence['reference_runs']['golden']['high_score'], 10)
-                    if not pages and parameter == 'learning_rate':
-                        return self.reply('kb_tool', dict(url='/golden/activity'))
                     if parameter in CHOICE_CHARTS:
                         self_test.assertEqual([part['type'] for part in content], ['text', 'image_url'])
                         if not duplicate_retry:
                             chart_choices.append(parameter)
                     else:
                         self_test.assertIsInstance(content, str)
-                    if pages and not duplicate_retry:
-                        self_test.assertEqual(json.loads(pages[0])['episodes_with_loss'], 9)
+                    self_test.assertEqual(evidence['runs']['golden']['metrics']['episodes_with_loss'], 9)
                     if parameter == 'reward_pair' and not duplicate_retry:
                         duplicate_attempts.append(parameter)
                     else:
@@ -187,10 +178,10 @@ class FullConfigurationIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(saved.metrics['termination_reasons']['snake'], {'count': 7, 'percent': 70})
         self.assertIsNone(saved.summary)
         events = ExperimentDb(db).choice_events(draft.draft_id)
-        self.assertEqual(sum(event['name'] == 'llm_request_started' for event in events), 17)
+        self.assertEqual(sum(event['name'] == 'llm_request_started' for event in events), 10)
         self.assertEqual(sum(bool(event['has_image']) for event in events), 3)
         replies = [json.loads(event['detail']) for event in events if event['name'] == 'reply_received']
-        self.assertEqual(replies, [{'prompt_tokens': 123, 'completion_tokens': 7}] * 17)
+        self.assertEqual(replies, [{'prompt_tokens': 123, 'completion_tokens': 7}] * 10)
         self.assertNotIn('data:image/png', json.dumps(events, default=str))
         rows = db.query("SELECT name, COUNT(*) AS n FROM events WHERE event_id>%s AND name IN ('simulation_analyzed','simulation_analysis_progress','simulation_submitted','configuration_compared') GROUP BY name", (first_event,))
         self.assertEqual({row['name']: row['n'] for row in rows},

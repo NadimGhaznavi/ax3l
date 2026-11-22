@@ -14,11 +14,11 @@ from ax3l.presentation.snakelab.Templates import templates
 
 
 class ConfigurationChoice(Prompt):
-    def __init__(self, draft: ConfigurationDraft, latest: SimulationAnalysis,
-                 golden: SimulationAnalysis, chart_scope: str, png: bytes | None):
+    def __init__(self, draft: ConfigurationDraft, references: dict[str, SimulationAnalysis],
+                 chart_scope: str, png: bytes | None):
         parameter = draft.next_parameter
         tool = "submit_pair_values" if parameter in PAIR_PARAMETERS else "submit_single_value"
-        context = choice_context(draft, latest, golden, chart_scope, png is not None)
+        context = choice_context(draft, references, chart_scope, png is not None)
         super().__init__(templates.render("prompts/choice.md.jinja", **context,
                                          label=CHOICE_LABELS[parameter], tool=tool,
                                          selection=KnowledgeBase().read("/guides/selection")))

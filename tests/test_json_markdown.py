@@ -6,7 +6,6 @@ import unittest
 
 from ax3l.activity.JsonMarkdown import json_markdown
 from ax3l.activity.MarkdownReport import markdown_html
-from ax3l.app.snakelab.prompts.ConfigurationNextStep import ConfigurationNextStep
 from ax3l.app.snakelab.ParameterSpace import parameter_paths
 from ax3l.presentation.snakelab.DataPages import config_page, draft_page
 from ax3l.activity.ToolResult import tool_result_html
@@ -61,8 +60,8 @@ class JsonMarkdownTests(unittest.TestCase):
         self.assertEqual(html.count('<td>'), 2)
 
     def test_lab_menu_paths_remain_visible_without_linking_to_report_routes(self):
-        draft = ConfigurationDraft('draft', 'gold', {}, SimulationConfiguration.defaults())
-        prompt = ConfigurationNextStep(draft, PARAMETER_ORDER).to_md()
+        prompt = ('[Review latest simulation](/latest)\n[Golden](/golden)\n[Best](/best)\n'
+                  '[Draft](/draft)\n[Reference](/guides)\n\n```json\n{"learning_rate":0.001}\n```')
         html = markdown_html(prompt)
         for path in ('/latest', '/golden', '/best', '/draft', '/guides'):
             self.assertIn(path, html)

@@ -40,32 +40,26 @@ class SimulationDataTests(unittest.TestCase):
             page = page.split('```json\n', 1)[1].split('\n```', 1)[0]
         return json.loads(page)
 
-    def test_navigation_reaches_complete_snapshots_without_section_requests(self):
-        pending, pages = ['/'], {}
+    def test_legacy_snapshot_urls_remain_readable_without_advertising_data_reads(self):
+        self.assertEqual(re.findall(r'\]\(([^)]+)\)', self.read('/')['page']), [])
         configs = dict(draft=self.draft.config, latest=self.analyses[self.latest].config,
                        golden=self.analyses[self.gold].config, best=self.analyses[self.best].config)
-        while pending:
-            url = pending.pop()
-            if url in pages:
-                continue
+        for scope, config in configs.items():
+            url = f'/{scope}'
             result = self.read(url)
             self.assertEqual(result['status'], 'ok', url)
-            page = pages[url] = result['page']
+            page = result['page']
             self.assertNotRegex(page, r'(?m)^\s*\|')
             for run_id in (*self.analyses, self.draft.draft_id):
                 self.assertNotIn(run_id.split('-')[0], page)
-            if url != '/':
-                data = json.loads(page.split('```json\n', 1)[1].split('\n```', 1)[0])
-                scope = url[1:]
-                self.assertEqual(data['scope'], scope)
-                self.assertEqual(data['seed'], configs[scope]['seed'])
-                self.assertEqual(data['config'], configs[scope])
-                if scope != 'draft':
-                    run_id = self.draft.references['all_time_best' if scope == 'best' else scope]
-                    self.assertEqual(data['metrics'], self.analyses[run_id].metrics)
-                    self.assertEqual(data['summary'], self.analyses[run_id].summary)
-            pending.extend(re.findall(r'\]\(([^)]+)\)', page))
-        self.assertEqual(set(pages), {'/', '/draft', '/latest', '/golden', '/best'})
+            data = json.loads(page.split('```json\n', 1)[1].split('\n```', 1)[0])
+            self.assertEqual(data['scope'], scope)
+            self.assertEqual(data['seed'], config['seed'])
+            self.assertEqual(data['config'], config)
+            if scope != 'draft':
+                run_id = self.draft.references['all_time_best' if scope == 'best' else scope]
+                self.assertEqual(data['metrics'], self.analyses[run_id].metrics)
+                self.assertEqual(data['summary'], self.analyses[run_id].summary)
         self.assertIs(self.payload('/best')['same_seed_as_draft'], False)
         self.store.save_draft.assert_not_called()
         self.store.save_analysis.assert_not_called()
@@ -93,11 +87,10 @@ class SimulationDataTests(unittest.TestCase):
         self.assertEqual(self.payload('/draft/model')['model']['hidden_size'], 104)
         self.assertEqual(self.payload('/golden/model')['model']['hidden_size'], 64)
 
-    def test_shared_reference_runs_have_one_index_entry_and_all_aliases_work(self):
+    def test_shared_reference_run_aliases_remain_readable(self):
         self.draft.references = dict.fromkeys(self.draft.references, self.gold)
         index = self.read('/')['page']
-        self.assertEqual(re.findall(r'\]\(([^)]+)\)', index), ['/latest', '/draft'])
-        self.assertEqual(len(re.findall(r'\]\(', index)), 2)
+        self.assertEqual(re.findall(r'\]\(([^)]+)\)', index), [])
         for label in ('latest', 'golden', 'best'):
             page = self.read(f'/{label}')['page']
             self.assertEqual(self.payload(f'/{label}')['roles'], ['latest', 'golden', 'best'])

@@ -14,13 +14,13 @@ actions, leaving the analysis method to Qwen.
 
 | Prompt | Purpose |
 | --- | --- |
-| `ConfigurationNextStep` | Presents the experiment menu, draft status, and available settings in JSON. Always offers Run next simulation. |
-| `ConfigurationChoice` | Presents the selected setting, save and run actions, reference links, and JSON evidence. Learning rate, epsilon, and distance rewards can include a chart. |
+| `ConfigurationNextStep` | Presents the experiment menu, draft status, and JSON with best, golden, latest, and draft values for each available setting, full reference-run data, and the saved draft. Always offers Run next simulation. |
+| `ConfigurationChoice` | Presents the selected setting, set and save action, run action, lab-reference link, and the inline comparison and run data. Learning rate, epsilon, and distance rewards can include a chart. |
 | `EpsilonNiceChoice` | Adds a compact definition of the custom EpsilonNice exploration rule when choosing its probability and steps. |
 | `InvalidValue` | Explains why Ax3l rejected a value. |
 | `NoDupes` | Identifies the duplicate proposal and asks Qwen to try different values for the same setting. |
 
-Use `select_parameter(parameter)` with a listed key. Each setting can be chosen
+Use `select_parameter(parameter)` with a key from `settings`. Each setting can be chosen
 once per draft, in any order. `submit_single_value` and `submit_pair_values`
 save changes using the limits in their tool descriptions. Ax3l binds the draft
 and setting identifiers. Duplicate proposals stay in the same conversation
@@ -48,13 +48,18 @@ extended deadline. After the configured grace period (seven minutes by default),
 Ax3l restarts the conversation if there is no saved change or runs the saved
 unique draft.
 
-`kb_tool(url)` reads one guide or complete data snapshot. `/latest`, `/golden`,
-and `/best` each include the run's full configuration, measured results, and
-saved observations. `/draft` includes its full configuration, saved setting
-names, and current setting. `/` is the shared browser menu. Navigation uses
-English; payloads use JSON and missing statistics are null. The data pages
-do not advertise section reads. Existing section URLs remain readable.
-Local guides start at `/guides`.
+The setup JSON includes `settings`, `runs`, and `draft`. Each available setting
+has a label and `values` containing `best`, `golden`, `latest`, and `draft`.
+Single settings use numbers; pairs retain their field names. `runs` contains
+the three reference runs' complete configurations, measured results, and saved
+observations. `draft` contains the complete saved configuration, phase, and
+saved and current setting names. Missing statistics and observations remain null.
+These values come from the draft's frozen references; no data read is needed.
+
+`kb_tool(url)` reads optional lab reference, starting at `/guides`. Navigation
+uses English and payloads use JSON. The setup menus and tool descriptions do
+not advertise `/latest`, `/golden`, `/best`, or `/draft`; those URLs and their
+section URLs remain readable for older sessions. `/` is the shared browser menu.
 The reference menu covers experiment rules, model inputs, exploration and reward
 implementation, and metric and chart definitions. It supplies no prescribed
 analysis sequence or hyperparameter tuning strategy.

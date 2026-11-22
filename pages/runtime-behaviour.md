@@ -66,8 +66,9 @@ once per experiment. Numeric seed proposals are rejected; schema-fixed settings 
 controlled by Ax3l.
 
 Ax3l loads the same short selection skill at the start of each choice. The
-prompt includes current values and same-setting values and scores from the
-latest and golden runs. Qwen receives at most one chart per choice.
+setup and choice prompts include best, golden, latest, and draft values in
+JSON, together with complete reference-run configurations, results, saved
+observations, and the saved draft. Qwen receives at most one chart per choice.
 
 | Choice | Chart | Measured facts alongside it |
 | --- | --- | --- |
@@ -85,9 +86,10 @@ after a seed change, runs on other seeds are labeled as historical context.
 Ax3l records the completed simulation's
 measurements directly from episode data.
 
-English directions in the prompt lead to relevant `kb_tool` pages when
-Qwen needs more detail. The shared menu at `/` links to `draft`, `latest`,
-`golden`, `best`, and `/guides` for optional background. Navigation uses English
+English directions in the prompt lead to `/guides` through `kb_tool` when
+Qwen wants lab reference. Configuration and run data are already in the screen;
+the menus no longer offer separate draft and reference-run reads. Older data
+URLs remain readable. Navigation uses English
 and experiment values use JSON. Guide and data pages, prompt wording, and tool
 descriptions use a dedicated Markdown presentation package. Choice rules appear in the
 submission tool description. Accepted choices are saved without starting a

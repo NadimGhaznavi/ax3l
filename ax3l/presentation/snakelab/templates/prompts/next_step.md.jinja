@@ -1,5 +1,5 @@
-{% from "navigation.md.jinja" import lab, experiment_links, run_action %}
-{{ lab("Prepare the next simulation") }}
+{% from "navigation.md.jinja" import lab, run_action %}
+{{ lab("Set new configuration values for the next simulation" if choices else "Review configuration changes") }}
 
 {% if action == "run" %}
 Draft status: Changes saved; no untested changes remain.
@@ -8,22 +8,21 @@ Draft status: Changes saved.
 {% elif action == "revise" %}
 Draft status: Duplicate configuration. Change a setting to make it unique.
 {% else %}
-Draft status: Inherited from golden.
+Starting values: golden.
 {% endif %}
 
 ## Experiment menu
 
-{{ experiment_links() }}
 {% if choices %}
-- Change configuration: call select_parameter with an available key.
+- Edit a configuration element: call select_parameter with its key from settings.
 {% endif %}
 - [Open lab reference](/guides)
 {{ run_action() }}
 
 Open menu URLs with kb_tool.
 
-## Available settings and current values
+## Configuration comparison and run data
 
 ```json
-{{ choices | json(compact=false) }}
+{{ evidence | json }}
 ```

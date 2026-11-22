@@ -5,6 +5,7 @@ import json
 
 from ax3l.app.Prompt import Prompt
 from ax3l.activity.ConfigurationEvidence import configuration_evidence
+from ax3l.app.snakelab.PairParameters import PAIR_PARAMETERS
 from ax3l.constants.DChoice import CHOICE_LABELS
 from ax3l.entities.ConfigurationDraft import ConfigurationDraft
 from ax3l.entities.SimulationAnalysis import SimulationAnalysis
@@ -16,8 +17,9 @@ class ConfigurationChoice(Prompt):
                  png: bytes | None):
         parameter = draft.next_parameter
         evidence = configuration_evidence(draft, [parameter], references)
+        pair_fields = [path[-1] for path in PAIR_PARAMETERS[parameter]] if parameter in PAIR_PARAMETERS else None
         super().__init__(templates.render("prompts/choice.md.jinja", evidence=evidence,
-                                         label=CHOICE_LABELS[parameter]))
+                                         label=CHOICE_LABELS[parameter], pair_fields=pair_fields))
         self._png = png
 
     def to_json(self) -> str:

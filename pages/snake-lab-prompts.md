@@ -16,7 +16,7 @@ actions, leaving the analysis method to Qwen.
 | Prompt | Purpose |
 | --- | --- |
 | `ConfigurationNextStep` | Presents the main configuration page, editing instructions, linked definitions, and separate JSON blocks for configurable values and historical results. Saved draft values remain visible. Always offers Run next simulation. |
-| `ConfigurationChoice` | Presents the selected setting, set and save action, run action, lab-reference link, and the inline comparison and run data. Learning rate, epsilon, and distance rewards can include a chart. |
+| `ConfigurationChoice` | Shows the lab heading, current setting, configuration comparison, and historical results. Chart images remain available. Generic instructions and menus stay on the main page. |
 | `EpsilonNiceChoice` | Adds a compact definition of the custom EpsilonNice exploration rule when choosing its probability and steps. |
 | `InvalidValue` | Explains why Ax3l rejected a value. |
 | `NoDupes` | Identifies the duplicate proposal and asks Qwen to try different values for the same setting. |
@@ -28,9 +28,9 @@ save changes using the limits in their tool descriptions. Ax3l binds the draft
 and setting identifiers. Duplicate proposals stay in the same conversation
 while untested values remain for that setting.
 
-Run next simulation stays visible throughout setup. The screen says, "Choose
+The main page lists Run next simulation and says, "Choose
 the Run next simulation option when you are done making changes to the
-configuration." Running checks the
+configuration." The run tool remains available during value choices. Running checks the
 saved configuration for duplicates. A rejected run returns to the same screen
 and preserves the conversation and its decision timer. Unsaved values are not
 included in an accepted run.

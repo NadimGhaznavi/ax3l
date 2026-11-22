@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.21.5] - 2026-11-22 @ 14:48
+
+### Summary
+
+Keep per-item configuration prompts focused on the selected setting and its data.
+
+### Changed
+
+- Remove the repeated objective, draft rules, experiment menu, save/run
+  directions, chart-source prose, and URL instructions from per-item prompts.
+  Retain the lab heading, current setting, comparison JSON, chart images, and
+  custom EpsilonNice explanation. Keep editing and run guidance on the main page.
+
 ## [4.21.4] - 2026-11-22 @ 14:35
 
 ### Summary

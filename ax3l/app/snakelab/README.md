@@ -53,8 +53,8 @@ or run decision.
 
 Ax3l freezes the latest, golden, and all-time best references when it opens a
 draft. It records missing measurements directly from completed runs. The
-[`choose-snake-setting/SKILL.md`](../../presentation/snakelab/guides/choose-snake-setting/SKILL.md) gives each choice the
-same short procedure. The prompt supplies the assigned setting's current
+[`choose-snake-setting/SKILL.md`](../../presentation/snakelab/guides/choose-snake-setting/SKILL.md) remains available as optional reference.
+Per-item prompts omit generic rules and menus, and supply the assigned setting's current
 values and reference results in JSON. Ax3l prepares one chart when the
 assignment calls for it:
 

@@ -179,10 +179,16 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.store.saved.phase, 'completed')
         for call in self.conversation.await_args_list:
             prompt = call.args[4][0].to_md()
-            self.assertIn('kb_tool', prompt)
-            self.assertTrue('/definitions/golden.md' in prompt or '[Open lab reference](/guides)' in prompt)
+            self.assertIn('Your role: Data Scientist', prompt)
+            if call.kwargs['parameter'] == REVISION_PARAMETER:
+                self.assertIn('kb_tool', prompt)
+                self.assertIn('/definitions/golden.md', prompt)
+                self.assertIn('Run next simulation', prompt)
+            else:
+                for generic in ('Objective:', 'A draft inherits', 'Experiment menu',
+                                'Run next simulation', 'Open menu URLs', 'Chart:'):
+                    self.assertNotIn(generic, prompt)
             self.assertNotRegex(prompt, r'\]\(/(?:latest|golden|best|draft)\)')
-            self.assertIn('Run next simulation', prompt)
             for run_id in (self.gold, self.latest, self.best):
                 self.assertNotIn(run_id.split('-')[0], prompt)
 
@@ -265,7 +271,6 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
                 evidence = prompt_data(content[0]['text'])
                 self.assertEqual(evidence['settings'][parameter]['values']['draft'], self.config['game']['rewards'][parameter])
                 if parameter in ('snake', 'wall'):
-                    self.assertIn('Chart: latest.', content[0]['text'])
                     self.assertNotIn('](/latest)', content[0]['text'])
                     self.assertEqual(evidence['episodes']['latest'], 500)
                     endings = evidence['termination_reasons']
@@ -287,7 +292,6 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.store.saved.selections, ['food'])
         content = json.loads(self.conversation.await_args_list[0].args[4][0].to_json())['content']
         self.assertEqual([part['type'] for part in content], ['text', 'image_url'])
-        self.assertIn('Chart: latest.', content[0]['text'])
         evidence = prompt_data(content[0]['text'])
         self.assertEqual(evidence['settings']['food']['values']['draft'], 10)
         self.assertEqual(evidence['settings']['food']['values']['latest'], 10)
@@ -310,7 +314,7 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         for text in ('EpsilonNice applies after ordinary epsilon exploration ends',
                      'value_1', 'eligible move outside a detour', 'next move',
                      'value_2 moves', 'immediately safe alternative',
-                     "model's pick if one exists", 'Each episode starts with no active detour', 'submit_pair_values'):
+                     "model's pick if one exists", 'Each episode starts with no active detour'):
             self.assertIn(text, content)
         evidence = prompt_data(content)
         self.assertEqual(evidence['settings']['epsilon_nice_pair']['values']['draft'], self.config['epsilon_nice'])
@@ -697,9 +701,6 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         for parameter in ('reward_pair', 'learning_rate', 'epsilon_pair'):
             content = messages[parameter]
             self.assertEqual([part['type'] for part in content], ['text', 'image_url'])
-            if parameter != 'learning_rate':
-                self.assertIn('Chart: latest.', content[0]['text'])
-        self.assertIn('Compare latest with golden.', messages['learning_rate'][0]['text'])
         self.assertEqual([call.args[-1] for call in self.chart.call_args_list],
                          ['distribution', 'loss', 'scores'])
         data = prompt_data(messages['epsilon_pair'][0]['text'])
@@ -730,15 +731,12 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         await self.cycle()
         self.snake.get_analysis_episodes.assert_called_once_with(self.gold)
         self.assertIsNone(self.chart.call_args.kwargs['golden_episodes'])
-        self.assertIn('Chart: golden.', self.prompts[1])
-        self.assertNotIn('Compare golden with golden.', self.prompts[1])
 
     async def test_golden_without_recorded_loss_keeps_the_latest_loss_chart(self):
         self.store.analyses[self.gold].metrics['episodes_with_loss'] = 0
         await self.cycle()
         self.snake.get_analysis_episodes.assert_called_once_with(self.latest)
         self.assertIsNone(self.chart.call_args.kwargs['golden_episodes'])
-        self.assertIn('Chart: latest. Golden has no recorded loss.', self.prompts[1])
 
     async def test_golden_supplies_chart_after_seed_change_and_missing_loss_skips_chart(self):
         self.decisions = ['learning_rate', 'epsilon_pair', 'run']
@@ -749,7 +747,6 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
                     for call in self.conversation.await_args_list}
         self.assertIsInstance(messages['learning_rate'], str)
         self.assertNotIn('](/golden)', messages['learning_rate'])
-        self.assertIn('Chart: golden.', messages['epsilon_pair'][0]['text'])
         self.assertEqual([call.args[-1] for call in self.chart.call_args_list], ['scores'])
         self.snake.get_analysis_episodes.assert_called_once_with(self.gold)
 
@@ -980,8 +977,6 @@ class ConfigurationLoopTests(unittest.IsolatedAsyncioTestCase):
         await self.cycle()
         messages = {call.kwargs['parameter']: call.args[4][0].to_md()
                     for call in self.conversation.await_args_list}
-        self.assertIn('Chart: latest.', messages['epsilon_pair'])
-        self.assertIn('Chart: golden.', messages['learning_rate'])
         evidence = prompt_data(messages['learning_rate'])
         self.assertFalse(evidence['same_seed_as_draft']['golden'])
         self.assertEqual([call.args[0]['seed'] for call in self.chart.call_args_list], [1970, 1970])

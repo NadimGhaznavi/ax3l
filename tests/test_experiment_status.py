@@ -596,7 +596,7 @@ class ExperimentStatusHttpTests(unittest.TestCase):
                                    dict(high_score=20, episodes=750, episodes_with_loss=730), '')
         references = dict.fromkeys(('best', 'golden', 'latest'), golden)
         opening = ConfigurationNextStep(self.draft, PARAMETER_ORDER, references)
-        choice = ConfigurationChoice(choice_draft, references, 'golden', None)
+        choice = ConfigurationChoice(choice_draft, references, None)
         records = {event_id: dict(event_id=event_id, category='Conversation', name='prompt_sent',
                                  source_name=prompt.source_name, content=prompt.to_json())
                    for event_id, prompt in ((81, opening), (82, choice))}
@@ -614,7 +614,12 @@ class ExperimentStatusHttpTests(unittest.TestCase):
             message = preview.split('id="message-content"', 1)[1].split('</div>', 1)[0]
             self.assertIn("Patrick Loeber's AI Snake Lab", message)
             self.assertIn('Your role: Data Scientist', message)
-            self.assertTrue('/definitions/golden.md' in message or '/guides' in message)
+            if event_id == 81:
+                self.assertIn('/definitions/golden.md', message)
+            else:
+                self.assertNotIn('Experiment menu', message)
+                self.assertNotIn('Objective:', message)
+                self.assertNotIn('Run next simulation', message)
             self.assertNotIn('href="/draft"', message)
             self.assertIn('<td>learning rate</td>', message)
             self.assertIn('<th>best</th>', message)

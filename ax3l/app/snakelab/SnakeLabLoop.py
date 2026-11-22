@@ -216,7 +216,7 @@ async def optimize(llm, output, db, endpoint):
                     prompt = ConfigurationNextStep(draft, parameters, reference_runs)
                 else:
                     choice = EpsilonNiceChoice if parameter == "epsilon_nice_pair" else ConfigurationChoice
-                    prompt = choice(draft, reference_runs, chart_scope, png)
+                    prompt = choice(draft, reference_runs, png)
                 if png is not None:
                     decision_deadline += IMAGE_PROMPT_EXTRA_SECONDS
                     draft.decision_expires_at += IMAGE_PROMPT_EXTRA_SECONDS

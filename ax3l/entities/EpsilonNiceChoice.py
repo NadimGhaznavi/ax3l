@@ -11,8 +11,7 @@ class EpsilonNiceChoice(ConfigurationChoice):
         self,
         draft: ConfigurationDraft,
         references: dict[str, SimulationAnalysis],
-        chart_scope: str,
         png: bytes | None,
     ):
-        super().__init__(draft, references, chart_scope, png)
+        super().__init__(draft, references, png)
         self._content += "\n\n" + templates.render("prompts/epsilon_nice.md.jinja")

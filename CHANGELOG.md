@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.21.4] - 2026-11-22 @ 14:35
+
 ### Summary
 
 Compare reference runs by metric, with five-place decimal rounding and no

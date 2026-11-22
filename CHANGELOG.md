@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Keep configuration task totals visible when Experiment Status rows are collapsed.
+
+### Added
+
+- Show bold elapsed time, input token, and output token totals on each
+  Experiment Status row with expandable tasks, updating with the existing refresh.
+
 ## [4.20.0] - 2026-11-21 @ 11:51
 
 ### Summary

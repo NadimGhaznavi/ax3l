@@ -29,6 +29,14 @@ def _elapsed(seconds: float | None) -> str:
     return f"{hours:02}:{clock}" if hours else clock
 
 
+def _totals(steps: list[dict]) -> dict:
+    seconds = sum(step["seconds"] for step in steps if step["seconds"] is not None)
+    input_tokens = sum(step["input_tokens"] for step in steps if step["input_tokens"] is not None)
+    output_tokens = sum(step["output_tokens"] for step in steps if step["output_tokens"] is not None)
+    return dict(elapsed=_elapsed(seconds), input_tokens=input_tokens,
+                output_tokens=output_tokens, tokens=input_tokens + output_tokens)
+
+
 def _rows(draft: ConfigurationDraft, inherited_config: dict, activity: dict[str, dict]) -> list[dict]:
     rows = []
     for parameter in PARAMETER_ORDER:
@@ -60,6 +68,8 @@ def _rows(draft: ConfigurationDraft, inherited_config: dict, activity: dict[str,
             selected=None, current=deciding, image_url=None,
             steps=[dict(step, elapsed=_elapsed(step["seconds"])) for step in work["steps"]] if work else [],
         ))
+    for row in rows:
+        row["totals"] = _totals(row["steps"])
     return rows
 
 
@@ -117,9 +127,6 @@ def experiment_status(draft: ConfigurationDraft | None, run: dict | None = None,
         outcome = "No completed result"
     rows = _rows(draft, golden["config"], activity or {})
     steps = [step for row in rows for step in row["steps"]]
-    seconds = sum(step["seconds"] for step in steps if step["seconds"] is not None)
-    input_tokens = sum(step["input_tokens"] for step in steps if step["input_tokens"] is not None)
-    output_tokens = sum(step["output_tokens"] for step in steps if step["output_tokens"] is not None)
     countdown = None
     if draft.phase in ("choosing", "selecting_parameter", "reviewing") and draft.decision_expires_at is not None:
         countdown = dict(remaining_seconds=draft.decision_expires_at - time(),
@@ -127,8 +134,7 @@ def experiment_status(draft: ConfigurationDraft | None, run: dict | None = None,
                          expiry_action="run" if draft.selections else "reset")
     return dict(
         draft=draft, rows=rows, phase=phase, detail=detail, countdown=countdown,
-        totals=dict(elapsed=_elapsed(seconds), input_tokens=input_tokens,
-                    output_tokens=output_tokens, tokens=input_tokens + output_tokens),
+        totals=_totals(steps),
         choices_selected=len(draft.selections), choices_total=len(PARAMETER_ORDER),
         high_score=score, target_score=target,
         difference=score - target if score is not None else None, outcome=outcome,

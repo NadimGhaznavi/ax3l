@@ -11,15 +11,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Summary
 
-Introduce the initial prompt wording for the four-view experiment design.
+Introduce four self-contained view prompts for assembling an experiment
+configuration.
 
 ### Added
 
-- Add a shared welcome introducing Patrick Loeber's Snake Lab and Qwen's role
-  as the data scientist tuning the Snake AI to improve its high score.
-- Add Reward Signals, Architecture, Training, and Exploration prompts. Each asks
-  Qwen to evaluate the previous hypothesis and propose a new hypothesis, expected
-  effect, and parameter values. Include the five prompt assets in installations.
+- Add Reward Signals, Architecture, Training, and Exploration prompt templates,
+  each introducing Qwen's role in Patrick Loeber's Snake Lab and the objective
+  of improving the Snake AI's high score.
+- Include sections for the previous hypothesis and choices, golden/latest
+  results, editable parameters, and a read-only JSON view of the remaining
+  configuration, including values marked as draft.
+- Ask Qwen to evaluate the previous hypothesis and propose a new hypothesis,
+  expected effect, and values for the current view's parameters. Include all
+  four prompt assets in installations.
+
+### Removed
+
+- Remove the separate welcome prompt. Keep view ordering and configuration
+  assembly out of the model-facing prompt text.
 
 ## [4.23.0] - 2026-11-23 @ 04:28
 

@@ -155,12 +155,22 @@ exec /usr/bin/systemd-analyze "$@"
                     self.assertEqual(installed.read_bytes(), asset.read_bytes(), str(asset))
                 smoke = subprocess.run([sys.executable, '-c', '''
 from pathlib import Path
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment, FileSystemLoader, StrictUndefined
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 from ax3l.server.Ax3lServer import main
 assert SimulationConfiguration.defaults()['model']['hidden_size'] == 64
 templates = Environment(loader=FileSystemLoader(Path('ax3l/server/templates')))
 assert templates.get_template('events.html')
+prompts = Environment(loader=FileSystemLoader(Path('ax3l/presentation/snakelab/prompts')),
+                      undefined=StrictUndefined)
+for name in ('reward-signals.md', 'architecture.md', 'training.md', 'exploration.md'):
+    prompts.get_template(name).render(
+        previous_hypothesis='The proposed adjustment will improve the high score.',
+        previous_values={},
+        comparison={'golden': {'high_score': 10}, 'latest': {'high_score': 11}},
+        parameters={},
+        other_parameters={'seed': 1971, 'model': {'layers': '2 (draft)'}},
+    )
 '''], cwd=self.app, env=dict(os.environ, PYTHONPATH=str(self.app), PYTHONDONTWRITEBYTECODE='1'),
                     capture_output=True, text=True, timeout=10)
                 self.assertEqual(smoke.returncode, 0, smoke.stderr)

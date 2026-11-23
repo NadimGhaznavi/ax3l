@@ -27,18 +27,6 @@
       <tr><th scope="row">High Score</th><td>{{ run.high_score if run.high_score is not none else '—' }}</td></tr>
       <tr><th scope="row">Completed At</th><td>{{ run.completed_at.strftime('%Y-%m-%d %H:%M:%S') if run.completed_at is not none else '—' }}</td></tr>
     </table>
-    {% if analysis %}
-    <h2>Simulation Analysis</h2>
-    {% if analysis.summary %}<p>{{ analysis.summary }}</p>{% endif %}
-    <table aria-label="Measured simulation analysis">
-      <tr><th scope="row">Mean Episode Score</th><td>{{ analysis.metrics.mean_score }} points</td></tr>
-      <tr><th scope="row">Median Episode Score</th><td>{{ analysis.metrics.median_score }} points</td></tr>
-      {% for key, label in [('wall', 'Wall Collisions'), ('snake', 'Body Collisions'), ('max_moves', 'Move Limit'), ('board_filled', 'Board Filled'), ('unrecorded_or_other', 'Unrecorded or Other')] %}
-      {% set ending = analysis.metrics.termination_reasons[key] %}
-      <tr><th scope="row">{{ label }}</th><td>{{ ending.count }} episodes ({{ '%.1f' | format(ending.percent) }}%)</td></tr>
-      {% endfor %}
-    </table>
-    {% endif %}
     <h2>Training and Exploration</h2>
     <table aria-label="Episode diagnostics">
       <tr><th scope="row">Recorded Episodes</th><td>{{ diagnostics.episodes }}</td></tr>

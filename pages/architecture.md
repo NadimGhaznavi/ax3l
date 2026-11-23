@@ -23,38 +23,23 @@ concurrent slots against the same loaded model.
 
 The LLM used by the project is [Qwen 3.5 - 4B](https://huggingface.co/Qwen/Qwen3.5-4B). This is an open source model created by the [Alibaba Group](https://www.alibabagroup.com/en-US/about-alibaba) out of China.
 
-## MCP servers and tools
+## Conversation workflows
 
-Ax3l starts a private stdio MCP session for each optimization conversation and
-sends its discovered tool definitions with inference requests. Ax3l executes
-the returned tool calls; the shared inference service has no global Ax3l tool
-registration.
-
-- The MCP tools let Qwen look up measurements and save parameter choices in an
-  Ax3l-owned configuration draft. Ax3l submits the complete draft after it
-  accepts every choice.
-- The tools use the [ZeroMQ](http://zeromq.org) messaging framework to deliver the results to the Ax3l server.
+The previous conversation workflows and their MCP tool sessions have been
+removed. The Ax3l server currently runs its ZeroMQ listener without starting
+inference or submitting simulations. The shared LLM HTTP interface and
+SnakeLab control and database interfaces remain available for the next flow.
 
 ## MariaDB
 
 - The MariaDB database stores application data, history, results, and events.
-- It also stores Ax3l's own execution state, including conversation and workflow progress needed for continuity across interruptions, restarts, and reboots.
 
 ## Reporting server
 
 - Reads from MariaDB.
 - Summarizes the current system state, e.g., the number of simulations run.
-- Offers an Experiment Status report card with fifteen configuration choices and
-  read-only checkmarks for accepted LLM choices, including unchanged values.
-  Paired settings advance together, inherited pending values remain visible,
-  and the next selection is highlighted. Simulation and measurement phases are
-  shown separately, with the result compared against the golden baseline on
-  the same seed. Current and Last completed views refresh every five seconds;
-  a failed refresh keeps the last successful card and its timestamp visible.
-  Each choice shows its chart preparation, inference requests, tool lookups,
-  and submission with per-step timings and per-request input and output tokens.
 - Presents a histogram showing score distribution across simulation runs.
-- Simulation details show exact termination counts and percentages and any previously saved Qwen notes. Run labels use the first UUID group; navigation retains full UUIDs.
+- Simulation details show recorded training, exploration, and termination counts. Run labels use the first UUID group; navigation retains full UUIDs.
 - Presents a plot of the high score over time, including local golden baselines
   established by seed rotations, which may decrease the score.
 - Presents an event log with filtering.
@@ -113,10 +98,7 @@ Ax3l's reporting and ZeroMQ bindings are declared in `DAx3l.CMDB_NETWORK` and ov
 `/opt/prod/ax3l/conf/ax3l.json`. The configuration interface validates the
 file once per process through `Network`. Installation and the network restart
 helper render Ax3l's service units from those same values. The outbound
-`llamasrv_url` is configured separately in the same file and read by the
-optimization process at startup. The same file sets `decision_grace_seconds`,
-defaulting to 420 seconds, which the optimizer and reporting service load at
-startup to keep conversation deadlines and the displayed grace countdown aligned.
+`llamasrv_url` is configured separately in the same file for use by the shared LLM interface.
 See [network configuration](/pages/scripts.html#network-configuration).
 
 ## Watchdog service
@@ -124,7 +106,7 @@ See [network configuration](/pages/scripts.html#network-configuration).
 - Checks Ax3l and reporting every 10 seconds; restarts inactive or failed units through systemd.
 - Shared LlamaSrv inference is managed independently; the watchdog does not control its services.
 - Logs only problems and recovery attempts to the systemd journal; successful polls are silent. Runs as root to manage system services.
-- Does not detect a stalled optimization loop in an otherwise active Ax3l process. Stop the watchdog before intentionally stopping individual services (`services.sh stop` does this automatically).
+- Monitors service activity rather than application progress. Stop the watchdog before intentionally stopping individual services (`services.sh stop` does this automatically).
 
 ---
 

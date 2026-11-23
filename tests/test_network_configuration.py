@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from ax3l.constants.DAx3l import DAx3l
 from ax3l.interface.Configuration import Configuration
@@ -37,7 +37,6 @@ class ConfigurationTests(unittest.TestCase):
         values = json.loads(self.path.read_text())
         self.assertEqual(set(values['network']), {'report', 'zmq'})
         self.assertEqual(values['llamasrv_url'], 'http://127.0.0.1:51001')
-        self.assertEqual(values['decision_grace_seconds'], 420)
         self.assertEqual(self.path.stat().st_mode & 0o777, 0o644)
         self.assertEqual(self.path.parent.stat().st_mode & 0o777, 0o755)
 
@@ -50,10 +49,8 @@ class ConfigurationTests(unittest.TestCase):
         self.assertEqual(self.read()['report'], ('127.0.0.2', 62000))
 
     def test_partial_overrides_and_missing_file_use_independent_defaults(self):
-        self.assertEqual(Configuration(self.path).decision_grace_seconds, 420)
         defaults = self.read()
         self.write({'network': {'report': {'port': 62000}}})
-        self.assertEqual(Configuration(self.path).decision_grace_seconds, 420)
         configured = self.read()
         self.assertEqual(configured['report'], ('0.0.0.0', 62000))
         self.assertEqual(defaults['report'], ('0.0.0.0', 28870))
@@ -61,12 +58,6 @@ class ConfigurationTests(unittest.TestCase):
         configured['zmq'] = ('127.0.0.2', 12345)
         self.assertEqual(self.read()['zmq'], defaults['zmq'])
 
-    def test_decision_grace_override_is_loaded_and_preserved_on_reinstall(self):
-        self.write({'decision_grace_seconds': 90})
-        original = self.path.read_bytes()
-        Configuration.install()
-        self.assertEqual(self.path.read_bytes(), original)
-        self.assertEqual(Configuration(self.path).decision_grace_seconds, 90)
 
     def test_wildcard_binding_has_loopback_destinations(self):
         self.write({'network': {'zmq': {'interface': '0.0.0.0'}}})
@@ -95,8 +86,6 @@ class ConfigurationTests(unittest.TestCase):
             cases.append(({'network': {'report': {'interface': interface}}}, 'network.report.interface'))
         for port in (None, True, '1234', 0, -1, 65536, 1.5):
             cases.append(({'network': {'report': {'port': port}}}, 'network.report.port'))
-        for seconds in (None, True, False, '300', 0, -1, 1.5, [], {}):
-            cases.append(({'decision_grace_seconds': seconds}, 'decision_grace_seconds'))
         for values, field in cases:
             with self.subTest(values=values):
                 self.write(values)
@@ -146,38 +135,14 @@ class ConfigurationTests(unittest.TestCase):
                 self.assertEqual(server.call_args.args[:2], binding)
                 server.return_value.__enter__.return_value.serve_forever.assert_called_once()
 
-    def test_ax3l_listener_and_mcp_default_use_resolved_endpoints(self):
+
+    def test_ax3l_listener_uses_resolved_endpoint(self):
         from ax3l.server.Ax3lServer import main
-        from ax3l.app.snakelab.tools.SubmitSingleValue import SubmitSingleValue
-        from ax3l.app.snakelab.tools.SubmitPairValues import SubmitPairValues
 
         self.write({'network': {'zmq': {'interface': '0.0.0.0', 'port': 61971}}})
-        loop = MagicMock()
-        loop.main.return_value = 0
-        with patch.dict('os.environ', {}, clear=True), patch('sys.argv', ['ax3l', '--llm-url', 'http://example']), \
-                patch('ax3l.server.Ax3lServer.ZMQServer') as server, \
-                patch('ax3l.server.Ax3lServer.import_module', return_value=loop):
-            server.return_value.__enter__.return_value.endpoint = 'tcp://0.0.0.0:61971'
+        with patch.dict('os.environ', {}, clear=True), patch('sys.argv', ['ax3l']), \
+                patch('ax3l.server.Ax3lServer.DbMgr'), \
+                patch('ax3l.server.Ax3lServer.ZMQServer') as server, patch('builtins.print'):
             self.assertEqual(main(), 0)
             self.assertEqual(server.call_args.args[0], 'tcp://0.0.0.0:61971')
-            self.assertEqual(loop.main.call_args.args[0][-1], 'tcp://127.0.0.1:61971')
-        for module, submitter in (('SubmitSingleValue', SubmitSingleValue), ('SubmitPairValues', SubmitPairValues)):
-            with patch(f'ax3l.app.snakelab.tools.{module}.ZMQClient') as client:
-                submitter()
-                client.assert_called_once_with('tcp://127.0.0.1:61971')
-                client.reset_mock()
-                submitter('tcp://127.0.0.2:12345')
-                client.assert_called_once_with('tcp://127.0.0.2:12345')
-
-    def test_ax3l_uses_configured_llamasrv_by_default(self):
-        from ax3l.server.Ax3lServer import main
-
-        self.write({'llamasrv_url': 'http://wintermute:51001'})
-        loop = MagicMock()
-        loop.main.return_value = 0
-        with patch.dict('os.environ', {}, clear=True), patch('sys.argv', ['ax3l']), \
-                patch('ax3l.server.Ax3lServer.ZMQServer') as server, \
-                patch('ax3l.server.Ax3lServer.import_module', return_value=loop):
-            server.return_value.__enter__.return_value.endpoint = 'tcp://127.0.0.1:61970'
-            self.assertEqual(main(), 0)
-            self.assertEqual(loop.main.call_args.args[0][:2], ['--url', 'http://wintermute:51001'])
+            server.return_value.__enter__.return_value.serve_forever.assert_called_once_with()

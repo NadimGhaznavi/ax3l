@@ -1,5 +1,4 @@
 import argparse
-import base64
 import json
 import logging
 import re
@@ -18,13 +17,10 @@ from ax3l.app.DbMgr import DbMgr
 from ax3l.app.ReportBackground import ReportBackground
 from ax3l.constants.DEventCategory import DEventCategory
 from ax3l.app.EventLogDb import EventLogDb
-from ax3l.app.snakelab.ExperimentDb import ExperimentDb
 from ax3l.activity.ReplyReport import fields, reply_content, reasoning_content
 from ax3l.activity.PromptReport import parts, summary
 from ax3l.activity.ScoreDistribution import distribution
 from ax3l.activity.ExperimentHighscores import highscores
-from ax3l.activity.ExperimentStatus import experiment_status
-from ax3l.activity.ExperimentActivity import choice_activity, item_activity
 from ax3l.activity.GoldenConfigurations import parameter_change
 from ax3l.activity.SimulationBoard import board_svg
 from ax3l.activity.SimulationAnimation import SimulationAnimation
@@ -36,7 +32,6 @@ from ax3l.constants.DReportMgr import DReportMgr
 from ax3l.constants.DAx3l import DAx3l
 from ax3l.constants.DLabel import FIELD_TO_LABEL_MAP
 from ax3l.interface.SnakeLab import SnakeLab
-from ax3l.interface.Configuration import Configuration
 from ax3l.interface.Network import Network
 
 
@@ -44,7 +39,6 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
                 gif_duration_ms: int = DReportMgr.GIF_DURATION_MS) -> HTTPServer:
     if gif_duration_ms < 10:
         raise ValueError("GIF frame duration must be at least 10 ms")
-    decision_grace_seconds = Configuration().decision_grace_seconds
     gifs = SimulationGifStore(gif_directory, SimulationAnimation.VERSION, gif_duration_ms)
     background = ReportBackground(gifs, gif_duration_ms)
     background_lock = Lock()
@@ -159,58 +153,6 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
                     traceback.print_exc()
                     self.send_error(500, "Unable to load golden configurations")
                     return
-            elif re.fullmatch(
-                r"/analysis-images/[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}/(?:scores|distribution|loss)\.png",
-                self.path,
-            ):
-                _, _, run_id, filename = self.path.split("/")
-                section = filename[:-4]
-                try:
-                    db = DbMgr(initialize_event_tables=False)
-                    try:
-                        activity = item_activity(ExperimentDb(db).activity_events([run_id]))
-                        image_id = activity.get((run_id, section), {}).get("image_event_id")
-                        prompt = EventLogDb(db).get(image_id) if image_id is not None else None
-                    finally:
-                        db.close()
-                    if prompt is None:
-                        self.send_error(404, "Analysis image not available")
-                        return
-                    image = next(part for part in parts(json.loads(prompt["content"])) if part["type"] == "image")
-                    body = base64.b64decode(image["url"].split(",", 1)[1], validate=True)
-                    content_type = "image/png"
-                except Exception:
-                    traceback.print_exc()
-                    self.send_error(500, "Unable to load analysis image")
-                    return
-            elif urlsplit(self.path).path == "/experiment-status":
-                views = parse_qs(urlsplit(self.path).query, keep_blank_values=True).get("view", ["current"])
-                if len(views) != 1 or views[0] not in ("current", "completed"):
-                    self.send_error(400, "View must be current or completed")
-                    return
-                view = views[0]
-                try:
-                    db = DbMgr(initialize_event_tables=False)
-                    try:
-                        experiments = ExperimentDb(db)
-                        draft = experiments.draft() if view == "current" else experiments.last_completed_draft()
-                        comparison = experiments.comparison(draft.run_id) if draft and draft.run_id else None
-                        analysis = experiments.analysis(draft.run_id) if draft and draft.run_id else None
-                        activity = choice_activity(experiments.choice_events(draft.draft_id)) if draft else {}
-                    finally:
-                        db.close()
-                    snake = SnakeLab()
-                    run = snake.get_run_result(draft.run_id) if draft and draft.run_id else None
-                    golden = snake.get_run_result(draft.golden_run_id) if draft else None
-                    body = templates.get_template("experiment_status.html").render(
-                        view=view, **experiment_status(draft, run, golden, comparison, analysis, activity,
-                                                      decision_grace_seconds=decision_grace_seconds)
-                    ).encode("utf-8")
-                    content_type = "text/html; charset=utf-8"
-                except Exception:
-                    traceback.print_exc()
-                    self.send_error(500, "Unable to load experiment status")
-                    return
             elif urlsplit(self.path).path == "/simulation-metrics":
                 sizes = parse_qs(urlsplit(self.path).query, keep_blank_values=True).get(
                     "bucket_size", [str(DReportMgr.SIMULATION_BUCKET_SIZE)])
@@ -273,17 +215,11 @@ def make_server(host: str, port: int, gif_directory: Path = DReportMgr.GIF_DIREC
                     if run is None:
                         self.send_error(404, "Simulation not found")
                         return
-                    db = DbMgr(initialize_event_tables=False)
-                    try:
-                        analysis = ExperimentDb(db).analysis(run_id)
-                    finally:
-                        db.close()
                     body = templates.get_template("simulation_run.html").render(
                         run=run, board_gif_url=animation_url(run_id, run["id"]),
                         board_svg=board_svg(run.get("high_score_snapshot")),
                         config=snake.get_config(run_id),
                         diagnostics=snake.get_episode_diagnostics(run_id),
-                        analysis=analysis,
                     ).encode("utf-8")
                     content_type = "text/html; charset=utf-8"
                 except Exception:

@@ -48,9 +48,6 @@ class DEventCategory:
         CANCELLED = "simulation_cancelled"
         FAILED = "simulation_failed"
         RESTARTED = "simulation_restarted"
-        ANALYZED = "simulation_analyzed"
-        ANALYSIS_PROGRESS = "simulation_analysis_progress"
-        ANALYSIS_TASK = "simulation_analysis_task"
         LABELS = {
             SUBMITTED: "Simulation submitted",
             QUEUED: "Simulation queued",
@@ -59,41 +56,18 @@ class DEventCategory:
             CANCELLED: "Simulation cancelled",
             FAILED: "Simulation failed",
             RESTARTED: "Simulation restarted",
-            ANALYZED: "Simulation analyzed",
-            ANALYSIS_PROGRESS: "Analysis section saved",
-            ANALYSIS_TASK: "Image analysis task",
         }
         TERMINAL_EVENTS = {"completed": COMPLETED, "cancelled": CANCELLED, "failed": FAILED}
 
     class Configuration(EventCategory):
         CATEGORY = "Configuration"
         PROPOSAL_ACCEPTED = "proposal_accepted"
-        PROPOSAL_INVALID = "proposal_rejected_invalid"
-        PROPOSAL_DUPLICATE = "proposal_rejected_duplicate"
-        PARAMETER_SPACE_EXHAUSTED = "parameter_space_exhausted"
         COMPARED = "configuration_compared"
         GOLDEN_CREATED = "golden_config_created"
-        GOLDEN_REPLACED = "golden_config_replaced"
-        GOLDEN_RETAINED = "golden_config_retained"
-        SEED_ROTATION_STARTED = "seed_rotation_started"
-        GOLDEN_SEED_INCREMENTED = "golden_config_seed_incremented"
-        DRAFT_SAVED = "configuration_draft_saved"
-        CHART_STARTED = "choice_chart_started"
-        CHART_FINISHED = "choice_chart_finished"
         LABELS = {
             PROPOSAL_ACCEPTED: "Proposal accepted",
-            PROPOSAL_INVALID: "Invalid proposal",
-            PROPOSAL_DUPLICATE: "Duplicate proposal",
-            PARAMETER_SPACE_EXHAUSTED: "Parameter space exhausted",
             COMPARED: "Compared",
             GOLDEN_CREATED: "Golden created",
-            GOLDEN_REPLACED: "Golden replaced",
-            GOLDEN_RETAINED: "Golden retained",
-            SEED_ROTATION_STARTED: "Seed rotation started",
-            GOLDEN_SEED_INCREMENTED: "Golden seed incremented",
-            DRAFT_SAVED: "Configuration draft saved",
-            CHART_STARTED: "Choice chart started",
-            CHART_FINISHED: "Choice chart finished",
         }
 
     ALL = (Conversation, LLM, Tool, SnakeLab, Configuration)

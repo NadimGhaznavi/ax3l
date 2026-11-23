@@ -150,6 +150,9 @@ exec /usr/bin/systemd-analyze "$@"
                 for asset in (ROOT / 'ax3l/server/templates').glob('*.html'):
                     installed = self.app / 'ax3l/server/templates' / asset.name
                     self.assertEqual(installed.read_bytes(), asset.read_bytes(), str(asset))
+                for asset in (ROOT / 'ax3l/presentation/snakelab/prompts').glob('*.md'):
+                    installed = self.app / asset.relative_to(ROOT)
+                    self.assertEqual(installed.read_bytes(), asset.read_bytes(), str(asset))
                 smoke = subprocess.run([sys.executable, '-c', '''
 from pathlib import Path
 from jinja2 import Environment, FileSystemLoader

@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Introduce the initial prompt wording for the four-view experiment design.
+
+### Added
+
+- Add a shared welcome introducing Patrick Loeber's Snake Lab and Qwen's role
+  as the data scientist tuning the Snake AI to improve its high score.
+- Add Reward Signals, Architecture, Training, and Exploration prompts. Each asks
+  Qwen to evaluate the previous hypothesis and propose a new hypothesis, expected
+  effect, and parameter values. Include the five prompt assets in installations.
+
 ## [4.23.0] - 2026-11-23 @ 04:28
 
 ### Summary

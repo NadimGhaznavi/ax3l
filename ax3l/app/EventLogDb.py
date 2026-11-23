@@ -79,85 +79,14 @@ class EventLogDb:
             ORDER BY g.occurred_at DESC, g.event_id DESC
         """, (DEventCategory.Configuration.CATEGORY, DEventCategory.Configuration.GOLDEN_CREATED))
 
-    def latest_snakelab_proposal(self) -> dict[str, Any] | None:
-        """Recover the latest accepted run and its recorded comparison, if any."""
-        category = DEventCategory.Configuration
-        rows = self._db.query("""
-            SELECT p.process_id, c.event_id AS comparison_id, m.content AS comparison
-            FROM events p
-            LEFT JOIN events c ON c.event_id = (
-                SELECT MAX(event_id) FROM events
-                WHERE process_id = p.process_id AND category = %s AND name = %s
-            )
-            LEFT JOIN event_messages m ON m.event_id = c.event_id
-            WHERE p.category = %s AND p.name = %s
-              AND p.event_id > COALESCE((SELECT MAX(event_id) FROM events
-                  WHERE category = %s AND name = %s), 0)
-            ORDER BY p.event_id DESC LIMIT 1
-        """, (category.CATEGORY, category.COMPARED, category.CATEGORY, category.PROPOSAL_ACCEPTED,
-               category.CATEGORY, category.GOLDEN_SEED_INCREMENTED))
-        return rows[0] if rows else None
-
-    def stagnant_rounds(self) -> int:
-        """Count complete configuration comparisons since the latest golden."""
-        return self._completed_rounds(since_golden=True)
 
     def experiment_cycles(self) -> int:
         """Count compared complete configurations across seeds."""
-        return self._completed_rounds(since_golden=False)
-
-    def _completed_rounds(self, *, since_golden: bool) -> int:
         category = DEventCategory.Configuration
         return self._db.query("""
-            SELECT COUNT(DISTINCT c.process_id) AS rounds FROM events c
-            WHERE c.category = %s AND c.name = %s AND
-                (%s = 0 OR c.event_id > COALESCE((SELECT MAX(event_id) FROM events
-                    WHERE category = %s AND name = %s), 0))
-        """, (category.CATEGORY, category.COMPARED, int(since_golden),
-               category.CATEGORY, category.GOLDEN_CREATED))[0]["rounds"]
-
-    def pending_seed_rotation(self) -> dict[str, Any] | None:
-        category = DEventCategory.Configuration
-        rows = self._db.query("""
-            SELECT i.event_id, i.ax3l_version, m.content, s.event_id AS submitted_event_id, s.process_id AS run_id
-            FROM events i JOIN event_messages m ON m.event_id = i.event_id
-            LEFT JOIN events s ON s.parent_event_id = i.event_id AND s.name = %s AND s.category = %s
-            WHERE i.name = %s AND i.category = %s
-              AND JSON_EXTRACT(m.content, '$.draft_id') IS NULL
-              AND NOT EXISTS (SELECT 1 FROM events g WHERE g.parent_event_id = s.event_id
-                              AND g.name = %s AND g.category = %s)
-            ORDER BY i.event_id DESC LIMIT 1
-        """, (category.GOLDEN_SEED_INCREMENTED, category.CATEGORY,
-               category.SEED_ROTATION_STARTED, category.CATEGORY,
-               category.GOLDEN_CREATED, category.CATEGORY))
-        return rows[0] if rows else None
-
-    def seed_rotation(self, draft_id: str) -> dict[str, Any] | None:
-        """Recover a draft's seed baseline, including an already accepted result."""
-        category = DEventCategory.Configuration
-        rows = self._db.query("""
-            SELECT i.event_id, i.ax3l_version, m.content,
-                   s.event_id AS submitted_event_id, s.process_id AS run_id,
-                   g.event_id AS completed_event_id
-            FROM events i JOIN event_messages m ON m.event_id = i.event_id
-            LEFT JOIN events s ON s.parent_event_id = i.event_id AND s.name = %s AND s.category = %s
-            LEFT JOIN events g ON g.parent_event_id = s.event_id AND g.name = %s AND g.category = %s
-            WHERE i.name = %s AND i.category = %s AND i.process_id = %s
-            ORDER BY i.event_id DESC LIMIT 1
-        """, (category.GOLDEN_SEED_INCREMENTED, category.CATEGORY,
-               category.GOLDEN_CREATED, category.CATEGORY,
-               category.SEED_ROTATION_STARTED, category.CATEGORY, draft_id))
-        return rows[0] if rows else None
-
-    def latest_seed_baseline(self) -> str | None:
-        category = DEventCategory.Configuration
-        rows = self._db.query("""
-            SELECT g.process_id FROM events g JOIN events s ON g.parent_event_id = s.event_id
-            WHERE g.name = %s AND g.category = %s AND s.name = %s AND s.category = %s
-            ORDER BY g.event_id DESC LIMIT 1
-        """, (category.GOLDEN_CREATED, category.CATEGORY,
-               category.GOLDEN_SEED_INCREMENTED, category.CATEGORY))
-        return rows[0]["process_id"] if rows else None
+            SELECT COUNT(DISTINCT process_id) AS rounds FROM events
+            WHERE category = %s AND name = %s
+        """, (category.CATEGORY, category.COMPARED))[0]["rounds"]
 
     def experiment_highscores(self) -> list[dict[str, Any]]:
         """Read golden scores and completed same-seed ties in decision order."""

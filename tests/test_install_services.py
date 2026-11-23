@@ -136,62 +136,34 @@ exec /usr/bin/systemd-analyze "$@"
                 self.assertEqual(self.config.stat().st_mode & 0o777, 0o750)
                 self.assertEqual((self.app / '.venv/lib/package.py').stat().st_mode & 0o777, 0o640)
                 self.assertEqual((self.app / '.venv/bin/python').stat().st_mode & 0o777, 0o750)
-                for module in ('app/snakelab/tools/__main__.py', 'activity/SimulationAnimation.py',
+                for module in ('activity/SimulationAnimation.py',
                                'activity/fonts/DejaVuSansMono.ttf', 'activity/fonts/LICENSE.txt',
                                'interface/SimulationGifStore.py', 'interface/SimulationConfiguration.py',
-                               'activity/RunAnalysis.py', 'entities/ConfigurationDraft.py',
-                               'entities/SimulationAnalysis.py', 'app/snakelab/AnalyzeRun.py',
-                               'app/snakelab/ExperimentDb.py', 'app/snakelab/WipeExperimentWorkspace.py',
-                               'presentation/snakelab/guides/choose-snake-setting/SKILL.md',
-                               'app/snakelab/prompts/ConfigurationChoice.py',
-                               'entities/EpsilonNiceChoice.py',
-                               'app/snakelab/SubmitSimulationSummaryHandler.py',
-                               'app/snakelab/tools/SubmitSimulationSummary.py',
-                               'app/snakelab/SelectParameterHandler.py', 'app/snakelab/tools/SelectParameter.py',
-                               'app/snakelab/RunSimulationHandler.py', 'app/snakelab/tools/RunSimulation.py',
-                               'app/snakelab/RequestSeedChangeHandler.py', 'app/snakelab/tools/RequestSeedChange.py',
-                               'app/snakelab/prompts/ConfigurationNextStep.py',
-                               'app/snakelab/prompts/NoDupes.py',
-                               'interface/KnowledgeBase.py', 'interface/MarkdownTemplates.py',
-                               'activity/PresentationValues.py',
-                               'app/snakelab/PageBrowser.py', 'activity/ConfigurationEvidence.py',
-                               'presentation/snakelab/Templates.py', 'constants/DSimulationAnalysis.py',
-                               'constants/DScoreDistribution.py',
-                               'interface/SimulationData.py', 'activity/SimulationDataValues.py', 'presentation/snakelab/DataPages.py',
-                               'activity/ParameterRules.py', 'constants/DChoice.py',
-                               'app/snakelab/tools/ReadSimulationData.py',
-                               'presentation/snakelab/guides/index.md',
-                               'presentation/snakelab/guides/analysis/index.md',
-                               'presentation/snakelab/guides/analysis/scores.md',
-                               'presentation/snakelab/guides/analysis/distribution.md',
-                               'presentation/snakelab/guides/analysis/loss.md',
-                               'app/snakelab/prompts/FirstContactEpsilonNicePair.py',
-                               'app/snakelab/prompts/ComparisonEpsilonNicePair.py', 'app/ReportBackground.py'):
+                               'activity/RunAnalysis.py', 'constants/DScoreDistribution.py',
+                               'activity/PresentationValues.py', 'app/ReportBackground.py'):
                     self.assertTrue((self.app / 'ax3l' / module).is_file(), module)
                 reporting = (self.units / 'reporting-server.service').read_text()
                 self.assertIn(f'--gif-dir {self.app}/games', reporting)
                 self.assertIn('--port 28870', reporting)
                 self.assertIn(f'ReadWritePaths={self.app}/games', reporting)
                 self.assertTrue((self.app / 'games').is_dir())
-                for asset in (ROOT / 'ax3l/presentation/snakelab').rglob('*'):
-                    if asset.is_file() and asset.suffix in ('.md', '.jinja'):
-                        installed = self.app / 'ax3l/presentation/snakelab' / asset.relative_to(ROOT / 'ax3l/presentation/snakelab')
-                        self.assertEqual(installed.read_bytes(), asset.read_bytes(), str(asset))
+                for asset in (ROOT / 'ax3l/server/templates').glob('*.html'):
+                    installed = self.app / 'ax3l/server/templates' / asset.name
+                    self.assertEqual(installed.read_bytes(), asset.read_bytes(), str(asset))
                 smoke = subprocess.run([sys.executable, '-c', '''
-from ax3l.interface.KnowledgeBase import KnowledgeBase
+from pathlib import Path
+from jinja2 import Environment, FileSystemLoader
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
-from ax3l.presentation.snakelab.DataPages import config_page
-assert '24-value feature vector' in KnowledgeBase().read('/guides/model')
-assert '"hidden_size":64' in config_page('draft', 'model', SimulationConfiguration.defaults())
+from ax3l.server.Ax3lServer import main
+assert SimulationConfiguration.defaults()['model']['hidden_size'] == 64
+templates = Environment(loader=FileSystemLoader(Path('ax3l/server/templates')))
+assert templates.get_template('events.html')
 '''], cwd=self.app, env=dict(os.environ, PYTHONPATH=str(self.app), PYTHONDONTWRITEBYTECODE='1'),
                     capture_output=True, text=True, timeout=10)
                 self.assertEqual(smoke.returncode, 0, smoke.stderr)
                 application = (self.units / 'ax3l-server.service').read_text()
                 self.assertIn('--zmq-endpoint tcp://127.0.0.1:61970', application)
-                self.assertIn('--output /var/lib/ax3l/snakelab', application)
-                self.assertIn('RuntimeDirectory=ax3l', application)
-                self.assertIn('Environment=XDG_CONFIG_HOME=/run/ax3l/chrome-config', application)
-                self.assertIn('Environment=XDG_CACHE_HOME=/run/ax3l/chrome-cache', application)
+                self.assertNotIn('--output', application)
                 calls = self.log.read_text()
                 self.assertLess(calls.index('verify'), calls.index('systemctl stop'))
                 self.assertNotIn('llamasrv', calls)

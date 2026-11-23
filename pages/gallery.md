@@ -4,7 +4,7 @@ author_profile: true
 layout: single
 ---
 
-Screenshots of the reporting dashboard, simulation results, and the prompts and responses used to choose simulation parameters. Select an image to view it at full size.
+Screenshots of the reporting dashboard and simulation results. Select an image to view it at full size.
 
 ## Reporting dashboard
 
@@ -17,24 +17,6 @@ The current experiment, high-score board, report links, and event log.
 The game, model, and training settings used for a simulation run.
 
 [![Simulation configuration with parameter names and values]({{ '/pages/images/config.png' | relative_url }})]({{ '/pages/images/config.png' | relative_url }})
-
-## Parameter history prompt
-
-The current golden configuration and comparable results supplied to the LLM before it selects a new parameter value.
-
-[![Comparison prompt containing batch-size results and the current golden score]({{ '/pages/images/parm-history-prompt.png' | relative_url }})]({{ '/pages/images/parm-history-prompt.png' | relative_url }})
-
-## Parameter selection prompt
-
-The instruction to choose an untested batch size and submit it through a tool call.
-
-[![Parameter selection prompt asking the LLM to choose an untested batch size]({{ '/pages/images/parm-prompt.png' | relative_url }})]({{ '/pages/images/parm-prompt.png' | relative_url }})
-
-## LLM response
-
-The recorded reply, including the selected value, reasoning, tool call, token usage, and timings.
-
-[![Complete LLM response selecting a batch size of 58]({{ '/pages/images/llm-response.png' | relative_url }})]({{ '/pages/images/llm-response.png' | relative_url }})
 
 ## Completed simulation
 

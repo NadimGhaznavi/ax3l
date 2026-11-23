@@ -1,13 +1,9 @@
 """Compare Nice pairs without mixing other architectures or exploration schedules."""
 
-import json
 import unittest
 from unittest.mock import Mock, patch
 
-from ax3l.app.snakelab.GenerateDefaultConfig import GenerateDefaultConfig
 from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb
-from ax3l.app.snakelab.prompts.ComparisonEpsilonNicePair import ComparisonEpsilonNicePair
-from ax3l.app.snakelab.prompts.FirstContactEpsilonNicePair import FirstContactEpsilonNicePair
 from ax3l.interface.SnakeLab import SnakeLab
 
 
@@ -28,20 +24,6 @@ class EpsilonNiceComparisonTests(unittest.TestCase):
             self.assertNotIn(f'c.{column} = g.{column}', sql)
         self.assertEqual(parameters, ('gold',))
 
-    def test_prompts_explain_the_golden_schedule_and_joint_tuning(self):
-        config = GenerateDefaultConfig().run()
-        with patch('ax3l.app.snakelab.prompts.ComparisonEpsilonNicePair.SnakeLab') as snake:
-            snake.return_value.get_run_result.return_value = dict(config=config, high_score=4)
-            snake.return_value.get_epsilon_nice_report.return_value = []
-            prompt = ComparisonEpsilonNicePair('gold')
-            report = json.loads(prompt.to_md().split('```json\n')[1].split('```')[0])
-            self.assertEqual(report['epsilon'], config['epsilon'])
-            self.assertEqual(report['gold'], dict(probability=.005, steps=20, high_score=4))
-        instructions = FirstContactEpsilonNicePair().to_md()
-        for text in ('probability', 'steps', 'positive', '750-episode', 'next move'):
-            self.assertIn(text, instructions)
-        self.assertIn('value_1 = start chance: number; above 0; at most 0.1.', instructions)
-        self.assertIn('value_2 = moves per detour: whole number; at least 1; at most 50.', instructions)
 
     def test_interface_closes_connection_on_success_and_failure(self):
         run = 'f6e72cb3-9bcf-4669-b368-a17c656bad79'

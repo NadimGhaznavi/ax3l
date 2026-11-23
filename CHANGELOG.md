@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Remove the existing conversation workflows so the next flow starts from a
+clean application foundation. Performed extensive analysis on the experiment
+goals and conversation design.
+
+### Removed
+
+- Remove current and legacy conversation loops, prompts, MCP tools, handlers,
+  model-facing pages and guides, and conversation design notes and screenshots.
+- Remove draft selection, decision timers, seed rotation, round-robin recovery,
+  saved analysis workflows, and the experiment-workspace reset helper.
+- Remove the flow-specific Experiment Status report and analysis-image routes.
+  Retain event reports, simulation details, score charts, and shared interfaces.
+- Remove the MCP dependency, conversation capture settings, decision-grace
+  configuration, and optimization command-line options.
+
+### Changed
+
+- Keep the Ax3l ZeroMQ service running without starting conversations or
+  submitting simulations. Domain requests return an unknown-method error until
+  a replacement workflow is installed.
+- Update installation assets, service arguments, tests, and documentation for
+  a fresh uninstall/install reset.
+
 ## [4.22.0] - 2026-11-22 @ 15:09
 
 ### Summary

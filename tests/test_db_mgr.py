@@ -164,44 +164,6 @@ class DbMgrTests(unittest.TestCase):
                 self.db.execute("INSERT INTO event_key_values VALUES (%s, %s, %s)", (event_id, "model", "duplicate"))
         self.assertEqual(self.db.query("SELECT * FROM events WHERE process_id = %s", (self.process_id,)), [])
 
-    def test_latest_proposal_recovers_pending_run_and_comparison(self):
-        import json
-        from ax3l.app.EventLogDb import EventLogDb
-        self.db.log('proposal_accepted', 'Configuration', 'INFO', 'learning_rate: .003', process_id=self.process_id)
-        dal = EventLogDb(self.db)
-        self.assertEqual(dal.latest_snakelab_proposal(), {
-            'process_id': self.process_id, 'comparison_id': None, 'comparison': None})
-        snapshot = json.dumps({'golden_run_id': 'gold', 'latest_run_id': self.process_id,
-                               'current_golden_run_id': self.process_id, 'reason': 'High score: 11 > 10'})
-        event_id = self.db.log('configuration_compared', 'Configuration', 'INFO', snapshot, process_id=self.process_id)
-        self.db.log('proposal_accepted', 'Other', 'INFO', 'unrelated', process_id=self.process_id)
-        self.assertEqual(dal.latest_snakelab_proposal(), {
-            'process_id': self.process_id, 'comparison_id': event_id, 'comparison': snapshot})
-
-    def test_stagnation_reset_and_rotation_recovery_queries(self):
-        import json
-        from ax3l.app.EventLogDb import EventLogDb
-        dal = EventLogDb(self.db)
-        def log(name, content='test', parent=None):
-            return self.db.log(name, 'Configuration', 'INFO', content,
-                               process_id=self.process_id, parent_event_id=parent)
-        log('golden_config_created')
-        self.assertEqual(dal.stagnant_rounds(), 0)
-        log('configuration_compared')
-        log('configuration_compared')
-        self.assertEqual(dal.stagnant_rounds(), 1)  # One complete configuration; repeated events count once.
-        log('golden_config_created')
-        self.assertEqual(dal.stagnant_rounds(), 0)
-        log('proposal_accepted')
-        intent = log('seed_rotation_started', json.dumps({'config': {'seed': 2}}))
-        self.assertEqual(dal.pending_seed_rotation()['event_id'], intent)
-        submitted = log('golden_config_seed_incremented', parent=intent)
-        self.assertEqual(dal.pending_seed_rotation()['run_id'], self.process_id)
-        self.assertIsNone(dal.latest_snakelab_proposal())
-        log('golden_config_created', parent=submitted)
-        self.assertIsNone(dal.pending_seed_rotation())
-        self.assertEqual(dal.latest_seed_baseline(), self.process_id)
-
 
 if __name__ == "__main__":
     unittest.main()

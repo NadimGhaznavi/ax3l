@@ -1,4 +1,4 @@
-"""Resolve Ax3l listeners, its LlamaSrv dependency, and decision timing."""
+"""Resolve Ax3l listeners and its LlamaSrv dependency."""
 
 from ipaddress import IPv4Address
 import json
@@ -13,7 +13,6 @@ class Configuration:
         self.path = path if path is not None else Path(DAx3l.BASE_DIR) / DAx3l.CONFIG_FILE
         self.network = {use: (interface, port) for use, interface, port in DAx3l.CMDB_NETWORK}
         self.llamasrv_url = DAx3l.LLAMASRV_URL
-        self.decision_grace_seconds = DAx3l.DECISION_GRACE_SECONDS
         try:
             text = self.path.read_text()
         except FileNotFoundError:
@@ -22,13 +21,9 @@ class Configuration:
             values = json.loads(text)
         except json.JSONDecodeError as error:
             raise ValueError(f'{self.path}: invalid JSON: {error}') from error
-        if not isinstance(values, dict) or values.keys() - {'network', 'llamasrv_url', 'decision_grace_seconds'}:
-            raise ValueError(f'{self.path}: expected an object containing network, llamasrv_url, '
-                             'and/or decision_grace_seconds settings.')
+        if not isinstance(values, dict) or values.keys() - {'network', 'llamasrv_url'}:
+            raise ValueError(f'{self.path}: expected an object containing network and/or llamasrv_url settings.')
         self.llamasrv_url = self.validate_llamasrv_url(values.get('llamasrv_url', self.llamasrv_url))
-        self.decision_grace_seconds = values.get('decision_grace_seconds', self.decision_grace_seconds)
-        if type(self.decision_grace_seconds) is not int or self.decision_grace_seconds <= 0:
-            raise ValueError(f'{self.path}: decision_grace_seconds: expected a positive integer.')
         network = values.get('network', {})
         if not isinstance(network, dict):
             raise ValueError(f'{self.path}: network must be an object.')
@@ -77,7 +72,6 @@ class Configuration:
             'network': {use: {'interface': interface, 'port': port}
                         for use, (interface, port) in configuration.network.items()},
             'llamasrv_url': configuration.llamasrv_url,
-            'decision_grace_seconds': configuration.decision_grace_seconds,
         }
         try:
             stream = path.open('x')

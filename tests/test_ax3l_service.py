@@ -1,6 +1,5 @@
-"""Exercise the service entry point with MariaDB and a local LLM fixture."""
+"""Exercise the idle service without MariaDB, inference, or SnakeLab."""
 
-from http.server import BaseHTTPRequestHandler, HTTPServer
 import os
 from pathlib import Path
 import re
@@ -8,92 +7,46 @@ import signal
 import subprocess
 import sys
 import tempfile
-from threading import Thread
 import time
 import unittest
 
+from ax3l.zmq.ZMQClient import ZMQClient
+from ax3l.zmq.ZMQMsg import ZMQMsg
 
-@unittest.skipUnless(os.environ.get("AX3L_TEST_DB") == "1", "requires disposable MariaDB test database")
+
 class Ax3lServiceTests(unittest.TestCase):
-    def test_graceful_stop_during_first_iteration(self):
-        self.assertEqual(os.environ["DB_NAME"], "ax3l_test")
-        from ax3l.app.DbMgr import DbMgr
-
-        class LLMHandler(BaseHTTPRequestHandler):
-            def do_POST(self):
-                self.rfile.read(int(self.headers["Content-Length"]))
-                time.sleep(2)
-                body = b'{"choices":[{"message":{"content":"Test response"}}]}'
-                self.send_response(200)
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
+    def test_retired_actions_are_rejected_and_service_stops_cleanly(self):
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder) / 'service.log'
+            with output.open('w') as console:
+                process = subprocess.Popen([
+                    sys.executable, '-c',
+                    'from unittest.mock import patch; '
+                    'from ax3l.server.Ax3lServer import main; '
+                    'patch("ax3l.server.Ax3lServer.DbMgr").start(); '
+                    'raise SystemExit(main())',
+                    '--zmq-endpoint', 'tcp://127.0.0.1:*',
+                ], stdout=console, stderr=console,
+                    env={key: value for key, value in os.environ.items() if not key.startswith('DB_')})
                 try:
-                    self.wfile.write(body)
-                except BrokenPipeError:
-                    pass
-
-            def log_message(self, *args):
-                pass
-
-        llm = HTTPServer(("127.0.0.1", 0), LLMHandler)
-        worker = Thread(target=llm.serve_forever, daemon=True)
-        worker.start()
-        db = DbMgr()
-        process_id = None
-        try:
-            with tempfile.TemporaryDirectory() as folder:
-                output = Path(folder)
-                with (output / "service.log").open("w+") as console:
-                    process = subprocess.Popen([
-                        sys.executable, "-c",
-                        "from unittest.mock import patch; "
-                        "from importlib import import_module; "
-                        "from ax3l.server.Ax3lServer import main; "
-                        "from ax3l.app.Prompt import Prompt; "
-                        "from ax3l.app.snakelab.GenerateDefaultConfig import GenerateDefaultConfig; "
-                        "golden = Prompt('Golden configuration'); "
-                        "golden.run_id = 'f6e72cb3-9bcf-4669-b368-a17c656bad79'; "
-                        "patch('ax3l.interface.SnakeLab.SnakeLab.is_simulation_running', return_value=False).start(); "
-                        "patch('ax3l.app.EventLogDb.EventLogDb.pending_seed_rotation', return_value=None).start(); "
-                        "patch('ax3l.app.EventLogDb.EventLogDb.stagnant_rounds', return_value=0).start(); "
-                        "patch('ax3l.app.EventLogDb.EventLogDb.current_golden_config', return_value={'process_id': golden.run_id}).start(); "
-                        "patch('ax3l.interface.SnakeLab.SnakeLab.get_run_result', return_value={'status': 'completed', 'high_score': 10, 'config': GenerateDefaultConfig().run()}).start(); "
-                        "patch('ax3l.interface.SnakeLab.SnakeLab.get_latest_completed_run_id', return_value=golden.run_id).start(); "
-                        "patch('ax3l.interface.SnakeLab.SnakeLab.get_all_time_best_run_id', return_value=golden.run_id).start(); "
-                        "patch('ax3l.interface.SnakeLab.SnakeLab.get_analysis_episodes', return_value=[]).start(); "
-                        "patch('ax3l.app.snakelab.SnakeLabLoop.render_analysis', return_value=b'png').start(); "
-                        "patch('ax3l.interface.SnakeLab.SnakeLab.get_num_sims', return_value=1).start(); "
-                        "raise SystemExit(main())",
-                        "--zmq-endpoint", "tcp://127.0.0.1:*",
-                        "--llm-url", f"http://127.0.0.1:{llm.server_port}",
-                        "--output", str(output / "snakelab"),
-                    ], stdout=console, stderr=console)
-                    try:
-                        deadline = time.monotonic() + 15
-                        while time.monotonic() < deadline:
-                            match = re.search(r"Conversation: ([\w-]+)", (output / "service.log").read_text())
-                            if match:
-                                process_id = match[1]
-                                rows = db.query("SELECT name FROM events WHERE process_id = %s ORDER BY event_id", (process_id,))
-                                if any(row["name"] == "prompt_sent" for row in rows):
-                                    break
-                            self.assertIsNone(process.poll(), (output / "service.log").read_text())
-                            time.sleep(0.05)
-                        else:
-                            self.fail(f"Service did not log its first prompts\n{(output / 'service.log').read_text()}")
-                        self.assertFalse((output / "snakelab").exists())
-                        process.send_signal(signal.SIGINT)
-                        self.assertEqual(process.wait(timeout=5), 130)
-                        rows = db.query("SELECT name, log_level FROM events WHERE process_id = %s ORDER BY event_id", (process_id,))
-                        self.assertEqual(rows[-1], {"name": "conversation_ended", "log_level": "INFO"})
-                    finally:
-                        if process.poll() is None:
-                            process.kill()
-                            process.wait()
-        finally:
-            if process_id:
-                db.execute("DELETE FROM events WHERE process_id = %s ORDER BY event_id DESC", (process_id,))
-            db.close()
-            llm.shutdown()
-            worker.join()
-            llm.server_close()
+                    deadline = time.monotonic() + 10
+                    while time.monotonic() < deadline:
+                        match = re.search(r'Ax3l listening on (tcp://[^;]+);', output.read_text())
+                        if match:
+                            break
+                        self.assertIsNone(process.poll(), output.read_text())
+                        time.sleep(.02)
+                    else:
+                        self.fail('Service did not start: ' + output.read_text())
+                    client = ZMQClient(match[1], timeout=1)
+                    for method in ('select_parameter', 'submit_single_value', 'submit_pair_values',
+                                   'run_simulation', 'request_seed_change', 'submit_simulation_summary',
+                                   'read_simulation_data', 'read_analysis_data'):
+                        response = client.request(ZMQMsg('test', method, 'snakelab', {}))
+                        self.assertEqual(response.payload['error']['code'], 'unknown_method')
+                    process.send_signal(signal.SIGINT)
+                    self.assertEqual(process.wait(timeout=5), 130, output.read_text())
+                finally:
+                    if process.poll() is None:
+                        process.kill()
+                        process.wait()

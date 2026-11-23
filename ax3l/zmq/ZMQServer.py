@@ -16,6 +16,7 @@ class ZMQServer:
         self._handler = handler
         self._ready = Event()
         self._stop = Event()
+        self._finished = Event()
         self._error: BaseException | None = None
         self._thread = Thread(target=self._serve, name="ax3l-zmq", daemon=True)
 
@@ -30,6 +31,12 @@ class ZMQServer:
     def __exit__(self, *_):
         self._stop.set()
         self._thread.join()
+        if self._error is not None:
+            raise self._error
+
+    def serve_forever(self) -> None:
+        """Wait for the listener to stop, propagating transport failures."""
+        self._finished.wait()
         if self._error is not None:
             raise self._error
 
@@ -72,3 +79,4 @@ class ZMQServer:
             self._error = error
         finally:
             self._ready.set()
+            self._finished.set()

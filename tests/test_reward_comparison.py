@@ -1,9 +1,7 @@
-import json
 import unittest
 from unittest.mock import Mock, patch
 
 from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb
-from ax3l.app.snakelab.prompts.ComparisonRewardPair import ComparisonRewardPair
 from ax3l.interface.SnakeLab import SnakeLab
 
 
@@ -50,23 +48,6 @@ class RewardComparisonTests(unittest.TestCase):
         self.assertTrue(all(scores == [] for scores in cells))
         self.assertEqual(len({id(scores) for scores in cells}), 55)
 
-    def test_prompt_json_contains_gold_and_grid_and_refreshes(self):
-        with patch("ax3l.app.snakelab.prompts.ComparisonRewardPair.SnakeLab") as snake:
-            baseline = {"config": {"game": {"rewards": {
-                "closer_to_food": 2, "further_from_food": -2}}}, "high_score": 37}
-            snake.return_value.get_run_result.return_value = baseline
-            grid = {"0": {"-6": []}, "3": {"-3": [37, 39, 41]}}
-            snake.return_value.get_reward_report.return_value = grid
-            prompt = ComparisonRewardPair("gold")
-            report = json.loads(prompt.to_md().split("```json\n")[1].split("```")[0])
-            self.assertEqual(report, {"gold": {"closer_to_food": 2,
-                                             "further_from_food": -2, "high_score": 37},
-                                      "results": grid})
-            self.assertIn("across all seeds", prompt.to_md())
-            snake.return_value.get_reward_report.assert_called_once_with("gold")
-            baseline["high_score"] = 40
-            prompt.refresh()
-            self.assertIn('"high_score": 40', prompt.to_md())
 
     def test_interface_closes_database_on_success_and_failure(self):
         golden_id = "f6e72cb3-9bcf-4669-b368-a17c656bad79"

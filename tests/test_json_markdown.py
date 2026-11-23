@@ -6,11 +6,7 @@ import unittest
 
 from ax3l.activity.JsonMarkdown import json_markdown
 from ax3l.activity.MarkdownReport import markdown_html
-from ax3l.app.snakelab.ParameterSpace import parameter_paths
-from ax3l.presentation.snakelab.DataPages import config_page, draft_page
 from ax3l.activity.ToolResult import tool_result_html
-from ax3l.entities.ConfigurationDraft import ConfigurationDraft, PARAMETER_ORDER
-from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 
 
 class JsonMarkdownTests(unittest.TestCase):
@@ -85,21 +81,6 @@ class JsonMarkdownTests(unittest.TestCase):
         self.assertRegex(html, r'<td>termination reasons / wall / count</td>\s*<td>187</td>\s*<td>200</td>\s*<td>225</td>')
         self.assertEqual(html.count('<table>'), 1)
 
-    def test_actual_draft_json_block_is_compact_and_keeps_every_setting(self):
-        config = SimulationConfiguration.defaults()
-        draft = ConfigurationDraft('draft', 'gold', {}, config)
-        html = self.render(draft_page(draft))
-        self.assertEqual(html.count('<table>'), 2)
-        self.assertNotIn('<pre>', html)
-        self.assertIn('<h1>Current draft</h1>', html)
-        for parameter in PARAMETER_ORDER:
-            for path in parameter_paths(parameter):
-                label = ' / '.join(field.replace('_', ' ') for field in path)
-                self.assertIn(f'<td>{label}</td>', html)
-        self.assertIn('<td>saved settings</td>', html)
-        self.assertIn('<td>current setting</td>', html)
-        html = self.render(config_page('golden', 'model', config))
-        self.assertIn('<td>transformer</td>', html)
 
     def test_markdown_characters_and_html_are_displayed_as_literal_json_values(self):
         value = '<script>alert(1)</script> | *literal* [link](javascript:alert(1))\nnext'

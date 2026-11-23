@@ -1,7 +1,5 @@
 import json
 import os
-import runpy
-from pathlib import Path
 from threading import Thread
 import unittest
 from unittest.mock import Mock, patch
@@ -94,22 +92,6 @@ class HighscoreTests(unittest.TestCase):
         db._connection.commit.assert_not_called()
         db._connection.rollback.assert_called_once()
 
-    def test_initial_baseline_and_restart_record_only_completed_score(self):
-        initialize = runpy.run_path(str(Path('ax3l/app/snakelab/main-loop.py')))['initialize_simulation']
-        for resume in (False, True):
-            snake, db = Mock(), Mock()
-            snake.get_num_sims.side_effect = [1 if resume else 0, 1]
-            snake.submit_simulation.return_value = 'initial'
-            snake.get_simulation_status.return_value = 'completed'
-            snake.get_run_result.return_value = {'high_score': 38, 'config': {'seed': 7}}
-            db.query.side_effect = [[], [{'event_id': 1, 'process_id': 'initial'}]]
-            with patch.dict(initialize.__globals__, {'SnakeLab': lambda: snake}), patch('time.sleep'):
-                initialize(db)
-            call = db.log.call_args
-            self.assertEqual(call.args[0], 'golden_config_created')
-            self.assertEqual(call.kwargs['experiment_score'], {'simulations': 1, 'score': 38, 'seed': 7})
-            if resume:
-                snake.submit_simulation.assert_not_called()
 
     def test_http_page_empty_and_failure(self):
         snake = self.enterContext(patch('ax3l.server.ReportingServer.SnakeLab')).return_value

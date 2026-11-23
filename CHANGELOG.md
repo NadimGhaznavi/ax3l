@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.23.0] - 2026-11-23 @ 04:28
+
 ### Summary
 
 Remove the existing conversation workflows so the next flow starts from a

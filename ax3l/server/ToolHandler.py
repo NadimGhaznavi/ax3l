@@ -1,4 +1,4 @@
-"""Reject domain requests while no conversation workflow is installed."""
+"""Reject unregistered external domain requests."""
 
 from ax3l.zmq.ZMQMsg import ZMQMsg
 

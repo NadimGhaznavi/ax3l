@@ -18,9 +18,11 @@ module name without its package or `.py` suffix. The prompt detail heading
 and browser title include the recorded source, for example
 `Prompt (ExamplePrompt): #123`.
 
-The event catalog and rendering infrastructure remain available while the
-replacement conversation workflow is designed. Retired draft, chart-task,
-validation, and seed-rotation event definitions have been removed.
+The four-view loop uses the shared conversation, inference, tool, simulation,
+and comparison events. `view_experiment_state_saved` records a durable snapshot
+of the shuffled view order, proposals, and simulation progress. A view name is
+stored as the prompt's source and parameter metadata. Native `submit_view` calls
+and their validated results use the Tool category.
 
 | Event | Category |
 | --- | --- |
@@ -40,6 +42,7 @@ validation, and seed-rotation event definitions have been removed.
 | `simulation_cancelled` | SnakeLab |
 | `simulation_failed` | SnakeLab |
 | `simulation_restarted` | SnakeLab |
+| `view_experiment_state_saved` | Configuration |
 | `proposal_accepted` | Configuration |
 | `configuration_compared` | Configuration |
 | `golden_config_created` | Configuration |

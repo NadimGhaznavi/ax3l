@@ -14,10 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Separate simulation evaluation from configuration tuning, with four result
 conversations followed by four configuration conversations. Keep presentation
 modules and prompts directly under `ax3l/presentation/`, and remove the unused
-default-configuration wrapper.
+default-configuration wrapper. Begin separate application documentation with
+a draft Use Case View.
 
 ### Added
 
+- Add a standalone documentation entry point and four initial use cases under
+  `docs/`, with actors and a Mermaid overview. Keep the existing Pages content,
+  navigation, and publishing configuration unchanged.
 - Add four evaluation prompt skeletons with a labeled comparison-image placeholder
   and a dedicated Observations submission. Real comparison charts remain to be built.
 - Checkpoint each view's Observations and feed them into that view's next tuning

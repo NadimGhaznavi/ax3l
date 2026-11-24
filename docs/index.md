@@ -3,9 +3,9 @@
 Ax3l explores whether a locally hosted language model can improve a Snake AI's
 performance by proposing simulation settings and learning from the results.
 
-These documents describe the application through four connected views. They
-start from the application's goals and lead toward the design and its
-implementation.
+These documents capture the application's current behavior through four
+connected views. They start from actors' goals and explain the responsibilities,
+design, and code that realize those goals.
 
 | View | Purpose | Status |
 | --- | --- | --- |
@@ -14,9 +14,11 @@ implementation.
 | Design View | Software structure, interfaces, and mechanisms | To be developed |
 | Implementation View | Source organization and realization of the design | To be developed through refactoring |
 
-The initial use cases describe current behavior for discussion. They establish
-the starting point for the later views; proposed behavior changes will be
-identified explicitly.
+We begin with [Deploy Ax3l software](use-case/uc-01-deploy-ax3l-software.md).
+Each view is checked against the actual code. We will develop the related
+analysis and design, then refactor the implementation while preserving its
+observable behavior. Any proposed behavior changes will be identified
+explicitly.
 
 This documentation has its own entry point and navigation. The existing public
 site remains separate. Markdown links connect the documents, and Mermaid

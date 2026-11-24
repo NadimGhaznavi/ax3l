@@ -6,7 +6,7 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from ax3l.constants.DViewConversation import DViewConversation
 from ax3l.entities.ExperimentView import ExperimentView
-from ax3l.presentation.snakelab.ComparisonImage import comparison_image
+from ax3l.presentation.ComparisonImage import comparison_image
 
 
 class ViewPrompts:
@@ -17,8 +17,8 @@ class ViewPrompts:
         )
 
     def render(self, view: ExperimentView, context: dict) -> str:
-        prompt = self._templates.get_template(f"{view.name}.md").render(**context)
-        submission = self._templates.get_template("proposal-submission.md").render(
+        prompt = self._templates.get_template(f"selections/{view.name}.md").render(**context)
+        submission = self._templates.get_template("selections/proposal-submission.md").render(
             hypothesis_max_length=DViewConversation.HYPOTHESIS_MAX_LENGTH,
         )
         return prompt + "\n\n" + submission

@@ -22,7 +22,7 @@ from ax3l.interface.LLM import LLM
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 from ax3l.interface.SnakeLab import SnakeLab
 from ax3l.interface.ViewConversation import ViewConversation
-from ax3l.presentation.snakelab.ViewPrompts import ViewPrompts
+from ax3l.presentation.ViewPrompts import ViewPrompts
 
 
 class ExperimentLoop:

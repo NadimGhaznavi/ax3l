@@ -12,7 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Summary
 
 Separate simulation evaluation from configuration tuning, with four result
-conversations followed by four configuration conversations.
+conversations followed by four configuration conversations. Keep presentation
+modules and prompts directly under `ax3l/presentation/`.
 
 ### Added
 
@@ -26,6 +27,9 @@ conversations followed by four configuration conversations.
 
 ### Changed
 
+- Flatten the presentation package by removing its SnakeLab subdirectory. Keep
+  prompt templates in `prompts/evaluations/` and `prompts/selections/`, and update
+  module imports, template loading, and installation paths.
 - Finish all four evaluations before starting the next configuration pass. Evaluate
   the initial baseline too, and include final result evaluations in bounded runs.
 - Match Architecture, Exploration, and Training prompt structure to the updated

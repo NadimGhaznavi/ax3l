@@ -64,10 +64,12 @@ class DEventCategory:
         PROPOSAL_ACCEPTED = "proposal_accepted"
         COMPARED = "configuration_compared"
         GOLDEN_CREATED = "golden_config_created"
+        STATE_SAVED = "view_experiment_state_saved"
         LABELS = {
             PROPOSAL_ACCEPTED: "Proposal accepted",
             COMPARED: "Compared",
             GOLDEN_CREATED: "Golden created",
+            STATE_SAVED: "View experiment saved",
         }
 
     ALL = (Conversation, LLM, Tool, SnakeLab, Configuration)

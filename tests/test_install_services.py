@@ -140,7 +140,11 @@ exec /usr/bin/systemd-analyze "$@"
                                'activity/fonts/DejaVuSansMono.ttf', 'activity/fonts/LICENSE.txt',
                                'interface/SimulationGifStore.py', 'interface/SimulationConfiguration.py',
                                'activity/RunAnalysis.py', 'constants/DScoreDistribution.py',
-                               'activity/PresentationValues.py', 'app/ReportBackground.py'):
+                               'activity/PresentationValues.py', 'app/ReportBackground.py',
+                               'app/snakelab/ExperimentLoop.py', 'app/snakelab/ExperimentDb.py',
+                               'interface/ViewConversation.py', 'entities/ExperimentState.py',
+                               'entities/ExperimentView.py', 'entities/ViewProposal.py',
+                               'presentation/snakelab/ViewPrompts.py'):
                     self.assertTrue((self.app / 'ax3l' / module).is_file(), module)
                 reporting = (self.units / 'reporting-server.service').read_text()
                 self.assertIn(f'--gif-dir {self.app}/games', reporting)

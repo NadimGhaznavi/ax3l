@@ -13,7 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Separate simulation evaluation from configuration tuning, with four result
 conversations followed by four configuration conversations. Keep presentation
-modules and prompts directly under `ax3l/presentation/`.
+modules and prompts directly under `ax3l/presentation/`, and remove the unused
+default-configuration wrapper.
 
 ### Added
 
@@ -37,6 +38,11 @@ modules and prompts directly under `ax3l/presentation/`.
   shared submission instructions when rendering tuning prompts.
 - Submit only a hypothesis and parameter values in tuning conversations; include
   the expected observable effect in the short hypothesis.
+
+### Removed
+
+- Remove the test-only `GenerateDefaultConfig` wrapper; tests now call
+  `SimulationConfiguration.defaults()` directly.
 
 ## [4.23.2] - 2026-11-24 @ 04:35
 

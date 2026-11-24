@@ -5,7 +5,7 @@ from fractions import Fraction
 from unittest.mock import Mock
 
 from ax3l.app.snakelab.ParameterSpace import finite_choices, finite_values
-from ax3l.app.snakelab.GenerateDefaultConfig import GenerateDefaultConfig
+from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb, CONFIGURATION_FIELDS, _config_values
 
 
@@ -36,7 +36,7 @@ class ParameterSpaceTests(unittest.TestCase):
         db = Mock()
         parameters = ['learning_rate', 'gamma', 'epsilon_pair', 'epsilon_nice_pair', 'seed',
                       'food', 'empty', 'snake', 'wall']
-        self.assertEqual(SnakeLabDb(db).available_parameters(GenerateDefaultConfig().run(), parameters), parameters)
+        self.assertEqual(SnakeLabDb(db).available_parameters(SimulationConfiguration.defaults(), parameters), parameters)
         db.query.assert_not_called()
 
 
@@ -49,7 +49,7 @@ class ExhaustionDbTests(unittest.TestCase):
         self.connection.execute(f'CREATE TABLE configurations (run_id TEXT, {columns})')
         self.connection.execute('CREATE TABLE simulation_runs (run_id TEXT, status TEXT)')
         self.snake = SnakeLabDb(self)
-        self.base = GenerateDefaultConfig().run()
+        self.base = SimulationConfiguration.defaults()
         self.insert('gold', self.base)
 
     def query(self, sql, params):

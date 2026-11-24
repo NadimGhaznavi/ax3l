@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from ax3l.app.DbMgr import DbMgr
 from ax3l.interface.SnakeLab import SnakeLab
-from ax3l.app.snakelab.GenerateDefaultConfig import GenerateDefaultConfig
+from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 from ax3l.app.snakelab.SnakeLabDb import CONFIGURATION_COLUMNS, CONFIGURATION_FIELDS, _config_values
 
 
@@ -148,7 +148,7 @@ class SnakeLabDbTests(unittest.TestCase):
         from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb
         db = self.configuration_db()
         dal = SnakeLabDb(db)
-        config = GenerateDefaultConfig().run()
+        config = SimulationConfiguration.defaults()
         for layers, status in ((1, 'completed'), (2, 'failed'), (3, 'queued')):
             trial = deepcopy(config)
             trial['model']['layers'] = layers
@@ -174,7 +174,7 @@ class SnakeLabDbTests(unittest.TestCase):
         from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb
         db = self.configuration_db()
         dal = SnakeLabDb(db)
-        config = GenerateDefaultConfig().run()
+        config = SimulationConfiguration.defaults()
         missing = (Fraction(1, 10), Fraction(-1, 10))
         for closer, further in finite_choices('reward_pair') - {missing}:
             trial = deepcopy(config)
@@ -192,7 +192,7 @@ class SnakeLabDbTests(unittest.TestCase):
         from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb
         db = self.configuration_db()
         dal = SnakeLabDb(db)
-        candidate = GenerateDefaultConfig().run()
+        candidate = SimulationConfiguration.defaults()
         self.assertTrue(dal.is_config_unique(candidate))
         for state in ('queued', 'running', 'completed', 'failed', 'cancelled'):
             with self.subTest(state=state):
@@ -218,7 +218,7 @@ class SnakeLabDbTests(unittest.TestCase):
         db = self.configuration_db()
         ids = []
         for lr, score, status in zip((.01, .002, .001), (12, 9, None), ('completed', 'completed', 'failed')):
-            config = GenerateDefaultConfig().run()
+            config = SimulationConfiguration.defaults()
             config['training']['learning_rate'] = lr
             ids.append(self.insert_config(db, config, status, score))
         dal = SnakeLabDb(db)
@@ -235,7 +235,7 @@ class SnakeLabDbTests(unittest.TestCase):
     def test_score_history_omits_seeds_and_preserves_sorted_repeated_scores(self):
         from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb
         db = self.configuration_db()
-        config = GenerateDefaultConfig().run()
+        config = SimulationConfiguration.defaults()
         for seed, score, state in ((9000, 12, 'completed'), (9001, 0, 'completed'),
                                    (9002, 12, 'completed'), (8999, None, 'completed'),
                                    (8998, 99, 'failed'), (9003, 3, 'completed')):
@@ -252,7 +252,7 @@ class SnakeLabDbTests(unittest.TestCase):
         from copy import deepcopy
         from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb
         db = self.configuration_db()
-        config = GenerateDefaultConfig().run()
+        config = SimulationConfiguration.defaults()
         golden_id = self.insert_config(db, config, score=4)
         changed = deepcopy(config)
         changed['seed'] += 1
@@ -271,7 +271,7 @@ class SnakeLabDbTests(unittest.TestCase):
         from copy import deepcopy
         from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb
         db = self.configuration_db()
-        baseline = GenerateDefaultConfig().run()
+        baseline = SimulationConfiguration.defaults()
         golden = self.insert_config(db, baseline, score=4)
         trial = deepcopy(baseline)
         trial['epsilon_nice'].update(probability=.01, steps=40)

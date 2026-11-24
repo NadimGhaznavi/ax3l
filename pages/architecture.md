@@ -25,10 +25,20 @@ The LLM used by the project is [Qwen 3.5 - 4B](https://huggingface.co/Qwen/Qwen3
 
 ## Conversation workflows
 
-The previous conversation workflows and their MCP tool sessions have been
-removed. The Ax3l server currently runs its ZeroMQ listener without starting
-inference or submitting simulations. The shared LLM HTTP interface and
-SnakeLab control and database interfaces remain available for the next flow.
+Ax3l shuffles four views and requests one proposal per view using native
+function calls through the shared LLM HTTP interface. Each view receives focused
+measurements, its previous hypothesis and choices, editable setting rules, and
+read-only configuration context. The application assembles and validates the
+complete draft, submits it through the SnakeLab interface, and compares the
+completed result before the next cycle. The view sequence and draft assembly
+are internal to Ax3l; no MCP process or external tool registration is required.
+
+`ExperimentState` and `ViewProposal` hold data. The view configuration and evidence
+activities prepare model context without external access. `ViewPrompts` owns
+presentation resources, `ViewConversation` owns the inference response boundary,
+and `ExperimentDb` owns checkpoint queries through the shared `DbMgr`.
+`ExperimentLoop` sequences their work. Snapshots, submission intent, and accepted
+choices survive restarts. See [Runtime Behaviour](/pages/runtime-behaviour).
 
 ## MariaDB
 

@@ -9,6 +9,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Run the four-view experiment end to end: shuffle the views, assemble their
+proposals into one configuration, submit it to SnakeLab, and compare the result
+with the experiment's golden reference.
+
+### Added
+
+- Add Reward Signals, Architecture, Training, and Exploration prompt templates,
+  each introducing Qwen's role in Patrick Loeber's Snake Lab and the objective
+  of improving the Snake AI's high score.
+- Include sections for the previous hypothesis and choices, golden/latest
+  results, editable parameters, and a read-only JSON view of the remaining
+  configuration, including values marked as draft.
+- Ask Qwen to evaluate the previous hypothesis and propose a new hypothesis,
+  expected effect, and values for the current view's parameters. Include all
+  four prompt assets in installations.
+- Assign tunable parameters to the four views, show other settings as read-only
+  JSON, and mark already proposed values as draft. Supply compact measurements
+  for each view and retain the previous hypothesis, expected effect, and choices.
+- Use local LLM native tool calls to accept one validated proposal per view.
+  Keep proposal values within the view's scope and the existing simulation
+  policy, including the joint reward constraint.
+- Persist shuffled order, accepted proposals, submission intent, run identity,
+  and comparison progress in MariaDB through the shared event log. Resume
+  interrupted cycles and reconcile lost submission replies without resending.
+- Add local HTTP/ZeroMQ end-to-end fixtures and disposable MariaDB checks for
+  complete cycles, restart recovery, promotion recovery, and checkpoint rollback.
+
+### Changed
+
+- Start the experiment loop from the Ax3l service. Add `--cycles` for a bounded
+  run and `--llm-url` for an inference endpoint override.
+- Establish a real default baseline on an empty installation and seed initial
+  hypotheses for each view. Record their seeded origin outside the model prompt.
+- Promote strictly better high scores and retain golden on ties or losses.
+  Preserve the reference used by the preceding trial so its improvement remains
+  visible after promotion. Keep shuffling and final submission outside Qwen's
+  instructions.
+
+### Removed
+
+- Remove the separate welcome prompt. Keep view ordering and configuration
+  assembly out of the model-facing prompt text.
+
 ## [4.23.0] - 2026-11-23 @ 04:28
 
 ### Summary

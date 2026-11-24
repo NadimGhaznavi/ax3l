@@ -142,7 +142,9 @@ class ConfigurationTests(unittest.TestCase):
         self.write({'network': {'zmq': {'interface': '0.0.0.0', 'port': 61971}}})
         with patch.dict('os.environ', {}, clear=True), patch('sys.argv', ['ax3l']), \
                 patch('ax3l.server.Ax3lServer.DbMgr'), \
+                patch('ax3l.server.Ax3lServer.ExperimentLoop') as workflow, \
                 patch('ax3l.server.Ax3lServer.ZMQServer') as server, patch('builtins.print'):
             self.assertEqual(main(), 0)
             self.assertEqual(server.call_args.args[0], 'tcp://0.0.0.0:61971')
-            server.return_value.__enter__.return_value.serve_forever.assert_called_once_with()
+            workflow.return_value.run.assert_called_once_with(
+                cycles=None, check=server.return_value.__enter__.return_value.check)

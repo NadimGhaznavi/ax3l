@@ -1,4 +1,4 @@
-"""Exercise the idle service without MariaDB, inference, or SnakeLab."""
+"""Exercise the listener and shutdown while the workflow is waiting."""
 
 import os
 from pathlib import Path
@@ -22,8 +22,10 @@ class Ax3lServiceTests(unittest.TestCase):
                 process = subprocess.Popen([
                     sys.executable, '-c',
                     'from unittest.mock import patch; '
+                    'from threading import Event; '
                     'from ax3l.server.Ax3lServer import main; '
                     'patch("ax3l.server.Ax3lServer.DbMgr").start(); '
+                    'patch("ax3l.server.Ax3lServer.ExperimentLoop.run", side_effect=lambda **kw: Event().wait()).start(); '
                     'raise SystemExit(main())',
                     '--zmq-endpoint', 'tcp://127.0.0.1:*',
                 ], stdout=console, stderr=console,

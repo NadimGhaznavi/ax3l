@@ -10,7 +10,7 @@ The **Ax3l Project uses** [Qwen 3.5 4B](https://huggingface.co/Qwen/Qwen3.5-4B),
 
 This project uses the [Snake Lab Server](https://snakelabserver.osoyalce.com) which houses a small and simple AI. The Snake Lab AI is trainable. The Snake Lab Server accepts a configuration to set the AI's hyper-parameters and configure the training environment. The Snake Lab server also runs the training simulation. The high score and other simulation results are stored in a database.
 
-The Ax3l experiment explores whether an LLM can improve the Snake AI by choosing simulation configurations and analyzing results. The previous conversation flow has been removed while a replacement is designed. Reporting and shared simulation interfaces remain available.
+The Ax3l experiment explores whether an LLM can improve the Snake AI by choosing simulation configurations and analyzing results. Four focused views contribute hypotheses and parameter choices to a shared configuration. Ax3l runs that configuration, compares the result with its golden reference, and uses the evidence in the next cycle.
 
 ---
 

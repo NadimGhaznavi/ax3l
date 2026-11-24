@@ -37,6 +37,10 @@ class ZMQServer:
     def serve_forever(self) -> None:
         """Wait for the listener to stop, propagating transport failures."""
         self._finished.wait()
+        self.check()
+
+    def check(self) -> None:
+        """Surface a listener failure to the application's foreground loop."""
         if self._error is not None:
             raise self._error
 

@@ -6,3 +6,4 @@ class DSnakeLab:
     ENDPOINT: Final[str] = "tcp://127.0.0.1:41970"
     TIMEOUT_MS: Final[int] = 3000
     PROTOCOL_VERSION: Final[int] = 1
+    STATUS_POLL_SECONDS: Final[int] = 5

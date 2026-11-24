@@ -90,10 +90,10 @@ Uninstall removes the application configuration with the application directory.
 
 ## Shared inference and service lifecycle
 
-Provision LlamaSrv separately. The previous conversation and MCP tool
-workflows have been removed; the Ax3l service currently runs without sending
-inference requests. The configured LlamaSrv URL and shared HTTP interface
-remain available for the replacement workflow.
+Provision LlamaSrv separately with a model supporting native function calls.
+Ax3l supplies the `submit_view` tool definition per request and handles accepted
+values locally. It starts no MCP sessions and registers no tools with the shared
+inference service.
 
 Check the shared endpoint without sending an inference request:
 
@@ -102,15 +102,18 @@ curl -fsS http://wintermute:51001/health
 curl -fsS http://wintermute:51001/props
 ```
 
-Start the Ax3l listener with:
+Start the continuous four-view experiment service with:
 
 ```sh
 .venv/bin/python -m ax3l.server.Ax3lServer
 ```
 
-The old optimization entry point and its `--url`, `--llm-url`, and `--output`
-options have been removed. Fresh installations generate configuration without
-the retired decision-grace setting.
+Use `--cycles 1` to stop after one complete four-view experiment, excluding
+initial baseline creation. `--llm-url http://HOST:51001` overrides the configured
+inference URL. The old optimization entry point and raw-output options remain
+removed. Fresh installations generate configuration without the retired
+decision-grace setting. See [Runtime Behaviour](/pages/runtime-behaviour) for the
+cycle and restart semantics.
 
 Startup order is **reporting → Ax3l → watchdog**; shutdown uses the reverse
 order. The watchdog recovers only Ax3l and reporting. LlamaSrv's configuration,

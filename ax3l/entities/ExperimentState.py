@@ -1,4 +1,4 @@
-"""A durable four-view configuration cycle and its preceding experiment."""
+"""A durable configuration cycle and its four result evaluations."""
 
 from dataclasses import dataclass, field
 
@@ -18,5 +18,6 @@ class ExperimentState:
     previous: dict[str, ViewProposal] = field(default_factory=dict)
     previous_seeded: bool = True
     proposals: dict[str, ViewProposal] = field(default_factory=dict)
+    observations: dict[str, str] = field(default_factory=dict)
     run_id: str | None = None
     preceding_match: str | None = None

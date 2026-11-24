@@ -123,14 +123,21 @@ class LocalLLM:
 
     @staticmethod
     def proposal(request):
+        if request['tools'][0]['function']['name'] == 'submit_observations':
+            content = request['messages'][0]['content'][0]['text']
+            title = content.splitlines()[0].removeprefix('## Task: ').removesuffix(' Evaluation')
+            arguments = dict(observations=f'{title}: comparison measurements are not available yet.')
+            return dict(choices=[dict(message=dict(role='assistant', tool_calls=[dict(
+                id='observations', type='function', function=dict(
+                    name='submit_observations', arguments=json.dumps(arguments)),
+            )]))])
         properties = request['tools'][0]['function']['parameters']['properties']['values']['properties']
         view = next(view for view in VIEWS.values() if set(view.parameters) == set(properties))
         changed = {'reward-signals': {'game.rewards.food': 12},
                    'architecture': {'model.hidden_size': 72},
                    'training': {'training.learning_rate': .002},
                    'exploration': {'epsilon.initial': .9}}[view.name]
-        arguments = dict(evaluation='The observed scores support another trial.',
-                         hypothesis=f'Hypothesis for {view.name}.', expected_effect='A higher high score.',
+        arguments = dict(hypothesis=f'Hypothesis for {view.name}.',
                          values=changed)
         return dict(choices=[dict(message=dict(role='assistant', content=None, tool_calls=[dict(
             id='proposal', type='function', function=dict(name='submit_view', arguments=json.dumps(arguments)),

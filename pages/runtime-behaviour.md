@@ -4,14 +4,16 @@ author_profile: true
 layout: single
 ---
 
-Ax3l runs four focused view conversations to assemble one complete SnakeLab
-configuration. It submits that configuration once, waits for the simulation,
-and compares its high score with the golden reference.
+Ax3l evaluates each completed simulation in four focused conversations, then
+runs another four conversations to assemble the next SnakeLab configuration.
+It submits that configuration once, waits for the simulation, compares its high
+score with the golden reference, and evaluates the results again.
 
 ## Four views
 
-Each cycle shuffles Reward Signals, Architecture, Training, and Exploration.
-The order is saved before the first conversation and is retained across restarts.
+Both passes cover Reward Signals, Architecture, Training, and Exploration.
+Evaluations run in the order below. The following configuration pass shuffles
+the views; that order is saved and retained across restarts.
 
 | View | Tunable parameters |
 | --- | --- |
@@ -20,15 +22,31 @@ The order is saved before the first conversation and is retained across restarts
 | Training | Learning rate, batch size, gamma, and random seed |
 | Exploration | Epsilon initial/decay and EpsilonNice probability/steps |
 
-Each conversation starts with its own role and focused golden/latest comparison.
-It receives its previous hypothesis, expected effect, and parameter choices.
+### Result evaluation
+
+Each evaluation starts with its own role, the hypothesis and parameter choices
+used for the completed simulation, and an attached golden/latest comparison
+image. The four evaluation templates are skeletons. Their PNG images currently
+identify the view and compared runs but contain no measurements. The instructions
+ask the model to record this limitation instead of inventing observations.
+
+Qwen submits only Observations through the required native `submit_observations`
+function. Observations must contain nonblank text and have at most 280 characters.
+No new configuration is requested during evaluation. Each accepted result is
+checkpointed, and all four evaluations finish before configuration tuning begins.
+
+### Configuration tuning
+
+Each tuning conversation receives its previous hypothesis, parameter choices,
+and the Observations from its separate evaluation conversation.
 The editable settings include their current values and schema rules. Other
 settings appear as read-only JSON; accepted proposals from earlier views carry
 `(draft)` markers. The numeric simulation configuration is stored separately
 from these display strings.
 
-Qwen returns an evaluation, a new hypothesis, its expected effect, and parameter
-values through the required native `submit_view` tool call. It may change several
+Qwen returns a new hypothesis and parameter values through the required native
+`submit_view` function. The hypothesis must contain nonblank text and have at
+most 280 characters, including its expected observable effect. It may change several
 settings within the current view. The application validates that response at the
 LLM boundary, including setting ownership, numeric limits, and the combined
 closer/farther reward constraint. Invalid responses stop the run with logged
@@ -45,7 +63,8 @@ baseline. If completed simulations already exist without a golden event, it
 adopts the best completed result. An existing golden reference is reused.
 
 The initial hypotheses and per-view choices are seeded examples, paired with the
-real baseline measurements. No simulation scores are fabricated. Their seeded
+real baseline run. It receives the same four evaluation conversations before
+the first tuning pass. No simulation scores are fabricated. Their seeded
 origin is recorded in the experiment checkpoint through `previous_seeded`;
 Qwen receives the same prompt shape as on later cycles.
 
@@ -56,15 +75,18 @@ seed remains a normal Training parameter in this initial implementation.
 The next conversations compare the preceding trial against the golden reference
 used for that trial. That reference is retained even when the trial is promoted,
 so an improvement does not disappear into an identical golden/latest comparison.
-All four views evaluate the same combined simulation result. Their context
-contains only the preceding experiment and the current draft; accumulated history
-remains in MariaDB.
+All four views evaluate the same combined simulation result. Each subsequent
+tuning prompt receives its own view's Observations. Their context contains only
+the preceding experiment and the current draft; accumulated history remains in
+MariaDB.
 
 ## Persistence and restart
 
 Ax3l saves experiment snapshots in the shared event log through `DbMgr`. Each
-accepted view is checkpointed before continuing. Restart resumes the saved order
-and skips accepted views. Prompts, full model responses, native tool results,
+accepted evaluation or proposal is checkpointed before continuing. Restart
+resumes the current pass and skips accepted views. Older combined-flow
+checkpoints enter evaluation before resuming unfinished tuning, preserving
+accepted choices. Prompts, full model responses, native tool results,
 submissions, completions, comparisons, and promotions are logged for reporting.
 
 Submission intent is saved before calling SnakeLab. If the reply is lost, restart
@@ -88,7 +110,9 @@ The default is continuous operation. For one complete four-view experiment:
 .venv/bin/python -m ax3l.server.Ax3lServer --cycles 1
 ```
 
-Baseline creation does not count toward `--cycles`. `--llm-url http://HOST:PORT`
+Baseline creation and its evaluations do not count toward `--cycles`. A cycle
+finishes after its simulation and all four result evaluations complete.
+`--llm-url http://HOST:PORT`
 overrides the configured LlamaSrv URL. `--zmq-endpoint` and `AX3L_ZMQ_ENDPOINT`
 select the Ax3l listener. The LlamaSrv model must support native function calling;
 MCP sessions and the removed conversation tools are not used. SIGINT closes the

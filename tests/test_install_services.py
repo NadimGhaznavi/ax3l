@@ -144,7 +144,9 @@ exec /usr/bin/systemd-analyze "$@"
                                'app/snakelab/ExperimentLoop.py', 'app/snakelab/ExperimentDb.py',
                                'interface/ViewConversation.py', 'entities/ExperimentState.py',
                                'entities/ExperimentView.py', 'entities/ViewProposal.py',
-                               'presentation/snakelab/ViewPrompts.py'):
+                               'presentation/snakelab/ViewPrompts.py',
+                               'presentation/snakelab/ComparisonImage.py',
+                               'constants/DViewConversation.py'):
                     self.assertTrue((self.app / 'ax3l' / module).is_file(), module)
                 reporting = (self.units / 'reporting-server.service').read_text()
                 self.assertIn(f'--gif-dir {self.app}/games', reporting)
@@ -154,27 +156,32 @@ exec /usr/bin/systemd-analyze "$@"
                 for asset in (ROOT / 'ax3l/server/templates').glob('*.html'):
                     installed = self.app / 'ax3l/server/templates' / asset.name
                     self.assertEqual(installed.read_bytes(), asset.read_bytes(), str(asset))
-                for asset in (ROOT / 'ax3l/presentation/snakelab/prompts').glob('*.md'):
+                for asset in (ROOT / 'ax3l/presentation/snakelab/prompts').rglob('*.md'):
                     installed = self.app / asset.relative_to(ROOT)
                     self.assertEqual(installed.read_bytes(), asset.read_bytes(), str(asset))
                 smoke = subprocess.run([sys.executable, '-c', '''
 from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
+from ax3l.entities.ExperimentView import VIEWS
+from ax3l.presentation.snakelab.ViewPrompts import ViewPrompts
 from ax3l.server.Ax3lServer import main
 assert SimulationConfiguration.defaults()['model']['hidden_size'] == 64
 templates = Environment(loader=FileSystemLoader(Path('ax3l/server/templates')))
 assert templates.get_template('events.html')
 prompts = Environment(loader=FileSystemLoader(Path('ax3l/presentation/snakelab/prompts')),
                       undefined=StrictUndefined)
-for name in ('reward-signals.md', 'architecture.md', 'training.md', 'exploration.md'):
-    prompts.get_template(name).render(
+for view in VIEWS.values():
+    context = dict(
         previous_hypothesis='The proposed adjustment will improve the high score.',
         previous_values={},
-        comparison={'golden': {'high_score': 10}, 'latest': {'high_score': 11}},
+        previous_observations='Comparison measurements are not available yet.',
+        reference_run_id='golden-run', latest_run_id='latest-run',
         parameters={},
         other_parameters={'seed': 1971, 'model': {'layers': '2 (draft)'}},
     )
+    assert ViewPrompts().render(view, context)
+    assert ViewPrompts().render_evaluation(view, context)[1]['type'] == 'image_url'
 '''], cwd=self.app, env=dict(os.environ, PYTHONPATH=str(self.app), PYTHONDONTWRITEBYTECODE='1'),
                     capture_output=True, text=True, timeout=10)
                 self.assertEqual(smoke.returncode, 0, smoke.stderr)

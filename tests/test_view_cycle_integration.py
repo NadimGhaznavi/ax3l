@@ -104,16 +104,17 @@ class ViewCycleIntegrationTests(unittest.TestCase):
     def test_service_completes_two_cycles_with_native_tools_and_real_database(self):
         self.assertEqual(self.service(cycles=2), 0)
         self.assertEqual(self.db.query('SELECT COUNT(*) AS n FROM simulation_runs')[0]['n'], 3)
-        self.assertEqual(len(self.model.requests), 8)
+        self.assertEqual(len(self.model.requests), 20)
         state = ExperimentDb(self.db).load()
         self.assertEqual(state.phase, 'completed')
         self.assertEqual(set(state.order), {'architecture', 'training', 'exploration', 'reward-signals'})
         self.assertEqual(len(state.proposals), 4)
+        self.assertEqual(len(state.observations), 4)
         rows = self.db.query('SELECT run_id, high_score FROM simulation_runs ORDER BY id')
         self.assertEqual(state.golden_run_id, rows[1]['run_id'])
         self.assertEqual(state.latest_run_id, rows[2]['run_id'])
-        for name, expected in (('view_experiment_state_saved', None), ('conversation_started', 8),
-                               ('conversation_ended', 8), ('configuration_compared', 2),
+        for name, expected in (('view_experiment_state_saved', None), ('conversation_started', 20),
+                               ('conversation_ended', 20), ('configuration_compared', 2),
                                ('proposal_accepted', 2), ('simulation_submitted', 3),
                                ('simulation_completed', 3), ('golden_config_created', 2)):
             count = self.count_events(name)
@@ -128,11 +129,25 @@ class ViewCycleIntegrationTests(unittest.TestCase):
         with patch.object(ExperimentDb, 'save', stop):
             self.assertEqual(self.service(), 130)
         order = ExperimentDb(self.db).load().order
-        self.assertEqual(len(self.model.requests), 2)
+        self.assertEqual(len(self.model.requests), 6)
         self.assertEqual(self.service(), 0)
-        self.assertEqual(len(self.model.requests), 4)
+        self.assertEqual(len(self.model.requests), 12)
         self.assertEqual(ExperimentDb(self.db).load().order, order)
         self.assertEqual(self.count_events('simulation_submitted'), 2)
+
+    def test_restart_skips_saved_observations(self):
+        save = ExperimentDb.save
+        def stop(store, state):
+            save(store, state)
+            if state.phase == 'evaluating' and len(state.observations) == 2:
+                raise KeyboardInterrupt()
+        with patch.object(ExperimentDb, 'save', stop):
+            self.assertEqual(self.service(), 130)
+        self.assertEqual(len(ExperimentDb(self.db).load().observations), 2)
+        self.assertEqual(len(self.model.requests), 2)
+        self.assertEqual(self.service(), 0)
+        self.assertEqual(len(self.model.requests), 12)
+        self.assertEqual(len(ExperimentDb(self.db).load().observations), 4)
 
     def test_submission_with_lost_acknowledgement_is_not_repeated(self):
         submit = SnakeLab.submit_simulation
@@ -145,19 +160,19 @@ class ViewCycleIntegrationTests(unittest.TestCase):
         self.assertEqual(ExperimentDb(self.db).load().phase, 'submitting')
         self.assertEqual(self.service(), 0)
         self.assertEqual(self.db.query('SELECT COUNT(*) AS n FROM simulation_runs')[0]['n'], 2)
-        self.assertEqual(len(self.model.requests), 4)
+        self.assertEqual(len(self.model.requests), 12)
 
     def test_restart_after_promotion_does_not_repeat_comparison_or_promotion(self):
         save = ExperimentDb.save
         def stop(store, state):
-            if state.phase == 'completed' and not state.baseline:
+            if state.phase == 'evaluating' and not state.baseline and state.proposals:
                 raise KeyboardInterrupt()
             save(store, state)
         with patch.object(ExperimentDb, 'save', stop):
             self.assertEqual(self.service(), 130)
         self.assertEqual(ExperimentDb(self.db).load().phase, 'comparing')
         self.assertEqual(self.service(), 0)
-        self.assertEqual(len(self.model.requests), 4)
+        self.assertEqual(len(self.model.requests), 12)
         self.assertEqual(self.count_events('configuration_compared'), 1)
         self.assertEqual(self.count_events('golden_config_created'), 2)
         self.assertEqual(self.count_events('simulation_completed'), 2)

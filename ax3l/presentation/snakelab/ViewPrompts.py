@@ -1,10 +1,12 @@
-"""Load and render the four model-facing view templates."""
+"""Render separate result evaluation and configuration prompts for each view."""
 
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
+from ax3l.constants.DViewConversation import DViewConversation
 from ax3l.entities.ExperimentView import ExperimentView
+from ax3l.presentation.snakelab.ComparisonImage import comparison_image
 
 
 class ViewPrompts:
@@ -15,4 +17,16 @@ class ViewPrompts:
         )
 
     def render(self, view: ExperimentView, context: dict) -> str:
-        return self._templates.get_template(f"{view.name}.md").render(**context)
+        prompt = self._templates.get_template(f"{view.name}.md").render(**context)
+        submission = self._templates.get_template("proposal-submission.md").render(
+            hypothesis_max_length=DViewConversation.HYPOTHESIS_MAX_LENGTH,
+        )
+        return prompt + "\n\n" + submission
+
+    def render_evaluation(self, view: ExperimentView, context: dict) -> list[dict]:
+        prompt = self._templates.get_template(f"evaluations/{view.name}.md").render(
+            **context, observations_max_length=DViewConversation.OBSERVATIONS_MAX_LENGTH,
+        )
+        return [dict(type="text", text=prompt), dict(type="image_url", image_url=dict(
+            url=comparison_image(view, context["reference_run_id"], context["latest_run_id"]),
+        ))]

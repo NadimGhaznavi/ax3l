@@ -1,11 +1,9 @@
-"""One view's assessment and proposed experiment."""
+"""One view's next hypothesis and proposed parameter values."""
 
 from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
 class ViewProposal:
-    evaluation: str
     hypothesis: str
-    expected_effect: str
     values: dict[str, int | float]

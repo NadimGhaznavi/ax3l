@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Separate simulation evaluation from configuration tuning, with four result
+conversations followed by four configuration conversations.
+
+### Added
+
+- Add four evaluation prompt skeletons with a labeled comparison-image placeholder
+  and a dedicated Observations submission. Real comparison charts remain to be built.
+- Checkpoint each view's Observations and feed them into that view's next tuning
+  prompt. Resume interrupted evaluation and tuning passes without repeating
+  accepted submissions, including checkpoints from the preceding combined flow.
+- Enforce a 280-character limit on both hypotheses and Observations at the LLM
+  boundary and display those limits in the prompts.
+
+### Changed
+
+- Finish all four evaluations before starting the next configuration pass. Evaluate
+  the initial baseline too, and include final result evaluations in bounded runs.
+- Match Architecture, Exploration, and Training prompt structure to the updated
+  Reward Signals prompt. Keep the Reward Signals template intact and add
+  shared submission instructions when rendering tuning prompts.
+- Submit only a hypothesis and parameter values in tuning conversations; include
+  the expected observable effect in the short hypothesis.
+
 ## [4.23.2] - 2026-11-24 @ 04:35
 
 ### Summary

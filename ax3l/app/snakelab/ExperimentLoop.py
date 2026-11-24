@@ -1,4 +1,4 @@
-"""Assemble four view proposals, run their configuration, and evaluate the result."""
+"""Evaluate results in four conversations before assembling four new proposals."""
 
 from collections.abc import Callable
 from copy import deepcopy
@@ -8,7 +8,6 @@ from time import sleep
 from uuid import uuid4
 
 from ax3l.activity.ViewConfiguration import apply_values, editable_parameters, other_parameters, view_values
-from ax3l.activity.ViewEvidence import run_evidence, view_comparison
 from ax3l.app.ConfigurationLog import ConfigurationLog
 from ax3l.app.DbMgr import DbMgr
 from ax3l.app.EventLogDb import EventLogDb
@@ -34,7 +33,6 @@ class ExperimentLoop:
         self._events = EventLogDb(db)
         self._conversation = ViewConversation(llm, db)
         self._prompts = ViewPrompts()
-        self._evidence = {}
 
     def run(self, *, cycles: int | None = None, check: Callable[[], None] = lambda: None) -> None:
         state = self._store.load()
@@ -84,7 +82,9 @@ class ExperimentLoop:
                     sleep(DSnakeLab.STATUS_POLL_SECONDS)
             elif state.phase == "comparing":
                 self._finish(state)
-                if not state.baseline:
+            elif state.phase in ("evaluating", "evaluating_previous"):
+                self._evaluate_view(state)
+                if state.phase == "completed" and not state.baseline and state.proposals:
                     completed += 1
             else:
                 raise ValueError(f"Unknown experiment phase: {state.phase}")
@@ -94,10 +94,10 @@ class ExperimentLoop:
         run_id = golden["process_id"] if golden else self._snake.get_all_time_best_run_id()
         config = self._completed_result(run_id)["config"] if run_id else SimulationConfiguration.defaults()
         previous = {
-            name: ViewProposal("", view.initial_hypothesis, "Establish the starting performance.",
-                               view_values(view, config)) for name, view in VIEWS.items()
+            name: ViewProposal(view.initial_hypothesis, view_values(view, config))
+            for name, view in VIEWS.items()
         }
-        state = ExperimentState(str(uuid4()), "completed" if run_id else "ready", deepcopy(config),
+        state = ExperimentState(str(uuid4()), "evaluating" if run_id else "ready", deepcopy(config),
                                 baseline=run_id is None, golden_run_id=run_id, latest_run_id=run_id,
                                 reference_run_id=run_id, previous=previous)
         if run_id and golden is None:
@@ -120,16 +120,23 @@ class ExperimentLoop:
             latest_run_id=previous.latest_run_id, reference_run_id=previous.reference_run_id, order=order,
             previous=previous.proposals or previous.previous,
             previous_seeded=not bool(previous.proposals),
+            observations=previous.observations.copy(),
         )
-        self._evidence.clear()
         self._store.save(state)
         return state
 
-    def _run_evidence(self, run_id: str) -> dict:
-        if run_id not in self._evidence:
-            self._evidence[run_id] = run_evidence(self._completed_result(run_id),
-                                                 self._snake.get_analysis_episodes(run_id))
-        return self._evidence[run_id]
+    def _evaluate_view(self, state: ExperimentState) -> None:
+        name = list(VIEWS)[len(state.observations)]
+        view = VIEWS[name]
+        proposals = state.previous if state.phase == "evaluating_previous" else state.proposals or state.previous
+        previous = proposals[name]
+        context = dict(previous_hypothesis=previous.hypothesis, previous_values=previous.values,
+                       reference_run_id=state.reference_run_id, latest_run_id=state.latest_run_id)
+        content = self._prompts.render_evaluation(view, context)
+        state.observations[name] = self._conversation.evaluate(view, content, state.experiment_id)
+        if len(state.observations) == len(VIEWS):
+            state.phase = "choosing" if state.phase == "evaluating_previous" else "completed"
+        self._store.save(state)
 
     def _choose_view(self, state: ExperimentState) -> None:
         name = state.order[len(state.proposals)]
@@ -137,10 +144,9 @@ class ExperimentLoop:
         previous = state.previous[name]
         proposed = {path for proposal in state.proposals.values() for path in proposal.values}
         context = dict(
-            previous_hypothesis=f"{previous.hypothesis}\n\nExpected effect: {previous.expected_effect}",
+            previous_hypothesis=previous.hypothesis,
             previous_values=previous.values,
-            comparison=view_comparison(view, self._run_evidence(state.reference_run_id),
-                                       self._run_evidence(state.latest_run_id)),
+            previous_observations=state.observations[name],
             parameters=editable_parameters(view, state.config),
             other_parameters=other_parameters(view, state.config, proposed),
         )
@@ -193,5 +199,6 @@ class ExperimentLoop:
             self._promote(winner, reason)
         state.reference_run_id = state.run_id if state.baseline else state.golden_run_id
         state.golden_run_id, state.latest_run_id = winner, state.run_id
-        state.phase = "completed"
+        state.observations = {}
+        state.phase = "evaluating"
         self._store.save(state)

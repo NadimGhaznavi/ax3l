@@ -23,8 +23,13 @@ class ExperimentDb:
             return None
         data = json.loads(rows[0]["content"])
         SimulationConfiguration.validate(data["config"])
+        # Upgrade checkpoints written before result evaluation became a separate pass.
+        if "observations" not in data:
+            data["phase"] = {"completed": "evaluating", "choosing": "evaluating_previous"}.get(
+                data["phase"], data["phase"])
         for key in ("previous", "proposals"):
-            data[key] = {name: ViewProposal(**proposal) for name, proposal in data[key].items()}
+            data[key] = {name: ViewProposal(proposal["hypothesis"], proposal["values"])
+                         for name, proposal in data[key].items()}
         return ExperimentState(**data)
 
     def save(self, state: ExperimentState) -> None:

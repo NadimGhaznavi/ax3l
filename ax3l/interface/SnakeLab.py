@@ -1,12 +1,14 @@
 """Query Snake Lab through its control interface and MariaDB database."""
 
+from contextlib import contextmanager
+from collections.abc import Iterator
 from uuid import UUID, uuid4
 
-import zmq
+from ax3l.zmq.ZMQClient import ZMQClient
 
 from ax3l.constants.DSnakeLab import DSnakeLab
-from ax3l.app.DbMgr import DbMgr
-from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb
+from ax3l.interface.database.DbMgr import DbMgr
+from ax3l.interface.database.SnakeLabDb import SnakeLabDb
 
 
 class SnakeLabQueryError(RuntimeError):
@@ -23,62 +25,47 @@ class SnakeLab:
     def __init__(self, endpoint: str = DSnakeLab.ENDPOINT):
         self.endpoint = endpoint
 
+    @contextmanager
+    def _data(self) -> Iterator[SnakeLabDb]:
+        """Own a read connection for one external-data operation."""
+        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
+        try:
+            yield SnakeLabDb(db)
+        finally:
+            db.close()
+
     def get_num_sims(self) -> int:
         """Return the total stored run count using Ax3l’s DB credentials.
 
         Database errors propagate. The connection is closed after each query,
         and no tables are initialized in the Snake Lab database.
         """
-        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
-        try:
-            return SnakeLabDb(db).get_num_sims()
-        finally:
-            db.close()
+        with self._data() as simulations:
+            return simulations.get_num_sims()
 
     def get_episode_totals(self) -> dict[str, int]:
         """Return total games and moves recorded by Snake Lab."""
-        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
-        try:
-            return SnakeLabDb(db).get_episode_totals()
-        finally:
-            db.close()
+        with self._data() as simulations:
+            return simulations.get_episode_totals()
 
     def get_high_score(self) -> int | None:
         """Return the experiment's highest recorded score across configs and seeds."""
-        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
-        try:
-            return SnakeLabDb(db).get_high_score()
-        finally:
-            db.close()
+        with self._data() as simulations:
+            return simulations.get_high_score()
 
     def get_run_scores(self) -> dict[int, int | None]:
         """Return the latest score per simulation ID, oldest submissions first."""
-        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
-        try:
-            return SnakeLabDb(db).get_run_scores()
-        finally:
-            db.close()
+        with self._data() as simulations:
+            return simulations.get_run_scores()
 
-    def get_analysis_episodes(self, run_id: str) -> list[dict]:
-        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
-        try:
-            return SnakeLabDb(db).get_analysis_episodes(run_id)
-        finally:
-            db.close()
 
     def get_latest_completed_run_id(self) -> str | None:
-        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
-        try:
-            return SnakeLabDb(db).get_latest_completed_run_id()
-        finally:
-            db.close()
+        with self._data() as simulations:
+            return simulations.get_latest_completed_run_id()
 
     def get_all_time_best_run_id(self) -> str | None:
-        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
-        try:
-            return SnakeLabDb(db).get_all_time_best_run_id()
-        finally:
-            db.close()
+        with self._data() as simulations:
+            return simulations.get_all_time_best_run_id()
 
     def is_simulation_running(self) -> bool:
         """Return whether work is running, paused, cancelling, or queued.
@@ -100,27 +87,18 @@ class SnakeLab:
 
     def get_config(self, run_id: str) -> dict | None:
         UUID(run_id)
-        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
-        try:
-            return SnakeLabDb(db).get_config(run_id)
-        finally:
-            db.close()
+        with self._data() as simulations:
+            return simulations.get_config(run_id)
 
     def get_run_summary(self, run_id: str) -> dict | None:
         UUID(run_id)
-        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
-        try:
-            return SnakeLabDb(db).get_run_summary(run_id)
-        finally:
-            db.close()
+        with self._data() as simulations:
+            return simulations.get_run_summary(run_id)
 
     def get_run_result(self, run_id: str) -> dict | None:
         UUID(run_id)
-        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
-        try:
-            return SnakeLabDb(db).get_run_result(run_id)
-        finally:
-            db.close()
+        with self._data() as simulations:
+            return simulations.get_run_result(run_id)
 
     def get_highscore_frames(self, run_id: str) -> list[dict] | None:
         """Retrieve and validate a complete captured game; None means no capture."""
@@ -173,97 +151,17 @@ class SnakeLab:
                 raise ValueError("Snake Lab response has invalid direction or score")
         return frames
 
-    def get_learning_rate_history(self) -> list[dict]:
-        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
-        try:
-            return SnakeLabDb(db).get_learning_rate_history()
-        finally:
-            db.close()
 
     def find_config_run(self, config: dict) -> str | None:
-        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
-        try:
-            return SnakeLabDb(db).find_config_run(config)
-        finally:
-            db.close()
+        with self._data() as simulations:
+            return simulations.find_config_run(config)
 
-    def get_parameter_report(self, golden_run_id: str, parameter: str) -> list[dict]:
-        UUID(golden_run_id)
-        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
-        try:
-            return SnakeLabDb(db).get_parameter_report(golden_run_id, parameter)
-        finally:
-            db.close()
-
-    def parameter_space_exhausted(self, golden_run_id: str, parameter: str) -> bool:
-        UUID(golden_run_id)
-        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
-        try:
-            return SnakeLabDb(db).parameter_space_exhausted(golden_run_id, parameter)
-        finally:
-            db.close()
-
-    def available_parameters(self, config: dict, parameters: list[str]) -> list[str]:
-        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
-        try:
-            return SnakeLabDb(db).available_parameters(config, parameters)
-        finally:
-            db.close()
-
-    def get_epsilon_report(self, golden_run_id: str) -> list[dict]:
-        UUID(golden_run_id)
-        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
-        try:
-            return SnakeLabDb(db).get_epsilon_report(golden_run_id)
-        finally:
-            db.close()
-
-    def get_reward_report(self, golden_run_id: str) -> dict:
-        UUID(golden_run_id)
-        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
-        try:
-            return SnakeLabDb(db).get_reward_report(golden_run_id)
-        finally:
-            db.close()
-
-    def get_epsilon_nice_report(self, golden_run_id: str) -> list[dict]:
-        UUID(golden_run_id)
-        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
-        try:
-            return SnakeLabDb(db).get_epsilon_nice_report(golden_run_id)
-        finally:
-            db.close()
 
     def get_episode_diagnostics(self, run_id: str) -> dict:
         UUID(run_id)
-        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
-        try:
-            return SnakeLabDb(db).get_episode_diagnostics(run_id)
-        finally:
-            db.close()
+        with self._data() as simulations:
+            return simulations.get_episode_diagnostics(run_id)
 
-    def get_learning_rate_report(self, golden_run_id: str) -> list[dict]:
-        UUID(golden_run_id)
-        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
-        try:
-            return SnakeLabDb(db).get_learning_rate_report(golden_run_id)
-        finally:
-            db.close()
-
-    def is_config_unique(self, config: dict) -> bool:
-        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
-        try:
-            return SnakeLabDb(db).is_config_unique(config)
-        finally:
-            db.close()
-
-    def get_episode_losses(self, run_id: str) -> list[tuple[int, float | None]]:
-        UUID(run_id)
-        db = DbMgr(database=DSnakeLab.DATABASE, initialize_event_tables=False)
-        try:
-            return SnakeLabDb(db).get_episode_losses(run_id)
-        finally:
-            db.close()
 
     def submit_simulation(self, config: dict) -> str:
         """Submit once and return the queued run ID; never retry a submission."""
@@ -302,14 +200,7 @@ class SnakeLab:
             "method": method,
             "payload": payload,
         }
-        with zmq.Context() as context:
-            with context.socket(zmq.REQ) as socket:
-                socket.setsockopt(zmq.LINGER, 0)
-                socket.setsockopt(zmq.SNDTIMEO, DSnakeLab.TIMEOUT_MS)
-                socket.setsockopt(zmq.RCVTIMEO, DSnakeLab.TIMEOUT_MS)
-                socket.connect(self.endpoint)
-                socket.send_json(request)
-                response = socket.recv_json()
+        response = ZMQClient(self.endpoint, DSnakeLab.TIMEOUT_MS / 1000).request_json(request)
 
         if not isinstance(response, dict):
             raise ValueError("Snake Lab response must be an object")

@@ -34,18 +34,19 @@ The helper preserves relative paths for:
 
 - Python and `*.schema.json` files under [ax3l/](../../ax3l/).
 - Markdown under [presentation/prompts/](../../ax3l/presentation/prompts/).
-- HTML under [server/templates/](../../ax3l/server/templates/).
-- Files under [activity/fonts/](../../ax3l/activity/fonts/), including its license.
+- HTML under [presentation/reporting/templates/](../../ax3l/presentation/reporting/templates/).
+- Files under [presentation/reporting/fonts/](../../ax3l/presentation/reporting/fonts/), including its license.
 
 Files are installed with mode `644`, owned by the supplied account and group
 (`ax3l` in the deployment workflow). Null-delimited file discovery preserves paths
-containing spaces. The helper runs in a subshell so its working-directory change
-does not escape into service orchestration.
+containing spaces. The helper stages the package inside the installation
+directory, then moves it into place. Its subshell owns staging cleanup and the
+working-directory change.
 
 The caller enables `errexit` and `pipefail`. Discovery feeds copying through a
 pipeline, so a failure in either stage stops installation before service
-definitions are installed or services are started. Files already copied can
-remain, consistent with the design's partial-failure contract.
+definitions are installed or services are started. Failed preparation removes
+the staged files. Other installation resources can remain after failure.
 
 ## Installed layout
 
@@ -96,13 +97,12 @@ disabled, a private socket, and the disposable `ax3l_test` database/account.
 | --- | --- |
 | Refuse existing installation resources | Directory, service-unit, Linux account/group, database, and database-account cases stop before provisioning. |
 | Reuse saved credentials | Fresh installation validates and reuses saved credentials without changing their contents or private permissions. |
-| Deliver a working package layout | Tests compare installed assets with the checkout and import configuration, prompt rendering, and the server entry point from the installed tree. |
+| Deliver a working package layout | Tests compare installed assets with the checkout and load configuration, prompts, report templates, and service entry points from the installed tree. |
 | Stop on preparation or installation failure | Dependency, browser, service-definition, and file-discovery failures prevent later service activation. |
 | Respect service ordering and ownership boundaries | Unit rendering and start/stop calls are checked; independently managed service definitions remain untouched. |
 | Provision the application database | Private MariaDB checks verify creation and login, and refusal when the database or account already exists. |
 
-All 15 deployment tests passed with the private database check enabled for this
-implementation slice. Configuration resolution, file copying, permission modes,
+Configuration resolution, package replacement, file copying, permission modes,
 and systemd definition validation run for real. Dependency/browser provisioning,
 privileged ownership changes, and service-manager actions are stubbed. These
 checks do not constitute a live deployment or an end-to-end simulation test.

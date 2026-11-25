@@ -21,9 +21,14 @@ between documentation views through a common glossary, and connect deployment
 responsibilities, design, and implementation through all four views. Separate
 application-file installation from service orchestration and propagate discovery
 failures before service activation.
+Refactor the application around explicit experiment, reporting, persistence,
+transport, and presentation responsibilities, removing retired tuning machinery.
 
 ### Added
 
+- Add a full-suite runner that owns a private MariaDB instance and runs database,
+  HTTP, ZeroMQ, and deployment fixtures without using deployed services. Document
+  the resulting package structure and runtime contracts in the Implementation View.
 - Add an Implementation View index and deployment implementation realization,
   covering source ownership, file delivery, installed entry points, and verified
   contracts. Link forward from Design to complete the four-view documentation.
@@ -52,6 +57,22 @@ failures before service activation.
 
 ### Changed
 
+- Separate report queries, HTML rendering, and HTTP handling. Keep report templates,
+  animations, and fonts together under `ax3l/presentation/reporting/`.
+- Move database adapters under `ax3l/interface/database/`. Keep SQL and event
+  persistence outside application workflows and database mechanics, preserving
+  constructor-driven event schema initialization and atomic event writes.
+- Group experiment and reporting workflows under `ax3l/app/`. Keep service recovery
+  in application control flow, and put simulation schemas beside their interface.
+- Reuse the bounded ZeroMQ client for SnakeLab requests without changing the
+  protocol, correlation validation, timeout behavior, or submission retry policy.
+- Count distinct compared runs directly during atomic reporting refreshes. Retain
+  incremental completed-run summaries and read-only access to SnakeLab source data.
+- Show the recorded decision in golden configuration history, replacing obsolete
+  individual-parameter and value-change columns.
+- Stage the complete application package before replacement, restore the previous
+  package if replacement fails, and remove retired installed modules on upgrade.
+  Preserve configuration, credentials, the runtime, and generated animations.
 - Keep UC-01 and its realizations focused on fresh installation. Catalog upgrade
   and uninstall as separate use cases, retaining only brief cleanup guidance in
   UC-01 and removing duplicated lifecycle details from its realizations.
@@ -87,6 +108,9 @@ failures before service activation.
 
 ### Removed
 
+- Remove unused single/pair parameter searches, comparison queries, run-analysis
+  plots, round-robin reporting projections, legacy checkpoint conversion, and
+  their retired-path tests. Retain current workflow and integration coverage.
 - Remove the test-only `GenerateDefaultConfig` wrapper; tests now call
   `SimulationConfiguration.defaults()` directly.
 

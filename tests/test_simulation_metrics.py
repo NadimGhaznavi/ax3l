@@ -10,8 +10,8 @@ from urllib.error import HTTPError
 from urllib.request import urlopen
 
 from ax3l.activity.SimulationMetrics import buckets, metrics
-from ax3l.app.DbMgr import DbMgr
-from ax3l.app.EventLogDb import EventLogDb
+from ax3l.interface.database.DbMgr import DbMgr
+from ax3l.interface.database.EventLogDb import EventLogDb
 
 
 class MetricsReportTests(unittest.TestCase):
@@ -102,8 +102,8 @@ class MetricsReportTests(unittest.TestCase):
 
     def test_page_empty_state_and_database_cleanup(self):
         from ax3l.server.ReportingServer import make_server
-        db = self.enterContext(patch('ax3l.server.ReportingServer.DbMgr')).return_value
-        log = self.enterContext(patch('ax3l.server.ReportingServer.EventLogDb')).return_value
+        db = self.enterContext(patch('ax3l.app.reporting.Reports.DbMgr')).return_value
+        log = self.enterContext(patch('ax3l.app.reporting.Reports.EventLogDb')).return_value
         log.simulation_metrics.return_value = []
         server = make_server('127.0.0.1', 0)
         thread = Thread(target=server.serve_forever, daemon=True)
@@ -137,7 +137,7 @@ class MetricsReportTests(unittest.TestCase):
                 urlopen(url + '?bucket_size=' + value)
             self.assertEqual(error.exception.code, 400)
         log.simulation_metrics.side_effect = RuntimeError('database unavailable')
-        with patch('ax3l.server.ReportingServer.traceback.print_exc'), self.assertRaises(HTTPError) as error:
+        with patch('ax3l.interface.ReportHandler.logging.exception'), self.assertRaises(HTTPError) as error:
             urlopen(url)
         self.assertEqual(error.exception.code, 500)
         self.assertEqual(db.close.call_count, 7)
@@ -176,7 +176,7 @@ class MetricsDatabaseTests(unittest.TestCase):
                         start + timedelta(seconds=offset + duration) if duration is not None else None))
 
         def event(name, seconds, process='conversation', category='Conversation', content='{}', parent=1):
-            id = db.log(name, category, 'INFO', content, process_id=process, parent_event_id=parent)
+            id = EventLogDb(db).log(name, category, 'INFO', content, process_id=process, parent_event_id=parent)
             db.execute('UPDATE events SET occurred_at=%s WHERE event_id=%s',
                        (start + timedelta(seconds=seconds), id))
 

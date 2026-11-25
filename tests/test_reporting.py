@@ -1,5 +1,7 @@
 """HTTP integration check using the disposable test event database."""
 
+from ax3l.interface.database.EventLogDb import EventLogDb
+
 import os
 import json
 from threading import Thread
@@ -11,6 +13,15 @@ from unittest.mock import patch
 
 
 class ClientDisconnectTests(unittest.TestCase):
+    def test_startup_failure_closes_background_workers(self):
+        from ax3l.server.ReportingServer import make_server
+
+        with patch('ax3l.server.ReportingServer.ReportBackground') as background, \
+                patch('ax3l.server.ReportingServer.ReportRenderer', side_effect=RuntimeError('Missing template')):
+            with self.assertRaisesRegex(RuntimeError, 'Missing template'):
+                make_server('127.0.0.1', 0)
+            background.return_value.close.assert_called_once_with()
+
     def test_disconnect_during_response_headers_or_body(self):
         from io import BytesIO
         from unittest.mock import Mock
@@ -29,11 +40,10 @@ class ClientDisconnectTests(unittest.TestCase):
                             f'GET {path} HTTP/1.0\r\n\r\n'.encode())
                         request.sendall.side_effect = [None] * (write - 1) + [error()]
                         with patch.object(handler, 'log_message'), patch(
-                            'ax3l.server.ReportingServer.traceback.print_exc'
+                            'ax3l.interface.ReportHandler.logging.exception'
                         ) as traceback_log, patch(
-                            'ax3l.server.ReportingServer.SnakeLab'
-                        ) as snake:
-                            snake.return_value.get_run_summary.return_value = None
+                            'ax3l.interface.SnakeLab.SnakeLab.get_run_summary', return_value=None
+                        ):
                             instance = handler(request, ('127.0.0.1', 1234), Mock())
                         self.assertTrue(instance.close_connection)
                         self.assertEqual(request.sendall.call_count, write)
@@ -63,8 +73,8 @@ class ExperimentStatusTests(unittest.TestCase):
     def test_all_time_score_includes_the_live_golden_when_reporting_totals_are_stale(self):
         from ax3l.server.ReportingServer import make_server
 
-        self.enterContext(patch('ax3l.server.ReportingServer.DbMgr'))
-        log = self.enterContext(patch('ax3l.server.ReportingServer.EventLogDb')).return_value
+        self.enterContext(patch('ax3l.app.reporting.Reports.DbMgr'))
+        log = self.enterContext(patch('ax3l.app.reporting.Reports.EventLogDb')).return_value
         log.recent.return_value = []
         snake = self.enterContext(patch('ax3l.server.ReportingServer.SnakeLab')).return_value
         background = self.enterContext(patch('ax3l.server.ReportingServer.ReportBackground')).return_value
@@ -98,7 +108,7 @@ class ExperimentStatusTests(unittest.TestCase):
         from ax3l.constants.DLabel import FIELD_TO_LABEL_MAP
 
         templates = Environment(
-            loader=FileSystemLoader(Path(__file__).parents[1] / 'ax3l/server/templates'),
+            loader=FileSystemLoader(Path(__file__).parents[1] / 'ax3l/presentation/reporting/templates'),
             autoescape=select_autoescape(['html']))
         templates.globals['field_labels'] = FIELD_TO_LABEL_MAP
         for parameter in ('learning_rate', 'epsilon_pair', 'reward_pair', None, '<unsafe>'):
@@ -123,8 +133,8 @@ class ExperimentStatusTests(unittest.TestCase):
     def test_prompt_detail_source_title_and_escaping(self):
         from ax3l.server.ReportingServer import make_server
 
-        self.enterContext(patch('ax3l.server.ReportingServer.DbMgr'))
-        log = self.enterContext(patch('ax3l.server.ReportingServer.EventLogDb')).return_value
+        self.enterContext(patch('ax3l.app.reporting.Reports.DbMgr'))
+        log = self.enterContext(patch('ax3l.app.reporting.Reports.EventLogDb')).return_value
         server = make_server('127.0.0.1', 0)
         thread = Thread(target=server.serve_forever, daemon=True)
         thread.start()
@@ -151,15 +161,15 @@ class ExperimentStatusTests(unittest.TestCase):
         from ax3l.server.ReportingServer import make_server
         from ax3l.constants.DAx3l import DAx3l
 
-        self.enterContext(patch('ax3l.server.ReportingServer.DbMgr'))
-        log = self.enterContext(patch('ax3l.server.ReportingServer.EventLogDb')).return_value
+        self.enterContext(patch('ax3l.app.reporting.Reports.DbMgr'))
+        log = self.enterContext(patch('ax3l.app.reporting.Reports.EventLogDb')).return_value
         log.recent.return_value = []
         snake = self.enterContext(patch('ax3l.server.ReportingServer.SnakeLab')).return_value
         snake.get_highscore_frames.return_value = None
-        self.enterContext(patch('ax3l.app.ReportBackground.SnakeLab', return_value=snake))
-        self.enterContext(patch('ax3l.app.ReportBackground.ReportBackground.episode_totals',
+        self.enterContext(patch('ax3l.app.reporting.ReportBackground.SnakeLab', return_value=snake))
+        self.enterContext(patch('ax3l.app.reporting.ReportBackground.ReportBackground.episode_totals',
                                side_effect=lambda: snake.get_episode_totals()))
-        self.enterContext(patch('ax3l.app.ReportBackground.ReportBackground.status',
+        self.enterContext(patch('ax3l.app.reporting.ReportBackground.ReportBackground.status',
             side_effect=lambda: dict(snake_lab_status='Idle',
                 simulations_submitted=snake.get_num_sims(),
                 all_time_high_score=snake.get_high_score(), experiment_cycles=log.experiment_cycles())))
@@ -219,8 +229,8 @@ class ExperimentStatusTests(unittest.TestCase):
 class ReportingTests(unittest.TestCase):
     def test_log_page_refresh_and_escaping(self):
         self.assertEqual(os.environ["DB_NAME"], "ax3l_test")
-        from ax3l.app.DbMgr import DbMgr
-        from ax3l.app.ReportBackground import ReportBackground
+        from ax3l.interface.database.DbMgr import DbMgr
+        from ax3l.app.reporting.ReportBackground import ReportBackground
         from ax3l.server.ReportingServer import make_server
         import zmq
 
@@ -239,20 +249,20 @@ class ReportingTests(unittest.TestCase):
             return_value={"games_played": 170, "moves_made": 1700},
         ))
         self.enterContext(patch(
-            "ax3l.app.ReportBackground.ReportBackground.episode_totals",
+            "ax3l.app.reporting.ReportBackground.ReportBackground.episode_totals",
             return_value={"games_played": 170, "moves_made": 1700},
         ))
         self.enterContext(patch(
-            "ax3l.app.ReportBackground.ReportBackground.status",
+            "ax3l.app.reporting.ReportBackground.ReportBackground.status",
             side_effect=lambda: dict(ReportBackground._load_status(),
                 simulations_submitted=17, experiment_cycles=0,
                 all_time_high_score=high_score.return_value),
         ))
         self.enterContext(patch(
-            "ax3l.app.ReportBackground.ReportBackground.animation_ready", return_value=False,
+            "ax3l.app.reporting.ReportBackground.ReportBackground.animation_ready", return_value=False,
         ))
         self.enterContext(patch(
-            "ax3l.app.EventLogDb.EventLogDb.current_golden_config",
+            "ax3l.interface.database.EventLogDb.EventLogDb.current_golden_config",
             return_value={"process_id": str(uuid4())},
         ))
         self.enterContext(patch(
@@ -265,7 +275,7 @@ class ReportingTests(unittest.TestCase):
         self.addCleanup(db.close)
         self.addCleanup(db.execute, "DELETE FROM events WHERE process_id = %s", (process_id,))
         first = f"{process_id} <script>alert('test')</script>\nNext line"
-        db.log("report_test", "System", "INFO", first, process_id=process_id)
+        EventLogDb(db).log("report_test", "System", "INFO", first, process_id=process_id)
         server = make_server("127.0.0.1", 0)
         thread = Thread(target=server.serve_forever, daemon=True)
         thread.start()
@@ -287,7 +297,7 @@ class ReportingTests(unittest.TestCase):
             second = f"{process_id} refreshed event"
             simulation.return_value = True
             high_score.return_value = 60
-            db.log("report_test", "System", "INFO", second, process_id=process_id)
+            EventLogDb(db).log("report_test", "System", "INFO", second, process_id=process_id)
             with urlopen(url) as response:
                 page = response.read().decode()
                 self.assertLess(page.index(second), page.index("&lt;script&gt;"))
@@ -323,7 +333,7 @@ class ReportingTests(unittest.TestCase):
                 "timings": {"predicted_ms": 946.36},
                 "extra": {"flag": False, "empty": [], "missing": None},
             }
-            event_id = db.log("reply_received", "Conversation", "INFO", json.dumps(payload), process_id=process_id)
+            event_id = EventLogDb(db).log("reply_received", "Conversation", "INFO", json.dumps(payload), process_id=process_id)
             with urlopen(url) as response:
                 page = response.read().decode()
                 self.assertIn(f'href="/events/{event_id}">Quiet &lt;script&gt;night&lt;/script&gt;', page)
@@ -340,20 +350,19 @@ class ReportingTests(unittest.TestCase):
                     {"type": "text", "text": caption},
                     {"type": "image_url", "image_url": {"url": png_url}},
                 ]}
-                prompt_id = db.log("prompt_sent", "Conversation", "INFO", json.dumps(prompt),
+                prompt_id = EventLogDb(db).log("prompt_sent", "Conversation", "INFO", json.dumps(prompt),
                                    process_id=process_id, source_name="ComparisonPlot")
                 with urlopen(url) as response:
                     page = response.read().decode()
                     self.assertIn(f'href="/events/{prompt_id}"', page)
                     self.assertNotIn(png_url, page)
-                with patch("ax3l.interface.SnakeLab.SnakeLab.get_episode_losses", side_effect=AssertionError("Must use logged snapshot")):
-                    with urlopen(f"{url}/events/{prompt_id}") as response:
-                        page = response.read().decode()
+                with urlopen(f"{url}/events/{prompt_id}") as response:
+                    page = response.read().decode()
                 self.assertIn(f'<img src="{png_url}"', page)
                 self.assertIn(f'Prompt (ComparisonPlot): #{prompt_id}', page)
                 self.assertNotIn('<script>test</script>', page)
                 self.assertIn('Back to event log', page)
-            text_id = db.log("prompt_sent", "Conversation", "INFO",
+            text_id = EventLogDb(db).log("prompt_sent", "Conversation", "INFO",
                              json.dumps({"role": "user", "content": "Choose a learning rate."}), process_id=process_id)
             with urlopen(f"{url}/events/{text_id}") as response:
                 page = response.read().decode()

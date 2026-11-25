@@ -10,9 +10,9 @@ import unittest
 from unittest.mock import patch
 from uuid import uuid4
 
-from ax3l.app.DbMgr import DbMgr
-from ax3l.app.snakelab.ExperimentDb import ExperimentDb
-from ax3l.app.snakelab.SnakeLabDb import CONFIGURATION_FIELDS, CONFIGURATION_COLUMNS, _config_values
+from ax3l.interface.database.DbMgr import DbMgr
+from ax3l.interface.database.ExperimentDb import ExperimentDb
+from ax3l.interface.database.SnakeLabDb import CONFIGURATION_FIELDS, CONFIGURATION_COLUMNS, _config_values
 from ax3l.constants.DSnakeLab import DSnakeLab
 from ax3l.entities.ExperimentState import ExperimentState
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration

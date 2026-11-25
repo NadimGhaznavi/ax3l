@@ -13,8 +13,8 @@ from jsonschema import ValidationError
 from PIL import Image
 
 from ax3l.activity.ViewConfiguration import apply_values, other_parameters
-from ax3l.app.snakelab.ExperimentLoop import ExperimentLoop
-from ax3l.app.snakelab.ExperimentDb import ExperimentDb
+from ax3l.app.experiment.ExperimentLoop import ExperimentLoop
+from ax3l.interface.database.ExperimentDb import ExperimentDb
 from ax3l.constants.DViewConversation import DViewConversation
 from ax3l.entities.ExperimentView import VIEWS
 from ax3l.entities.ExperimentState import ExperimentState
@@ -73,10 +73,10 @@ class ViewCycleTests(unittest.TestCase):
         self.snake = FakeSnake()
         self.model = LocalLLM()
         self.addCleanup(self.model.close)
-        self.enterContext(patch('ax3l.app.snakelab.ExperimentLoop.ExperimentDb', return_value=self.store))
-        self.enterContext(patch('ax3l.app.snakelab.ExperimentLoop.EventLogDb',
+        self.enterContext(patch('ax3l.app.experiment.ExperimentLoop.ExperimentDb', return_value=self.store))
+        self.enterContext(patch('ax3l.app.experiment.ExperimentLoop.EventLogDb',
                                return_value=MemoryEvents(self.log)))
-        self.shuffle = self.enterContext(patch('ax3l.app.snakelab.ExperimentLoop.shuffle',
+        self.shuffle = self.enterContext(patch('ax3l.app.experiment.ExperimentLoop.shuffle',
                                                side_effect=lambda names: names.reverse()))
 
     def loop(self):
@@ -178,31 +178,6 @@ class ViewCycleTests(unittest.TestCase):
         self.assertIn(f'Latest simulation: {run_id}', prompt_text(self.model.requests[0]))
         self.assertEqual(len(self.snake.submissions), 2)
 
-    def test_old_partial_draft_gets_evaluations_and_keeps_accepted_choices(self):
-        run_id = self.snake.submit_simulation(SimulationConfiguration.defaults())
-        config = apply_values(SimulationConfiguration.defaults(), {'epsilon.initial': .9})
-        previous = {name: ViewProposal(view.initial_hypothesis, {}) for name, view in VIEWS.items()}
-        state = ExperimentState('legacy-experiment', 'choosing', config,
-                                golden_run_id=run_id, reference_run_id=run_id, latest_run_id=run_id,
-                                previous=previous, order=list(reversed(VIEWS)), proposals={
-                                    'exploration': ViewProposal('Already accepted.', {'epsilon.initial': .9}),
-                                })
-        data = asdict(state)
-        del data['observations']
-        for key in ('previous', 'proposals'):
-            for proposal in data[key].values():
-                proposal.update(evaluation='Old combined evaluation.', expected_effect='A higher high score.')
-        db = Mock()
-        db.query.return_value = [dict(content=json.dumps(data))]
-        self.store.save(ExperimentDb(db).load())
-        self.loop().run(cycles=1)
-        self.assertEqual(len(self.model.requests), 11)  # Four evaluations, three choices, four evaluations.
-        self.assertEqual([tool_name(request) for request in self.model.requests[:4]],
-                         ['submit_observations'] * 4)
-        self.assertIn(VIEWS['exploration'].initial_hypothesis, prompt_text(self.model.requests[3]))
-        self.assertIn('Already accepted.', prompt_text(self.model.requests[-1]))
-        self.assertEqual(self.snake.submissions[-1]['epsilon']['initial'], .9)
-        self.shuffle.assert_not_called()
 
     def test_restart_during_trial_evaluations_does_not_resubmit_the_simulation(self):
         normal = self.store.save

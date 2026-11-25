@@ -3,7 +3,7 @@ from datetime import datetime
 import unittest
 from unittest.mock import Mock, patch
 
-from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb, CONFIGURATION_COLUMNS, CONFIGURATION_FIELDS, _config_values
+from ax3l.interface.database.SnakeLabDb import SnakeLabDb, CONFIGURATION_COLUMNS, CONFIGURATION_FIELDS, _config_values
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 from ax3l.interface.SnakeLab import SnakeLab
 from ax3l.server.ReportingServer import make_server
@@ -14,7 +14,7 @@ RUN_ID = "f6e72cb3-9bcf-4669-b368-a17c656bad79"
 
 class SimulationControlTests(unittest.TestCase):
     def exchange(self, method, response, *args):
-        with patch("ax3l.interface.SnakeLab.zmq.Context") as context:
+        with patch("ax3l.zmq.ZMQClient.zmq.Context") as context:
             socket = context.return_value.__enter__.return_value.socket.return_value.__enter__.return_value
             socket.recv_json.side_effect = lambda: {
                 "protocol_version": 1,
@@ -108,8 +108,8 @@ class ConfigPageTests(unittest.TestCase):
         event = dict(event_id=1, occurred_at=datetime.now(), name="simulation_submitted",
                      category="SnakeLab", log_level="INFO", content="Submitted config.",
                      process_id=RUN_ID)
-        with patch("ax3l.server.ReportingServer.DbMgr"), patch(
-            "ax3l.server.ReportingServer.EventLogDb"
+        with patch("ax3l.app.reporting.Reports.DbMgr"), patch(
+            "ax3l.app.reporting.Reports.EventLogDb"
         ) as log, patch("ax3l.server.ReportingServer.SnakeLab") as snake:
             snake.return_value.is_simulation_running.return_value = True
             snake.return_value.get_high_score.return_value = 37

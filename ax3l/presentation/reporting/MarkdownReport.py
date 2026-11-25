@@ -5,7 +5,7 @@ import re
 
 from markdown_it import MarkdownIt
 
-from ax3l.activity.JsonMarkdown import json_markdown
+from ax3l.presentation.reporting.JsonMarkdown import json_markdown
 
 
 def _json_block(match: re.Match) -> str:

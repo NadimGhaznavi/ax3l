@@ -7,9 +7,9 @@ from time import monotonic
 import pymysql
 import zmq
 
-from ax3l.activity.SimulationAnimation import SimulationAnimation
-from ax3l.app.DbMgr import DbMgr
-from ax3l.app.ReportingRefresh import ReportingRefresh
+from ax3l.presentation.reporting.SimulationAnimation import SimulationAnimation
+from ax3l.interface.database.DbMgr import DbMgr
+from ax3l.app.reporting.ReportingRefresh import ReportingRefresh
 from ax3l.constants.DReportMgr import DReportMgr
 from ax3l.interface.SimulationGifStore import SimulationGifStore
 from ax3l.interface.SnakeLab import SnakeLab

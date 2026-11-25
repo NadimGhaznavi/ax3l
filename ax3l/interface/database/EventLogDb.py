@@ -1,7 +1,6 @@
-import json
 from typing import Any
 
-from ax3l.app.DbMgr import DbMgr
+from ax3l.interface.database.DbMgr import DbMgr
 from ax3l.constants.DEventCategory import DEventCategory
 from ax3l.constants.DSnakeLab import DSnakeLab
 
@@ -9,6 +8,44 @@ from ax3l.constants.DSnakeLab import DSnakeLab
 class EventLogDb:
     def __init__(self, db: DbMgr):
         self._db = db
+
+    def log(
+        self,
+        name: str,
+        category: str,
+        log_level: str,
+        content: str,
+        *,
+        process_id: str | None = None,
+        parent_event_id: int | None = None,
+        source_name: str | None = None,
+        parameter: str | None = None,
+        ax3l_version: str | None = None,
+        experiment_score: dict | None = None,
+    ) -> int:
+        """Commit an event and its message together and return the event ID.
+
+        This method owns its transaction; call it outside transaction().
+        """
+        with self._db.transaction():
+            self._db.execute(
+                """INSERT INTO events
+                   (name, category, log_level, process_id, parent_event_id, source_name, parameter, ax3l_version)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+                (name, category, log_level, process_id, parent_event_id, source_name, parameter, ax3l_version),
+            )
+            event_id = self._db.query("SELECT LAST_INSERT_ID() AS event_id")[0]["event_id"]
+            self._db.execute(
+                "INSERT INTO event_messages (event_id, content) VALUES (%s, %s)",
+                (event_id, content),
+            )
+            if experiment_score is not None:
+                self._db.execute(
+                    "INSERT INTO experiment_highscores (event_id, simulations, score, seed) VALUES (%s, %s, %s, %s)",
+                    (event_id, experiment_score["simulations"], experiment_score["score"], experiment_score["seed"]),
+                )
+        return event_id
+
 
     def recent(self) -> list[dict[str, Any]]:
         """Return the latest 500 events, newest first."""
@@ -62,7 +99,7 @@ class EventLogDb:
                 FROM events e JOIN event_messages m USING (event_id)
                 WHERE e.category = 'Configuration' AND e.name = 'proposal_accepted'
             )
-            SELECT g.event_id, g.occurred_at, g.process_id, 'configuration' AS parameter,
+            SELECT g.event_id, g.occurred_at, g.process_id,
                    h.score AS high_score, r.event_id AS reply_id,
                    rm.content AS response, gm.content AS decision
             FROM events g

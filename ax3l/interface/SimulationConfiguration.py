@@ -7,7 +7,7 @@ from pathlib import Path
 from jsonschema import Draft202012Validator, ValidationError
 
 
-SCHEMA = json.loads((Path(__file__).parents[1] / "app/snakelab/simulation-config-v2.schema.json").read_text())
+SCHEMA = json.loads((Path(__file__).with_name("schemas") / "simulation-config-v2.schema.json").read_text())
 _VALIDATOR = Draft202012Validator(SCHEMA)
 
 

@@ -1,8 +1,8 @@
 import argparse
 import os
 
-from ax3l.app.DbMgr import DbMgr
-from ax3l.app.snakelab.ExperimentLoop import ExperimentLoop
+from ax3l.interface.database.DbMgr import DbMgr
+from ax3l.app.experiment.ExperimentLoop import ExperimentLoop
 from ax3l.interface.Configuration import Configuration
 from ax3l.interface.LLM import LLM
 from ax3l.interface.Network import Network

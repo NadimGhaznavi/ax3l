@@ -2,7 +2,7 @@
 
 import json
 
-from ax3l.activity.MarkdownReport import markdown_html
+from ax3l.presentation.reporting.MarkdownReport import markdown_html
 from ax3l.constants.DEventCategory import DEventCategory as Events
 
 

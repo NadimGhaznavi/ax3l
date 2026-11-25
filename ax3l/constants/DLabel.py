@@ -4,8 +4,6 @@ from typing import Final
 
 
 class DLabel:
-    # Pair labels follow the component order in PairParameters.PAIR_PARAMETERS.
-
     HIDDEN_SIZE: Final[str] = "Hidden Size"
     LAYERS: Final[str] = "Encoder Layers"
     DROPOUT: Final[str] = "Dropout"
@@ -31,40 +29,22 @@ class DLabel:
 
 FIELD_TO_LABEL_MAP: Final[dict[str, str]] = {
     "configuration": "Complete configuration",
-    "revision": "Experiment decision",
-    "simulation_summary": "Simulation analysis",
-    "hidden_size": DLabel.HIDDEN_SIZE,
     "model.hidden_size": DLabel.HIDDEN_SIZE,
-    "layers": DLabel.LAYERS,
     "model.layers": DLabel.LAYERS,
-    "dropout": DLabel.DROPOUT,
     "model.dropout": DLabel.DROPOUT,
-    "sequence_length": DLabel.SEQUENCE_LENGTH,
     "training.sequence_length": DLabel.SEQUENCE_LENGTH,
-    "batch_size": DLabel.BATCH_SIZE,
     "training.batch_size": DLabel.BATCH_SIZE,
-    "learning_rate": DLabel.LEARNING_RATE,
     "training.learning_rate": DLabel.LEARNING_RATE,
-    "gamma": DLabel.GAMMA,
     "training.gamma": DLabel.GAMMA,
     "seed": DLabel.SEED,
-    "epsilon_pair": DLabel.EPSILON_PAIR,
     "epsilon.initial": DLabel.EPSILON_INITIAL,
     "epsilon.decay": DLabel.EPSILON_DECAY,
-    "reward_pair": DLabel.REWARD_PAIR,
-    "closer_to_food": DLabel.CLOSER_TO_FOOD,
     "game.rewards.closer_to_food": DLabel.CLOSER_TO_FOOD,
-    "further_from_food": DLabel.FURTHER_FROM_FOOD,
     "game.rewards.further_from_food": DLabel.FURTHER_FROM_FOOD,
-    "food": DLabel.FOOD,
     "game.rewards.food": DLabel.FOOD,
-    "empty": DLabel.EMPTY,
     "game.rewards.empty": DLabel.EMPTY,
-    "snake": DLabel.SNAKE,
     "game.rewards.snake": DLabel.SNAKE,
-    "wall": DLabel.WALL,
     "game.rewards.wall": DLabel.WALL,
-    "epsilon_nice_pair": DLabel.EPSILON_NICE_PAIR,
     "epsilon_nice.probability": DLabel.EPSILON_NICE_PROBABILITY,
     "epsilon_nice.steps": DLabel.EPSILON_NICE_STEPS,
     "model.type": "Model",
@@ -80,7 +60,7 @@ FIELD_TO_DESCRIPTION_MAP: Final[dict[str, str]] = {
     "training.batch_size": "Training batch size",
     "training.learning_rate": "Optimizer learning rate",
     "training.gamma": "Discount factor",
-    "seed": "Request the next untested seed.",
+    "seed": "Random seed used for the simulation.",
     "epsilon.initial": "Initial probability",
     "epsilon.decay": "Probability decay rate",
     "game.rewards.closer_to_food": "",

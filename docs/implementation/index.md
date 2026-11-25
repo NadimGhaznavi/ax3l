@@ -4,6 +4,9 @@
 
 **Status:** Initial draft, checked against the current implementation.
 
+[Application structure](architecture.md) maps the current package responsibilities
+and shared runtime contracts.
+
 ## Realizations
 
 | Use case | Design | Implementation realization |

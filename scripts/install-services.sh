@@ -24,7 +24,7 @@ if [[ ! -x $install_dir/.venv/bin/python ]]; then
 fi
 "$install_dir/.venv/bin/python" -m pip install -r "$checkout_dir/requirements.txt"
 "$install_dir/.venv/bin/python" "$checkout_dir/scripts/install-chrome.py" --app "$install_dir"
-# Repair environments created under install.sh's former inherited umask 077.
+# Allow service-account access to the prepared runtime.
 chgrp -R "$service_account" "$install_dir/.venv"
 chmod -R g+rX "$install_dir/.venv"
 install -d -m 755 "$install_dir/games"

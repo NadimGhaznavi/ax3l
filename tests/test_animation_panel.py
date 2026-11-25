@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageSequence
 
-from ax3l.activity.SimulationAnimation import SimulationAnimation
+from ax3l.presentation.reporting.SimulationAnimation import SimulationAnimation
 
 
 def score_frames(scores):
@@ -18,7 +18,7 @@ def score_frames(scores):
 
 class AnimationTests(unittest.TestCase):
     def test_embedded_labels_and_padding_on_every_frame(self):
-        font_path = Path(__file__).resolve().parents[1] / 'ax3l/activity/fonts/DejaVuSansMono.ttf'
+        font_path = Path(__file__).resolve().parents[1] / 'ax3l/presentation/reporting/fonts/DejaVuSansMono.ttf'
         font = ImageFont.truetype(str(font_path), SimulationAnimation.FONT_SIZE)
         original_text = ImageDraw.ImageDraw.text
         calls = []

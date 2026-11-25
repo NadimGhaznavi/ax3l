@@ -7,7 +7,7 @@ from typing import TypeVar
 from jsonschema import Draft202012Validator
 
 from ax3l.activity.ViewConfiguration import apply_values
-from ax3l.app.DbMgr import DbMgr
+from ax3l.interface.database.EventLogDb import EventLogDb
 from ax3l.constants.DEventCategory import DEventCategory as Events
 from ax3l.constants.DViewConversation import DViewConversation
 from ax3l.entities.ExperimentView import ExperimentView
@@ -24,9 +24,9 @@ def _nonfinite(value):
 
 
 class ViewConversation:
-    def __init__(self, llm: LLM, db: DbMgr):
+    def __init__(self, llm: LLM, events: EventLogDb):
         self._llm = llm
-        self._db = db
+        self._events = events
 
     def propose(self, view: ExperimentView, prompt: str, config: dict, experiment_id: str) -> ViewProposal:
         schema = dict(type="object", additionalProperties=False,
@@ -60,11 +60,11 @@ class ViewConversation:
         tool = dict(type="function", function=dict(
             name=tool_name, description=description, parameters=schema,
         ))
-        conversation = self._db.log(Events.Conversation.STARTED, Events.Conversation.CATEGORY, "INFO",
+        conversation = self._events.log(Events.Conversation.STARTED, Events.Conversation.CATEGORY, "INFO",
                                     f"{action} {view.name} with {self._llm.url}.", process_id=experiment_id)
 
         def log(category, name, content, level="INFO"):
-            return self._db.log(name, category.CATEGORY, level, content, process_id=experiment_id,
+            return self._events.log(name, category.CATEGORY, level, content, process_id=experiment_id,
                                 parent_event_id=conversation, parameter=view.name, source_name=view.name)
 
         outcome, level = "View submission accepted.", "INFO"

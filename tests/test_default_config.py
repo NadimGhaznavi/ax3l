@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class DefaultConfigTests(unittest.TestCase):
     def test_defaults_form_a_valid_complete_configuration(self):
-        schema = json.loads((ROOT / "ax3l/app/snakelab/simulation-config-v2.schema.json").read_text())
+        schema = json.loads((ROOT / "ax3l/interface/schemas/simulation-config-v2.schema.json").read_text())
         config = SimulationConfiguration.defaults()
         Draft202012Validator(schema).validate(config)
         self.assertEqual(config["model"], {

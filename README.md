@@ -4,6 +4,16 @@ If you like this project, please give it a star (top right corner)! :)
 
 ## Tests
 
+For the full suite with a private, disposable MariaDB server, run:
+
+```sh
+.venv/bin/python scripts/test.py
+```
+
+This requires MariaDB server and client tools. The runner supplies its own test
+credentials and uses local HTTP/ZeroMQ fixtures. It does not use deployed services.
+Pass unittest options such as `-v` or `-p test_view_cycle_integration.py` to focus a run.
+
 Run the normal suite from the checkout with `.venv/bin/python -m unittest discover -s tests`.
 HTTP and ZeroMQ fixtures bind only to loopback. Database integration tests are
 opt-in and require a disposable MariaDB database named `ax3l_test`.

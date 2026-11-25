@@ -8,6 +8,8 @@ connected views. They start from actors' goals and explain the responsibilities,
 design, and code that realize those goals.
 
 The [shared glossary](glossary.md) defines terminology used across the views.
+The [application structure](implementation/architecture.md) maps the code's
+current responsibilities and verification commands.
 
 | View | Purpose | Status |
 | --- | --- | --- |

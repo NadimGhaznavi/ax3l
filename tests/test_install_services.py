@@ -162,12 +162,16 @@ exec /usr/bin/systemd-analyze "$@"
                 self.assertEqual(self.config.stat().st_mode & 0o777, 0o750)
                 self.assertEqual((self.app / '.venv/lib/package.py').stat().st_mode & 0o777, 0o640)
                 self.assertEqual((self.app / '.venv/bin/python').stat().st_mode & 0o777, 0o750)
-                for module in ('activity/SimulationAnimation.py',
-                               'activity/fonts/DejaVuSansMono.ttf', 'activity/fonts/LICENSE.txt',
+                for module in ('presentation/reporting/SimulationAnimation.py',
+                               'presentation/reporting/fonts/DejaVuSansMono.ttf', 'presentation/reporting/fonts/LICENSE.txt',
                                'interface/SimulationGifStore.py', 'interface/SimulationConfiguration.py',
-                               'activity/RunAnalysis.py', 'constants/DScoreDistribution.py',
-                               'activity/PresentationValues.py', 'app/ReportBackground.py',
-                               'app/snakelab/ExperimentLoop.py', 'app/snakelab/ExperimentDb.py',
+                               'interface/schemas/simulation-config-v2.schema.json',
+                               'interface/ReportHandler.py', 'interface/database/EventSchema.py',
+                               'interface/database/EventLogDb.py', 'interface/database/DbMgr.py',
+                               'app/reporting/Reports.py', 'presentation/reporting/ReportRenderer.py',
+                               'constants/DScoreDistribution.py',
+                               'presentation/reporting/PresentationValues.py', 'app/reporting/ReportBackground.py',
+                               'app/experiment/ExperimentLoop.py', 'interface/database/ExperimentDb.py',
                                'interface/ViewConversation.py', 'entities/ExperimentState.py',
                                'entities/ExperimentView.py', 'entities/ViewProposal.py',
                                'presentation/ViewPrompts.py',
@@ -179,8 +183,8 @@ exec /usr/bin/systemd-analyze "$@"
                 self.assertIn('--port 28870', reporting)
                 self.assertIn(f'ReadWritePaths={self.app}/games', reporting)
                 self.assertTrue((self.app / 'games').is_dir())
-                for asset in (ROOT / 'ax3l/server/templates').glob('*.html'):
-                    installed = self.app / 'ax3l/server/templates' / asset.name
+                for asset in (ROOT / 'ax3l/presentation/reporting/templates').glob('*.html'):
+                    installed = self.app / 'ax3l/presentation/reporting/templates' / asset.name
                     self.assertEqual(installed.read_bytes(), asset.read_bytes(), str(asset))
                 for asset in (ROOT / 'ax3l/presentation/prompts').rglob('*.md'):
                     installed = self.app / asset.relative_to(ROOT)
@@ -192,8 +196,11 @@ from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 from ax3l.entities.ExperimentView import VIEWS
 from ax3l.presentation.ViewPrompts import ViewPrompts
 from ax3l.server.Ax3lServer import main
+from ax3l.server.ReportingServer import make_server
+from ax3l.presentation.reporting.ReportRenderer import ReportRenderer
+ReportRenderer()
 assert SimulationConfiguration.defaults()['model']['hidden_size'] == 64
-templates = Environment(loader=FileSystemLoader(Path('ax3l/server/templates')))
+templates = Environment(loader=FileSystemLoader(Path('ax3l/presentation/reporting/templates')))
 assert templates.get_template('events.html')
 for view in VIEWS.values():
     context = dict(
@@ -227,8 +234,7 @@ for view in VIEWS.values():
         result = self.run_installer()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.app / '.venv').stat().st_mode & 0o777, 0o755)
-        for module in ('app/ReportBackground.py', 'app/ReportingDb.py', 'app/ReportingRefresh.py',
-                       'activity/CompletedRounds.py'):
+        for module in ('app/reporting/ReportBackground.py', 'interface/database/ReportingDb.py', 'app/ReportingRefresh.py'):
             self.assertTrue((self.app / 'ax3l' / module).is_file(), module)
         config = json.loads((self.app / 'conf/ax3l.json').read_text())
         self.assertEqual(config['llamasrv_url'], 'http://127.0.0.1:51001')
@@ -236,6 +242,9 @@ for view in VIEWS.values():
 
     def test_asset_discovery_failure_prevents_service_activation(self):
         self.prepare()
+        previous = self.app / 'ax3l/previous.py'
+        previous.parent.mkdir()
+        previous.write_text('previous application')
         self.executable(self.bin / 'find', '''#!/bin/sh
 printf 'Application file discovery failed.\\n' >&2
 exit 44
@@ -248,6 +257,41 @@ exit 44
         self.assertNotIn('systemctl daemon-reload', calls)
         self.assertNotIn('systemctl start', calls)
         self.assertEqual(list(self.units.iterdir()), [])
+        self.assertEqual(previous.read_text(), 'previous application')
+        self.assertEqual(list(self.app.glob('.application.*')), [])
+
+    def test_upgrade_replaces_the_package_and_preserves_runtime_data(self):
+        self.prepare(old=True)
+        previous = self.app / 'ax3l/retired.py'
+        previous.parent.mkdir()
+        previous.write_text('retired application module')
+        games = self.app / 'games'
+        games.mkdir()
+        (games / 'saved.gif').write_bytes(b'saved animation')
+        result = self.run_installer(script='upgrade.sh')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(previous.exists())
+        self.assertTrue((self.app / 'ax3l/server/Ax3lServer.py').is_file())
+        self.assertEqual((games / 'saved.gif').read_bytes(), b'saved animation')
+        self.assertTrue((self.app / 'conf/ax3l.json').is_file())
+        self.assertEqual(list(self.app.glob('.application.*')), [])
+
+    def test_package_replacement_failure_restores_the_previous_package(self):
+        self.prepare(old=True)
+        previous = self.app / 'ax3l/previous.py'
+        previous.parent.mkdir()
+        previous.write_text('previous application')
+        self.executable(self.bin / 'mv', '''#!/bin/sh
+case "$2" in
+    */.application.*/ax3l) exit 44 ;;
+esac
+exec /usr/bin/mv "$@"
+''')
+        result = self.run_installer(script='upgrade.sh')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(previous.read_text(), 'previous application')
+        self.assertEqual(list(self.app.glob('.application.*')), [])
+        self.assertNotIn('systemctl start', self.log.read_text())
 
     def test_provisioning_failures_do_not_stop_services(self):
         self.prepare()

@@ -3,7 +3,8 @@
 from dataclasses import asdict
 import json
 
-from ax3l.app.DbMgr import DbMgr
+from ax3l.interface.database.DbMgr import DbMgr
+from ax3l.interface.database.EventLogDb import EventLogDb
 from ax3l.constants.DEventCategory import DEventCategory as Events
 from ax3l.entities.ExperimentState import ExperimentState
 from ax3l.entities.ViewProposal import ViewProposal
@@ -23,17 +24,13 @@ class ExperimentDb:
             return None
         data = json.loads(rows[0]["content"])
         SimulationConfiguration.validate(data["config"])
-        # Upgrade checkpoints written before result evaluation became a separate pass.
-        if "observations" not in data:
-            data["phase"] = {"completed": "evaluating", "choosing": "evaluating_previous"}.get(
-                data["phase"], data["phase"])
         for key in ("previous", "proposals"):
             data[key] = {name: ViewProposal(proposal["hypothesis"], proposal["values"])
                          for name, proposal in data[key].items()}
         return ExperimentState(**data)
 
     def save(self, state: ExperimentState) -> None:
-        self._db.log(Events.Configuration.STATE_SAVED, Events.Configuration.CATEGORY, "INFO",
+        EventLogDb(self._db).log(Events.Configuration.STATE_SAVED, Events.Configuration.CATEGORY, "INFO",
                      json.dumps(asdict(state), allow_nan=False), process_id=state.experiment_id)
 
     def comparison(self, run_id: str) -> dict | None:

@@ -8,10 +8,10 @@ from time import sleep
 from uuid import uuid4
 
 from ax3l.activity.ViewConfiguration import apply_values, editable_parameters, other_parameters, view_values
-from ax3l.app.ConfigurationLog import ConfigurationLog
-from ax3l.app.DbMgr import DbMgr
-from ax3l.app.EventLogDb import EventLogDb
-from ax3l.app.snakelab.ExperimentDb import ExperimentDb
+from ax3l.app.experiment.ConfigurationLog import ConfigurationLog
+from ax3l.interface.database.DbMgr import DbMgr
+from ax3l.interface.database.EventLogDb import EventLogDb
+from ax3l.interface.database.ExperimentDb import ExperimentDb
 from ax3l.constants.DAx3l import DAx3l
 from ax3l.constants.DEventCategory import DEventCategory as Events
 from ax3l.constants.DSnakeLab import DSnakeLab
@@ -27,11 +27,11 @@ from ax3l.presentation.ViewPrompts import ViewPrompts
 
 class ExperimentLoop:
     def __init__(self, db: DbMgr, llm: LLM, snake: SnakeLab):
-        self._db = db
         self._snake = snake
         self._store = ExperimentDb(db)
         self._events = EventLogDb(db)
-        self._conversation = ViewConversation(llm, db)
+        self._configuration_log = ConfigurationLog(self._events)
+        self._conversation = ViewConversation(llm, self._events)
         self._prompts = ViewPrompts()
 
     def run(self, *, cycles: int | None = None, check: Callable[[], None] = lambda: None) -> None:
@@ -67,22 +67,22 @@ class ExperimentLoop:
                 status = self._snake.get_simulation_status(state.run_id)
                 if status == "completed":
                     if Events.SnakeLab.COMPLETED not in self._store.run_events(state.run_id):
-                        self._db.log(Events.SnakeLab.COMPLETED, Events.SnakeLab.CATEGORY, "INFO",
+                        self._events.log(Events.SnakeLab.COMPLETED, Events.SnakeLab.CATEGORY, "INFO",
                                      "Simulation completed.", process_id=state.run_id)
                     state.phase = "comparing"
                     self._store.save(state)
                 elif status in ("failed", "cancelled"):
-                    self._db.log(Events.SnakeLab.TERMINAL_EVENTS[status], Events.SnakeLab.CATEGORY, "ERROR",
+                    self._events.log(Events.SnakeLab.TERMINAL_EVENTS[status], Events.SnakeLab.CATEGORY, "ERROR",
                                  f"Simulation {status}.", process_id=state.run_id)
                     raise RuntimeError(f"Simulation {state.run_id} {status}; no completed result to compare.")
                 else:
                     if status == "running" and Events.SnakeLab.STARTED not in self._store.run_events(state.run_id):
-                        self._db.log(Events.SnakeLab.STARTED, Events.SnakeLab.CATEGORY, "INFO",
+                        self._events.log(Events.SnakeLab.STARTED, Events.SnakeLab.CATEGORY, "INFO",
                                      "Simulation started running.", process_id=state.run_id)
                     sleep(DSnakeLab.STATUS_POLL_SECONDS)
             elif state.phase == "comparing":
                 self._finish(state)
-            elif state.phase in ("evaluating", "evaluating_previous"):
+            elif state.phase == "evaluating":
                 self._evaluate_view(state)
                 if state.phase == "completed" and not state.baseline and state.proposals:
                     completed += 1
@@ -128,14 +128,14 @@ class ExperimentLoop:
     def _evaluate_view(self, state: ExperimentState) -> None:
         name = list(VIEWS)[len(state.observations)]
         view = VIEWS[name]
-        proposals = state.previous if state.phase == "evaluating_previous" else state.proposals or state.previous
+        proposals = state.proposals or state.previous
         previous = proposals[name]
         context = dict(previous_hypothesis=previous.hypothesis, previous_values=previous.values,
                        reference_run_id=state.reference_run_id, latest_run_id=state.latest_run_id)
         content = self._prompts.render_evaluation(view, context)
         state.observations[name] = self._conversation.evaluate(view, content, state.experiment_id)
         if len(state.observations) == len(VIEWS):
-            state.phase = "choosing" if state.phase == "evaluating_previous" else "completed"
+            state.phase = "completed"
         self._store.save(state)
 
     def _choose_view(self, state: ExperimentState) -> None:
@@ -162,17 +162,17 @@ class ExperimentLoop:
         recorded = self._store.run_events(state.run_id)
         parent = recorded.get(Events.Configuration.PROPOSAL_ACCEPTED)
         if not state.baseline and parent is None:
-            parent = self._db.log(Events.Configuration.PROPOSAL_ACCEPTED, Events.Configuration.CATEGORY, "INFO",
+            parent = self._events.log(Events.Configuration.PROPOSAL_ACCEPTED, Events.Configuration.CATEGORY, "INFO",
                                   json.dumps(dict(draft_id=state.experiment_id, config=state.config), allow_nan=False),
                                   process_id=state.run_id)
         if Events.SnakeLab.SUBMITTED not in recorded:
-            self._db.log(Events.SnakeLab.SUBMITTED, Events.SnakeLab.CATEGORY, "INFO",
+            self._events.log(Events.SnakeLab.SUBMITTED, Events.SnakeLab.CATEGORY, "INFO",
                          "Submitted baseline configuration." if state.baseline else "Submitted four-view configuration.",
                          process_id=state.run_id, parent_event_id=parent, ax3l_version=DAx3l.VERSION)
 
     def _promote(self, run_id: str, reason: str) -> None:
         result = self._completed_result(run_id)
-        ConfigurationLog(self._db).golden_config_created(
+        self._configuration_log.golden_config_created(
             run_id, reason=reason, experiment_score=dict(simulations=self._snake.get_num_sims(),
                                                         score=result["high_score"], seed=result["config"]["seed"]))
 
@@ -191,7 +191,7 @@ class ExperimentLoop:
                 reason = f"High score: {latest['high_score']} {'>' if won else '<='} {golden['high_score']}."
                 comparison = dict(golden_run_id=state.golden_run_id, latest_run_id=state.run_id,
                                   current_golden_run_id=winner, reason=reason)
-                self._db.log(Events.Configuration.COMPARED, Events.Configuration.CATEGORY, "INFO",
+                self._events.log(Events.Configuration.COMPARED, Events.Configuration.CATEGORY, "INFO",
                              json.dumps(comparison), process_id=state.run_id)
             winner, reason = comparison["current_golden_run_id"], comparison["reason"]
         current = self._events.current_golden_config()

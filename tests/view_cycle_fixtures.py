@@ -47,10 +47,13 @@ class MemoryStore:
 
 class MemoryEvents:
     def __init__(self, log):
-        self.log = log
+        self._log = log
+
+    def log(self, *args, **kwargs):
+        return self._log.log(*args, **kwargs)
 
     def current_golden_config(self):
-        events = [e for e in self.log.events if e['name'] == 'golden_config_created']
+        events = [e for e in self._log.events if e['name'] == 'golden_config_created']
         return dict(process_id=events[-1]['process_id']) if events else None
 
 

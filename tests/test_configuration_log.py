@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import Mock
 
-from ax3l.app.ConfigurationLog import ConfigurationLog
+from ax3l.app.experiment.ConfigurationLog import ConfigurationLog
 from ax3l.constants.DEventCategory import DEventCategory
 
 

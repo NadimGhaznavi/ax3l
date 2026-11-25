@@ -18,10 +18,14 @@ default-configuration wrapper. Begin separate application documentation with
 a draft deployment Use Case View. Require a fresh installation, keeping database
 credentials across explicit uninstall and reinstall operations. Share terminology
 between documentation views through a common glossary, and describe deployment
-responsibilities and collaboration in its Analysis realization.
+responsibilities and collaboration through Analysis and Design realizations.
 
 ### Added
 
+- Add a Design View index and deployment design realization, linking analysis
+  participants to the current scripts, helper interfaces, configuration classes,
+  resources, service definitions, and failure contracts. Include Mermaid
+  structure and sequence diagrams and link forward from Analysis.
 - Add an Analysis View index and the deployment analysis realization, with
   participant responsibilities, Mermaid class and sequence diagrams, failure
   decisions, and traceability back to UC-01. Define analysis roles in the shared

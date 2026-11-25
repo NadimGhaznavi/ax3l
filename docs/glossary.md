@@ -92,6 +92,19 @@ on the host containing the selected source checkout.
 The view mapping the design to source packages, modules, scripts, supporting
 resources, executables, and tests.
 
+## Interface
+
+The public contract through which a software element is used. Examples include
+command-line arguments, a shell function's inputs and outputs, and Python methods.
+
+## Interface class
+
+The project's code-class category for a bridge to a technology, API, protocol,
+or application component, as defined in the
+[coding guidelines](../pages/coding-guidelines.md#classify-classes-by-responsibility).
+A [boundary](#boundary) describes an analysis role; an interface class is a
+concrete code element.
+
 ## LlamaSrv
 
 The independently managed application that hosts the language model and provides

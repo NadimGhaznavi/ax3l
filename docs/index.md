@@ -13,7 +13,7 @@ The [shared glossary](glossary.md) defines terminology used across the views.
 | --- | --- | --- |
 | [Use Case View](use-case/index.md) | Actors, goals, and observable behavior | Initial draft |
 | [Analysis View](analysis/index.md) | Concepts, responsibilities, and collaborations | Initial draft |
-| Design View | Software structure, interfaces, and mechanisms | To be developed |
+| [Design View](design/index.md) | Software structure, interfaces, and mechanisms | Initial draft |
 | Implementation View | Source organization and realization of the design | To be developed through refactoring |
 
 We begin with [Deploy Ax3l software](use-case/uc-01-deploy-ax3l-software.md).

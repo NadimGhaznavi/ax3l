@@ -138,3 +138,8 @@ The responsibilities and ordering were checked against
 [application configuration](../../ax3l/interface/Configuration.py),
 [runtime chart verification](../../scripts/install-chrome.py), and
 [service control](../../scripts/services.sh).
+
+## Design realization
+
+[Deployment design](../design/uc-01-deploy-ax3l-software.md) maps these participants
+to concrete scripts, functions, configuration classes, and service contracts.

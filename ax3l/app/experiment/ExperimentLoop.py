@@ -133,6 +133,16 @@ class ExperimentLoop:
         previous = proposals[name]
         context = dict(previous_hypothesis=previous.hypothesis, previous_values=previous.values,
                        reference_run_id=state.reference_run_id, latest_run_id=state.latest_run_id)
+        if name in ("architecture", "exploration"):
+            episodes = (self._snake.get_exploration_episodes if name == "exploration"
+                        else self._snake.get_episode_scores)
+            reference = episodes(state.reference_run_id)
+            latest = reference if state.latest_run_id == state.reference_run_id else episodes(state.latest_run_id)
+            reference_score = self._completed_result(state.reference_run_id)["high_score"]
+            latest_score = (reference_score if state.latest_run_id == state.reference_run_id
+                            else self._completed_result(state.latest_run_id)["high_score"])
+            context.update(reference_episodes=reference, latest_episodes=latest,
+                           reference_high_score=reference_score, latest_high_score=latest_score)
         content = self._prompts.render_evaluation(view, context)
         state.observations[name] = self._conversation.evaluate(view, content, state.experiment_id)
         if len(state.observations) == len(VIEWS):
@@ -152,8 +162,6 @@ class ExperimentLoop:
             parameters=editable_parameters(view, state.config),
             other_parameters=other_parameters(view, state.config, proposed),
         )
-        if name == "architecture":
-            context["golden_run_episodes"] = self._snake.get_episode_scores(state.golden_run_id)
         prompt = self._prompts.render(view, context)
         proposal = self._conversation.propose(view, prompt, state.config, state.experiment_id)
         state.config = apply_values(state.config, proposal.values)

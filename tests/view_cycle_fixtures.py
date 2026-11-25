@@ -101,6 +101,9 @@ class FakeSnake:
     def get_episode_scores(self, run_id):
         return [dict(episode=row['episode'], score=row['score']) for row in episodes()]
 
+    def get_exploration_episodes(self, run_id):
+        return episodes()
+
 
 class LocalLLM:
     def __init__(self, respond=None):
@@ -132,7 +135,9 @@ class LocalLLM:
         if request['tools'][0]['function']['name'] == 'submit_observations':
             content = request['messages'][0]['content'][0]['text']
             title = content.splitlines()[0].removeprefix('## Task: ').removesuffix(' Evaluation')
-            arguments = dict(observations=f'{title}: comparison measurements are not available yet.')
+            observation = ('recorded training results evaluated.' if title in ('Architecture', 'Exploration')
+                           else 'comparison measurements are not available yet.')
+            arguments = dict(observations=f'{title}: {observation}')
             return dict(choices=[dict(message=dict(role='assistant', tool_calls=[dict(
                 id='observations', type='function', function=dict(
                     name='submit_observations', arguments=json.dumps(arguments)),

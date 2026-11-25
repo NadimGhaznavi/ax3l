@@ -15,20 +15,27 @@
 
 {{ previous_hypothesis }}
 
-### PreviousParameter choices
+### Previous parameter choices
 
 ```json
 {{ previous_values | tojson(indent=2) }}
 ```
 
-## Lastest to Golden Comparison
+## Latest to Golden Comparison
 
-- Golden reference: {{ reference_run_id }}
-- Latest simulation: {{ latest_run_id }}
+- Golden reference: {{ reference_run_id }} (high score: {{ reference_high_score }})
+- Latest simulation: {{ latest_run_id }} (high score: {{ latest_high_score }})
 
-The attached image is the place for this view's golden/latest comparison.
-It is currently a placeholder with no measurements. Record that limitation
-instead of inventing a result or drawing an unsupported conclusion.
+The attached image compares the recorded 90th and 25th score percentiles for
+Golden (orange) and Latest (blue), using consecutive 50-epoch windows. The final
+window may be shorter. Both runs share epoch and score axes; curves end at each
+run's last recorded epoch.
+
+Judge the hypothesis using the high scores, learning progress, and lower-tail
+performance. These are training results from individual runs, not independent
+validation. If both run IDs match, this is a baseline self-comparison, not evidence
+of improvement. Report missing measurements shown in the chart instead of
+inventing results.
 
 ## Submit Observations
 

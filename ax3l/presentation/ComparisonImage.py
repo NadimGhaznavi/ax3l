@@ -1,4 +1,4 @@
-"""A placeholder for each view's future golden/latest comparison image."""
+"""Golden/latest placeholders for the reward-signals and training evaluations."""
 
 from base64 import b64encode
 from io import BytesIO

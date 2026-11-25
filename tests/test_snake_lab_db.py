@@ -75,6 +75,26 @@ class SnakeLabDbTests(unittest.TestCase):
         factory.assert_called_once_with(database='snakelab', initialize_event_tables=False)
         self.assertFalse(db._connection.open)
 
+    def test_exploration_episodes_are_scoped_ordered_and_closed_through_the_interface(self):
+        db = DbMgr(initialize_event_tables=False)
+        self.addCleanup(lambda: db.close() if db._connection.open else None)
+        db.execute('''CREATE TEMPORARY TABLE simulation_episodes (
+            run_id CHAR(36), episode INT, score INT, epsilon DOUBLE, steps INT,
+            epsilon_nice_injections INT
+        )''')
+        run_id, other = str(uuid4()), str(uuid4())
+        for row in ((run_id, 3, 8, 0, 100, 20), (other, 1, 99, 0, 200, 100),
+                    (run_id, 1, 0, .9, 10, 0), (run_id, 2, 4, .4, 50, 0)):
+            db.execute('INSERT INTO simulation_episodes VALUES (%s, %s, %s, %s, %s, %s)', row)
+        with patch('ax3l.interface.SnakeLab.DbMgr', return_value=db) as factory:
+            self.assertEqual(SnakeLab().get_exploration_episodes(run_id), [
+                dict(episode=1, score=0, epsilon=.9, steps=10, epsilon_nice_injections=0),
+                dict(episode=2, score=4, epsilon=.4, steps=50, epsilon_nice_injections=0),
+                dict(episode=3, score=8, epsilon=0, steps=100, epsilon_nice_injections=20),
+            ])
+        factory.assert_called_once_with(database='snakelab', initialize_event_tables=False)
+        self.assertFalse(db._connection.open)
+
     def test_high_score_across_runs_and_seeds_through_interface(self):
         def connect(**kwargs):
             self.assertEqual(kwargs.pop("database"), "snakelab")

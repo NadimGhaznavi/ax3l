@@ -31,8 +31,6 @@
 
 {{ previous_observations }}
 
-{{ golden_run_score_image }}
-
 ## Parameters to tune
 
 ```json

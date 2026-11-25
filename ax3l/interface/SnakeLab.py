@@ -64,6 +64,12 @@ class SnakeLab:
         with self._data() as simulations:
             return simulations.get_episode_scores(run_id)
 
+    def get_exploration_episodes(self, run_id: str) -> list[dict]:
+        """Read a run's recorded exploration measurements for evaluation."""
+        UUID(run_id)
+        with self._data() as simulations:
+            return simulations.get_exploration_episodes(run_id)
+
 
     def get_latest_completed_run_id(self) -> str | None:
         with self._data() as simulations:

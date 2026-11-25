@@ -23,6 +23,7 @@ from ax3l.entities.ExperimentState import ExperimentState
 from ax3l.entities.ViewProposal import ViewProposal
 from ax3l.interface.SimulationConfiguration import SCHEMA, SimulationConfiguration
 from ax3l.interface.ViewConversation import ViewConversation
+from ax3l.presentation.RunComparisonImage import run_comparison_image
 from view_cycle_fixtures import FakeSnake, LocalLLM, MemoryEvents, MemoryLog, MemoryStore
 
 
@@ -109,7 +110,7 @@ class ViewCycleTests(unittest.TestCase):
                                'training.sequence_length': 8, 'training.gamma': .95}.items():
             self.assertEqual(SimulationConfiguration.value_at(first_trial, tuple(path.split('.'))), expected)
         self.assertIn('Hypothesis for exploration.', prompt_text(self.model.requests[12]))
-        self.assertIn('Exploration: comparison measurements are not available yet.',
+        self.assertIn('Exploration: recorded training results evaluated.',
                       prompt_text(self.model.requests[12]))
         baseline = list(self.snake.results)[0]
         self.assertIn(f'Golden reference: {baseline}', prompt_text(self.model.requests[8]))
@@ -140,7 +141,14 @@ class ViewCycleTests(unittest.TestCase):
             if tool_name(request) == 'submit_observations':
                 content = request['messages'][0]['content']
                 self.assertEqual([part['type'] for part in content], ['text', 'image_url'])
-                self.assertIn('placeholder with no measurements', prompt_text(request))
+                if '## Task: Architecture Evaluation' in prompt_text(request):
+                    self.assertIn('consecutive 50-epoch windows', prompt_text(request))
+                    self.assertNotIn('placeholder', prompt_text(request))
+                elif '## Task: Exploration Evaluation' in prompt_text(request):
+                    self.assertIn('150-epoch windows', prompt_text(request))
+                    self.assertNotIn('placeholder', prompt_text(request))
+                else:
+                    self.assertIn('placeholder with no measurements', prompt_text(request))
                 self.assertIn('280 characters', prompt_text(request))
                 self.assertNotIn('Parameters to tune', prompt_text(request))
                 url = content[1]['image_url']['url']
@@ -154,34 +162,55 @@ class ViewCycleTests(unittest.TestCase):
         self.assertEqual(names.count('simulation_completed'), 3)
         self.assertLess(names.index('simulation_completed'), names.index('golden_config_created'))
 
-    def test_architecture_selection_sends_golden_scores_between_observations_and_parameters(self):
-        self.snake.scores = iter((10, 12, 7, 9))
-        with patch.object(self.snake, 'get_episode_scores', wraps=self.snake.get_episode_scores) as scores:
-            self.loop().run(cycles=3)
-        runs = list(self.snake.results)
-        self.assertEqual([call.args[0] for call in scores.call_args_list], [runs[0], runs[1], runs[1]])
-        for offset in (4, 12, 20):
-            for name, request in zip(reversed(VIEWS), self.model.requests[offset:offset + 4]):
+    def test_all_tuning_prompts_are_text_only_and_do_not_read_chart_data(self):
+        loop = self.loop()
+        loop.run(cycles=1)
+        state = loop._next_cycle(self.store.load())
+        with patch.object(self.snake, 'get_episode_scores') as scores, \
+                patch.object(self.snake, 'get_exploration_episodes') as exploration:
+            for _ in VIEWS:
+                loop._choose_view(state)
+        scores.assert_not_called()
+        exploration.assert_not_called()
+        for request in self.model.requests:
+            if tool_name(request) == 'submit_view':
                 content = request['messages'][0]['content']
-                if name != 'architecture':
-                    self.assertIsInstance(content, str)
+                self.assertIsInstance(content, str)
+                self.assertIn('### Previous observations', content)
+                self.assertIn('## Parameters to tune', content)
+                self.assertIn('submit_view', content)
+                self.assertNotIn('{{', content)
+
+    def test_evaluation_images_use_the_original_reference_and_latest_even_after_promotion(self):
+        def scores(run_id):
+            value = self.snake.results[run_id]['high_score']
+            return [dict(episode=i, score=value, epsilon=max(0, 1 - i / 150),
+                         steps=100, epsilon_nice_injections=value if i >= 150 else 0)
+                    for i in range(1, 301)]
+        with patch.object(self.snake, 'get_episode_scores', side_effect=scores) as score_reads, \
+                patch.object(self.snake, 'get_exploration_episodes', side_effect=scores) as exploration_reads:
+            self.loop().run(cycles=2)
+        baseline, winner, loser = self.snake.results
+        expected_reads = [baseline, baseline, winner, winner, loser]
+        self.assertEqual([call.args[0] for call in score_reads.call_args_list], expected_reads)
+        self.assertEqual([call.args[0] for call in exploration_reads.call_args_list], expected_reads)
+        for offset, reference, latest in ((0, baseline, baseline), (8, baseline, winner), (16, winner, loser)):
+            for name, request in zip(VIEWS, self.model.requests[offset:offset + 4]):
+                if name not in ('architecture', 'exploration'):
                     continue
-                self.assertEqual([part['type'] for part in content], ['text', 'image_url', 'text'])
-                self.assertIn('### Previous observations', content[0]['text'])
-                self.assertIn('Architecture: comparison measurements are not available yet.', content[0]['text'])
-                self.assertNotIn('## Parameters to tune', content[0]['text'])
-                self.assertTrue(content[2]['text'].lstrip().startswith('## Parameters to tune'))
-                self.assertIn('submit_view', content[2]['text'])
-                self.assertNotIn('{{', prompt_text(request))
-                with Image.open(BytesIO(b64decode(content[1]['image_url']['url'].split(',')[1]))) as image:
-                    self.assertEqual(image.format, 'PNG')
-                    self.assertEqual(image.size, (1056, 768))
+                text = prompt_text(request)
+                self.assertIn(f'Golden reference: {reference} (high score: {self.snake.results[reference]["high_score"]})', text)
+                self.assertIn(f'Latest simulation: {latest} (high score: {self.snake.results[latest]["high_score"]})', text)
+                self.assertIn('baseline self-comparison', text)
+                self.assertEqual(request['messages'][0]['content'][1]['image_url']['url'],
+                                 run_comparison_image(VIEWS[name], scores(reference), scores(latest)))
         logged = [json.loads(event['content']) for event in self.log.events
-                  if event['name'] == 'prompt_sent' and event.get('parameter') == 'architecture']
-        selections = [request['messages'][0] for request in self.model.requests
-                      if tool_name(request) == 'submit_view'
-                      and isinstance(request['messages'][0]['content'], list)]
-        self.assertEqual([message for message in logged if len(message['content']) == 3], selections)
+                  if event['name'] == 'prompt_sent' and event.get('parameter') in ('architecture', 'exploration')]
+        evaluations = [request['messages'][0] for request in self.model.requests
+                       if tool_name(request) == 'submit_observations'
+                       and any(f'## Task: {name} Evaluation' in prompt_text(request)
+                               for name in ('Architecture', 'Exploration'))]
+        self.assertEqual([message for message in logged if isinstance(message['content'], list)], evaluations)
 
     def test_restart_keeps_order_and_accepted_views(self):
         normal = self.store.save

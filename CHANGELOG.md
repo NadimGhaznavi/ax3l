@@ -25,14 +25,19 @@ Refactor the application around explicit experiment, reporting, persistence,
 transport, and presentation responsibilities, removing retired tuning machinery.
 Allow shared tuning parameters across views while preventing conflicting
 proposals within each configuration cycle.
-Show the golden run's training score percentiles in architecture tuning prompts.
+Show golden/latest training measurements in architecture and exploration evaluation
+prompts, and keep configuration tuning prompts text-only.
 
 ### Added
 
-- Generate a golden-run score PNG for architecture selection, between previous
-  observations and parameters to tune. Plot the 90th and 25th percentiles in
-  50-epoch windows, with shared score axes and at least five interior horizontal
-  guides per panel, and send the image inline to the vision model.
+- Generate golden/latest score comparison PNGs for architecture evaluation. Plot
+  the 90th and 25th percentiles in 50-epoch windows, with shared axes and at least
+  five interior horizontal guides per score panel, and send the image to Qwen.
+- Add exploration evaluation PNGs with checkpoint epsilon probabilities, observed
+  EpsilonNice move override rates, and 90th/25th score percentiles in 150-epoch
+  windows. Use recorded episodes from the original reference and latest run,
+  including final partial windows, and include each run's high score in both
+  evaluation prompts. Identify baseline self-comparisons and missing measurements.
 - Add a JSON example to the shared proposal submission instructions, showing
   `submit_view` arguments with a hypothesis and parameter values.
 - Add a full-suite runner that owns a private MariaDB instance and runs database,
@@ -56,8 +61,8 @@ Show the golden run's training score percentiles in architecture tuning prompts.
   an actor and a Mermaid overview. Capture provisioning, credential reuse,
   service startup, and the limits of installation verification. Keep the
   existing Pages content, navigation, and publishing configuration unchanged.
-- Add four evaluation prompt skeletons with a labeled comparison-image placeholder
-  and a dedicated Observations submission. Real comparison charts remain to be built.
+- Add four evaluation prompts with a dedicated Observations submission. Reward
+  Signals and Training retain labeled comparison-image placeholders.
 - Checkpoint each view's Observations and feed them into that view's next tuning
   prompt. Resume interrupted evaluation and tuning passes without repeating
   accepted submissions, including checkpoints from the preceding combined flow.
@@ -66,6 +71,8 @@ Show the golden run's training score percentiles in architecture tuning prompts.
 
 ### Changed
 
+- Keep all configuration tuning prompts text-only; move architecture score
+  imagery to result evaluation and add the latest run alongside the golden reference.
 - Share sequence length between Architecture and Training, and gamma between
   Training and Reward Signals. Once submitted in the shuffled tuning pass,
   a shared parameter becomes read-only for later views, including after restart.

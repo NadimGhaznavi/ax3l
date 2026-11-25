@@ -14,13 +14,12 @@ The [shared glossary](glossary.md) defines terminology used across the views.
 | [Use Case View](use-case/index.md) | Actors, goals, and observable behavior | Initial draft |
 | [Analysis View](analysis/index.md) | Concepts, responsibilities, and collaborations | Initial draft |
 | [Design View](design/index.md) | Software structure, interfaces, and mechanisms | Initial draft |
-| Implementation View | Source organization and realization of the design | To be developed through refactoring |
+| [Implementation View](implementation/index.md) | Source organization and realization of the design | Initial implementation |
 
 We begin with [Deploy Ax3l software](use-case/uc-01-deploy-ax3l-software.md).
-Each view is checked against the actual code. We will develop the related
-analysis and design, then refactor the implementation while preserving its
-observable behavior. Any proposed behavior changes will be identified
-explicitly.
+The use case can be followed through all four views. Each view is checked against
+the actual code, and focused refactoring keeps the implementation aligned with
+the documented contracts. Any proposed behavior changes are identified explicitly.
 
 This documentation has its own entry point and navigation. The existing public
 site remains separate. Markdown links connect the documents, and Mermaid

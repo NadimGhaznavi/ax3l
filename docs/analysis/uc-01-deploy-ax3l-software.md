@@ -17,7 +17,7 @@ distributed across installation scripts and supporting helpers.
 | Host access | Boundary | Inspect and change host resources, access the database service, obtain runtime dependencies, and manage Ax3l's services. |
 | Deployment source | [Entity](../glossary.md#entity) | The selected checkout's application files, dependency requirements, and supporting resources. |
 | Installation resources | Entity | The host's Ax3l directories, Linux account/group, database/account, and service definitions. |
-| Database credentials | Entity | Connection settings and password, retained separately from the application across uninstall and reinstall. |
+| Database credentials | Entity | Validated or generated connection settings and password, stored separately from application configuration. |
 | Application configuration | Entity | Listener settings and the inference-service address used by the installed application. |
 
 ```mermaid
@@ -79,7 +79,7 @@ sequenceDiagram
 
     alt A check fails
         Control-->>Interface: Refuse deployment and identify the failure
-        Interface-->>DevOps: Failure, with uninstall guidance for an existing installation
+        Interface-->>DevOps: Failure and next action
     else Checks pass
         Control->>Host: Create Linux account/group and directories#59; reuse or save credentials
         Control->>Host: Create database/account, grant access, and verify login
@@ -105,9 +105,9 @@ stops at the first failing operation; later operations are not attempted.
 
 | Situation | Deployment control's decision |
 | --- | --- |
-| An [existing installation](../glossary.md#existing-installation) is found | Refuse before provisioning and direct DevOps to uninstall separately. |
+| An [existing installation](../glossary.md#existing-installation) is found | Refuse before provisioning and refer DevOps to [UC-03](../use-case/index.md#use-cases). |
 | Only saved [database credentials](../glossary.md#database-credentials) remain | Validate and reuse them; create a new database account with that password. |
-| Provisioning, configuration, runtime preparation, or service validation fails | Stop. Completed provisioning may remain; DevOps uninstalls it before retrying. |
+| Provisioning, configuration, runtime preparation, or service validation fails | Stop. Completed provisioning may remain. |
 | File installation or service activation fails after stopping services | Stop. Files may be partly installed and services partly started; there is no automatic rollback. |
 | All service-start commands succeed | Report completion. Application health and a successful experiment are not verified by deployment. |
 
@@ -125,9 +125,7 @@ host operations. Help succeeds; unsupported arguments fail.
 | 8 | Deployment control activates the prepared services through host access in the required order. |
 
 [EXT-01](../use-case/index.md#external-use-cases) remains a DevOps-arranged
-precondition. SnakeLab cleanup has no participant or operation in this
-collaboration. Uninstallation is a separate action; deployment never invokes it
-automatically.
+precondition, outside this collaboration.
 
 ## Code basis
 

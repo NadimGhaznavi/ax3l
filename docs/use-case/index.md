@@ -17,13 +17,17 @@ managed applications, including SnakeLab and LlamaSrv, are out of scope.
 
 | Actor | Role |
 | --- | --- |
-| [DevOps](../glossary.md#devops) | Deploys Ax3l software on the target host. |
+| [DevOps](../glossary.md#devops) | Deploys, upgrades, and uninstalls Ax3l software. |
 
 ## Use cases
 
 | ID | Goal | Primary actor |
 | --- | --- | --- |
 | [UC-01](uc-01-deploy-ax3l-software.md) | Deploy Ax3l software | DevOps |
+| UC-02 | Upgrade Ax3l software | DevOps |
+| UC-03 | Uninstall Ax3l software | DevOps |
+
+UC-02 and UC-03 are listed for separate documentation.
 
 ## External use cases
 
@@ -41,6 +45,8 @@ flowchart LR
 
     subgraph ax3l["Ax3l"]
         deploy(["UC-01: Deploy Ax3l software"])
+        upgrade(["UC-02: Upgrade Ax3l software"])
+        uninstall(["UC-03: Uninstall Ax3l software"])
     end
 
     subgraph snakelab["SnakeLab — external system"]
@@ -48,6 +54,8 @@ flowchart LR
     end
 
     devops --- deploy
+    devops --- upgrade
+    devops --- uninstall
     devops --- clear
     deploy -.->|depends on| clear
 ```

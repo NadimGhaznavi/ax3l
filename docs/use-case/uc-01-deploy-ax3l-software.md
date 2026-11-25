@@ -49,9 +49,8 @@ services on that host.
 ## Alternatives and failures
 
 - **[Existing or partial installation](../glossary.md#existing-installation):**
-  Refuse installation and direct DevOps to uninstall first. Uninstallation deletes
-  Ax3l's application files and experiment data, retaining database credentials for
-  the next installation.
+  Refuse installation and direct DevOps to
+  [UC-03: Uninstall Ax3l software](index.md#use-cases).
 - **Saved [database credentials](../glossary.md#database-credentials) only:**
   Validate and reuse them.
 - **Invalid credentials file:** Reject a file with incorrect ownership,
@@ -59,8 +58,7 @@ services on that host.
 - **Database access failure:** Stop if administrative access or the newly created
   Ax3l account's login fails.
 - **Configuration, dependency, browser, or service-definition failure:** Stop
-  before the service-stop step. Earlier provisioning changes may already exist;
-  DevOps uninstalls those resources before attempting another installation.
+  before the service-stop step. Earlier provisioning changes may remain.
 - **File installation or service startup failure:** Stop with a failing exit
   status. Some files may have been replaced and some services may remain stopped
   or already have started.
@@ -80,7 +78,7 @@ or that an experiment has run successfully.
 
 On failure, installation provides no automatic rollback. Provisioning and file
 changes already made may remain. Saved credentials are retained so a later
-installation after uninstall can reuse them.
+installation can reuse them.
 
 ## Scope
 
@@ -91,8 +89,6 @@ transfer software between hosts, or install or manage SnakeLab or LlamaSrv.
 ## Behavior references
 
 - [Installation entry point](../../scripts/install.sh).
-- [Uninstallation](../../scripts/uninstall.sh), used before replacing an existing
-  installation and preserving credentials for the next deployment.
 - [Service installation](../../scripts/install-services.sh) and
   [chart-browser provisioning](../../scripts/install-chrome.py).
 - [Service configuration](../../scripts/service-configuration.sh),

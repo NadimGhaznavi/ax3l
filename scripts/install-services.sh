@@ -16,6 +16,7 @@ install_dir=/opt/prod/ax3l
 config_dir=/etc/ax3l
 
 . "$checkout_dir/scripts/service-configuration.sh"
+. "$checkout_dir/scripts/application-files.sh"
 resolve_service_configuration
 
 if [[ ! -x $install_dir/.venv/bin/python ]]; then
@@ -30,11 +31,7 @@ install -d -m 755 "$install_dir/games"
 render_service_units
 "$checkout_dir/scripts/services.sh" stop
 
-cd -- "$checkout_dir"
-while IFS= read -r -d '' source; do
-    install -D -m 644 -o "$service_account" -g "$service_account" \
-        -- "$source" "$install_dir/$source"
-done < <(find ax3l -type f \( -name '*.py' -o -name '*.schema.json' -o -path 'ax3l/presentation/prompts/*.md' -o -path 'ax3l/server/templates/*.html' -o -path 'ax3l/activity/fonts/*' \) -print0)
+install_application_files "$checkout_dir" "$install_dir" "$service_account"
 
 # install.sh creates this directory under umask 077. Allow service-account
 # traversal; database credentials retain mode 600.

@@ -234,6 +234,21 @@ for view in VIEWS.values():
         self.assertEqual(config['llamasrv_url'], 'http://127.0.0.1:51001')
         self.assertEqual(set(config['network']), {'report', 'zmq'})
 
+    def test_asset_discovery_failure_prevents_service_activation(self):
+        self.prepare()
+        self.executable(self.bin / 'find', '''#!/bin/sh
+printf 'Application file discovery failed.\\n' >&2
+exit 44
+''')
+        result = self.run_installer()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Application file discovery failed.', result.stderr)
+        calls = self.log.read_text()
+        self.assertIn('systemctl stop ax3l-server.service', calls)
+        self.assertNotIn('systemctl daemon-reload', calls)
+        self.assertNotIn('systemctl start', calls)
+        self.assertEqual(list(self.units.iterdir()), [])
+
     def test_provisioning_failures_do_not_stop_services(self):
         self.prepare()
         for failure in ('pip', 'chrome', 'verify'):

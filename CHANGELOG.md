@@ -17,11 +17,16 @@ modules and prompts directly under `ax3l/presentation/`, and remove the unused
 default-configuration wrapper. Begin separate application documentation with
 a draft deployment Use Case View. Require a fresh installation, keeping database
 credentials across explicit uninstall and reinstall operations. Share terminology
-between documentation views through a common glossary, and describe deployment
-responsibilities and collaboration through Analysis and Design realizations.
+between documentation views through a common glossary, and connect deployment
+responsibilities, design, and implementation through all four views. Separate
+application-file installation from service orchestration and propagate discovery
+failures before service activation.
 
 ### Added
 
+- Add an Implementation View index and deployment implementation realization,
+  covering source ownership, file delivery, installed entry points, and verified
+  contracts. Link forward from Design to complete the four-view documentation.
 - Add a Design View index and deployment design realization, linking analysis
   participants to the current scripts, helper interfaces, configuration classes,
   resources, service definitions, and failure contracts. Include Mermaid
@@ -47,6 +52,12 @@ responsibilities and collaboration through Analysis and Design realizations.
 
 ### Changed
 
+- Keep UC-01 and its realizations focused on fresh installation. Catalog upgrade
+  and uninstall as separate use cases, retaining only brief cleanup guidance in
+  UC-01 and removing duplicated lifecycle details from its realizations.
+- Extract application-file selection and copying into the sourced
+  `scripts/application-files.sh` helper, with explicit checkout, target, and
+  account arguments. Preserve installed paths, ownership, and permission modes.
 - Refuse installation when Ax3l application files, service units, Linux accounts,
   or database resources already exist. Direct DevOps to uninstall first, while
   allowing saved credentials to be reused.
@@ -68,6 +79,9 @@ responsibilities and collaboration through Analysis and Design realizations.
 
 ### Fixed
 
+- Propagate application-file discovery failures so installation cannot continue
+  to service registration and startup after discovery fails. Add a regression
+  check for this failure path.
 - Escape semicolons in deployment sequence-diagram messages so Mermaid can render
   the analysis realization.
 

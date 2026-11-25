@@ -25,9 +25,14 @@ Refactor the application around explicit experiment, reporting, persistence,
 transport, and presentation responsibilities, removing retired tuning machinery.
 Allow shared tuning parameters across views while preventing conflicting
 proposals within each configuration cycle.
+Show the golden run's training score percentiles in architecture tuning prompts.
 
 ### Added
 
+- Generate a golden-run score PNG for architecture selection, between previous
+  observations and parameters to tune. Plot the 90th and 25th percentiles in
+  50-epoch windows, with shared score axes and at least five interior horizontal
+  guides per panel, and send the image inline to the vision model.
 - Add a JSON example to the shared proposal submission instructions, showing
   `submit_view` arguments with a hypothesis and parameter values.
 - Add a full-suite runner that owns a private MariaDB instance and runs database,

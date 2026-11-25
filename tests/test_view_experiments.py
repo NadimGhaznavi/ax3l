@@ -28,7 +28,8 @@ from view_cycle_fixtures import FakeSnake, LocalLLM, MemoryEvents, MemoryLog, Me
 
 def prompt_text(request):
     content = request['messages'][0]['content']
-    return content if isinstance(content, str) else content[0]['text']
+    return content if isinstance(content, str) else '\n'.join(
+        part['text'] for part in content if part['type'] == 'text')
 
 
 def blocks(request):
@@ -124,7 +125,7 @@ class ViewCycleTests(unittest.TestCase):
                 self.assertNotIn('(draft)', json.dumps(readonly))
             else:
                 self.assertIn('(draft)', json.dumps(readonly))
-            content = request['messages'][0]['content']
+            content = prompt_text(request)
             self.assertIn('### Previous observations', content)
             self.assertIn('280 characters', content)
             self.assertNotIn('## Golden and latest results', content)
@@ -152,6 +153,35 @@ class ViewCycleTests(unittest.TestCase):
         self.assertEqual(names.count('golden_config_created'), 2)
         self.assertEqual(names.count('simulation_completed'), 3)
         self.assertLess(names.index('simulation_completed'), names.index('golden_config_created'))
+
+    def test_architecture_selection_sends_golden_scores_between_observations_and_parameters(self):
+        self.snake.scores = iter((10, 12, 7, 9))
+        with patch.object(self.snake, 'get_episode_scores', wraps=self.snake.get_episode_scores) as scores:
+            self.loop().run(cycles=3)
+        runs = list(self.snake.results)
+        self.assertEqual([call.args[0] for call in scores.call_args_list], [runs[0], runs[1], runs[1]])
+        for offset in (4, 12, 20):
+            for name, request in zip(reversed(VIEWS), self.model.requests[offset:offset + 4]):
+                content = request['messages'][0]['content']
+                if name != 'architecture':
+                    self.assertIsInstance(content, str)
+                    continue
+                self.assertEqual([part['type'] for part in content], ['text', 'image_url', 'text'])
+                self.assertIn('### Previous observations', content[0]['text'])
+                self.assertIn('Architecture: comparison measurements are not available yet.', content[0]['text'])
+                self.assertNotIn('## Parameters to tune', content[0]['text'])
+                self.assertTrue(content[2]['text'].lstrip().startswith('## Parameters to tune'))
+                self.assertIn('submit_view', content[2]['text'])
+                self.assertNotIn('{{', prompt_text(request))
+                with Image.open(BytesIO(b64decode(content[1]['image_url']['url'].split(',')[1]))) as image:
+                    self.assertEqual(image.format, 'PNG')
+                    self.assertEqual(image.size, (1056, 768))
+        logged = [json.loads(event['content']) for event in self.log.events
+                  if event['name'] == 'prompt_sent' and event.get('parameter') == 'architecture']
+        selections = [request['messages'][0] for request in self.model.requests
+                      if tool_name(request) == 'submit_view'
+                      and isinstance(request['messages'][0]['content'], list)]
+        self.assertEqual([message for message in logged if len(message['content']) == 3], selections)
 
     def test_restart_keeps_order_and_accepted_views(self):
         normal = self.store.save

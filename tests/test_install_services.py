@@ -176,6 +176,7 @@ exec /usr/bin/systemd-analyze "$@"
                                'entities/ExperimentView.py', 'entities/ViewProposal.py',
                                'presentation/ViewPrompts.py',
                                'presentation/ComparisonImage.py',
+                               'presentation/GoldenRunScoreImage.py', 'activity/ScorePercentiles.py',
                                'constants/DViewConversation.py'):
                     self.assertTrue((self.app / 'ax3l' / module).is_file(), module)
                 reporting = (self.units / 'reporting-server.service').read_text()
@@ -208,10 +209,14 @@ for view in VIEWS.values():
         previous_values={},
         previous_observations='Comparison measurements are not available yet.',
         reference_run_id='golden-run', latest_run_id='latest-run',
+        golden_run_episodes=[{'episode': 1, 'score': 0}, {'episode': 2, 'score': 4}],
         parameters={},
         other_parameters={'seed': 1971, 'model': {'layers': '2 (draft)'}},
     )
-    assert ViewPrompts().render(view, context)
+    content = ViewPrompts().render(view, context)
+    assert content
+    if view.name == 'architecture':
+        assert [part['type'] for part in content] == ['text', 'image_url', 'text']
     assert ViewPrompts().render_evaluation(view, context)[1]['type'] == 'image_url'
 '''], cwd=self.app, env=dict(os.environ, PYTHONPATH=str(self.app), PYTHONDONTWRITEBYTECODE='1'),
                     capture_output=True, text=True, timeout=10)

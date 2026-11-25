@@ -98,6 +98,9 @@ class FakeSnake:
     def get_analysis_episodes(self, run_id):
         return episodes()
 
+    def get_episode_scores(self, run_id):
+        return [dict(episode=row['episode'], score=row['score']) for row in episodes()]
+
 
 class LocalLLM:
     def __init__(self, respond=None):

@@ -152,6 +152,8 @@ class ExperimentLoop:
             parameters=editable_parameters(view, state.config),
             other_parameters=other_parameters(view, state.config, proposed),
         )
+        if name == "architecture":
+            context["golden_run_episodes"] = self._snake.get_episode_scores(state.golden_run_id)
         prompt = self._prompts.render(view, context)
         proposal = self._conversation.propose(view, prompt, state.config, state.experiment_id)
         state.config = apply_values(state.config, proposal.values)

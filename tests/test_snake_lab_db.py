@@ -59,6 +59,22 @@ class SnakeLabDbTests(unittest.TestCase):
         self.assertEqual(self.query_count(), 0)
         self.assertFalse(self.db._connection.open)
 
+    def test_episode_scores_are_scoped_to_the_run_and_ordered_through_the_interface(self):
+        db = DbMgr(initialize_event_tables=False)
+        self.addCleanup(lambda: db.close() if db._connection.open else None)
+        db.execute('''CREATE TEMPORARY TABLE simulation_episodes (
+            run_id CHAR(36), episode INT, score INT
+        )''')
+        run_id, other_run = str(uuid4()), str(uuid4())
+        for row in ((run_id, 3, 8), (other_run, 1, 99), (run_id, 1, 0), (run_id, 2, 4)):
+            db.execute('INSERT INTO simulation_episodes VALUES (%s, %s, %s)', row)
+        with patch('ax3l.interface.SnakeLab.DbMgr', return_value=db) as factory:
+            self.assertEqual(SnakeLab().get_episode_scores(run_id), [
+                dict(episode=1, score=0), dict(episode=2, score=4), dict(episode=3, score=8),
+            ])
+        factory.assert_called_once_with(database='snakelab', initialize_event_tables=False)
+        self.assertFalse(db._connection.open)
+
     def test_high_score_across_runs_and_seeds_through_interface(self):
         def connect(**kwargs):
             self.assertEqual(kwargs.pop("database"), "snakelab")

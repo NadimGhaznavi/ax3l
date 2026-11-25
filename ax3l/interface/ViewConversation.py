@@ -28,7 +28,8 @@ class ViewConversation:
         self._llm = llm
         self._events = events
 
-    def propose(self, view: ExperimentView, prompt: str, config: dict, experiment_id: str) -> ViewProposal:
+    def propose(self, view: ExperimentView, prompt: str | list[dict], config: dict,
+                experiment_id: str) -> ViewProposal:
         schema = dict(type="object", additionalProperties=False,
                       required=["hypothesis", "values"], properties={
             "hypothesis": dict(type="string", minLength=1, pattern=r"\S",

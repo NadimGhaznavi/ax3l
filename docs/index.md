@@ -12,7 +12,7 @@ The [shared glossary](glossary.md) defines terminology used across the views.
 | View | Purpose | Status |
 | --- | --- | --- |
 | [Use Case View](use-case/index.md) | Actors, goals, and observable behavior | Initial draft |
-| Analysis View | Concepts, responsibilities, and collaborations | To be developed |
+| [Analysis View](analysis/index.md) | Concepts, responsibilities, and collaborations | Initial draft |
 | Design View | Software structure, interfaces, and mechanisms | To be developed |
 | Implementation View | Source organization and realization of the design | To be developed through refactoring |
 

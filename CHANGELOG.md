@@ -17,10 +17,15 @@ modules and prompts directly under `ax3l/presentation/`, and remove the unused
 default-configuration wrapper. Begin separate application documentation with
 a draft deployment Use Case View. Require a fresh installation, keeping database
 credentials across explicit uninstall and reinstall operations. Share terminology
-between documentation views through a common glossary.
+between documentation views through a common glossary, and describe deployment
+responsibilities and collaboration in its Analysis realization.
 
 ### Added
 
+- Add an Analysis View index and the deployment analysis realization, with
+  participant responsibilities, Mermaid class and sequence diagrams, failure
+  decisions, and traceability back to UC-01. Define analysis roles in the shared
+  glossary and link the use case to its realization.
 - Add a shared application glossary with links from the documentation entry
   point, Use Case View, and deployment use case.
 - Add a standalone documentation entry point and the initial Deploy Ax3l software
@@ -56,6 +61,11 @@ between documentation views through a common glossary.
   shared submission instructions when rendering tuning prompts.
 - Submit only a hypothesis and parameter values in tuning conversations; include
   the expected observable effect in the short hypothesis.
+
+### Fixed
+
+- Escape semicolons in deployment sequence-diagram messages so Mermaid can render
+  the analysis realization.
 
 ### Removed
 

@@ -98,3 +98,8 @@ transfer software between hosts, or install or manage SnakeLab or LlamaSrv.
 - [Service configuration](../../scripts/service-configuration.sh),
   [application configuration](../../ax3l/interface/Configuration.py), and
   [service control](../../scripts/services.sh).
+
+## Analysis realization
+
+[Deployment analysis](../analysis/uc-01-deploy-ax3l-software.md) identifies the
+participants, responsibilities, and collaboration that realize this use case.

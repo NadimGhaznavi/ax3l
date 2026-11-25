@@ -28,6 +28,16 @@ Ax3l-owned event history, experiment checkpoints, reporting records, and cached
 game images. SnakeLab owns its simulation configurations, episodes, and results
 separately.
 
+## Boundary
+
+An analysis role that mediates interaction with an actor or an external resource.
+Concrete technology access is specified in the Design View.
+
+## Control
+
+An analysis role that coordinates a use case's collaborating participants,
+sequences their work, and makes workflow decisions.
+
 ## Database credentials
 
 The connection settings and password used by Ax3l's database account: host, port,
@@ -48,6 +58,11 @@ and mechanisms that realize the analysis responsibilities.
 
 The operational role responsible for deploying Ax3l and arranging its external
 prerequisites. This is the primary actor for deployment.
+
+## Entity
+
+An analysis role representing information or resource state relevant to the
+application. It may be transient or persistent.
 
 ## Existing installation
 

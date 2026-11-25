@@ -7,6 +7,8 @@ These documents capture the application's current behavior through four
 connected views. They start from actors' goals and explain the responsibilities,
 design, and code that realize those goals.
 
+The [shared glossary](glossary.md) defines terminology used across the views.
+
 | View | Purpose | Status |
 | --- | --- | --- |
 | [Use Case View](use-case/index.md) | Actors, goals, and observable behavior | Initial draft |

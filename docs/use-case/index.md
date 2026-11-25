@@ -1,6 +1,6 @@
 # Use Case View
 
-[Application documentation](../index.md)
+[Application documentation](../index.md) · [Glossary](../glossary.md)
 
 **Status:** Initial draft, checked against the current installation code.
 
@@ -9,15 +9,15 @@
 The Use Case View describes actors' goals and the application's current
 observable behavior.
 
-The system boundary includes Ax3l's deployment scripts. Deployment host
-preparation and the installation of independently managed applications,
-including SnakeLab and LlamaSrv, are out of scope.
+The [system boundary](../glossary.md#system-boundary) includes Ax3l's deployment
+scripts. Deployment host preparation and the installation of independently
+managed applications, including SnakeLab and LlamaSrv, are out of scope.
 
 ## Actors
 
 | Actor | Role |
 | --- | --- |
-| DevOps | Deploys Ax3l software on the target host. |
+| [DevOps](../glossary.md#devops) | Deploys Ax3l software on the target host. |
 
 ## Use cases
 

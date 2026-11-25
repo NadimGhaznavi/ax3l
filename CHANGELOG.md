@@ -16,10 +16,13 @@ conversations followed by four configuration conversations. Keep presentation
 modules and prompts directly under `ax3l/presentation/`, and remove the unused
 default-configuration wrapper. Begin separate application documentation with
 a draft deployment Use Case View. Require a fresh installation, keeping database
-credentials across explicit uninstall and reinstall operations.
+credentials across explicit uninstall and reinstall operations. Share terminology
+between documentation views through a common glossary.
 
 ### Added
 
+- Add a shared application glossary with links from the documentation entry
+  point, Use Case View, and deployment use case.
 - Add a standalone documentation entry point and the initial Deploy Ax3l software
   use case under `docs/`, checked against installation and supporting code, with
   an actor and a Mermaid overview. Capture provisioning, credential reuse,

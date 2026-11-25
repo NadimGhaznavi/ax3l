@@ -1,21 +1,21 @@
 # UC-01: Deploy Ax3l software
 
-[Use Case View](index.md)
+[Use Case View](index.md) · [Glossary](../glossary.md)
 
 **Status:** Initial draft, checked against the current installation code.
 
 **Goal:** Create a fresh Ax3l installation from a local checkout and start its
 services on that host.
 
-**Primary actor:** DevOps.
+**Primary actor:** [DevOps](../glossary.md#devops).
 
 **Trigger:** DevOps invokes installation from the selected checkout.
 
 ## Preconditions
 
 - The Ax3l checkout and its supporting installation files are present locally.
-- The target has no existing Ax3l installation. Saved database credentials may
-  remain from an earlier installation.
+- The target meets the [fresh installation](../glossary.md#fresh-installation)
+  conditions.
 - If SnakeLab contains earlier experiment data, DevOps has cleared it through
   [EXT-01](index.md#external-use-cases). Ax3l does not perform or verify this step.
 - DevOps can run installation as root on a host using systemd.
@@ -48,13 +48,12 @@ services on that host.
 
 ## Alternatives and failures
 
-- **Existing installation or partial installation:** Refuse installation if its
-  application directory, service units, Linux account/group, or database/account
-  already exists. Direct DevOps to uninstall first. Uninstallation deletes Ax3l's
-  application files and experiment data, retaining database credentials for the
-  next installation.
-- **Saved credentials only:** Validate and reuse them. Their presence does not
-  count as an existing installation.
+- **[Existing or partial installation](../glossary.md#existing-installation):**
+  Refuse installation and direct DevOps to uninstall first. Uninstallation deletes
+  Ax3l's application files and experiment data, retaining database credentials for
+  the next installation.
+- **Saved [database credentials](../glossary.md#database-credentials) only:**
+  Validate and reuse them.
 - **Invalid credentials file:** Reject a file with incorrect ownership,
   permissions, format, or installation settings, or one that is a symbolic link.
 - **Database access failure:** Stop if administrative access or the newly created

@@ -1,9 +1,11 @@
 """Exercise the view cycle through real prompt rendering and local HTTP inference."""
 
-from copy import deepcopy
 from base64 import b64decode
+from collections import Counter
+from copy import deepcopy
 from dataclasses import asdict
 from io import BytesIO
+from itertools import permutations
 import json
 import re
 import unittest
@@ -39,7 +41,7 @@ def tool_name(request):
 
 
 class ViewConfigurationTests(unittest.TestCase):
-    def test_four_views_partition_every_tunable_field(self):
+    def test_four_views_cover_every_tunable_field_with_only_the_intended_sharing(self):
         def fields(schema, path=''):
             for key, value in schema['properties'].items():
                 name = f'{path}.{key}' if path else key
@@ -48,8 +50,13 @@ class ViewConfigurationTests(unittest.TestCase):
                 elif 'const' not in value:
                     yield name
         editable = [name for view in VIEWS.values() for name in view.parameters]
-        self.assertEqual(len(editable), len(set(editable)))
         self.assertEqual(set(editable), set(fields(SCHEMA)))
+        shared = {name: {view.name for view in VIEWS.values() if name in view.parameters}
+                  for name, count in Counter(editable).items() if count > 1}
+        self.assertEqual(shared, {
+            'training.sequence_length': {'architecture', 'training'},
+            'training.gamma': {'training', 'reward-signals'},
+        })
 
     def test_read_only_context_removes_owned_values_and_marks_only_proposals(self):
         config = SimulationConfiguration.defaults()
@@ -60,7 +67,7 @@ class ViewConfigurationTests(unittest.TestCase):
         self.assertNotIn('batch_size', other['training'])
         self.assertEqual(other['model']['layers'], '1 (draft)')
         self.assertEqual(other['model']['hidden_size'], 64)
-        self.assertEqual(other['training']['sequence_length'], 4)
+        self.assertNotIn('sequence_length', other['training'])
         changed = apply_values(config, {'model.layers': 2})
         self.assertEqual(changed['model']['layers'], 2)
         self.assertEqual(config, original)
@@ -97,7 +104,8 @@ class ViewCycleTests(unittest.TestCase):
         self.assertEqual(state.golden_run_id, winner)  # Second experiment loses.
         first_trial = self.snake.submissions[1]
         for path, expected in {'game.rewards.food': 12, 'model.hidden_size': 72,
-                               'training.learning_rate': .002, 'epsilon.initial': .9}.items():
+                               'training.learning_rate': .002, 'epsilon.initial': .9,
+                               'training.sequence_length': 8, 'training.gamma': .95}.items():
             self.assertEqual(SimulationConfiguration.value_at(first_trial, tuple(path.split('.'))), expected)
         self.assertIn('Hypothesis for exploration.', prompt_text(self.model.requests[12]))
         self.assertIn('Exploration: comparison measurements are not available yet.',
@@ -106,9 +114,12 @@ class ViewCycleTests(unittest.TestCase):
         self.assertIn(f'Golden reference: {baseline}', prompt_text(self.model.requests[8]))
         self.assertIn(f'Latest simulation: {winner}', prompt_text(self.model.requests[8]))
         self.assertIn(f'Golden reference: {winner}', prompt_text(self.model.requests[16]))
+        proposed = set()
         for index, request in enumerate(self.model.requests[4:8]):
             previous_values, parameters, readonly = blocks(request)
-            self.assertEqual(len(parameters), len(VIEWS[state.order[index]].parameters))
+            name = state.order[index]
+            self.assertEqual(set(parameters), set(VIEWS[name].parameters) - proposed)
+            proposed.update(state.proposals[name].values)
             if index == 0:
                 self.assertNotIn('(draft)', json.dumps(readonly))
             else:
@@ -119,6 +130,10 @@ class ViewCycleTests(unittest.TestCase):
             self.assertNotIn('## Golden and latest results', content)
             for internal in ('round-robin', 'randomized', 'seeded', 'synthetic', 'four views'):
                 self.assertNotIn(internal, content.lower())
+        for offset in (4, 12):
+            parameters = blocks(self.model.requests[offset + 1])[1]
+            self.assertIn('training.sequence_length', parameters)
+            self.assertIn('training.gamma', parameters)
         for request in self.model.requests:
             self.assertEqual(len(request['messages']), 1)
             if tool_name(request) == 'submit_observations':
@@ -152,6 +167,96 @@ class ViewCycleTests(unittest.TestCase):
         self.assertEqual(len(self.model.requests), 12)
         self.assertEqual(len(self.snake.submissions), 2)
         self.shuffle.assert_called_once()
+        for index, field, value in ((6, 'sequence_length', 8), (7, 'gamma', .95)):
+            _, parameters, readonly = blocks(self.model.requests[index])
+            self.assertNotIn(f'training.{field}', parameters)
+            self.assertEqual(readonly['training'][field], f'{value} (draft)')
+            properties = self.model.requests[index]['tools'][0]['function']['parameters']['properties']
+            self.assertNotIn(f'training.{field}', properties['values']['properties'])
+
+    def test_shared_parameters_are_tuned_once_in_every_possible_view_order(self):
+        loop = self.loop()
+        shared = {
+            'training.sequence_length': ({'architecture', 'training'}, 8),
+            'training.gamma': ({'training', 'reward-signals'}, .95),
+        }
+        for order in permutations(VIEWS):
+            with self.subTest(order=order):
+                state = ExperimentState(
+                    'shared-parameters', 'choosing', SimulationConfiguration.defaults(), order=list(order),
+                    previous={name: ViewProposal(view.initial_hypothesis, {}) for name, view in VIEWS.items()},
+                    observations={name: 'Baseline observations.' for name in VIEWS},
+                )
+                start = len(self.model.requests)
+                for _ in order:
+                    loop._choose_view(state)
+                requests = dict(zip(order, self.model.requests[start:]))
+                self.assertEqual(state.phase, 'ready')
+                for name, request in requests.items():
+                    parameters = blocks(request)[1]
+                    properties = request['tools'][0]['function']['parameters']['properties']
+                    self.assertEqual(set(parameters), set(properties['values']['properties']))
+                for path, (owners, value) in shared.items():
+                    first, second = [name for name in order if name in owners]
+                    self.assertIn(path, blocks(requests[first])[1])
+                    self.assertNotIn(path, blocks(requests[second])[1])
+                    self.assertEqual(blocks(requests[second])[2]['training'][path.split('.')[1]],
+                                     f'{value} (draft)')
+                    self.assertEqual(state.proposals[first].values[path], value)
+                    self.assertNotIn(path, state.proposals[second].values)
+                    self.assertEqual(SimulationConfiguration.value_at(state.config, tuple(path.split('.'))), value)
+
+    def test_shared_parameters_remain_available_when_an_earlier_view_omits_them(self):
+        original = self.model.respond
+        def omit_shared(request):
+            response = original(request)
+            if tool_name(request) == 'submit_view':
+                function = response['choices'][0]['message']['tool_calls'][0]['function']
+                arguments = json.loads(function['arguments'])
+                if 'training.learning_rate' in arguments['values']:
+                    del arguments['values']['training.sequence_length']
+                    del arguments['values']['training.gamma']
+                    function['arguments'] = json.dumps(arguments)
+            return response
+        self.model.respond = omit_shared
+        self.loop().run(cycles=1)
+        proposals = self.store.load().proposals
+        for index, field, owner in ((6, 'sequence_length', 'architecture'), (7, 'gamma', 'reward-signals')):
+            path = f'training.{field}'
+            self.assertNotIn(path, proposals['training'].values)
+            self.assertIn(path, blocks(self.model.requests[index])[1])
+            self.assertIn(path, proposals[owner].values)
+
+    def test_unchanged_shared_values_cannot_be_resubmitted_by_later_views(self):
+        original = self.model.respond
+        for name, path, value in (('architecture', 'training.sequence_length', 12),
+                                  ('reward-signals', 'training.gamma', .94)):
+            with self.subTest(view=name, parameter=path):
+                def conflict(request):
+                    response = original(request)
+                    function = response['choices'][0]['message']['tool_calls'][0]['function']
+                    arguments = json.loads(function['arguments'])
+                    arguments['values'][path] = value
+                    function['arguments'] = json.dumps(arguments)
+                    return response
+                self.model.respond = conflict
+                state = ExperimentState(
+                    'unchanged-parameters', 'choosing', SimulationConfiguration.defaults(),
+                    order=['training', name],
+                    previous={name: ViewProposal('Previous hypothesis.', {})},
+                    observations={name: 'Baseline observations.'},
+                    proposals={'training': ViewProposal('Keep current values.', {
+                        'training.sequence_length': 4, 'training.gamma': .96,
+                    })},
+                )
+                self.store.save(state)
+                with self.assertRaises(ValidationError):
+                    self.loop()._choose_view(state)
+                self.assertNotIn(path, blocks(self.model.requests[-1])[1])
+                self.assertEqual(self.store.load(), state)
+                self.assertEqual(state.config, SimulationConfiguration.defaults())
+                self.assertNotIn(name, state.proposals)
+        self.assertEqual(self.snake.submissions, [])
 
     def test_restart_skips_saved_evaluations_before_choosing_any_parameters(self):
         normal = self.store.save
@@ -318,7 +423,7 @@ class ProposalBoundaryTests(unittest.TestCase):
             dict(template, values={'game.rewards.food': True}),
             dict(template, values={'game.rewards.food': 21}),
             dict(template, values={'game.rewards.food': float('nan')}),
-            dict(template, values={'training.gamma': .95}),
+            dict(template, values={'training.sequence_length': 8}),
             dict(template, values={'game.rewards.closer_to_food': 5, 'game.rewards.further_from_food': -1}),
             dict(template, hypothesis='  '),
             dict(template, hypothesis='x' * (DViewConversation.HYPOTHESIS_MAX_LENGTH + 1)),

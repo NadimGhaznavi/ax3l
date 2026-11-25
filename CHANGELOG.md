@@ -23,9 +23,13 @@ application-file installation from service orchestration and propagate discovery
 failures before service activation.
 Refactor the application around explicit experiment, reporting, persistence,
 transport, and presentation responsibilities, removing retired tuning machinery.
+Allow shared tuning parameters across views while preventing conflicting
+proposals within each configuration cycle.
 
 ### Added
 
+- Add a JSON example to the shared proposal submission instructions, showing
+  `submit_view` arguments with a hypothesis and parameter values.
 - Add a full-suite runner that owns a private MariaDB instance and runs database,
   HTTP, ZeroMQ, and deployment fixtures without using deployed services. Document
   the resulting package structure and runtime contracts in the Implementation View.
@@ -57,6 +61,9 @@ transport, and presentation responsibilities, removing retired tuning machinery.
 
 ### Changed
 
+- Share sequence length between Architecture and Training, and gamma between
+  Training and Reward Signals. Once submitted in the shuffled tuning pass,
+  a shared parameter becomes read-only for later views, including after restart.
 - Separate report queries, HTML rendering, and HTTP handling. Keep report templates,
   animations, and fonts together under `ax3l/presentation/reporting/`.
 - Move database adapters under `ax3l/interface/database/`. Keep SQL and event

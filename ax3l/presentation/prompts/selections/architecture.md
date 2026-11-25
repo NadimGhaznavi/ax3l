@@ -6,8 +6,8 @@
 ## Experiment Description
 
 - The Snake Lab server accepts a simulation configuration, executes it, and saves the results.
-- Other teams evaluate the results of the simulation and record their observations.
-- Other teams propose new hypotheses and parameter values to test in the next simulation.
+- The evaluation of the results and the selection of new parameters has been split into architecture, exploration, reward-signals, and training.
+- Other teams will evaluate the results and select new parameters for exploration, reward-signals, and training.
 
 ## Improving the Snake AI's high score
 

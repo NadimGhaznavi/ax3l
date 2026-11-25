@@ -11,17 +11,17 @@
 
 ## Previous Simulation
 
-### Hypothesis
+### Previous Hypothesis
 
 {{ previous_hypothesis }}
 
-### Parameter choices
+### PreviousParameter choices
 
 ```json
 {{ previous_values | tojson(indent=2) }}
 ```
 
-## Results Comparison
+## Lastest to Golden Comparison
 
 - Golden reference: {{ reference_run_id }}
 - Latest simulation: {{ latest_run_id }}

@@ -110,6 +110,10 @@ class ViewCycleIntegrationTests(unittest.TestCase):
         self.assertEqual(set(state.order), {'architecture', 'training', 'exploration', 'reward-signals'})
         self.assertEqual(len(state.proposals), 4)
         self.assertEqual(len(state.observations), 4)
+        self.assertEqual(state.config['training']['sequence_length'], 8)
+        self.assertEqual(state.config['training']['gamma'], .95)
+        for path in ('training.sequence_length', 'training.gamma'):
+            self.assertEqual(sum(path in proposal.values for proposal in state.proposals.values()), 1)
         rows = self.db.query('SELECT run_id, high_score FROM simulation_runs ORDER BY id')
         self.assertEqual(state.golden_run_id, rows[1]['run_id'])
         self.assertEqual(state.latest_run_id, rows[2]['run_id'])
@@ -126,7 +130,8 @@ class ViewCycleIntegrationTests(unittest.TestCase):
             save(store, state)
             if state.phase == 'choosing' and len(state.proposals) == 2:
                 raise KeyboardInterrupt()
-        with patch.object(ExperimentDb, 'save', stop):
+        with patch.object(ExperimentDb, 'save', stop), \
+                patch('ax3l.app.experiment.ExperimentLoop.shuffle', side_effect=lambda names: names.reverse()):
             self.assertEqual(self.service(), 130)
         order = ExperimentDb(self.db).load().order
         self.assertEqual(len(self.model.requests), 6)
@@ -134,6 +139,9 @@ class ViewCycleIntegrationTests(unittest.TestCase):
         self.assertEqual(len(self.model.requests), 12)
         self.assertEqual(ExperimentDb(self.db).load().order, order)
         self.assertEqual(self.count_events('simulation_submitted'), 2)
+        for index, path in ((6, 'training.sequence_length'), (7, 'training.gamma')):
+            properties = self.model.requests[index]['tools'][0]['function']['parameters']['properties']
+            self.assertNotIn(path, properties['values']['properties'])
 
     def test_restart_skips_saved_observations(self):
         save = ExperimentDb.save

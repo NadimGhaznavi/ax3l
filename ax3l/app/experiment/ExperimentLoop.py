@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 from copy import deepcopy
+from dataclasses import replace
 import json
 from random import shuffle
 from time import sleep
@@ -143,6 +144,7 @@ class ExperimentLoop:
         view = VIEWS[name]
         previous = state.previous[name]
         proposed = {path for proposal in state.proposals.values() for path in proposal.values}
+        view = replace(view, parameters=tuple(path for path in view.parameters if path not in proposed))
         context = dict(
             previous_hypothesis=previous.hypothesis,
             previous_values=previous.values,

@@ -17,9 +17,9 @@ the views; that order is saved and retained across restarts.
 
 | View | Tunable parameters |
 | --- | --- |
-| Reward Signals | Food, wall, snake, empty-space, closer-to-food, and farther-from-food rewards |
+| Reward Signals | Food, wall, snake, empty-space, closer-to-food, and farther-from-food rewards, and gamma |
 | Architecture | Hidden size, encoder layers, dropout, and sequence length |
-| Training | Learning rate, batch size, gamma, and random seed |
+| Training | Learning rate, batch size, sequence length, gamma, and random seed |
 | Exploration | Epsilon initial/decay and EpsilonNice probability/steps |
 
 ### Result evaluation
@@ -44,11 +44,19 @@ settings appear as read-only JSON; accepted proposals from earlier views carry
 `(draft)` markers. The numeric simulation configuration is stored separately
 from these display strings.
 
+Sequence length is shared by Architecture and Training; gamma is shared by
+Training and Reward Signals. The shuffled order determines which eligible view
+gets the first opportunity to tune each shared parameter. Once a view submits
+a value, including an unchanged value, that parameter becomes read-only for
+later views and is excluded from their submission tools. If the earlier view
+omits it, the next eligible view can still tune it. These restrictions survive
+restarts and reset at the start of each configuration cycle.
+
 Qwen returns a new hypothesis and parameter values through the required native
 `submit_view` function. The hypothesis must contain nonblank text and have at
 most 280 characters, including its expected observable effect. It may change several
 settings within the current view. The application validates that response at the
-LLM boundary, including setting ownership, numeric limits, and the combined
+LLM boundary, including the view's available settings, numeric limits, and the combined
 closer/farther reward constraint. Invalid responses stop the run with logged
 errors; there are no repair prompts or automatic inference retries.
 

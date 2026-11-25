@@ -135,11 +135,14 @@ class LocalLLM:
                     name='submit_observations', arguments=json.dumps(arguments)),
             )]))])
         properties = request['tools'][0]['function']['parameters']['properties']['values']['properties']
-        view = next(view for view in VIEWS.values() if set(view.parameters) == set(properties))
+        view = next(view for view in VIEWS.values() if set(properties) <= set(view.parameters))
         changed = {'reward-signals': {'game.rewards.food': 12},
                    'architecture': {'model.hidden_size': 72},
                    'training': {'training.learning_rate': .002},
                    'exploration': {'epsilon.initial': .9}}[view.name]
+        changed.update({name: value for name, value in {
+            'training.sequence_length': 8, 'training.gamma': .95,
+        }.items() if name in properties})
         arguments = dict(hypothesis=f'Hypothesis for {view.name}.',
                          values=changed)
         return dict(choices=[dict(message=dict(role='assistant', content=None, tool_calls=[dict(

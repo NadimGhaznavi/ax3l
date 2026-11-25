@@ -15,14 +15,15 @@ Separate simulation evaluation from configuration tuning, with four result
 conversations followed by four configuration conversations. Keep presentation
 modules and prompts directly under `ax3l/presentation/`, and remove the unused
 default-configuration wrapper. Begin separate application documentation with
-a draft deployment Use Case View.
+a draft deployment Use Case View. Require a fresh installation, keeping database
+credentials across explicit uninstall and reinstall operations.
 
 ### Added
 
 - Add a standalone documentation entry point and the initial Deploy Ax3l software
   use case under `docs/`, checked against installation and supporting code, with
-  an actor and a Mermaid overview. Capture provisioning, configuration reuse,
-  service replacement, and the limits of installation verification. Keep the
+  an actor and a Mermaid overview. Capture provisioning, credential reuse,
+  service startup, and the limits of installation verification. Keep the
   existing Pages content, navigation, and publishing configuration unchanged.
 - Add four evaluation prompt skeletons with a labeled comparison-image placeholder
   and a dedicated Observations submission. Real comparison charts remain to be built.
@@ -34,6 +35,14 @@ a draft deployment Use Case View.
 
 ### Changed
 
+- Refuse installation when Ax3l application files, service units, Linux accounts,
+  or database resources already exist. Direct DevOps to uninstall first, while
+  allowing saved credentials to be reused.
+- Retain the database credentials and their private directory during uninstall;
+  remove Ax3l application files and data without changing SnakeLab or LlamaSrv.
+- Document SnakeLab data cleanup as an undetailed external use case and a
+  deployment prerequisite, performed separately by DevOps.
+- Use DevOps as the deployment actor throughout the Use Case View.
 - Flatten the presentation package by removing its SnakeLab subdirectory. Keep
   prompt templates in `prompts/evaluations/` and `prompts/selections/`, and update
   module imports, template loading, and installation paths.

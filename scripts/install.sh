@@ -7,9 +7,10 @@ usage() {
 Usage: sudo scripts/install.sh
 
 Prepares /opt/prod/ax3l, the ax3l Linux account/group, the local ax3l
-MariaDB database/account, and /etc/ax3l/database.env. Existing credentials
-are reused; existing account passwords are not reset. Requires root and
-MariaDB administrative access through local socket authentication.
+MariaDB database/account, and /etc/ax3l/database.env for a fresh installation.
+Refuses existing Ax3l installation resources; run uninstall.sh first.
+Saved database credentials are retained by uninstall and reused here.
+Requires root and MariaDB administrative access through local socket authentication.
 Installs application modules and enables/starts Ax3l's three services.
 Inference uses the separately managed LlamaSrv endpoint in conf/ax3l.json.
 No release publication is performed.
@@ -32,6 +33,18 @@ fi
 [[ $EUID == 0 ]] || fail "Run installation as root."
 install_dir=/opt/prod/ax3l
 config_dir=/etc/ax3l
+service_account=ax3l
+
+[[ ! -e "$install_dir" && ! -L "$install_dir" ]] ||
+    fail "Ax3l installation already exists. Run scripts/uninstall.sh first; saved credentials will be retained."
+for name in ax3l-server reporting-server watchdog; do
+    unit="/etc/systemd/system/$name.service"
+    [[ ! -e "$unit" && ! -L "$unit" ]] ||
+        fail "Ax3l service units already exist. Run scripts/uninstall.sh first; saved credentials will be retained."
+done
+if getent passwd "$service_account" >/dev/null || getent group "$service_account" >/dev/null; then
+    fail "Ax3l Linux account or group already exists. Run scripts/uninstall.sh first; saved credentials will be retained."
+fi
 
 command -v mariadb >/dev/null || fail "Install the MariaDB client first."
 command -v openssl >/dev/null || fail "Install openssl first."
@@ -69,20 +82,20 @@ fi
 # Check administrative access before creating files or directories.
 "${admin[@]}" --batch --skip-column-names -e 'SELECT 1' >/dev/null ||
     fail "MariaDB administrative access failed."
+database_exists=$("${admin[@]}" --batch --skip-column-names -e \
+    "SELECT EXISTS(SELECT 1 FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = '$DB_NAME')
+         OR EXISTS(SELECT 1 FROM mysql.user WHERE User = '$DB_USER' AND Host = 'localhost');")
+[[ $database_exists == 0 ]] ||
+    fail "Ax3l database or database account already exists. Run scripts/uninstall.sh first; saved credentials will be retained."
 
 umask 077
 mkdir -p -- "$config_dir"
-service_account=ax3l
-if ! getent group "$service_account" >/dev/null; then
-    groupadd --system "$service_account"
-fi
-if ! getent passwd "$service_account" >/dev/null; then
-    useradd --system --gid "$service_account" --no-create-home \
-        --home-dir /nonexistent --shell /usr/sbin/nologin "$service_account"
-fi
+groupadd --system "$service_account"
+useradd --system --gid "$service_account" --no-create-home \
+    --home-dir /nonexistent --shell /usr/sbin/nologin "$service_account"
 install -d -m 755 -o "$service_account" -g "$service_account" -- "$install_dir"
 if [[ ! -e "$credentials_file" ]]; then
-    # Keep the generated password if provisioning fails, so a rerun can recover.
+    # Keep generated credentials through failures and subsequent uninstallation.
     (
         set -o noclobber
         printf 'DB_HOST=%s\nDB_PORT=%s\nDB_NAME=%s\nDB_USER=%s\nDB_PASSWORD=%s\n' \
@@ -91,8 +104,8 @@ if [[ ! -e "$credentials_file" ]]; then
 fi
 
 "${admin[@]}" <<SQL
-CREATE DATABASE IF NOT EXISTS \`$DB_NAME\`;
-CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASSWORD';
+CREATE DATABASE \`$DB_NAME\`;
+CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASSWORD';
 GRANT ALL PRIVILEGES ON \`$grant_database\`.* TO '$DB_USER'@'localhost';
 GRANT SELECT ON \`snakelab\`.* TO '$DB_USER'@'localhost';
 SQL
@@ -100,7 +113,7 @@ SQL
 MYSQL_PWD="$DB_PASSWORD" mariadb --no-defaults --protocol=socket \
     --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USER" --database="$DB_NAME" \
     --batch --skip-column-names -e 'SELECT 1' >/dev/null ||
-    fail "Database login failed. An existing account may have a different password; it was not reset."
+    fail "Ax3l database login failed."
 
 printf 'Installation directory ready: %s\n' "$install_dir"
 printf 'Credentials ready: %s\n' "$credentials_file"

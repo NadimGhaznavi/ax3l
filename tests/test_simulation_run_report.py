@@ -150,7 +150,7 @@ class SimulationRunReportTests(unittest.TestCase):
         self.assertIsNone(SnakeLabDb(db).get_run_summary(run_id))
 
     def test_completed_link_and_summary(self):
-        self.enterContext(patch('ax3l.app.reporting.Reports.DbMgr'))
+        self.enterContext(patch('ax3l.app.reporting.Reports.DbMgr')).return_value.query.return_value = []
         log = self.enterContext(patch('ax3l.app.reporting.Reports.EventLogDb')).return_value
         snake = self.enterContext(patch('ax3l.server.ReportingServer.SnakeLab')).return_value
         snake.get_config.return_value = SimulationConfiguration.defaults()

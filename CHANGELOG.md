@@ -32,9 +32,16 @@ Restore seed rotation as a shared request, running the golden and proposed
 settings on the same incremented seed before comparing their results.
 Run an editable synthetic experiment after the fresh baseline and before Qwen
 begins evaluation and autonomous tuning.
+Show the four evaluation and four selection conversations in collapsible
+Experiment Status sections with their recorded prompts, parameters, and costs.
 
 ### Added
 
+- Add eight Experiment Status sections above the event log. Retain the parameter
+  table headings, show hypotheses and observations, link each recorded prompt,
+  response, and reasoning, and report elapsed time and input/output tokens once
+  per conversation. Identify shared choices and pending, active, saved, failed,
+  and synthetic steps. Preserve expanded sections and table scrolling on refresh.
 - Add `conf/synthetic/config.json` and four hypothesis files for the first
   experiment. Validate them before the baseline, checkpoint the resolved inputs,
   and run both real simulations before any LLM requests. Compare the synthetic

@@ -59,6 +59,36 @@
       .experiment-board { grid-column: auto; grid-row: auto; }
     }
     .report-links a { border: 0; padding: 0; overflow-wrap: anywhere; }
+    .experiment-views { padding: 1rem; }
+    .experiment-views > header { border: 0; margin: 0 0 1rem; padding: 0; }
+    .experiment-views h2 { padding: 0; border: 0; background: transparent; font-size: 1.3rem; }
+    .view-controls { display: flex; gap: .5rem; }
+    .view-controls button { padding: .35rem .65rem; font: inherit; color: var(--text); background: #151f2b; border: 1px solid var(--border); cursor: pointer; }
+    .view-controls button:hover { background: #23364b; }
+    .view-controls button:focus-visible, .view-section > summary:focus-visible { outline: 2px solid var(--link); outline-offset: 3px; }
+    .view-section { margin-top: .6rem; border: 1px solid var(--border); }
+    .view-section > summary { padding: .65rem 1rem; background: #151f2b; cursor: pointer; }
+    .view-state { float: right; margin-left: 1rem; font-size: .85rem; color: var(--muted); }
+    .view-state.failed, .view-error { color: #ffa4a4; }
+    .view-body { padding: .75rem; }
+    .view-links { color: var(--muted); }
+    .view-links a { border: 0; padding: 0; }
+    .view-hypothesis, .view-note { margin: .6rem 0; }
+    .view-note { font-size: .85rem; }
+    .view-table-wrap { overflow-x: auto; }
+    .view-table { min-width: 1080px; table-layout: fixed; }
+    .experiment-views .view-table th, .experiment-views .view-table td { width: auto; white-space: normal; }
+    .experiment-views .view-table th:nth-child(1) { width: 7%; }
+    .experiment-views .view-table th:nth-child(2) { width: 28%; }
+    .experiment-views .view-table th:nth-child(3) { width: 10%; }
+    .experiment-views .view-table th:nth-child(4) { width: 11%; }
+    .experiment-views .view-table th:nth-child(5) { width: 19%; }
+    .experiment-views .view-table th:nth-child(6) { width: 9%; }
+    .experiment-views .view-table th:nth-child(7), .experiment-views .view-table th:nth-child(8) { width: 8%; }
+    .view-table .saved-cell { text-align: center; }
+    .saved-cell input { accent-color: #7bdba3; }
+    .view-table .view-metric { text-align: right; white-space: nowrap; font-weight: bold; }
+    .choice-changed { background: #44351c; color: #ffd07a; box-shadow: inset 3px 0 #ffd07a; }
     .note { margin: 1rem 0; padding: .6rem 1rem; border: 1px solid var(--border); }
     .events-page th:not(:last-child), .events-page td:not(:last-child) { width: 1%; }
     .entry:hover { background: #23364b; }

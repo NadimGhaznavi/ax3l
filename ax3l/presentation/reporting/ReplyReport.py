@@ -4,6 +4,22 @@ import json
 from typing import Any
 
 
+def reply_summary(content: str) -> str:
+    """Keep rejected response bodies readable in the event list."""
+    try:
+        return reply_content(json.loads(content))
+    except (ValueError, KeyError, IndexError, TypeError, AttributeError):
+        return content
+
+
+def response_usage(content: str) -> dict:
+    try:
+        usage = json.loads(content).get("usage", {})
+    except (ValueError, TypeError, AttributeError):
+        return {}
+    return usage if isinstance(usage, dict) else {}
+
+
 def reasoning_content(content: str | None) -> str:
     """Read only the first choice's captured reasoning, if present."""
     try:

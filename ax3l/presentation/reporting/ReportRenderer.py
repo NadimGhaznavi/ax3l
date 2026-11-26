@@ -13,9 +13,10 @@ from ax3l.constants.DAx3l import DAx3l
 from ax3l.constants.DEventCategory import DEventCategory as Events
 from ax3l.constants.DLabel import FIELD_TO_LABEL_MAP
 from ax3l.constants.DReportMgr import DReportMgr
+from ax3l.presentation.reporting.ExperimentStatus import experiment_sections
 from ax3l.presentation.reporting.MarkdownReport import markdown_html
 from ax3l.presentation.reporting.PromptReport import parts, summary
-from ax3l.presentation.reporting.ReplyReport import fields, reply_content, reasoning_content
+from ax3l.presentation.reporting.ReplyReport import fields, reply_summary, reasoning_content
 from ax3l.presentation.reporting.SimulationBoard import board_svg
 from ax3l.presentation.reporting.ToolResult import tool_result_html
 
@@ -45,15 +46,16 @@ class ReportRenderer:
             event = dict(original)
             if event["category"] == Events.Conversation.CATEGORY:
                 if event["name"] == Events.Conversation.RESPONSE:
-                    event["reply_text"] = reply_content(json.loads(event["content"]))
+                    event["reply_text"] = reply_summary(event["content"])
                 elif event["name"] == Events.Conversation.PROMPT:
                     event["prompt_text"] = summary(json.loads(event["content"]))
             events.append(event)
         current = data["current_run"]
-        values = {key: value for key, value in data.items() if key not in ("current_run", "events")}
+        values = {key: value for key, value in data.items() if key not in ("current_run", "events", "experiment")}
         return self._render("events.html", hostname=socket.gethostname(),
                             current_board_svg=board_svg(current.get("high_score_snapshot"))
-                            if current else None, events=events, **values)
+                            if current else None, events=events,
+                            experiment_sections=experiment_sections(data["experiment"]), **values)
 
     def event(self, event: dict, *, reason: bool = False, preview: bool = False) -> bytes | None:
         if reason:
@@ -67,11 +69,17 @@ class ReportRenderer:
         if event["name"] == Events.Conversation.PROMPT:
             return self._render("prompt.html", event=event, parts=parts(json.loads(event["content"])),
                                 preview=preview, markdown_html=markdown_html)
-        response = json.loads(event["content"])
+        try:
+            response = json.loads(event["content"])
+        except json.JSONDecodeError:
+            return self._render("reply.html", event=event, reply_text=event["content"], sections=[])
+        if not isinstance(response, dict):
+            return self._render("reply.html", event=event, reply_text=event["content"],
+                                sections=[("Response", fields(response))])
         groups = ("choices", "usage", "timings")
         sections = [("Response", fields({key: value for key, value in response.items() if key not in groups}))]
         sections.extend((key, fields(response[key], key)) for key in groups if key in response)
-        return self._render("reply.html", event=event, reply_text=reply_content(response), sections=sections)
+        return self._render("reply.html", event=event, reply_text=reply_summary(event["content"]), sections=sections)
 
     def tool_result(self, event: dict) -> bytes:
         return self._render("tool_result.html", event=event, result_html=tool_result_html(event))

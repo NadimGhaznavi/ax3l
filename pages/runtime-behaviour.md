@@ -136,6 +136,16 @@ MariaDB.
 
 ## Persistence and restart
 
+The reporting homepage shows eight collapsible Experiment Status sections: the
+four result evaluations followed by the four parameter selections in their saved
+order. Each section links to its recorded LLM prompt and response and shows its
+hypothesis, observations where applicable, parameter descriptions, baseline and
+chosen values, and saved state. Elapsed time and input/output tokens appear once
+per conversation. Shared parameter choices identify the view that submitted them.
+Waiting views do not reuse submissions from an older selection pass. Synthetic
+startup choices are identified separately and have no fabricated prompt or token
+counts. Automatic refresh retains expanded sections and horizontal table scroll.
+
 Ax3l saves experiment snapshots in the shared event log through `DbMgr`. Each
 accepted evaluation or proposal is checkpointed before continuing. Restart
 resumes the current pass and skips accepted views. Older combined-flow

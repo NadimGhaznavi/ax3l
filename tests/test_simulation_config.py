@@ -108,7 +108,7 @@ class ConfigPageTests(unittest.TestCase):
         event = dict(event_id=1, occurred_at=datetime.now(), name="simulation_submitted",
                      category="SnakeLab", log_level="INFO", content="Submitted config.",
                      process_id=RUN_ID)
-        with patch("ax3l.app.reporting.Reports.DbMgr"), patch(
+        with patch("ax3l.app.reporting.Reports.DbMgr") as db, patch(
             "ax3l.app.reporting.Reports.EventLogDb"
         ) as log, patch("ax3l.server.ReportingServer.SnakeLab") as snake:
             snake.return_value.is_simulation_running.return_value = True
@@ -116,6 +116,7 @@ class ConfigPageTests(unittest.TestCase):
             snake.return_value.get_num_sims.return_value = 1
             log.return_value.current_golden_config.return_value = None
             log.return_value.experiment_cycles.return_value = 0
+            db.return_value.query.return_value = []
             log.return_value.recent.return_value = [event]
             _, page = self.request("/")
         self.assertIn(f'Submitted <a href="/simulations/{RUN_ID}/config">config</a>.', page)

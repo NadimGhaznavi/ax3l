@@ -210,7 +210,7 @@ class AnimationReportTests(unittest.TestCase):
     def setUp(self):
         self.directory = self.enterContext(TemporaryDirectory())
         self.run_id = str(uuid4())
-        self.enterContext(patch('ax3l.app.reporting.Reports.DbMgr'))
+        self.enterContext(patch('ax3l.app.reporting.Reports.DbMgr')).return_value.query.return_value = []
         self.log = self.enterContext(patch('ax3l.app.reporting.Reports.EventLogDb')).return_value
         self.log.recent.return_value = []
         self.log.current_golden_config.return_value = {'process_id': self.run_id}

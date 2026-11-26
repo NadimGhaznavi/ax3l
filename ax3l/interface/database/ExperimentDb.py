@@ -33,6 +33,17 @@ class ExperimentDb:
         EventLogDb(self._db).log(Events.Configuration.STATE_SAVED, Events.Configuration.CATEGORY, "INFO",
                      json.dumps(asdict(state), allow_nan=False), process_id=state.experiment_id)
 
+    def initial_config(self, experiment_id: str) -> dict:
+        rows = self._db.query("""
+            SELECT JSON_EXTRACT(m.content, '$.config') AS config
+            FROM events e JOIN event_messages m USING (event_id)
+            WHERE e.category = %s AND e.name = %s AND e.process_id = %s
+            ORDER BY e.event_id LIMIT 1
+        """, (Events.Configuration.CATEGORY, Events.Configuration.STATE_SAVED, experiment_id))
+        config = json.loads(rows[0]["config"])
+        SimulationConfiguration.validate(config)
+        return config
+
     def comparison(self, run_id: str) -> dict | None:
         rows = self._db.query("""
             SELECT m.content FROM events e JOIN event_messages m USING (event_id)

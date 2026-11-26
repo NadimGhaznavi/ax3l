@@ -73,7 +73,7 @@ class ExperimentStatusTests(unittest.TestCase):
     def test_all_time_score_includes_the_live_golden_when_reporting_totals_are_stale(self):
         from ax3l.server.ReportingServer import make_server
 
-        self.enterContext(patch('ax3l.app.reporting.Reports.DbMgr'))
+        self.enterContext(patch('ax3l.app.reporting.Reports.DbMgr')).return_value.query.return_value = []
         log = self.enterContext(patch('ax3l.app.reporting.Reports.EventLogDb')).return_value
         log.recent.return_value = []
         snake = self.enterContext(patch('ax3l.server.ReportingServer.SnakeLab')).return_value
@@ -133,7 +133,7 @@ class ExperimentStatusTests(unittest.TestCase):
     def test_prompt_detail_source_title_and_escaping(self):
         from ax3l.server.ReportingServer import make_server
 
-        self.enterContext(patch('ax3l.app.reporting.Reports.DbMgr'))
+        self.enterContext(patch('ax3l.app.reporting.Reports.DbMgr')).return_value.query.return_value = []
         log = self.enterContext(patch('ax3l.app.reporting.Reports.EventLogDb')).return_value
         server = make_server('127.0.0.1', 0)
         thread = Thread(target=server.serve_forever, daemon=True)
@@ -161,7 +161,7 @@ class ExperimentStatusTests(unittest.TestCase):
         from ax3l.server.ReportingServer import make_server
         from ax3l.constants.DAx3l import DAx3l
 
-        self.enterContext(patch('ax3l.app.reporting.Reports.DbMgr'))
+        self.enterContext(patch('ax3l.app.reporting.Reports.DbMgr')).return_value.query.return_value = []
         log = self.enterContext(patch('ax3l.app.reporting.Reports.EventLogDb')).return_value
         log.recent.return_value = []
         snake = self.enterContext(patch('ax3l.server.ReportingServer.SnakeLab')).return_value

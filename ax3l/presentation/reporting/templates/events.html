@@ -52,6 +52,13 @@
     </figure>
     </div>
   </section>
+  <section class="experiment-views" aria-labelledby="view-status-title">
+    <header>
+      <h2 id="view-status-title">Experiment Status</h2>
+      <div class="view-controls"><button type="button" data-views-open="true">Expand all</button><button type="button" data-views-open="false">Collapse all</button></div>
+    </header>
+    <div id="view-conversations">{% include "experiment_status.html" %}</div>
+  </section>
   <section class="event-log-panel" aria-labelledby="event-log-title">
   <header>
     <h1 id="event-log-title">Ax3l Event Log</h1>
@@ -124,6 +131,14 @@
     const interval = document.querySelector('#refresh-interval');
     const status = document.querySelector('#refresh-status');
     const main = document.querySelector('main');
+    const viewStatus = document.querySelector('#view-conversations');
+    for (const button of document.querySelectorAll('[data-views-open]')) {
+      button.addEventListener('click', () => {
+        for (const section of viewStatus.querySelectorAll('.view-section')) {
+          section.open = button.dataset.viewsOpen === 'true';
+        }
+      });
+    }
     let refreshMs = 0;
     let timer;
     let controller;
@@ -234,6 +249,17 @@
         const scrollX = window.scrollX;
         const scrollY = window.scrollY;
         const scrollLeft = main.scrollLeft;
+        const viewState = new Map(Array.from(viewStatus.querySelectorAll('.view-section'), section =>
+          [section.id, { open: section.open, scrollLeft: section.querySelector('.view-table-wrap').scrollLeft }]
+        ));
+        viewStatus.replaceChildren(...page.querySelector('#view-conversations').childNodes);
+        for (const section of viewStatus.querySelectorAll('.view-section')) {
+          const saved = viewState.get(section.id);
+          if (saved) {
+            section.open = saved.open;
+            section.querySelector('.view-table-wrap').scrollLeft = saved.scrollLeft;
+          }
+        }
         main.replaceChildren(...page.querySelector('main').childNodes);
         initializeFilters();
         document.querySelector('.note').textContent = page.querySelector('.note').textContent;

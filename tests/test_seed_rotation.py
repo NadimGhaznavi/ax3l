@@ -244,7 +244,8 @@ class SeedRotationTests(unittest.TestCase):
     def test_seed_overflow_stops_before_submitting_either_run(self):
         config = SimulationConfiguration.defaults()
         config['seed'] = SimulationConfiguration.field(('seed',))['maximum']
-        self.snake.submit_simulation(config)
+        run_id = self.snake.submit_simulation(config)
+        self.log.log('golden_config_created', 'Configuration', 'INFO', 'Existing golden.', process_id=run_id)
         with self.assertRaises(ValidationError):
             self.loop().run(cycles=1)
         self.assertEqual(len(self.snake.submissions), 1)

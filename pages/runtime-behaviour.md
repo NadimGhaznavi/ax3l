@@ -82,8 +82,9 @@ baseline, then runs a file-backed synthetic experiment on the same seed. No LLM
 requests occur between these simulations. The synthetic result is compared with
 the baseline using the usual high-score rule. Qwen then evaluates that comparison
 in all four views and begins the autonomous configuration loop.
-If completed simulations already exist without a golden event, Ax3l
-adopts the best completed result. An existing golden reference is reused.
+Without Ax3l's own saved state or golden reference, both startup runs execute
+even if SnakeLab contains older simulations. Those older results are preserved
+and do not become the new baseline. An existing Ax3l golden reference is reused.
 
 ### Editable first experiment
 

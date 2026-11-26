@@ -342,6 +342,7 @@ class ViewCycleTests(unittest.TestCase):
 
     def test_existing_golden_is_evaluated_before_new_proposals(self):
         run_id = self.snake.submit_simulation(SimulationConfiguration.defaults())
+        self.log.log('golden_config_created', 'Configuration', 'INFO', 'Existing golden.', process_id=run_id)
         self.loop().run(cycles=1)
         self.assertEqual(len(self.model.requests), 12)
         self.assertIn(f'Latest simulation: {run_id}', prompt_text(self.model.requests[0]))

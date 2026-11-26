@@ -16,6 +16,12 @@ installation.
 
 This release was verified at a high level and appears to be working.
 
+### Changed
+
+- Increase the fixed simulation length from 750 to 1,500 episodes for the default
+  baseline, synthetic first experiment, and autonomous candidates. Keep the
+  comparison windows at 150 episodes.
+
 ### Fixed
 
 - Establish the default baseline and synthetic experiment when Ax3l has no saved

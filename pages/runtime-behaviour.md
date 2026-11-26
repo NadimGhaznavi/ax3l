@@ -8,6 +8,8 @@ Ax3l evaluates experiment results in four focused conversations, then
 runs another four conversations to assemble the next SnakeLab configuration.
 It submits that configuration, waits for the simulation, compares its high
 score with the golden reference, and evaluates the results again.
+Every simulation runs for 1,500 episodes, including the initial baseline,
+synthetic experiment, and both runs when rotating the seed.
 When a new seed is requested, it first runs the golden settings on that seed to
 establish the comparison baseline.
 
@@ -103,6 +105,9 @@ and `/opt/prod/ax3l/conf/synthetic/` after installation:
   configuration so they describe the intended changes and expected results.
 
 Install and upgrade copy missing startup files and preserve existing edits.
+When upgrading from 750 episodes, update `epochs` in the installed synthetic
+configuration to `1500` and start a fresh experiment history so the baseline and
+candidate simulations use the same length.
 Ax3l validates all five files before submitting the initial baseline. It saves
 the resolved per-view choices and hypotheses in the first checkpoint; restarting
 resumes those saved inputs even if the files have since changed. File edits apply

@@ -7,9 +7,9 @@ from urllib.error import HTTPError
 from urllib.request import urlopen
 
 from ax3l.activity.ExperimentHighscores import highscores
-from ax3l.app.ConfigurationLog import ConfigurationLog
-from ax3l.app.DbMgr import DbMgr
-from ax3l.app.EventLogDb import EventLogDb
+from ax3l.app.experiment.ConfigurationLog import ConfigurationLog
+from ax3l.interface.database.DbMgr import DbMgr
+from ax3l.interface.database.EventLogDb import EventLogDb
 from ax3l.server.ReportingServer import make_server
 
 
@@ -82,20 +82,20 @@ class HighscoreTests(unittest.TestCase):
         db.execute = Mock()
         db.query = Mock(return_value=[{'event_id': 4}])
         snapshot = {'simulations': 12, 'score': 40, 'seed': 2}
-        ConfigurationLog(db).golden_config_created('run', reason='New seed', experiment_score=snapshot)
+        ConfigurationLog(EventLogDb(db)).golden_config_created('run', reason='New seed', experiment_score=snapshot)
         self.assertEqual(db.execute.call_args.args[1], (4, 12, 40, 2))
         db._connection.commit.assert_called_once()
         db._connection.reset_mock()
         db.execute.side_effect = [1, 1, RuntimeError('write failed')]
         with self.assertRaises(RuntimeError):
-            ConfigurationLog(db).golden_config_created('run', reason='New seed', experiment_score=snapshot)
+            ConfigurationLog(EventLogDb(db)).golden_config_created('run', reason='New seed', experiment_score=snapshot)
         db._connection.commit.assert_not_called()
         db._connection.rollback.assert_called_once()
 
 
     def test_http_page_empty_and_failure(self):
         snake = self.enterContext(patch('ax3l.server.ReportingServer.SnakeLab')).return_value
-        db = self.enterContext(patch('ax3l.server.ReportingServer.DbMgr')).return_value
+        db = self.enterContext(patch('ax3l.app.reporting.Reports.DbMgr')).return_value
         snake.get_num_sims.return_value = 5
         db.query.return_value = [dict(simulations=1, score=38, seed=1, run_id='run',
                                      reason='Initial', matched=False),
@@ -120,7 +120,7 @@ class HighscoreTests(unittest.TestCase):
             with urlopen(url) as response:
                 self.assertIn('No accepted scores recorded yet.', response.read().decode())
             db.query.side_effect = RuntimeError('offline')
-            with patch('ax3l.server.ReportingServer.traceback.print_exc'), self.assertRaises(HTTPError) as error:
+            with patch('ax3l.interface.ReportHandler.logging.exception'), self.assertRaises(HTTPError) as error:
                 urlopen(url)
             self.assertEqual(error.exception.code, 500)
         finally:

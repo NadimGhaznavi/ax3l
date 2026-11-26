@@ -1,13 +1,14 @@
-"""The editable settings and initial hypothesis for each experiment view."""
+"""The editable settings for each experiment view."""
 
 from dataclasses import dataclass
+
+from ax3l.constants.DViewConversation import DViewConversation
 
 
 @dataclass(frozen=True)
 class ExperimentView:
     name: str
     parameters: tuple[str, ...]
-    initial_hypothesis: str
 
 
 VIEWS = {
@@ -15,15 +16,19 @@ VIEWS = {
         ExperimentView("reward-signals", (
             "game.rewards.food", "game.rewards.wall", "game.rewards.snake",
             "game.rewards.empty", "game.rewards.closer_to_food", "game.rewards.further_from_food",
-        ), "These reward signals encourage collecting food and discourage collisions and unproductive movement."),
+            "training.gamma", DViewConversation.NEW_SEED,
+        )),
         ExperimentView("architecture", (
             "model.hidden_size", "model.layers", "model.dropout", "training.sequence_length",
-        ), "This architecture and sequence length provide enough capacity and context to learn useful play."),
+            DViewConversation.NEW_SEED,
+        )),
         ExperimentView("training", (
-            "training.learning_rate", "training.batch_size", "training.gamma", "seed",
-        ), "These training settings support consistent learning that improves scores over the run."),
+            "training.learning_rate", "training.batch_size", "training.sequence_length", "training.gamma",
+            DViewConversation.NEW_SEED,
+        )),
         ExperimentView("exploration", (
             "epsilon.initial", "epsilon.decay", "epsilon_nice.probability", "epsilon_nice.steps",
-        ), "This exploration schedule discovers useful actions and allows increasingly effective play during training."),
+            DViewConversation.NEW_SEED,
+        )),
     )
 }

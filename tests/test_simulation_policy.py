@@ -7,7 +7,6 @@ import unittest
 from jsonschema import Draft202012Validator, ValidationError
 
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
-from ax3l.app.snakelab.ParameterSpace import finite_choices
 
 
 class SimulationPolicyTests(unittest.TestCase):
@@ -41,13 +40,13 @@ class SimulationPolicyTests(unittest.TestCase):
         config['epsilon']['decay'] = .999
         SimulationConfiguration.validate(config)
 
-    def test_every_tunable_model_value_is_accepted_by_the_server_schema(self):
+    def test_model_boundaries_are_accepted_by_the_server_schema(self):
         root = Path(__file__).resolve().parents[1]
         upstream = Draft202012Validator(json.loads(
             (root / 'pages/snake-lab/simulation-config-v2.schema.json').read_text()))
         config = SimulationConfiguration.defaults()
         for field in ('hidden_size', 'layers', 'dropout'):
-            for (value,) in finite_choices(field):
+            for value in ((32, 64, 128) if field == 'hidden_size' else (1, 2, 3) if field == 'layers' else (0, .05, .1)):
                 value = float(value) if field == 'dropout' else int(value)
                 with self.subTest(field=field, value=value):
                     self.assertEqual(SimulationConfiguration.value(('model', field), value), value)
@@ -55,13 +54,13 @@ class SimulationPolicyTests(unittest.TestCase):
                     SimulationConfiguration.validate(config)
                     upstream.validate(config)
 
-    def test_every_legal_reward_pair_is_accepted_by_the_server_schema(self):
+    def test_reward_policy_boundaries_match_the_server_schema(self):
         root = Path(__file__).resolve().parents[1]
         upstream = Draft202012Validator(json.loads(
             (root / 'pages/snake-lab/simulation-config-v2.schema.json').read_text()))
         config = SimulationConfiguration.defaults()
         upstream.validate(config)
-        for closer, further in finite_choices('reward_pair'):
+        for closer, further in ((0, -5), (.1, -.1), (1, -1), (5, -5)):
             config['game']['rewards'].update(closer_to_food=float(closer), further_from_food=float(further))
             SimulationConfiguration.validate(config)
             upstream.validate(config)

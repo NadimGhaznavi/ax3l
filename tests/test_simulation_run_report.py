@@ -12,13 +12,13 @@ from urllib.error import HTTPError
 from urllib.request import urlopen
 from uuid import uuid4
 
-from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb
-from ax3l.app.snakelab.GenerateDefaultConfig import GenerateDefaultConfig
-from ax3l.app.EventLogDb import EventLogDb
-from ax3l.app.DbMgr import DbMgr
+from ax3l.interface.database.SnakeLabDb import SnakeLabDb
+from ax3l.interface.SimulationConfiguration import SimulationConfiguration
+from ax3l.interface.database.EventLogDb import EventLogDb
+from ax3l.interface.database.DbMgr import DbMgr
 from ax3l.constants.DSnakeLab import DSnakeLab
 from ax3l.server.ReportingServer import make_server
-from ax3l.activity.SimulationBoard import board_svg
+from ax3l.presentation.reporting.SimulationBoard import board_svg
 
 
 SNAPSHOT = {"board": {"grid_size": [4, 3], "snake_head": [2, 1],
@@ -48,7 +48,7 @@ class SimulationRunReportTests(unittest.TestCase):
                 VALUES (%s, '2026-10-10 12:00:00', 'SnakeLab', 'simulation_completed', %s)''',
                 (event_id, run_id))
         # Keep all fixtures connection-local, without writing the Snake Lab database.
-        with patch('ax3l.app.EventLogDb.DSnakeLab.DATABASE', os.environ['DB_NAME']):
+        with patch('ax3l.interface.database.EventLogDb.DSnakeLab.DATABASE', os.environ['DB_NAME']):
             events = EventLogDb(db).recent()
         self.assertEqual([event['event_id'] for event in events], list(range(505, 5, -1)))
         self.assertTrue(all(event['simulation_high_score'] == 38 for event in events))
@@ -66,8 +66,13 @@ class SimulationRunReportTests(unittest.TestCase):
         ) CHARACTER SET utf8mb4 COLLATE utf8mb4_uca1400_ai_ci''')
         db.execute('''CREATE TEMPORARY TABLE event_messages (event_id INTEGER, content TEXT)
             CHARACTER SET utf8mb4 COLLATE utf8mb4_uca1400_ai_ci''')
-        runs = db.query(f'SELECT run_id, high_score FROM `{DSnakeLab.DATABASE}`.simulation_runs LIMIT 5')
-        self.assertTrue(runs, 'SnakeLab needs at least one simulation for this check')
+        db.execute("""CREATE TEMPORARY TABLE snakelab.simulation_runs (
+            run_id CHAR(36), high_score INT
+        ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci""")
+        runs = [dict(run_id=str(uuid4()), high_score=score) for score in (None, 0, 38)]
+        for run in runs:
+            db.execute('INSERT INTO snakelab.simulation_runs VALUES (%s, %s)',
+                       (run['run_id'], run['high_score']))
         for index, run in enumerate(runs):
             db.execute('''INSERT INTO events (event_id, category, name, process_id)
                 VALUES (%s, 'SnakeLab', 'simulation_completed', %s)''', (index, run['run_id']))
@@ -145,17 +150,17 @@ class SimulationRunReportTests(unittest.TestCase):
         self.assertIsNone(SnakeLabDb(db).get_run_summary(run_id))
 
     def test_completed_link_and_summary(self):
-        self.enterContext(patch('ax3l.server.ReportingServer.DbMgr'))
-        log = self.enterContext(patch('ax3l.server.ReportingServer.EventLogDb')).return_value
+        self.enterContext(patch('ax3l.app.reporting.Reports.DbMgr')).return_value.query.return_value = []
+        log = self.enterContext(patch('ax3l.app.reporting.Reports.EventLogDb')).return_value
         snake = self.enterContext(patch('ax3l.server.ReportingServer.SnakeLab')).return_value
-        snake.get_config.return_value = GenerateDefaultConfig().run()
+        snake.get_config.return_value = SimulationConfiguration.defaults()
         snake.get_episode_diagnostics.return_value = dict(episodes=500, post_epsilon_episodes=274,
             epsilon_injections=100, epsilon_nice_injections=42, total_reward=7.5,
             wall=200, snake=250, max_moves=49, board_filled=1)
         snake.get_highscore_frames.return_value = None
-        self.enterContext(patch('ax3l.app.ReportBackground.SnakeLab', return_value=snake))
-        self.enterContext(patch('ax3l.app.ReportBackground.DbMgr'))
-        self.enterContext(patch('ax3l.app.ReportBackground.ReportingRefresh')).return_value.refresh.return_value = dict(
+        self.enterContext(patch('ax3l.app.reporting.ReportBackground.SnakeLab', return_value=snake))
+        self.enterContext(patch('ax3l.app.reporting.ReportBackground.DbMgr'))
+        self.enterContext(patch('ax3l.app.reporting.ReportBackground.ReportingRefresh')).return_value.refresh.return_value = dict(
             games_played=0, moves_made=0, simulations_submitted=0, experiment_cycles=0, all_time_high_score=None)
         snake.get_high_score.return_value = 0
         snake.get_num_sims.return_value = 1

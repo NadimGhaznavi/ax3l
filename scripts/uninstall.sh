@@ -7,9 +7,10 @@ usage() {
 Usage: sudo scripts/uninstall.sh
 
 Stops and removes Ax3l service units, then deletes /opt/prod/ax3l,
-/etc/ax3l/database.env, the local ax3l MariaDB database/account, and the
-ax3l Linux account/group. All Ax3l data is deleted. Requires root and
-MariaDB administrative access through local socket authentication.
+the local ax3l MariaDB database/account, and the ax3l Linux account/group.
+Ax3l experiment data is deleted. /etc/ax3l/database.env is retained for
+reinstallation. Requires root and MariaDB administrative access through
+local socket authentication. SnakeLab and LlamaSrv remain unchanged.
 HELP
 }
 
@@ -54,9 +55,9 @@ DROP USER IF EXISTS '$database'@'localhost';
 SQL
 
 rm -rf -- "$install_dir"
-rm -f -- "$credentials_file"
 if [[ -d "$config_dir" ]]; then
-    rmdir -- "$config_dir"
+    chgrp root "$config_dir"
+    chmod 700 "$config_dir"
 fi
 if getent passwd "$service_account" >/dev/null; then
     userdel "$service_account"
@@ -65,5 +66,8 @@ if getent group "$service_account" >/dev/null; then
     groupdel "$service_account"
 fi
 
-printf 'Removed Ax3l installation, credentials, database/account %s, and Linux account/group %s.\n' \
+printf 'Removed Ax3l installation, database/account %s, and Linux account/group %s.\n' \
     "$database" "$service_account"
+if [[ -f "$credentials_file" ]]; then
+    printf 'Retained database credentials: %s\n' "$credentials_file"
+fi

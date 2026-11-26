@@ -5,13 +5,43 @@ Load its DB_* environment variables and set AX3L_TEST_DB=1 to run.
 
 import os
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from uuid import uuid4
+
+from ax3l.interface.database.EventLogDb import EventLogDb
+
+
+class DatabaseLifecycleTests(unittest.TestCase):
+    def test_initialization_failure_closes_the_connection(self):
+        from ax3l.interface.database.DbMgr import DbMgr
+
+        with patch.dict(os.environ, DB_HOST='test-host', DB_NAME='ax3l_test',
+                        DB_USER='test-user', DB_PASSWORD='test-password'), \
+                patch('ax3l.interface.database.DbMgr.pymysql.connect') as connect, \
+                patch('ax3l.interface.database.DbMgr.EventSchema') as schema:
+            schema.return_value.initialize.side_effect = RuntimeError('Schema unavailable')
+            with self.assertRaisesRegex(RuntimeError, 'Schema unavailable'):
+                DbMgr()
+            schema.return_value.initialize.assert_called_once_with()
+            connect.return_value.close.assert_called_once_with()
+
+    def test_external_connection_has_no_schema_side_effect(self):
+        from ax3l.interface.database.DbMgr import DbMgr
+
+        with patch.dict(os.environ, DB_HOST='test-host', DB_NAME='ax3l_test',
+                        DB_USER='test-user', DB_PASSWORD='test-password'), \
+                patch('ax3l.interface.database.DbMgr.pymysql.connect') as connect, \
+                patch('ax3l.interface.database.DbMgr.EventSchema') as schema:
+            db = DbMgr(database='snakelab', initialize_event_tables=False)
+            schema.assert_not_called()
+            self.assertEqual(connect.call_args.kwargs['database'], 'snakelab')
+            db.close()
+            connect.return_value.close.assert_called_once_with()
 
 
 class EventVersionTests(unittest.TestCase):
     def test_version_is_written_with_submission_and_message_in_one_transaction(self):
-        from ax3l.app.DbMgr import DbMgr
+        from ax3l.interface.database.DbMgr import DbMgr
 
         db = object.__new__(DbMgr)
         db._connection = Mock()
@@ -21,7 +51,7 @@ class EventVersionTests(unittest.TestCase):
             with self.subTest(version=version):
                 db.execute.reset_mock()
                 db._connection.reset_mock()
-                self.assertEqual(db.log('simulation_submitted', 'SnakeLab', 'INFO',
+                self.assertEqual(EventLogDb(db).log('simulation_submitted', 'SnakeLab', 'INFO',
                                         'Submitted config.', process_id='run',
                                         ax3l_version=version), 4)
                 sql, values = db.execute.call_args_list[0].args
@@ -32,7 +62,7 @@ class EventVersionTests(unittest.TestCase):
         db._connection.reset_mock()
         db.execute.side_effect = [1, RuntimeError('message write failed')]
         with self.assertRaises(RuntimeError):
-            db.log('simulation_submitted', 'SnakeLab', 'INFO', 'Submitted config.',
+            EventLogDb(db).log('simulation_submitted', 'SnakeLab', 'INFO', 'Submitted config.',
                    ax3l_version='1.0.7')
         db._connection.commit.assert_not_called()
         db._connection.rollback.assert_called_once()
@@ -42,7 +72,7 @@ class EventVersionTests(unittest.TestCase):
 class DbMgrTests(unittest.TestCase):
     def setUp(self):
         self.assertEqual(os.environ["DB_NAME"], "ax3l_test")
-        from ax3l.app.DbMgr import DbMgr
+        from ax3l.interface.database.DbMgr import DbMgr
 
         self.db = DbMgr()
         self.process_id = str(uuid4())
@@ -61,8 +91,6 @@ class DbMgrTests(unittest.TestCase):
         return self.db.query("SELECT LAST_INSERT_ID() AS event_id")[0]["event_id"]
 
     def test_current_golden_config_selects_latest_creation(self):
-        from ax3l.app.EventLogDb import EventLogDb
-
         with self.db.transaction():
             for category, reason in (("Configuration", "Initial defaults"),
                                      ("Configuration", "Parameter x: 2 > 4"),
@@ -79,7 +107,7 @@ class DbMgrTests(unittest.TestCase):
             self.db.execute("DELETE FROM events WHERE process_id = %s", (self.process_id,))
 
     def test_round_trip_and_reinitialization(self):
-        from ax3l.app.DbMgr import DbMgr
+        from ax3l.interface.database.DbMgr import DbMgr
 
         content = "A tree's quiet shade 🌳\nSecond line"
         with self.db.transaction():
@@ -101,22 +129,21 @@ class DbMgrTests(unittest.TestCase):
             self.assertEqual(self.db.query(f"SELECT * FROM {table} WHERE event_id = %s", (event_id,)), [])
 
     def test_log_commits_content_and_links(self):
-        from ax3l.app.DbMgr import DbMgr
+        from ax3l.interface.database.DbMgr import DbMgr
 
-        prompt_id = self.db.log(
+        prompt_id = EventLogDb(self.db).log(
             "prompt_sent", "Conversation", "INFO", "Describe the configuration.",
             process_id=self.process_id, source_name="GoldenConfig", parameter="reward_pair",
             ax3l_version="1.0.7",
         )
         content = "A tree's quiet shade 🌳\nSecond line"
-        reply_id = self.db.log(
+        reply_id = EventLogDb(self.db).log(
             "reply_received", "Conversation", "INFO", content,
             process_id=self.process_id, parent_event_id=prompt_id,
         )
         self.assertGreater(reply_id, prompt_id)
         reader = DbMgr()
         try:
-            from ax3l.app.EventLogDb import EventLogDb
             self.assertEqual(EventLogDb(reader).get(prompt_id)['source_name'], 'GoldenConfig')
             self.assertIsNone(EventLogDb(reader).get(reply_id)['source_name'])
             self.assertEqual(EventLogDb(reader).get(prompt_id)['parameter'], 'reward_pair')
@@ -145,7 +172,7 @@ class DbMgrTests(unittest.TestCase):
 
         # Force rejection of the message insert after the envelope was inserted.
         with self.assertRaises(pymysql.IntegrityError):
-            self.db.log(
+            EventLogDb(self.db).log(
                 "reply_received", "Conversation", "INFO", None,
                 process_id=self.process_id,
             )

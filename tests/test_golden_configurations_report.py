@@ -10,9 +10,8 @@ from urllib.error import HTTPError
 from urllib.request import urlopen
 from uuid import uuid4
 
-from ax3l.app.EventLogDb import EventLogDb
-from ax3l.activity.ReplyReport import reasoning_content
-from ax3l.activity.GoldenConfigurations import parameter_change
+from ax3l.interface.database.EventLogDb import EventLogDb
+from ax3l.presentation.reporting.ReplyReport import reasoning_content
 
 
 class GoldenHistoryTests(unittest.TestCase):
@@ -43,7 +42,7 @@ class GoldenHistoryTests(unittest.TestCase):
         event(6, 'Conversation', 'reply_received', 'conversation', response)
         event(7, 'Conversation', 'reply_received', 'unrelated', 'wrong response')
         event(8, 'Configuration', 'proposal_accepted', 'winner', '{"draft_id":"conversation"}')
-        event(9, 'Configuration', 'golden_config_created', 'winner', 'High score: 55 > 0; network.size: 4 -> 6.')
+        event(9, 'Configuration', 'golden_config_created', 'winner', 'High score: 55 > 0.')
         event(10, 'Configuration', 'golden_config_retained', 'winner')
         event(11, 'Configuration', 'golden_config_created', 'seed-baseline')
         event(12, 'Tool', 'tool_execution_completed', 'unrelated', 'invalid JSON')
@@ -57,43 +56,24 @@ class GoldenHistoryTests(unittest.TestCase):
         rows = EventLogDb(Db()).golden_configurations()
         self.assertEqual([r['process_id'] for r in rows], ['seed-baseline', 'winner', 'baseline'])
         self.assertEqual([r['high_score'] for r in rows], [None, 55, 0])
-        self.assertEqual(parameter_change(rows[1]['decision']), 'network.size: 4 > 6')
-        self.assertEqual(parameter_change(rows[2]['decision']), '')
         self.assertEqual(rows[1]['reply_id'], 6)
-        self.assertEqual(rows[1]['parameter'], 'configuration')
         self.assertEqual(reasoning_content(rows[1]['response']), 'winning reason')
         for row in (rows[0], rows[2]):
             self.assertIsNone(row['reply_id'])
-            self.assertEqual(row['parameter'], 'configuration')
 
     def test_missing_reasoning(self):
         for content in (None, '', 'invalid', 'null', '{}', '{"choices":[]}',
                         '{"choices":[{"message":{"content":"not reasoning"}}]}'):
             self.assertEqual(reasoning_content(content), '')
 
-    def test_recorded_value_changes(self):
-        for decision, expected in (
-            (None, ''),
-            ('Initial defaults', ''),
-            ('Fresh baseline after seed rotation. Score to beat: 55.', ''),
-            ('High score: 55 > 0; network.size: 4 -> 6.', 'network.size: 4 > 6'),
-            ('High score: 55 > 0; learning_rate: 1e-05 -> 0.001.', 'Learning Rate: 1e-05 > 0.001'),
-            ('High score: 55 > 0; model.layers: 1 -> 2.', 'Encoder Layers: 1 > 2'),
-            ('High score: 55 > 0; seed: 1970 -> 1971.', 'Random Seed: 1970 > 1971'),
-            ('High score: 55 > 0; epsilon.initial: 0.9 -> 0.8.', 'Epsilon: initial: 0.9 > 0.8'),
-            ('High score: 55 > 0; rewards.food: 0 -> 6; rewards.death: -4 -> -2.',
-             'rewards.food: 0 > 6; rewards.death: -4 > -2'),
-        ):
-            with self.subTest(decision=decision):
-                self.assertEqual(parameter_change(decision), expected)
 
 
 class GoldenReportTests(unittest.TestCase):
     def test_table_detail_links_missing_data_and_escaping(self):
         from ax3l.server.ReportingServer import make_server
 
-        self.enterContext(patch('ax3l.server.ReportingServer.DbMgr'))
-        log = self.enterContext(patch('ax3l.server.ReportingServer.EventLogDb')).return_value
+        self.enterContext(patch('ax3l.app.reporting.Reports.DbMgr'))
+        log = self.enterContext(patch('ax3l.app.reporting.Reports.EventLogDb')).return_value
         snake = self.enterContext(patch('ax3l.server.ReportingServer.SnakeLab')).return_value
         run_id = str(uuid4())
         reason = 'Consider <script>unsafe</script>\nThen choose a value.'
@@ -102,7 +82,7 @@ class GoldenReportTests(unittest.TestCase):
         log.golden_configurations.return_value = [
             dict(event_id=9, occurred_at=datetime(2026, 9, 15, 12, 30, 45),
                  process_id=run_id, parameter='<parameter>', reply_id=6, response=response, high_score=55,
-                 decision='High score: 55 > 0; epsilon.initial: 0.9 -> 0.8.'),
+                 decision='High score: 55 > 0.'),
             dict(event_id=1, occurred_at=None, process_id=None, parameter=None,
                  reply_id=None, response=None, high_score=None),
             dict(event_id=0, occurred_at=None, process_id=None, parameter=None,
@@ -123,8 +103,8 @@ class GoldenReportTests(unittest.TestCase):
                 return result.read().decode()
 
         page = get('/golden-configurations')
-        for value in ('Date', 'Time', 'Configuration', 'Simulation', 'High Score', '<td>55</td>', '<td>0</td>', 'Parameter', 'Change', '<td>Epsilon: initial: 0.9 &gt; 0.8</td>', 'Reason', '2026-09-15',
-                      '12:30:45', '&lt;parameter&gt;', f'href="/simulations/{run_id}/config"'):
+        for value in ('Date', 'Time', 'Configuration', 'Simulation', 'High Score', '<td>55</td>', '<td>0</td>', 'Decision', '<td>High score: 55 &gt; 0.</td>', 'Reason', '2026-09-15',
+                      '12:30:45', f'href="/simulations/{run_id}/config"'):
             self.assertIn(value, page)
         self.assertIn(f'href="/simulations/{run_id}/config">{run_id[:8]}</a>', page)
         self.assertIn(f'href="/simulations/{run_id}">Details</a>', page)
@@ -141,12 +121,9 @@ class GoldenReportTests(unittest.TestCase):
         self.assertIn('42', config_page)
         self.assertIn('Learning Rate', config_page)
         self.assertNotIn('training.learning_rate', config_page)
-        log.golden_configurations.return_value[0].update(
-            parameter='reward_pair',
-            decision='game.rewards.further_from_food: -4 -> -2; game.rewards.closer_to_food: -2 -> -2.')
+        log.golden_configurations.return_value[0]['decision'] = 'Adopt <script>baseline</script>.'
         page = get('/golden-configurations')
-        self.assertIn('Food Reward: closer, further', page)
-        self.assertIn('Food Reward: closer: -2 &gt; -2, Food Reward: further: -4 &gt; -2', page)
+        self.assertIn('Adopt &lt;script&gt;baseline&lt;/script&gt;.', page)
         log.get.return_value['content'] = '{}'
         with self.assertRaises(HTTPError) as error:
             get('/events/6/reason')

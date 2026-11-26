@@ -4,13 +4,13 @@ import subprocess
 import unittest
 from unittest.mock import patch
 
-from ax3l.activity.CheckServices import CheckServices
+from ax3l.app.CheckServices import CheckServices
 from ax3l.interface.Systemd import Systemd
 
 
 class WatchdogTests(unittest.TestCase):
     def setUp(self):
-        systemd = patch('ax3l.activity.CheckServices.Systemd')
+        systemd = patch('ax3l.app.CheckServices.Systemd')
         self.systemd = systemd.start().return_value
         self.addCleanup(systemd.stop)
         self.systemd.state.return_value = 'active'

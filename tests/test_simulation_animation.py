@@ -16,7 +16,7 @@ from uuid import uuid4
 from PIL import Image, ImageSequence
 import zmq
 
-from ax3l.activity.SimulationAnimation import SimulationAnimation
+from ax3l.presentation.reporting.SimulationAnimation import SimulationAnimation
 from ax3l.interface.SimulationGifStore import SimulationGifStore
 from ax3l.interface.SnakeLab import SnakeLab, SnakeLabQueryError
 from ax3l.server.ReportingServer import make_server
@@ -210,15 +210,15 @@ class AnimationReportTests(unittest.TestCase):
     def setUp(self):
         self.directory = self.enterContext(TemporaryDirectory())
         self.run_id = str(uuid4())
-        self.enterContext(patch('ax3l.server.ReportingServer.DbMgr'))
-        self.log = self.enterContext(patch('ax3l.server.ReportingServer.EventLogDb')).return_value
+        self.enterContext(patch('ax3l.app.reporting.Reports.DbMgr')).return_value.query.return_value = []
+        self.log = self.enterContext(patch('ax3l.app.reporting.Reports.EventLogDb')).return_value
         self.log.recent.return_value = []
         self.log.current_golden_config.return_value = {'process_id': self.run_id}
         self.log.experiment_cycles.return_value = 1
         self.snake = self.enterContext(patch('ax3l.server.ReportingServer.SnakeLab')).return_value
-        self.enterContext(patch('ax3l.app.ReportBackground.SnakeLab', return_value=self.snake))
-        self.enterContext(patch('ax3l.app.ReportBackground.DbMgr'))
-        self.refresh = self.enterContext(patch('ax3l.app.ReportBackground.ReportingRefresh')).return_value
+        self.enterContext(patch('ax3l.app.reporting.ReportBackground.SnakeLab', return_value=self.snake))
+        self.enterContext(patch('ax3l.app.reporting.ReportBackground.DbMgr'))
+        self.refresh = self.enterContext(patch('ax3l.app.reporting.ReportBackground.ReportingRefresh')).return_value
         self.refresh.refresh.return_value = dict(
             games_played=0, moves_made=0, simulations_submitted=0, experiment_cycles=0, all_time_high_score=None)
         self.snake.get_run_summary.return_value = dict(id=123, run_id=self.run_id, high_score=1,

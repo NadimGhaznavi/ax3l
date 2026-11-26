@@ -10,15 +10,16 @@ import unittest
 from unittest.mock import patch
 from uuid import uuid4
 
-from ax3l.app.DbMgr import DbMgr
-from ax3l.app.snakelab.ExperimentDb import ExperimentDb
-from ax3l.app.snakelab.SnakeLabDb import CONFIGURATION_FIELDS, CONFIGURATION_COLUMNS, _config_values
+from ax3l.interface.database.DbMgr import DbMgr
+from ax3l.interface.database.ExperimentDb import ExperimentDb
+from ax3l.interface.database.SnakeLabDb import CONFIGURATION_FIELDS, CONFIGURATION_COLUMNS, _config_values
 from ax3l.constants.DSnakeLab import DSnakeLab
 from ax3l.entities.ExperimentState import ExperimentState
+from ax3l.entities.ExperimentView import VIEWS
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 from ax3l.interface.SnakeLab import SnakeLab
 from ax3l.server.Ax3lServer import main
-from view_cycle_fixtures import LocalLLM, LocalSnakeControl, episodes
+from view_cycle_fixtures import LocalLLM, LocalSnakeControl, episodes, new_seed_proposal
 
 
 @unittest.skipUnless(os.environ.get('AX3L_TEST_DB') == '1', 'requires disposable MariaDB test database')
@@ -48,7 +49,7 @@ class ViewCycleIntegrationTests(unittest.TestCase):
             PRIMARY KEY(run_id, episode)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci''')
         self.tables.append('simulation_episodes')
-        self.scores = iter((10, 12, 7))
+        self.scores = iter((10, 9, 12, 7))
         self.control = LocalSnakeControl(self.handle_control)
         self.addCleanup(self.control.close)
         self.model = LocalLLM()
@@ -103,19 +104,24 @@ class ViewCycleIntegrationTests(unittest.TestCase):
 
     def test_service_completes_two_cycles_with_native_tools_and_real_database(self):
         self.assertEqual(self.service(cycles=2), 0)
-        self.assertEqual(self.db.query('SELECT COUNT(*) AS n FROM simulation_runs')[0]['n'], 3)
-        self.assertEqual(len(self.model.requests), 8)
+        self.assertEqual(self.db.query('SELECT COUNT(*) AS n FROM simulation_runs')[0]['n'], 4)
+        self.assertEqual(len(self.model.requests), 20)
         state = ExperimentDb(self.db).load()
         self.assertEqual(state.phase, 'completed')
         self.assertEqual(set(state.order), {'architecture', 'training', 'exploration', 'reward-signals'})
         self.assertEqual(len(state.proposals), 4)
+        self.assertEqual(len(state.observations), 4)
+        self.assertEqual(state.config['training']['sequence_length'], 8)
+        self.assertEqual(state.config['training']['gamma'], .95)
+        for path in ('training.sequence_length', 'training.gamma'):
+            self.assertEqual(sum(path in proposal.values for proposal in state.proposals.values()), 1)
         rows = self.db.query('SELECT run_id, high_score FROM simulation_runs ORDER BY id')
-        self.assertEqual(state.golden_run_id, rows[1]['run_id'])
-        self.assertEqual(state.latest_run_id, rows[2]['run_id'])
-        for name, expected in (('view_experiment_state_saved', None), ('conversation_started', 8),
-                               ('conversation_ended', 8), ('configuration_compared', 2),
-                               ('proposal_accepted', 2), ('simulation_submitted', 3),
-                               ('simulation_completed', 3), ('golden_config_created', 2)):
+        self.assertEqual(state.golden_run_id, rows[2]['run_id'])
+        self.assertEqual(state.latest_run_id, rows[3]['run_id'])
+        for name, expected in (('view_experiment_state_saved', None), ('conversation_started', 20),
+                               ('conversation_ended', 20), ('configuration_compared', 3),
+                               ('proposal_accepted', 3), ('simulation_submitted', 4),
+                               ('simulation_completed', 4), ('golden_config_created', 2)):
             count = self.count_events(name)
             self.assertGreater(count, 0) if expected is None else self.assertEqual(count, expected)
 
@@ -125,14 +131,59 @@ class ViewCycleIntegrationTests(unittest.TestCase):
             save(store, state)
             if state.phase == 'choosing' and len(state.proposals) == 2:
                 raise KeyboardInterrupt()
-        with patch.object(ExperimentDb, 'save', stop):
+        with patch.object(ExperimentDb, 'save', stop), \
+                patch('ax3l.app.experiment.ExperimentLoop.shuffle', side_effect=lambda names: names.reverse()):
             self.assertEqual(self.service(), 130)
         order = ExperimentDb(self.db).load().order
+        self.assertEqual(len(self.model.requests), 6)
+        self.assertEqual(self.service(), 0)
+        self.assertEqual(len(self.model.requests), 12)
+        self.assertEqual(ExperimentDb(self.db).load().order, order)
+        self.assertEqual(self.count_events('simulation_submitted'), 3)
+        for index, path in ((6, 'training.sequence_length'), (7, 'training.gamma')):
+            properties = self.model.requests[index]['tools'][0]['function']['parameters']['properties']
+            self.assertNotIn(path, properties['values']['properties'])
+
+    def test_restart_skips_saved_observations(self):
+        save = ExperimentDb.save
+        def stop(store, state):
+            save(store, state)
+            if state.phase == 'evaluating' and len(state.observations) == 2:
+                raise KeyboardInterrupt()
+        with patch.object(ExperimentDb, 'save', stop):
+            self.assertEqual(self.service(), 130)
+        self.assertEqual(len(ExperimentDb(self.db).load().observations), 2)
         self.assertEqual(len(self.model.requests), 2)
         self.assertEqual(self.service(), 0)
-        self.assertEqual(len(self.model.requests), 4)
-        self.assertEqual(ExperimentDb(self.db).load().order, order)
-        self.assertEqual(self.count_events('simulation_submitted'), 2)
+        self.assertEqual(len(self.model.requests), 12)
+        self.assertEqual(len(ExperimentDb(self.db).load().observations), 4)
+
+    def test_saved_startup_inputs_survive_restart_before_synthetic_submission(self):
+        save = ExperimentDb.save
+        def stop(store, state):
+            save(store, state)
+            if state.synthetic and not state.baseline and state.phase == 'ready':
+                raise KeyboardInterrupt()
+        with patch.object(ExperimentDb, 'save', stop):
+            self.assertEqual(self.service(), 130)
+        state = ExperimentDb(self.db).load()
+        self.assertTrue(state.synthetic)
+        self.assertFalse(state.baseline)
+        self.assertEqual(len(state.proposals), 4)
+        self.assertEqual(self.model.requests, [])
+        self.assertEqual(self.count_events('simulation_submitted'), 1)
+        self.assertEqual(self.service(), 0)
+        rows = self.db.query('''SELECT r.run_id, c.model_hidden_size, c.training_learning_rate
+            FROM simulation_runs r JOIN configurations c USING (run_id) ORDER BY r.id''')
+        self.assertEqual(len(rows), 3)
+        self.assertEqual(rows[1]['model_hidden_size'], state.config['model']['hidden_size'])
+        self.assertEqual(rows[1]['training_learning_rate'], state.config['training']['learning_rate'])
+        for name, request in zip(VIEWS, self.model.requests[:4]):
+            text = request['messages'][0]['content'][0]['text']
+            self.assertIn(state.proposals[name].hypothesis, text)
+            self.assertIn(rows[0]['run_id'], text)
+            self.assertIn(rows[1]['run_id'], text)
+        self.assertEqual(self.count_events('simulation_submitted'), 3)
 
     def test_submission_with_lost_acknowledgement_is_not_repeated(self):
         submit = SnakeLab.submit_simulation
@@ -144,23 +195,23 @@ class ViewCycleIntegrationTests(unittest.TestCase):
                 self.service()
         self.assertEqual(ExperimentDb(self.db).load().phase, 'submitting')
         self.assertEqual(self.service(), 0)
-        self.assertEqual(self.db.query('SELECT COUNT(*) AS n FROM simulation_runs')[0]['n'], 2)
-        self.assertEqual(len(self.model.requests), 4)
+        self.assertEqual(self.db.query('SELECT COUNT(*) AS n FROM simulation_runs')[0]['n'], 3)
+        self.assertEqual(len(self.model.requests), 12)
 
     def test_restart_after_promotion_does_not_repeat_comparison_or_promotion(self):
         save = ExperimentDb.save
         def stop(store, state):
-            if state.phase == 'completed' and not state.baseline:
+            if state.phase == 'evaluating' and not state.synthetic and state.proposals:
                 raise KeyboardInterrupt()
             save(store, state)
         with patch.object(ExperimentDb, 'save', stop):
             self.assertEqual(self.service(), 130)
         self.assertEqual(ExperimentDb(self.db).load().phase, 'comparing')
         self.assertEqual(self.service(), 0)
-        self.assertEqual(len(self.model.requests), 4)
-        self.assertEqual(self.count_events('configuration_compared'), 1)
+        self.assertEqual(len(self.model.requests), 12)
+        self.assertEqual(self.count_events('configuration_compared'), 2)
         self.assertEqual(self.count_events('golden_config_created'), 2)
-        self.assertEqual(self.count_events('simulation_completed'), 2)
+        self.assertEqual(self.count_events('simulation_completed'), 3)
 
     def test_checkpoint_write_rolls_back_envelope_and_preserves_previous_snapshot(self):
         store = ExperimentDb(self.db)
@@ -178,3 +229,83 @@ class ViewCycleIntegrationTests(unittest.TestCase):
                 store.save(state)
         self.assertEqual(store.load(), previous)
         self.assertEqual(self.count_events('view_experiment_state_saved'), 1)
+
+    def test_seed_request_runs_golden_then_candidate_on_the_incremented_seed(self):
+        self.model.respond = new_seed_proposal
+        self.scores = iter((10, 9, 4, 8))
+        self.assertEqual(self.service(), 0)
+        rows = self.db.query('''SELECT r.run_id, r.high_score, c.seed, c.training_learning_rate
+            FROM simulation_runs r JOIN configurations c USING (run_id) ORDER BY r.id''')
+        self.assertEqual([row['seed'] for row in rows], [1970, 1970, 1971, 1971])
+        self.assertEqual([row['training_learning_rate'] for row in rows], [.001, .0005, .001, .002])
+        state = ExperimentDb(self.db).load()
+        self.assertTrue(state.new_seed)
+        self.assertFalse(state.seed_baseline)
+        self.assertEqual(state.reference_run_id, rows[2]['run_id'])
+        self.assertEqual(state.golden_run_id, rows[3]['run_id'])
+        comparison = ExperimentDb(self.db).comparison(rows[3]['run_id'])
+        self.assertEqual(comparison['golden_run_id'], rows[2]['run_id'])
+        self.assertEqual(self.count_events('golden_config_created'), 3)
+        self.assertEqual(self.count_events('configuration_compared'), 2)
+        self.assertEqual(len(self.model.requests), 12)
+
+    def test_seed_request_stays_read_only_after_restart_during_view_selection(self):
+        self.model.respond = new_seed_proposal
+        save = ExperimentDb.save
+        def stop(store, state):
+            save(store, state)
+            if state.phase == 'choosing' and len(state.proposals) == 1:
+                raise KeyboardInterrupt()
+        with patch.object(ExperimentDb, 'save', stop):
+            self.assertEqual(self.service(), 130)
+        self.assertTrue(ExperimentDb(self.db).load().new_seed)
+        self.assertEqual(self.service(), 0)
+        for request in self.model.requests[5:8]:
+            properties = request['tools'][0]['function']['parameters']['properties']['values']['properties']
+            self.assertNotIn('new seed', properties)
+            self.assertIn('"new seed": true', request['messages'][0]['content'])
+        self.assertEqual(self.count_events('simulation_submitted'), 4)
+
+    def test_restart_after_seed_baseline_promotion_does_not_run_it_again(self):
+        self.model.respond = new_seed_proposal
+        self.scores = iter((10, 9, 4, 8))
+        save = ExperimentDb.save
+        def stop(store, state):
+            if state.new_seed and not state.seed_baseline and state.phase == 'ready':
+                raise KeyboardInterrupt()
+            save(store, state)
+        with patch.object(ExperimentDb, 'save', stop):
+            self.assertEqual(self.service(), 130)
+        state = ExperimentDb(self.db).load()
+        self.assertEqual(state.phase, 'comparing')
+        self.assertTrue(state.seed_baseline)
+        self.assertEqual(self.count_events('golden_config_created'), 2)
+        self.assertEqual(self.service(), 0)
+        self.assertEqual(self.count_events('golden_config_created'), 3)
+        self.assertEqual(self.count_events('simulation_submitted'), 4)
+        self.assertEqual(len(self.model.requests), 12)
+
+    def check_lost_seed_run_reply(self, submission_number):
+        self.model.respond = new_seed_proposal
+        submit = SnakeLab.submit_simulation
+        def lost_reply(snake, config):
+            run_id = submit(snake, config)
+            if self.db.query('SELECT COUNT(*) AS n FROM simulation_runs')[0]['n'] == submission_number:
+                raise TimeoutError('Lost acknowledgement')
+            return run_id
+        with patch.object(SnakeLab, 'submit_simulation', lost_reply):
+            with self.assertRaises(TimeoutError):
+                self.service()
+        state = ExperimentDb(self.db).load()
+        self.assertEqual(state.phase, 'submitting')
+        self.assertEqual(state.seed_baseline, submission_number == 3)
+        self.assertEqual(self.service(), 0)
+        self.assertEqual(self.db.query('SELECT COUNT(*) AS n FROM simulation_runs')[0]['n'], 4)
+        self.assertEqual(self.count_events('simulation_submitted'), 4)
+        self.assertEqual(len(self.model.requests), 12)
+
+    def test_lost_seed_baseline_reply_is_reconciled_without_resubmission(self):
+        self.check_lost_seed_run_reply(3)
+
+    def test_lost_seed_candidate_reply_is_reconciled_without_resubmission(self):
+        self.check_lost_seed_run_reply(4)

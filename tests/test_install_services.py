@@ -3,6 +3,8 @@
 Only absolute host paths and EUID checks are redirected in the fixture script.
 Rendering, file copying, chmod, and systemd validation are real.
 Package/browser provisioning, ownership changes, and systemctl are simulated.
+Set AX3L_TEST_INSTALL_DB=1 to also exercise a full install/uninstall/reinstall
+against a private MariaDB instance created inside the test directory.
 """
 import json
 import os
@@ -11,6 +13,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,7 +24,7 @@ class InstallServicesTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix='ax3l-installer-')
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        for name in ('scripts', 'systemd', 'ax3l'):
+        for name in ('scripts', 'systemd', 'ax3l', 'conf'):
             shutil.copytree(ROOT / name, self.root / name,
                             ignore=shutil.ignore_patterns('__pycache__'))
         shutil.copy(ROOT / 'requirements.txt', self.root)
@@ -30,7 +33,7 @@ class InstallServicesTests(unittest.TestCase):
         self.log = self.root / 'calls'
         self.bin = self.root / 'test-bin'
         self.bin.mkdir()
-        for name in ('install-services.sh', 'service-configuration.sh', 'restart.sh', 'uninstall.sh'):
+        for name in ('install.sh', 'install-services.sh', 'service-configuration.sh', 'restart.sh', 'uninstall.sh'):
             script = self.root / 'scripts' / name
             script.write_text(script.read_text().replace('$EUID', '$TEST_EUID')
                               .replace('/opt/prod/ax3l', str(self.root / 'app'))
@@ -46,6 +49,28 @@ if [ "$1" = show ]; then echo loaded; fi
 ''')
         self.executable(self.bin / 'chgrp', '''#!/bin/sh
 printf 'chgrp %s\n' "$*" >> "$TEST_LOG"
+''')
+        self.executable(self.bin / 'getent', '''#!/bin/sh
+if [ "${TEST_EXISTING_LINUX:-}" = "$1" ]; then exit 0; fi
+exit 2
+''')
+        for command in ('groupadd', 'useradd', 'groupdel', 'userdel'):
+            self.executable(self.bin / command, f'''#!/bin/sh
+printf '{command} %s\\n' "$*" >> "$TEST_LOG"
+''')
+        self.executable(self.bin / 'mariadb', '''#!/usr/bin/python3
+import os, sys
+from pathlib import Path
+args = sys.argv[1:]
+if '-e' in args:
+    sql = args[args.index('-e') + 1]
+    print(os.environ.get('TEST_EXISTING_DATABASE', '0') if 'SCHEMATA' in sql else '1')
+else:
+    sql = sys.stdin.read()
+    with Path(os.environ['TEST_ROOT'], 'database.sql').open('a') as stream:
+        stream.write(sql)
+with Path(os.environ['TEST_LOG']).open('a') as stream:
+    stream.write('mariadb ' + sql + '\\n')
 ''')
         # Preserve real install modes and file copies; omit privileged ownership.
         self.executable(self.bin / 'install', '''#!/usr/bin/python3
@@ -104,11 +129,12 @@ exec /usr/bin/systemd-analyze "$@"
                     path.chmod(0o700)
             (self.app / '.venv').chmod(0o700)
 
-    def run_installer(self, *args, fail='', euid=None, script='install-services.sh'):
+    def run_installer(self, *args, fail='', euid=None, script='install-services.sh', extra_env=None):
         env = dict(os.environ, PATH=f'{self.bin}:{os.environ["PATH"]}',
                    TEST_ROOT=str(self.root), TEST_LOG=str(self.log), TEST_FAIL=fail,
                    TEST_EUID=str(euid if euid is not None else 0),
                    PYTHONDONTWRITEBYTECODE='1')
+        env.update(extra_env or {})
         return subprocess.run(['bash', '-c', 'umask 077; exec bash "$@"', 'fixture',
                                str(self.root / 'scripts' / script), *args],
                               env=env, capture_output=True, text=True, timeout=30)
@@ -136,45 +162,69 @@ exec /usr/bin/systemd-analyze "$@"
                 self.assertEqual(self.config.stat().st_mode & 0o777, 0o750)
                 self.assertEqual((self.app / '.venv/lib/package.py').stat().st_mode & 0o777, 0o640)
                 self.assertEqual((self.app / '.venv/bin/python').stat().st_mode & 0o777, 0o750)
-                for module in ('activity/SimulationAnimation.py',
-                               'activity/fonts/DejaVuSansMono.ttf', 'activity/fonts/LICENSE.txt',
+                for module in ('presentation/reporting/SimulationAnimation.py',
+                               'presentation/reporting/fonts/DejaVuSansMono.ttf', 'presentation/reporting/fonts/LICENSE.txt',
                                'interface/SimulationGifStore.py', 'interface/SimulationConfiguration.py',
-                               'activity/RunAnalysis.py', 'constants/DScoreDistribution.py',
-                               'activity/PresentationValues.py', 'app/ReportBackground.py',
-                               'app/snakelab/ExperimentLoop.py', 'app/snakelab/ExperimentDb.py',
+                               'interface/schemas/simulation-config-v2.schema.json',
+                               'interface/ReportHandler.py', 'interface/database/EventSchema.py',
+                               'interface/database/EventLogDb.py', 'interface/database/DbMgr.py',
+                               'app/reporting/Reports.py', 'presentation/reporting/ReportRenderer.py',
+                               'constants/DScoreDistribution.py',
+                               'presentation/reporting/PresentationValues.py', 'app/reporting/ReportBackground.py',
+                               'app/experiment/ExperimentLoop.py', 'interface/database/ExperimentDb.py',
                                'interface/ViewConversation.py', 'entities/ExperimentState.py',
                                'entities/ExperimentView.py', 'entities/ViewProposal.py',
-                               'presentation/snakelab/ViewPrompts.py'):
+                               'presentation/ViewPrompts.py',
+                               'presentation/RunComparisonImage.py', 'activity/ScorePercentiles.py',
+                               'activity/ExplorationProgress.py', 'activity/RewardProgress.py', 'activity/TrainingProgress.py',
+                               'constants/DViewConversation.py'):
                     self.assertTrue((self.app / 'ax3l' / module).is_file(), module)
                 reporting = (self.units / 'reporting-server.service').read_text()
                 self.assertIn(f'--gif-dir {self.app}/games', reporting)
                 self.assertIn('--port 28870', reporting)
                 self.assertIn(f'ReadWritePaths={self.app}/games', reporting)
                 self.assertTrue((self.app / 'games').is_dir())
-                for asset in (ROOT / 'ax3l/server/templates').glob('*.html'):
-                    installed = self.app / 'ax3l/server/templates' / asset.name
+                for asset in (ROOT / 'ax3l/presentation/reporting/templates').glob('*.html'):
+                    installed = self.app / 'ax3l/presentation/reporting/templates' / asset.name
                     self.assertEqual(installed.read_bytes(), asset.read_bytes(), str(asset))
-                for asset in (ROOT / 'ax3l/presentation/snakelab/prompts').glob('*.md'):
+                for asset in (ROOT / 'ax3l/presentation/prompts').rglob('*.md'):
                     installed = self.app / asset.relative_to(ROOT)
                     self.assertEqual(installed.read_bytes(), asset.read_bytes(), str(asset))
+                for asset in (ROOT / 'conf/synthetic').iterdir():
+                    installed = self.app / asset.relative_to(ROOT)
+                    self.assertEqual(installed.read_bytes(), asset.read_bytes(), str(asset))
+                    self.assertEqual(installed.stat().st_mode & 0o777, 0o644)
                 smoke = subprocess.run([sys.executable, '-c', '''
 from pathlib import Path
-from jinja2 import Environment, FileSystemLoader, StrictUndefined
+from jinja2 import Environment, FileSystemLoader
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
+from ax3l.interface.SyntheticExperimentConfiguration import SyntheticExperimentConfiguration
+from ax3l.entities.ExperimentView import VIEWS
+from ax3l.presentation.ViewPrompts import ViewPrompts
 from ax3l.server.Ax3lServer import main
+from ax3l.server.ReportingServer import make_server
+from ax3l.presentation.reporting.ReportRenderer import ReportRenderer
+ReportRenderer()
 assert SimulationConfiguration.defaults()['model']['hidden_size'] == 64
-templates = Environment(loader=FileSystemLoader(Path('ax3l/server/templates')))
+assert set(SyntheticExperimentConfiguration.load()) == set(VIEWS)
+templates = Environment(loader=FileSystemLoader(Path('ax3l/presentation/reporting/templates')))
 assert templates.get_template('events.html')
-prompts = Environment(loader=FileSystemLoader(Path('ax3l/presentation/snakelab/prompts')),
-                      undefined=StrictUndefined)
-for name in ('reward-signals.md', 'architecture.md', 'training.md', 'exploration.md'):
-    prompts.get_template(name).render(
+for view in VIEWS.values():
+    context = dict(
         previous_hypothesis='The proposed adjustment will improve the high score.',
         previous_values={},
-        comparison={'golden': {'high_score': 10}, 'latest': {'high_score': 11}},
+        previous_observations='Comparison measurements are not available yet.',
+        reference_run_id='golden-run', latest_run_id='latest-run',
+        reference_episodes=[{'episode': 1, 'score': 0, 'epsilon': .5, 'steps': 10, 'epsilon_nice_injections': 0, 'outcome': 'wall', 'loss': None}],
+        latest_episodes=[{'episode': 1, 'score': 4, 'epsilon': 0, 'steps': 10, 'epsilon_nice_injections': 2, 'outcome': 'snake', 'loss': .4}],
+        reference_high_score=0, latest_high_score=4,
         parameters={},
         other_parameters={'seed': 1971, 'model': {'layers': '2 (draft)'}},
     )
+    content = ViewPrompts().render(view, context)
+    assert content
+    assert isinstance(content, str)
+    assert ViewPrompts().render_evaluation(view, context)[1]['type'] == 'image_url'
 '''], cwd=self.app, env=dict(os.environ, PYTHONPATH=str(self.app), PYTHONDONTWRITEBYTECODE='1'),
                     capture_output=True, text=True, timeout=10)
                 self.assertEqual(smoke.returncode, 0, smoke.stderr)
@@ -191,17 +241,82 @@ for name in ('reward-signals.md', 'architecture.md', 'training.md', 'exploration
                                           'systemctl start ax3l-server.service',
                                           'systemctl start watchdog.service'])
 
+    def test_upgrade_preserves_edits_to_synthetic_configuration_and_hypotheses(self):
+        self.prepare()
+        self.assertEqual(self.run_installer().returncode, 0)
+        directory = self.app / 'conf/synthetic'
+        config = json.loads((directory / 'config.json').read_text())
+        config['model']['hidden_size'] = 80
+        (directory / 'config.json').write_text(json.dumps(config))
+        for path in directory.glob('*.md'):
+            path.write_text('An edited hypothesis should be preserved.\n')
+        edited = {path.name: path.read_bytes() for path in directory.iterdir()}
+        self.assertEqual(self.run_installer().returncode, 0)
+        self.assertEqual({path.name: path.read_bytes() for path in directory.iterdir()}, edited)
+
     def test_fresh_install_needs_no_model_binary_or_files(self):
         self.prepare()
         result = self.run_installer()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.app / '.venv').stat().st_mode & 0o777, 0o755)
-        for module in ('app/ReportBackground.py', 'app/ReportingDb.py', 'app/ReportingRefresh.py',
-                       'activity/CompletedRounds.py'):
+        for module in ('app/reporting/ReportBackground.py', 'interface/database/ReportingDb.py', 'app/ReportingRefresh.py'):
             self.assertTrue((self.app / 'ax3l' / module).is_file(), module)
         config = json.loads((self.app / 'conf/ax3l.json').read_text())
         self.assertEqual(config['llamasrv_url'], 'http://127.0.0.1:51001')
         self.assertEqual(set(config['network']), {'report', 'zmq'})
+
+    def test_asset_discovery_failure_prevents_service_activation(self):
+        self.prepare()
+        previous = self.app / 'ax3l/previous.py'
+        previous.parent.mkdir()
+        previous.write_text('previous application')
+        self.executable(self.bin / 'find', '''#!/bin/sh
+printf 'Application file discovery failed.\\n' >&2
+exit 44
+''')
+        result = self.run_installer()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Application file discovery failed.', result.stderr)
+        calls = self.log.read_text()
+        self.assertIn('systemctl stop ax3l-server.service', calls)
+        self.assertNotIn('systemctl daemon-reload', calls)
+        self.assertNotIn('systemctl start', calls)
+        self.assertEqual(list(self.units.iterdir()), [])
+        self.assertEqual(previous.read_text(), 'previous application')
+        self.assertEqual(list(self.app.glob('.application.*')), [])
+
+    def test_upgrade_replaces_the_package_and_preserves_runtime_data(self):
+        self.prepare(old=True)
+        previous = self.app / 'ax3l/retired.py'
+        previous.parent.mkdir()
+        previous.write_text('retired application module')
+        games = self.app / 'games'
+        games.mkdir()
+        (games / 'saved.gif').write_bytes(b'saved animation')
+        result = self.run_installer(script='upgrade.sh')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(previous.exists())
+        self.assertTrue((self.app / 'ax3l/server/Ax3lServer.py').is_file())
+        self.assertEqual((games / 'saved.gif').read_bytes(), b'saved animation')
+        self.assertTrue((self.app / 'conf/ax3l.json').is_file())
+        self.assertEqual(list(self.app.glob('.application.*')), [])
+
+    def test_package_replacement_failure_restores_the_previous_package(self):
+        self.prepare(old=True)
+        previous = self.app / 'ax3l/previous.py'
+        previous.parent.mkdir()
+        previous.write_text('previous application')
+        self.executable(self.bin / 'mv', '''#!/bin/sh
+case "$2" in
+    */.application.*/ax3l) exit 44 ;;
+esac
+exec /usr/bin/mv "$@"
+''')
+        result = self.run_installer(script='upgrade.sh')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(previous.read_text(), 'previous application')
+        self.assertEqual(list(self.app.glob('.application.*')), [])
+        self.assertNotIn('systemctl start', self.log.read_text())
 
     def test_provisioning_failures_do_not_stop_services(self):
         self.prepare()
@@ -274,7 +389,174 @@ for name in ('reward-signals.md', 'architecture.md', 'training.md', 'exploration
                 self.assertEqual(result.returncode, 2)
                 self.assertFalse(self.log.exists())
 
-    def test_uninstall_preserves_shared_inference(self):
+    def test_installer_rejects_existing_resources_without_changing_them(self):
+        self.prepare()
+        credentials = self.credentials.read_bytes()
+        result = self.run_installer(script='install.sh')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('uninstall.sh', result.stderr)
+        self.assertFalse(self.log.exists())
+        self.assertEqual(self.credentials.read_bytes(), credentials)
+
+        self.app.rmdir()
+        for name in ('ax3l-server', 'reporting-server', 'watchdog'):
+            with self.subTest(unit=name):
+                unit = self.units / f'{name}.service'
+                unit.write_text('# existing installation\n')
+                result = self.run_installer(script='install.sh')
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn('uninstall.sh', result.stderr)
+                self.assertFalse(self.log.exists())
+                self.assertEqual(unit.read_text(), '# existing installation\n')
+                unit.unlink()
+
+        for kind in ('passwd', 'group'):
+            with self.subTest(linux_resource=kind):
+                result = self.run_installer(script='install.sh', extra_env={'TEST_EXISTING_LINUX': kind})
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn('uninstall.sh', result.stderr)
+                self.assertFalse(self.log.exists())
+                self.assertFalse(self.app.exists())
+        self.assertEqual(self.credentials.read_bytes(), credentials)
+
+    def test_installer_rejects_existing_database_before_provisioning(self):
+        result = self.run_installer(script='install.sh', extra_env={'TEST_EXISTING_DATABASE': '1'})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('uninstall.sh', result.stderr)
+        self.assertFalse((self.root / 'app').exists())
+        self.assertFalse((self.root / 'etc/ax3l').exists())
+        calls = self.log.read_text()
+        self.assertIn('mysql.user', calls)
+        self.assertNotIn('groupadd', calls)
+        self.assertNotIn('CREATE ', calls)
+        self.assertNotIn('systemctl', calls)
+
+    def test_fresh_install_reuses_retained_credentials(self):
+        self.prepare()
+        self.app.rmdir()
+        saved = ('DB_HOST=localhost\nDB_PORT=3306\nDB_NAME=ax3l\nDB_USER=ax3l\n'
+                 f'DB_PASSWORD={"a" * 64}\n')
+        self.credentials.write_text(saved)
+        result = self.run_installer(script='install.sh')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.credentials.read_text(), saved)
+        self.assertEqual(self.credentials.stat().st_mode & 0o777, 0o600)
+        sql = (self.root / 'database.sql').read_text()
+        self.assertIn('CREATE DATABASE `ax3l`;', sql)
+        self.assertIn(f"IDENTIFIED BY '{'a' * 64}'", sql)
+        self.assertNotIn('DROP ', sql)
+        self.assertNotIn('DELETE ', sql)
+        self.assertTrue((self.app / 'conf/ax3l.json').is_file())
+        self.assertNotIn('snake-lab.service', self.log.read_text())
+
+    def test_fresh_install_saves_new_credentials(self):
+        result = self.run_installer(script='install.sh')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        credentials = self.root / 'etc/ax3l/database.env'
+        self.assertRegex(credentials.read_text(), r'DB_PASSWORD=[a-f0-9]{64}\n$')
+        self.assertEqual(credentials.stat().st_mode & 0o777, 0o600)
+
+    @unittest.skipUnless(os.environ.get('AX3L_TEST_INSTALL_DB') == '1',
+                         'requires opt-in private MariaDB installer check')
+    def test_install_uninstall_reinstall_with_real_database(self):
+        server_binary = Path('/usr/sbin/mariadbd')
+        if not server_binary.is_file() or shutil.which('mariadb-install-db') is None:
+            self.skipTest('requires MariaDB server and initialization tools')
+        data = self.root / 'database'
+        initialized = subprocess.run([
+            'mariadb-install-db', '--no-defaults', f'--datadir={data}',
+            '--auth-root-authentication-method=normal', '--skip-test-db',
+            '--innodb-use-native-aio=0',
+        ], capture_output=True, text=True, timeout=30)
+        self.assertEqual(initialized.returncode, 0, initialized.stdout + initialized.stderr)
+        socket = self.root / 'database.sock'
+        with (self.root / 'database-server.log').open('w') as output:
+            server = subprocess.Popen([
+                str(server_binary), '--no-defaults', f'--datadir={data}',
+                f'--socket={socket}', f'--pid-file={self.root / "database.pid"}',
+                '--skip-networking', '--innodb-buffer-pool-size=32M',
+                '--innodb-use-native-aio=0',
+            ], stdout=output, stderr=subprocess.STDOUT)
+        self.addCleanup(server.wait, timeout=10)
+        self.addCleanup(server.terminate)
+        admin = ['/usr/bin/mariadb', '--no-defaults', f'--socket={socket}',
+                 '--user=root', '--batch', '--skip-column-names']
+        deadline = time.monotonic() + 10
+        while True:
+            ready = subprocess.run([*admin, '-e', 'SELECT 1'], capture_output=True, text=True, timeout=5)
+            if ready.returncode == 0:
+                break
+            if server.poll() is not None or time.monotonic() >= deadline:
+                self.fail((self.root / 'database-server.log').read_text())
+            time.sleep(0.1)
+
+        def query(sql):
+            result = subprocess.run([*admin, '-e', sql], capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            return result.stdout.strip()
+
+        # The production database/account names are redirected only in this
+        # disposable checkout, and every database connection uses its private socket.
+        for name, old, new in (
+            ('install.sh', 'DB_NAME=ax3l\n', 'DB_NAME=ax3l_test\n'),
+            ('uninstall.sh', 'database=ax3l\n', 'database=ax3l_test\n'),
+        ):
+            path = self.root / 'scripts' / name
+            path.write_text(path.read_text().replace(old, new))
+        self.executable(self.bin / 'mariadb', '''#!/usr/bin/python3
+import os, sys
+args = [arg for arg in sys.argv[1:] if arg != '--no-defaults'
+        and not arg.startswith(('--host=', '--port=', '--protocol=', '--socket='))]
+if not any(arg.startswith('--user=') for arg in args):
+    args.insert(0, '--user=root')
+os.execv('/usr/bin/mariadb', ['mariadb', '--no-defaults', *args, '--protocol=socket',
+         '--socket=' + os.environ['TEST_DATABASE_SOCKET']])
+''')
+        self.prepare()
+        self.app.rmdir()
+        saved = ('DB_HOST=localhost\nDB_PORT=3306\nDB_NAME=ax3l_test\nDB_USER=ax3l_test\n'
+                 f'DB_PASSWORD={"a" * 64}\n')
+        self.credentials.write_text(saved)
+        extra_env = {'TEST_DATABASE_SOCKET': str(socket)}
+        query('CREATE DATABASE snakelab_test; CREATE TABLE snakelab_test.simulation_runs '
+              '(id INT PRIMARY KEY); INSERT INTO snakelab_test.simulation_runs VALUES (1)')
+
+        for create, remove in (
+            ('CREATE DATABASE ax3l_test', 'DROP DATABASE ax3l_test'),
+            ("CREATE USER 'ax3l_test'@'localhost'", "DROP USER 'ax3l_test'@'localhost'"),
+        ):
+            with self.subTest(existing_resource=create):
+                query(create)
+                rejected = self.run_installer(script='install.sh', extra_env=extra_env)
+                self.assertNotEqual(rejected.returncode, 0)
+                self.assertIn('uninstall.sh', rejected.stderr)
+                self.assertFalse(self.app.exists())
+                self.assertEqual(self.credentials.read_text(), saved)
+                query(remove)
+
+        installed = self.run_installer(script='install.sh', extra_env=extra_env)
+        self.assertEqual(installed.returncode, 0, installed.stderr)
+        query('CREATE TABLE ax3l_test.experiment_data (id INT PRIMARY KEY); '
+              'INSERT INTO ax3l_test.experiment_data VALUES (1)')
+        rejected = self.run_installer(script='install.sh', extra_env=extra_env)
+        self.assertNotEqual(rejected.returncode, 0)
+        self.assertEqual(query('SELECT COUNT(*) FROM ax3l_test.experiment_data'), '1')
+
+        removed = self.run_installer(script='uninstall.sh', extra_env=extra_env)
+        self.assertEqual(removed.returncode, 0, removed.stderr)
+        self.assertEqual(self.credentials.read_text(), saved)
+        self.assertEqual(query("SELECT COUNT(*) FROM information_schema.SCHEMATA "
+                               "WHERE SCHEMA_NAME = 'ax3l_test'"), '0')
+        self.assertEqual(query("SELECT COUNT(*) FROM mysql.user WHERE User = 'ax3l_test'"), '0')
+        reinstalled = self.run_installer(script='install.sh', extra_env=extra_env)
+        self.assertEqual(reinstalled.returncode, 0, reinstalled.stderr)
+        self.assertEqual(self.credentials.read_text(), saved)
+        self.assertEqual(query("SELECT COUNT(*) FROM information_schema.TABLES "
+                               "WHERE TABLE_SCHEMA = 'ax3l_test'"), '0')
+        self.assertEqual(query('SELECT COUNT(*) FROM snakelab_test.simulation_runs'), '1')
+        self.assertNotIn('snake-lab.service', self.log.read_text())
+
+    def test_uninstall_preserves_credentials_and_shared_inference(self):
         self.prepare()
         self.credentials.write_text('DB_NAME=ax3l\n')
         for name in ('watchdog', 'ax3l-server', 'reporting-server', 'llamasrv-llm', 'llamasrv-http'):
@@ -284,7 +566,9 @@ for name in ('reward-signals.md', 'architecture.md', 'training.md', 'exploration
         result = self.run_installer(script='uninstall.sh')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse(self.app.exists())
-        self.assertFalse(self.credentials.exists())
+        self.assertEqual(self.credentials.read_text(), 'DB_NAME=ax3l\n')
+        self.assertEqual(self.credentials.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(self.config.stat().st_mode & 0o777, 0o700)
         self.assertEqual({path.name for path in self.units.iterdir()},
                          {'llamasrv-llm.service', 'llamasrv-http.service'})
         self.assertNotIn('llamasrv', self.log.read_text())

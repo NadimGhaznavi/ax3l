@@ -7,7 +7,7 @@ from pathlib import Path
 from jsonschema import Draft202012Validator, ValidationError
 
 
-SCHEMA = json.loads((Path(__file__).parents[1] / "app/snakelab/simulation-config-v2.schema.json").read_text())
+SCHEMA = json.loads((Path(__file__).with_name("schemas") / "simulation-config-v2.schema.json").read_text())
 _VALIDATOR = Draft202012Validator(SCHEMA)
 
 
@@ -47,10 +47,6 @@ class SimulationConfiguration:
     @staticmethod
     def reward_pair_allowed(closer: int | float, further: int | float) -> bool:
         return closer + further <= 0
-
-    @staticmethod
-    def next_seed(seed: int) -> int:
-        return SimulationConfiguration.value(("seed",), seed + 1)
 
     @staticmethod
     def validate_reward_pair(closer: int | float, further: int | float) -> None:

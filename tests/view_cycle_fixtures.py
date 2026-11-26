@@ -9,6 +9,7 @@ from uuid import uuid4
 import zmq
 
 from ax3l.entities.ExperimentView import VIEWS
+from ax3l.constants.DViewConversation import DViewConversation
 from ax3l.interface.LLM import LLM
 
 
@@ -47,10 +48,13 @@ class MemoryStore:
 
 class MemoryEvents:
     def __init__(self, log):
-        self.log = log
+        self._log = log
+
+    def log(self, *args, **kwargs):
+        return self._log.log(*args, **kwargs)
 
     def current_golden_config(self):
-        events = [e for e in self.log.events if e['name'] == 'golden_config_created']
+        events = [e for e in self._log.events if e['name'] == 'golden_config_created']
         return dict(process_id=events[-1]['process_id']) if events else None
 
 
@@ -62,7 +66,7 @@ def episodes():
 
 
 class FakeSnake:
-    def __init__(self, scores=(10, 12, 7)):
+    def __init__(self, scores=(10, 9, 12, 7)):
         self.scores = iter(scores)
         self.results = {}
         self.submissions = []
@@ -95,6 +99,18 @@ class FakeSnake:
     def get_analysis_episodes(self, run_id):
         return episodes()
 
+    def get_episode_scores(self, run_id):
+        return [dict(episode=row['episode'], score=row['score']) for row in episodes()]
+
+    def get_exploration_episodes(self, run_id):
+        return episodes()
+
+    def get_reward_episodes(self, run_id):
+        return episodes()
+
+    def get_training_episodes(self, run_id):
+        return episodes()
+
 
 class LocalLLM:
     def __init__(self, respond=None):
@@ -123,14 +139,25 @@ class LocalLLM:
 
     @staticmethod
     def proposal(request):
+        if request['tools'][0]['function']['name'] == 'submit_observations':
+            content = request['messages'][0]['content'][0]['text']
+            title = content.splitlines()[0].removeprefix('## Task: ').removesuffix(' Evaluation')
+            arguments = dict(observations=f'{title}: recorded training results evaluated.')
+            return dict(choices=[dict(message=dict(role='assistant', tool_calls=[dict(
+                id='observations', type='function', function=dict(
+                    name='submit_observations', arguments=json.dumps(arguments)),
+            )]))])
         properties = request['tools'][0]['function']['parameters']['properties']['values']['properties']
-        view = next(view for view in VIEWS.values() if set(view.parameters) == set(properties))
+        view = next(view for view in VIEWS.values() if set(properties) <= set(view.parameters))
         changed = {'reward-signals': {'game.rewards.food': 12},
                    'architecture': {'model.hidden_size': 72},
                    'training': {'training.learning_rate': .002},
                    'exploration': {'epsilon.initial': .9}}[view.name]
-        arguments = dict(evaluation='The observed scores support another trial.',
-                         hypothesis=f'Hypothesis for {view.name}.', expected_effect='A higher high score.',
+        changed.update({name: value for name, value in {
+            'training.sequence_length': 8, 'training.gamma': .95,
+            DViewConversation.NEW_SEED: False,
+        }.items() if name in properties})
+        arguments = dict(hypothesis=f'Hypothesis for {view.name}.',
                          values=changed)
         return dict(choices=[dict(message=dict(role='assistant', content=None, tool_calls=[dict(
             id='proposal', type='function', function=dict(name='submit_view', arguments=json.dumps(arguments)),
@@ -140,6 +167,17 @@ class LocalLLM:
         self.server.shutdown()
         self.thread.join()
         self.server.server_close()
+
+
+def new_seed_proposal(request):
+    response = LocalLLM.proposal(request)
+    if request['tools'][0]['function']['name'] == 'submit_view':
+        function = response['choices'][0]['message']['tool_calls'][0]['function']
+        arguments = json.loads(function['arguments'])
+        if DViewConversation.NEW_SEED in arguments['values']:
+            arguments['values'][DViewConversation.NEW_SEED] = True
+            function['arguments'] = json.dumps(arguments)
+    return response
 
 
 class LocalSnakeControl:

@@ -2,7 +2,7 @@ import argparse
 import logging
 import time
 
-from ax3l.activity.CheckServices import CheckServices
+from ax3l.app.CheckServices import CheckServices
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

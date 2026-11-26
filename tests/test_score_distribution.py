@@ -205,7 +205,7 @@ class ScoreDistributionTests(unittest.TestCase):
             with urlopen(url) as response:
                 self.assertIn('No scores recorded yet.', response.read().decode())
             snake.get_run_scores.side_effect = RuntimeError('offline')
-            with patch('ax3l.server.ReportingServer.traceback.print_exc'):
+            with patch('ax3l.interface.ReportHandler.logging.exception'):
                 with self.assertRaises(HTTPError) as error:
                     urlopen(url)
             self.assertEqual(error.exception.code, 500)

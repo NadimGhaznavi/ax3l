@@ -3,8 +3,8 @@ from datetime import datetime
 import unittest
 from unittest.mock import Mock, patch
 
-from ax3l.app.snakelab.SnakeLabDb import SnakeLabDb, CONFIGURATION_COLUMNS, CONFIGURATION_FIELDS, _config_values
-from ax3l.app.snakelab.GenerateDefaultConfig import GenerateDefaultConfig
+from ax3l.interface.database.SnakeLabDb import SnakeLabDb, CONFIGURATION_COLUMNS, CONFIGURATION_FIELDS, _config_values
+from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 from ax3l.interface.SnakeLab import SnakeLab
 from ax3l.server.ReportingServer import make_server
 
@@ -14,7 +14,7 @@ RUN_ID = "f6e72cb3-9bcf-4669-b368-a17c656bad79"
 
 class SimulationControlTests(unittest.TestCase):
     def exchange(self, method, response, *args):
-        with patch("ax3l.interface.SnakeLab.zmq.Context") as context:
+        with patch("ax3l.zmq.ZMQClient.zmq.Context") as context:
             socket = context.return_value.__enter__.return_value.socket.return_value.__enter__.return_value
             socket.recv_json.side_effect = lambda: {
                 "protocol_version": 1,
@@ -48,7 +48,7 @@ class SimulationControlTests(unittest.TestCase):
     def test_configuration_lookup_uses_dal_and_closes_connection(self):
         with patch("ax3l.interface.SnakeLab.DbMgr") as factory:
             db = factory.return_value
-            config = GenerateDefaultConfig().run()
+            config = SimulationConfiguration.defaults()
             db.query.return_value = [dict(zip((c for c, _, _ in CONFIGURATION_FIELDS), _config_values(config)))]
             self.assertEqual(SnakeLab().get_config(RUN_ID), config)
             factory.assert_called_once_with(database="snakelab", initialize_event_tables=False)
@@ -108,14 +108,15 @@ class ConfigPageTests(unittest.TestCase):
         event = dict(event_id=1, occurred_at=datetime.now(), name="simulation_submitted",
                      category="SnakeLab", log_level="INFO", content="Submitted config.",
                      process_id=RUN_ID)
-        with patch("ax3l.server.ReportingServer.DbMgr"), patch(
-            "ax3l.server.ReportingServer.EventLogDb"
+        with patch("ax3l.app.reporting.Reports.DbMgr") as db, patch(
+            "ax3l.app.reporting.Reports.EventLogDb"
         ) as log, patch("ax3l.server.ReportingServer.SnakeLab") as snake:
             snake.return_value.is_simulation_running.return_value = True
             snake.return_value.get_high_score.return_value = 37
             snake.return_value.get_num_sims.return_value = 1
             log.return_value.current_golden_config.return_value = None
             log.return_value.experiment_cycles.return_value = 0
+            db.return_value.query.return_value = []
             log.return_value.recent.return_value = [event]
             _, page = self.request("/")
         self.assertIn(f'Submitted <a href="/simulations/{RUN_ID}/config">config</a>.', page)

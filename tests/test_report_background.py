@@ -9,17 +9,17 @@ from uuid import uuid4
 
 import pymysql
 
-from ax3l.app.ReportBackground import ReportBackground
+from ax3l.app.reporting.ReportBackground import ReportBackground
 from ax3l.interface.SimulationGifStore import SimulationGifStore
 
 
 class ReportBackgroundTests(unittest.TestCase):
     def setUp(self):
         directory = self.enterContext(TemporaryDirectory())
-        self.snake = self.enterContext(patch('ax3l.app.ReportBackground.SnakeLab')).return_value
-        self.db = self.enterContext(patch('ax3l.app.ReportBackground.DbMgr')).return_value
-        self.refresh = self.enterContext(patch('ax3l.app.ReportBackground.ReportingRefresh')).return_value
-        self.clock = self.enterContext(patch('ax3l.app.ReportBackground.monotonic', return_value=10))
+        self.snake = self.enterContext(patch('ax3l.app.reporting.ReportBackground.SnakeLab')).return_value
+        self.db = self.enterContext(patch('ax3l.app.reporting.ReportBackground.DbMgr')).return_value
+        self.refresh = self.enterContext(patch('ax3l.app.reporting.ReportBackground.ReportingRefresh')).return_value
+        self.clock = self.enterContext(patch('ax3l.app.reporting.ReportBackground.monotonic', return_value=10))
         self.background = ReportBackground(SimulationGifStore(Path(directory), 2, 20), 20)
         self.addCleanup(self.background.close)
 

@@ -23,3 +23,4 @@ class ExperimentState:
     preceding_match: str | None = None
     new_seed: bool = False
     seed_baseline: bool = False
+    synthetic: bool = False

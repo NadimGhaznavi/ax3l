@@ -97,15 +97,15 @@ class ViewCycleTests(unittest.TestCase):
         self.assertEqual([tool_name(request) for request in self.model.requests],
                          ['submit_observations'] * 4 + ['submit_view'] * 4 +
                          ['submit_observations'] * 4 + ['submit_view'] * 4 + ['submit_observations'] * 4)
-        self.assertEqual(len(self.snake.submissions), 3)  # Baseline plus two complete experiments.
+        self.assertEqual(len(self.snake.submissions), 4)  # Baseline, synthetic, and two autonomous experiments.
         self.assertEqual(self.shuffle.call_count, 2)
         state = self.store.load()
         self.assertEqual(state.order, list(reversed(VIEWS)))
         self.assertEqual(state.phase, 'completed')
         self.assertEqual(set(state.observations), set(VIEWS))
-        winner = list(self.snake.results)[1]
+        winner = list(self.snake.results)[2]
         self.assertEqual(state.golden_run_id, winner)  # Second experiment loses.
-        first_trial = self.snake.submissions[1]
+        first_trial = self.snake.submissions[2]
         for path, expected in {'game.rewards.food': 12, 'model.hidden_size': 72,
                                'training.learning_rate': .002, 'epsilon.initial': .9,
                                'training.sequence_length': 8, 'training.gamma': .95}.items():
@@ -156,10 +156,10 @@ class ViewCycleTests(unittest.TestCase):
                     self.assertEqual(image.format, 'PNG')
                     self.assertGreaterEqual(image.width, 400)
         names = [event['name'] for event in self.log.events]
-        self.assertEqual(names.count('proposal_accepted'), 2)
-        self.assertEqual(names.count('configuration_compared'), 2)
+        self.assertEqual(names.count('proposal_accepted'), 3)
+        self.assertEqual(names.count('configuration_compared'), 3)
         self.assertEqual(names.count('golden_config_created'), 2)
-        self.assertEqual(names.count('simulation_completed'), 3)
+        self.assertEqual(names.count('simulation_completed'), 4)
         self.assertLess(names.index('simulation_completed'), names.index('golden_config_created'))
 
     def test_all_tuning_prompts_are_text_only_and_do_not_read_chart_data(self):
@@ -197,13 +197,13 @@ class ViewCycleTests(unittest.TestCase):
                 patch.object(self.snake, 'get_reward_episodes', side_effect=scores) as reward_reads, \
                 patch.object(self.snake, 'get_training_episodes', side_effect=scores) as training_reads:
             self.loop().run(cycles=2)
-        baseline, winner, loser = self.snake.results
-        expected_reads = [baseline, baseline, winner, winner, loser]
+        baseline, synthetic, winner, loser = self.snake.results
+        expected_reads = [baseline, synthetic, baseline, winner, winner, loser]
         self.assertEqual([call.args[0] for call in score_reads.call_args_list], expected_reads)
         self.assertEqual([call.args[0] for call in exploration_reads.call_args_list], expected_reads)
         self.assertEqual([call.args[0] for call in reward_reads.call_args_list], expected_reads)
         self.assertEqual([call.args[0] for call in training_reads.call_args_list], expected_reads)
-        for offset, reference, latest in ((0, baseline, baseline), (8, baseline, winner), (16, winner, loser)):
+        for offset, reference, latest in ((0, baseline, synthetic), (8, baseline, winner), (16, winner, loser)):
             for name, request in zip(VIEWS, self.model.requests[offset:offset + 4]):
                 text = prompt_text(request)
                 self.assertIn(f'Golden reference: {reference} (high score: {self.snake.results[reference]["high_score"]})', text)
@@ -229,7 +229,7 @@ class ViewCycleTests(unittest.TestCase):
         self.assertEqual(len(self.model.requests), 6)
         self.loop().run(cycles=1)
         self.assertEqual(len(self.model.requests), 12)
-        self.assertEqual(len(self.snake.submissions), 2)
+        self.assertEqual(len(self.snake.submissions), 3)
         self.shuffle.assert_called_once()
         for index, field, value in ((6, 'sequence_length', 8), (7, 'gamma', .95)):
             _, parameters, readonly = blocks(self.model.requests[index])
@@ -248,7 +248,7 @@ class ViewCycleTests(unittest.TestCase):
             with self.subTest(order=order):
                 state = ExperimentState(
                     'shared-parameters', 'choosing', SimulationConfiguration.defaults(), order=list(order),
-                    previous={name: ViewProposal(view.initial_hypothesis, {}) for name, view in VIEWS.items()},
+                    previous={name: ViewProposal('Previous hypothesis.', {}) for name, view in VIEWS.items()},
                     observations={name: 'Baseline observations.' for name in VIEWS},
                 )
                 start = len(self.model.requests)
@@ -332,13 +332,13 @@ class ViewCycleTests(unittest.TestCase):
             with self.assertRaises(KeyboardInterrupt):
                 self.loop().run(cycles=1)
         self.assertEqual(len(self.model.requests), 2)
-        self.assertEqual(self.store.load().proposals, {})
-        self.assertEqual(len(self.snake.submissions), 1)
+        self.assertEqual(set(self.store.load().proposals), set(VIEWS))
+        self.assertEqual(len(self.snake.submissions), 2)
         self.loop().run(cycles=1)
         self.assertEqual(len(self.model.requests), 12)
         self.assertEqual([tool_name(request) for request in self.model.requests[:4]],
                          ['submit_observations'] * 4)
-        self.assertEqual(len(self.snake.submissions), 2)
+        self.assertEqual(len(self.snake.submissions), 3)
 
     def test_existing_golden_is_evaluated_before_new_proposals(self):
         run_id = self.snake.submit_simulation(SimulationConfiguration.defaults())
@@ -352,16 +352,16 @@ class ViewCycleTests(unittest.TestCase):
         normal = self.store.save
         def stop_after_two(state):
             normal(state)
-            if state.phase == 'evaluating' and state.proposals and len(state.observations) == 2:
+            if state.phase == 'evaluating' and not state.synthetic and state.proposals and len(state.observations) == 2:
                 raise KeyboardInterrupt()
         with patch.object(self.store, 'save', side_effect=stop_after_two):
             with self.assertRaises(KeyboardInterrupt):
                 self.loop().run(cycles=1)
         self.assertEqual(len(self.model.requests), 10)
-        self.assertEqual(len(self.snake.submissions), 2)
+        self.assertEqual(len(self.snake.submissions), 3)
         self.loop().run(cycles=1)
         self.assertEqual(len(self.model.requests), 12)
-        self.assertEqual(len(self.snake.submissions), 2)
+        self.assertEqual(len(self.snake.submissions), 3)
 
     def test_lost_submission_reply_reconciles_new_run_without_resubmitting(self):
         submit = self.snake.submit_simulation
@@ -373,7 +373,7 @@ class ViewCycleTests(unittest.TestCase):
                 self.loop().run(cycles=1)
         self.assertEqual(self.store.load().phase, 'submitting')
         self.loop().run(cycles=1)
-        self.assertEqual(len(self.snake.submissions), 2)
+        self.assertEqual(len(self.snake.submissions), 3)
         self.assertEqual(len(self.model.requests), 12)
 
     def test_unresolved_submission_is_never_sent_again(self):
@@ -395,7 +395,7 @@ class ViewCycleTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'will not be retried'):
                 self.loop().run(cycles=1)
             submit.assert_called_once()
-        self.assertEqual(len(self.snake.submissions), 2)
+        self.assertEqual(len(self.snake.submissions), 3)
 
     def test_invalid_proposal_stops_before_candidate_submission_and_can_resume(self):
         original = self.model.respond
@@ -410,11 +410,11 @@ class ViewCycleTests(unittest.TestCase):
         self.model.respond = invalid
         with self.assertRaises(ValidationError):
             self.loop().run(cycles=1)
-        self.assertEqual(len(self.snake.submissions), 1)
+        self.assertEqual(len(self.snake.submissions), 2)
         self.assertEqual(self.store.load().proposals, {})
         self.model.respond = original
         self.loop().run(cycles=1)
-        self.assertEqual(len(self.snake.submissions), 2)
+        self.assertEqual(len(self.snake.submissions), 3)
         self.assertEqual(len(self.model.requests), 13)
         self.assertEqual(self.store.load().phase, 'completed')
 
@@ -430,8 +430,8 @@ class ViewCycleTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             self.loop().run(cycles=1)
         self.assertEqual(len(self.store.load().observations), 2)
-        self.assertEqual(self.store.load().proposals, {})
-        self.assertEqual(len(self.snake.submissions), 1)
+        self.assertEqual(set(self.store.load().proposals), set(VIEWS))
+        self.assertEqual(len(self.snake.submissions), 2)
         self.model.respond = original
         self.loop().run(cycles=1)
         self.assertEqual(len(self.model.requests), 13)

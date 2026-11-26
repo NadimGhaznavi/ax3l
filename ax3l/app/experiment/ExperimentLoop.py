@@ -23,6 +23,7 @@ from ax3l.entities.ViewProposal import ViewProposal
 from ax3l.interface.LLM import LLM
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 from ax3l.interface.SnakeLab import SnakeLab
+from ax3l.interface.SyntheticExperimentConfiguration import SyntheticExperimentConfiguration
 from ax3l.interface.ViewConversation import ViewConversation
 from ax3l.presentation.ViewPrompts import ViewPrompts
 
@@ -87,7 +88,7 @@ class ExperimentLoop:
                 self._finish(state)
             elif state.phase == "evaluating":
                 self._evaluate_view(state)
-                if state.phase == "completed" and not state.baseline and state.proposals:
+                if state.phase == "completed" and not state.baseline and not state.synthetic and state.proposals:
                     completed += 1
             else:
                 raise ValueError(f"Unknown experiment phase: {state.phase}")
@@ -96,13 +97,13 @@ class ExperimentLoop:
         golden = self._events.current_golden_config()
         run_id = golden["process_id"] if golden else self._snake.get_all_time_best_run_id()
         config = self._completed_result(run_id)["config"] if run_id else SimulationConfiguration.defaults()
-        previous = {
-            name: ViewProposal(view.initial_hypothesis, view_values(view, config))
-            for name, view in VIEWS.items()
-        }
+        initial = SyntheticExperimentConfiguration.load()
+        previous = {name: ViewProposal(initial[name].hypothesis, view_values(view, config))
+                    for name, view in VIEWS.items()} if run_id else {}
         state = ExperimentState(str(uuid4()), "evaluating" if run_id else "ready", deepcopy(config),
                                 baseline=run_id is None, golden_run_id=run_id, latest_run_id=run_id,
-                                reference_run_id=run_id, previous=previous)
+                                reference_run_id=run_id, previous=previous,
+                                synthetic=run_id is None, proposals=initial if run_id is None else {})
         if run_id and golden is None:
             self._promote(run_id, "Adopted the best completed simulation as the initial baseline.")
         self._store.save(state)
@@ -122,7 +123,7 @@ class ExperimentLoop:
             str(uuid4()), "choosing", config, golden_run_id=previous.golden_run_id,
             latest_run_id=previous.latest_run_id, reference_run_id=previous.reference_run_id, order=order,
             previous=previous.proposals or previous.previous,
-            previous_seeded=not bool(previous.proposals),
+            previous_seeded=previous.synthetic or not bool(previous.proposals),
             observations=previous.observations.copy(),
         )
         self._store.save(state)
@@ -190,7 +191,8 @@ class ExperimentLoop:
         parent = recorded.get(Events.Configuration.PROPOSAL_ACCEPTED)
         if not state.baseline and not state.seed_baseline and parent is None:
             parent = self._events.log(Events.Configuration.PROPOSAL_ACCEPTED, Events.Configuration.CATEGORY, "INFO",
-                                  json.dumps(dict(draft_id=state.experiment_id, config=state.config), allow_nan=False),
+                                  json.dumps(dict(draft_id=state.experiment_id, config=state.config,
+                                                  origin="synthetic" if state.synthetic else "llm"), allow_nan=False),
                                   process_id=state.run_id)
         if Events.SnakeLab.SUBMITTED not in recorded:
             description = "Submitted four-view configuration."
@@ -198,6 +200,8 @@ class ExperimentLoop:
                 description = "Submitted baseline configuration."
             elif state.seed_baseline:
                 description = "Submitted golden configuration with a new seed."
+            elif state.synthetic:
+                description = "Submitted synthetic four-view configuration."
             self._events.log(Events.SnakeLab.SUBMITTED, Events.SnakeLab.CATEGORY, "INFO",
                          description,
                          process_id=state.run_id, parent_event_id=parent, ax3l_version=DAx3l.VERSION)
@@ -232,6 +236,15 @@ class ExperimentLoop:
         current = self._events.current_golden_config()
         if current is None or current["process_id"] != winner:
             self._promote(winner, reason)
+        if state.baseline and state.synthetic:
+            for proposal in state.proposals.values():
+                state.config = apply_values(state.config, proposal.values)
+            state.baseline = False
+            state.golden_run_id = winner
+            state.run_id, state.preceding_match = None, None
+            state.phase = "ready"
+            self._store.save(state)
+            return
         if state.seed_baseline:
             state.golden_run_id = winner
             state.run_id, state.preceding_match = None, None

@@ -32,7 +32,9 @@ Observations. The images are currently labeled placeholders; the four evaluation
 templates provide a skeleton for future comparison content.
 
 After all four evaluations, Ax3l shuffles the views and requests four new
-configuration proposals. Each view receives its previous hypothesis, choices,
+configuration proposals. Fresh startup runs the default baseline and a synthetic
+experiment from editable files in `conf/synthetic/` before the first LLM request.
+Each view receives its previous hypothesis, choices,
 and Observations, editable setting rules, and read-only configuration context.
 Hypotheses and Observations each have a hard limit of 280 characters. The
 application assembles and validates the complete draft, submits it through

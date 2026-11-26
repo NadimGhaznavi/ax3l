@@ -109,7 +109,11 @@ Start the continuous four-view experiment service with:
 ```
 
 Use `--cycles 1` to stop after one complete four-view experiment, excluding
-initial baseline creation. `--llm-url http://HOST:51001` overrides the configured
+initial baseline creation or the synthetic first experiment and its evaluations.
+Edit the five startup files in `/opt/prod/ax3l/conf/synthetic/` before initializing
+a fresh history; upgrades preserve those edits. See
+[editable first experiment](runtime-behaviour.md#editable-first-experiment).
+`--llm-url http://HOST:51001` overrides the configured
 inference URL. The old optimization entry point and raw-output options remain
 removed. Fresh installations generate configuration without the retired
 decision-grace setting. See [Runtime Behaviour](/pages/runtime-behaviour) for the

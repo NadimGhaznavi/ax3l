@@ -78,14 +78,37 @@ running the new-seed baseline first when requested.
 ## Baseline and results
 
 On a fresh installation, Ax3l runs the default configuration to establish a real
-baseline. If completed simulations already exist without a golden event, it
+baseline, then runs a file-backed synthetic experiment on the same seed. No LLM
+requests occur between these simulations. The synthetic result is compared with
+the baseline using the usual high-score rule. Qwen then evaluates that comparison
+in all four views and begins the autonomous configuration loop.
+If completed simulations already exist without a golden event, Ax3l
 adopts the best completed result. An existing golden reference is reused.
 
-The initial hypotheses and per-view choices are seeded examples, paired with the
-real baseline run. It receives the same four evaluation conversations before
-the first tuning pass. No simulation scores are fabricated. Their seeded
-origin is recorded in the experiment checkpoint through `previous_seeded`;
-Qwen receives the same prompt shape as on later cycles.
+### Editable first experiment
+
+The startup files live in [`conf/synthetic/`](../conf/synthetic/) in the checkout
+and `/opt/prod/ax3l/conf/synthetic/` after installation:
+
+- [`config.json`](../conf/synthetic/config.json) is the complete synthetic SnakeLab
+  configuration. The bundled example changes food reward, hidden size, learning
+  rate, and epsilon decay. Edit any per-view settings within the simulation schema;
+  keep the baseline seed and fixed settings, and change at least one tunable value.
+- [`reward-signals.md`](../conf/synthetic/reward-signals.md),
+  [`architecture.md`](../conf/synthetic/architecture.md),
+  [`training.md`](../conf/synthetic/training.md), and
+  [`exploration.md`](../conf/synthetic/exploration.md) each contain that view's
+  hypothesis as plain text, up to 280 characters. Update them alongside the
+  configuration so they describe the intended changes and expected results.
+
+Install and upgrade copy missing startup files and preserve existing edits.
+Ax3l validates all five files before submitting the initial baseline. It saves
+the resolved per-view choices and hypotheses in the first checkpoint; restarting
+resumes those saved inputs even if the files have since changed. File edits apply
+to the next fresh experiment history, not a running or completed initialization.
+The synthetic origin is recorded in checkpoints and the accepted-configuration
+event. Qwen receives the same prompt shape as on later cycles. All scores and
+comparison measurements come from real simulations.
 
 Every later cycle starts from the current golden configuration. A strictly higher
 high score becomes golden; ties and losses retain the comparison baseline.
@@ -144,7 +167,8 @@ The default is continuous operation. For one complete four-view experiment:
 .venv/bin/python -m ax3l.server.Ax3lServer --cycles 1
 ```
 
-Baseline creation and its evaluations do not count toward `--cycles`. A cycle
+Baseline creation and the synthetic experiment, including its evaluations, do
+not count toward `--cycles`. A cycle
 finishes after its simulation or pair of simulations and all four result evaluations complete.
 `--llm-url http://HOST:PORT`
 overrides the configured LlamaSrv URL. `--zmq-endpoint` and `AX3L_ZMQ_ENDPOINT`

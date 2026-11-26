@@ -2,6 +2,14 @@ This project is on [https://ax3l.osoyalce.com/](https://ax3l.osoyalce.com/).
 
 If you like this project, please give it a star (top right corner)! :)
 
+## First experiment
+
+A fresh history runs the default baseline, then a real synthetic experiment,
+before Qwen evaluates the results and starts autonomous tuning. Edit the synthetic
+configuration and four hypothesis files in [`conf/synthetic/`](conf/synthetic/).
+Installed copies live at `/opt/prod/ax3l/conf/synthetic/`; upgrades preserve local
+edits. See [startup behavior](pages/runtime-behaviour.md#editable-first-experiment).
+
 ## Tests
 
 For the full suite with a private, disposable MariaDB server, run:

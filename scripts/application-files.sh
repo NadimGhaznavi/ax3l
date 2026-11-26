@@ -38,4 +38,12 @@ install_application_files() (
     if ! mv -- "$staging_dir/ax3l" "$install_dir/ax3l"; then
         exit 1
     fi
+
+    # Seed editable experiments once; upgrades preserve local tuning.
+    for source in conf/synthetic/config.json conf/synthetic/*.md; do
+        if [[ ! -e $install_dir/$source ]]; then
+            install -D -m 644 -o "$service_account" -g "$service_account" \
+                -- "$source" "$install_dir/$source"
+        fi
+    done
 )

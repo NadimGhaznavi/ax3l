@@ -66,7 +66,7 @@ def episodes():
 
 
 class FakeSnake:
-    def __init__(self, scores=(10, 12, 7)):
+    def __init__(self, scores=(10, 9, 12, 7)):
         self.scores = iter(scores)
         self.results = {}
         self.submissions = []

@@ -30,9 +30,17 @@ configuration tuning prompts text-only. Align evaluation headings and use
 150-epoch comparison windows across all four views.
 Restore seed rotation as a shared request, running the golden and proposed
 settings on the same incremented seed before comparing their results.
+Run an editable synthetic experiment after the fresh baseline and before Qwen
+begins evaluation and autonomous tuning.
 
 ### Added
 
+- Add `conf/synthetic/config.json` and four hypothesis files for the first
+  experiment. Validate them before the baseline, checkpoint the resolved inputs,
+  and run both real simulations before any LLM requests. Compare the synthetic
+  result against the baseline, retain that reference after promotion, and exclude
+  initialization from `--cycles`. Install missing files while preserving local
+  edits on upgrade.
 - Add an optional `new seed` boolean to every tuning view. Start false each
   cycle, keep it editable while false, and move it into read-only parameters
   after any view requests true. Preserve the choice across restarts.

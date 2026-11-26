@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Run fresh initialization even when SnakeLab retains simulations from an earlier
+installation. 
+
+This release was verified at a high level and appears to be working.
+
+### Changed
+
+- Increase the fixed simulation length from 750 to 1,500 episodes for the default
+  baseline, synthetic first experiment, and autonomous candidates. Keep the
+  comparison windows at 150 episodes.
+
+### Fixed
+
+- Establish the default baseline and synthetic experiment when Ax3l has no saved
+  state or golden reference, instead of adopting SnakeLab's historical best run.
+  Preserve existing SnakeLab results and resume existing Ax3l experiment history.
+
 ## [5.0.0] - 2026-11-26 @ 06:11
 
 ### Summary

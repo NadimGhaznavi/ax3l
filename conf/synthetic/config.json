@@ -1,5 +1,5 @@
 {
-  "epochs": 750,
+  "epochs": 1500,
   "seed": 1970,
   "game": {
     "board_width": 20,

@@ -136,6 +136,25 @@ class SyntheticStartupTests(unittest.TestCase):
             self.assertIn(f'Golden reference: {baseline}', request['messages'][0]['content'][0]['text'])
         self.assertEqual(self.store.comparison(candidate)['golden_run_id'], synthetic)
 
+    def test_old_snakelab_history_does_not_replace_fresh_baseline_and_synthetic_runs(self):
+        old_config = apply_values(SimulationConfiguration.defaults(), {'model.hidden_size': 128})
+        old_config['seed'] = 8123
+        old = self.snake.submit_simulation(old_config)
+        self.snake.results[old]['high_score'] = 999
+        self.loop().run(cycles=1)
+        old, baseline, synthetic, candidate = self.snake.results
+        self.assertEqual(self.snake.submissions[1], SimulationConfiguration.defaults())
+        self.assertEqual(self.snake.submissions[2], json.loads((SOURCE / 'config.json').read_text()))
+        self.assertEqual(self.snake.results[old]['high_score'], 999)
+        self.assertEqual(self.snake.results[old]['config'], old_config)
+        for request in self.model.requests[:4]:
+            text = request['messages'][0]['content'][0]['text']
+            self.assertIn(f'Golden reference: {baseline}', text)
+            self.assertIn(f'Latest simulation: {synthetic}', text)
+            self.assertNotIn(old, text)
+        self.assertEqual(self.store.load().golden_run_id, synthetic)
+        self.assertEqual(self.store.load().latest_run_id, candidate)
+
     def test_restart_uses_saved_inputs_and_does_not_repeat_either_startup_run(self):
         save = self.store.save
         def stop(state):

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://snake-lab.local/schemas/simulation-config-v2.schema.json",
   "title": "Snake Lab simulation configuration",
-  "description": "Ax3l experiment policy for Snake Lab 3.0.4: small Transformer, required EpsilonNice, and 750 episodes.",
+  "description": "Ax3l experiment policy for Snake Lab 3.0.4: small Transformer, required EpsilonNice, and 1500 episodes.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -10,10 +10,10 @@
       "title": "Number of epochs",
       "description": "Number of complete Snake episodes to execute.",
       "type": "integer",
-      "default": 750,
+      "default": 1500,
       "minimum": 1,
       "x-snakelab-unit": "episodes",
-      "const": 750
+      "const": 1500
     },
     "seed": {
       "title": "Simulation seed",

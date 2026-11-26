@@ -25,20 +25,37 @@ The LLM used by the project is [Qwen 3.5 - 4B](https://huggingface.co/Qwen/Qwen3
 
 ## Conversation workflows
 
-Ax3l shuffles four views and requests one proposal per view using native
-function calls through the shared LLM HTTP interface. Each view receives focused
-measurements, its previous hypothesis and choices, editable setting rules, and
-read-only configuration context. The application assembles and validates the
-complete draft, submits it through the SnakeLab interface, and compares the
-completed result before the next cycle. The view sequence and draft assembly
-are internal to Ax3l; no MCP process or external tool registration is required.
+After a simulation finishes, Ax3l runs four result evaluation conversations,
+one each for Reward Signals, Architecture, Training, and Exploration. Each
+receives its hypothesis, choices, and a comparison image, and submits short
+Observations. The images are currently labeled placeholders; the four evaluation
+templates provide a skeleton for future comparison content.
 
-`ExperimentState` and `ViewProposal` hold data. The view configuration and evidence
-activities prepare model context without external access. `ViewPrompts` owns
-presentation resources, `ViewConversation` owns the inference response boundary,
+After all four evaluations, Ax3l shuffles the views and requests four new
+configuration proposals. Fresh startup runs the default baseline and a synthetic
+experiment from editable files in `conf/synthetic/` before the first LLM request.
+Each view receives its previous hypothesis, choices,
+and Observations, editable setting rules, and read-only configuration context.
+Hypotheses and Observations each have a hard limit of 280 characters. The
+application assembles and validates the complete draft, submits it through
+SnakeLab, and compares the completed result before evaluating it. Both passes
+use native function calls through the shared LLM HTTP interface. View sequencing
+and draft assembly are internal to Ax3l; no MCP process or external registration
+is required.
+
+Each view can request `new seed`. It starts false and becomes read-only once
+requested. After assembling the proposals, Ax3l increments the numeric seed and
+runs the golden settings first, then the proposed configuration, on that same
+seed. The golden run establishes a fresh baseline even if lower than before;
+the candidate must beat that baseline. Both runs are checkpointed for restart.
+
+`ExperimentState` and `ViewProposal` hold data. The view configuration activity
+prepares settings context without external access. `ViewPrompts` owns the tuning
+and evaluation presentation resources, and `ComparisonImage` supplies the image
+placeholder. `ViewConversation` owns the inference response boundary,
 and `ExperimentDb` owns checkpoint queries through the shared `DbMgr`.
 `ExperimentLoop` sequences their work. Snapshots, submission intent, and accepted
-choices survive restarts. See [Runtime Behaviour](/pages/runtime-behaviour).
+choices and Observations survive restarts. See [Runtime Behaviour](/pages/runtime-behaviour).
 
 ## MariaDB
 

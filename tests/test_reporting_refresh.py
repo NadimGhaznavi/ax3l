@@ -12,22 +12,11 @@ from threading import Event
 from unittest.mock import patch
 from uuid import uuid4
 
-from ax3l.activity.CompletedRounds import completed_rounds
-from ax3l.app.DbMgr import DbMgr
-from ax3l.app.EventLogDb import EventLogDb
-from ax3l.app.ReportingDb import ReportingDb
-from ax3l.app.ReportingRefresh import ReportingRefresh
+from ax3l.interface.database.DbMgr import DbMgr
+from ax3l.interface.database.EventLogDb import EventLogDb
+from ax3l.interface.database.ReportingDb import ReportingDb
+from ax3l.app.reporting.ReportingRefresh import ReportingRefresh
 from ax3l.constants.DSnakeLab import DSnakeLab
-
-
-class CompletedRoundsTests(unittest.TestCase):
-    def test_partial_rounds_gaps_and_duplicate_comparisons(self):
-        turns = [dict(parameter_index=index, first_completion=first) for index, first in (
-            (0, True), (1, True), (1, False), (2, True), (1, True), (0, True))]
-        self.assertEqual(completed_rounds(turns, 3), (1, 1))
-        self.assertEqual(completed_rounds([
-            dict(parameter_index=1, first_completion=True),
-            dict(parameter_index=2, first_completion=True)], 3, 1, 1), (2, 0))
 
 
 @unittest.skipUnless(os.environ.get("AX3L_TEST_DB") == "1", "requires disposable MariaDB test database")
@@ -39,7 +28,7 @@ class ReportingRefreshTests(unittest.TestCase):
         self.enterContext(patch.object(DSnakeLab, 'DATABASE', 'ax3l_test'))
         self.reports = ReportingDb(self.db)
         self.reports.initialize()
-        for table in ('report_runs', 'report_events', 'report_turns', 'report_state'):
+        for table in ('report_runs', 'report_state'):
             ddl = self.db.query(f"SHOW CREATE TABLE {table}")[0]['Create Table']
             self.db.execute(ddl.replace('CREATE TABLE', 'CREATE TEMPORARY TABLE', 1))
         self.db.execute("""CREATE TEMPORARY TABLE events (
@@ -116,12 +105,11 @@ class ReportingRefreshTests(unittest.TestCase):
         self.turn()
         self.assertEqual(ReportingRefresh(self.db).refresh()['experiment_cycles'], 9)
 
-    def test_late_visible_completion_replays_only_projected_turns(self):
+    def test_late_visible_comparison_counts_without_an_event_watermark(self):
         self.event('configuration_compared', str(uuid4()), event_id=4)
         self.assertEqual(self.refresh.refresh()['experiment_cycles'], 1)
         self.event('configuration_compared', str(uuid4()), event_id=2)
         self.assertEqual(self.refresh.refresh()['experiment_cycles'], 2)
-        self.assertEqual(self.reports.lock_state()['expected_parameter'], 0)
         self.assertEqual(self.refresh.refresh()['experiment_cycles'], EventLogDb(self.db).experiment_cycles())
 
     def test_failure_rolls_back_projection_counters_and_progress(self):
@@ -131,7 +119,6 @@ class ReportingRefreshTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'interrupted'):
                 self.refresh.refresh()
         self.assertEqual(self.db.query('SELECT COUNT(*) AS n FROM report_runs')[0]['n'], 0)
-        self.assertEqual(self.db.query('SELECT COUNT(*) AS n FROM report_turns')[0]['n'], 0)
         self.assertEqual(self.reports.totals()['games_played'], 0)
         self.assertEqual(self.refresh.refresh()['games_played'], 2)
         self.assertEqual(self.refresh.refresh()['games_played'], 2)
@@ -164,7 +151,7 @@ class ReportingRefreshTests(unittest.TestCase):
             self.refresh.refresh()
         self.assertFalse(any('simulation_episodes' in call.args[0] for call in query.call_args_list))
 
-    def test_backfill_crosses_run_and_event_batch_boundaries(self):
+    def test_backfill_crosses_run_batch_boundaries(self):
         for source_id in range(1, 260):
             self.run_row(source_id, steps=(1,))
         for index in range(520):

@@ -4,7 +4,7 @@ import unittest
 
 from jsonschema import Draft202012Validator
 
-from ax3l.app.snakelab.GenerateDefaultConfig import GenerateDefaultConfig
+from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -12,8 +12,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class DefaultConfigTests(unittest.TestCase):
     def test_defaults_form_a_valid_complete_configuration(self):
-        schema = json.loads((ROOT / "ax3l/app/snakelab/simulation-config-v2.schema.json").read_text())
-        config = GenerateDefaultConfig().run()
+        schema = json.loads((ROOT / "ax3l/interface/schemas/simulation-config-v2.schema.json").read_text())
+        config = SimulationConfiguration.defaults()
         Draft202012Validator(schema).validate(config)
         self.assertEqual(config["model"], {
             "type": "transformer", "heads": 4, "hidden_size": 64, "layers": 1, "dropout": 0.05,
@@ -24,4 +24,4 @@ class DefaultConfigTests(unittest.TestCase):
         })
         self.assertEqual(config["game"]["rewards"]["wall"], -10)
         config["training"]["batch_size"] = 8
-        self.assertEqual(GenerateDefaultConfig().run()["training"]["batch_size"], 64)
+        self.assertEqual(SimulationConfiguration.defaults()["training"]["batch_size"], 64)

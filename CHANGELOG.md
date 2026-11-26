@@ -9,6 +9,174 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.0.0] - 2026-11-26 @ 06:11
+
+### Summary
+
+Separate simulation evaluation from configuration tuning, with four result
+conversations followed by four configuration conversations. Keep presentation
+modules and prompts directly under `ax3l/presentation/`, and remove the unused
+default-configuration wrapper. Begin separate application documentation with
+a draft deployment Use Case View. Require a fresh installation, keeping database
+credentials across explicit uninstall and reinstall operations. Share terminology
+between documentation views through a common glossary, and connect deployment
+responsibilities, design, and implementation through all four views. Separate
+application-file installation from service orchestration and propagate discovery
+failures before service activation.
+Refactor the application around explicit experiment, reporting, persistence,
+transport, and presentation responsibilities, removing retired tuning machinery.
+Allow shared tuning parameters across views while preventing conflicting
+proposals within each configuration cycle.
+Show golden/latest training measurements in all four evaluation prompts, and keep
+configuration tuning prompts text-only. Align evaluation headings and use
+150-epoch comparison windows across all four views.
+Restore seed rotation as a shared request, running the golden and proposed
+settings on the same incremented seed before comparing their results.
+Run an editable synthetic experiment after the fresh baseline and before Qwen
+begins evaluation and autonomous tuning.
+Show the four evaluation and four selection conversations in collapsible
+Experiment Status sections with their recorded prompts, parameters, and costs.
+
+### Added
+
+- Add eight Experiment Status sections above the event log. Retain the parameter
+  table headings, show hypotheses and observations, link each recorded prompt,
+  response, and reasoning, and report elapsed time and input/output tokens once
+  per conversation. Identify shared choices and pending, active, saved, failed,
+  and synthetic steps. Preserve expanded sections and table scrolling on refresh.
+- Add `conf/synthetic/config.json` and four hypothesis files for the first
+  experiment. Validate them before the baseline, checkpoint the resolved inputs,
+  and run both real simulations before any LLM requests. Compare the synthetic
+  result against the baseline, retain that reference after promotion, and exclude
+  initialization from `--cycles`. Install missing files while preserving local
+  edits on upgrade.
+- Add an optional `new seed` boolean to every tuning view. Start false each
+  cycle, keep it editable while false, and move it into read-only parameters
+  after any view requests true. Preserve the choice across restarts.
+- On a new seed request, increment the numeric seed and run two full SnakeLab
+  simulations: current golden settings first, then Qwen's proposed settings.
+  Establish the first result as the new baseline even if lower, and compare the
+  candidate against it. Recover either run and committed promotions without
+  duplicate submissions or repeated conversations.
+- Add a golden/latest training evaluation PNG with combined 90th/25th score
+  percentiles and mean episode loss in 150-epoch windows. Retain final partial
+  windows, include measured zero losses, exclude missing losses from the mean,
+  and leave wholly unmeasured windows as gaps. Scale shared loss axes to both
+  runs' recorded values and include their high scores in the evaluation text.
+- Add a golden/latest reward-signals comparison PNG to the evaluation prompt.
+  Show food pickups, wall collisions, and snake collisions per 100 moves plus both
+  score percentiles in 150-epoch windows. Preserve the original reference after
+  promotion, retain final partial windows, and leave gaps for missing outcomes or
+  zero moves. Include both runs' high scores in the evaluation text.
+- Generate golden/latest score comparison PNGs for architecture evaluation. Plot
+  the 90th and 25th percentiles in 150-epoch windows, with shared axes and at least
+  five interior horizontal guides per score panel, and send the image to Qwen.
+- Add exploration evaluation PNGs with checkpoint epsilon probabilities, observed
+  EpsilonNice move override rates, and 90th/25th score percentiles in 150-epoch
+  windows. Use recorded episodes from the original reference and latest run,
+  including final partial windows, and include each run's high score in both
+  evaluation prompts. Identify baseline self-comparisons and missing measurements.
+- Add a JSON example to the shared proposal submission instructions, showing
+  `submit_view` arguments with a hypothesis and parameter values.
+- Add a full-suite runner that owns a private MariaDB instance and runs database,
+  HTTP, ZeroMQ, and deployment fixtures without using deployed services. Document
+  the resulting package structure and runtime contracts in the Implementation View.
+- Add an Implementation View index and deployment implementation realization,
+  covering source ownership, file delivery, installed entry points, and verified
+  contracts. Link forward from Design to complete the four-view documentation.
+- Add a Design View index and deployment design realization, linking analysis
+  participants to the current scripts, helper interfaces, configuration classes,
+  resources, service definitions, and failure contracts. Include Mermaid
+  structure and sequence diagrams and link forward from Analysis.
+- Add an Analysis View index and the deployment analysis realization, with
+  participant responsibilities, Mermaid class and sequence diagrams, failure
+  decisions, and traceability back to UC-01. Define analysis roles in the shared
+  glossary and link the use case to its realization.
+- Add a shared application glossary with links from the documentation entry
+  point, Use Case View, and deployment use case.
+- Add a standalone documentation entry point and the initial Deploy Ax3l software
+  use case under `docs/`, checked against installation and supporting code, with
+  an actor and a Mermaid overview. Capture provisioning, credential reuse,
+  service startup, and the limits of installation verification. Keep the
+  existing Pages content, navigation, and publishing configuration unchanged.
+- Add four evaluation prompts with a dedicated Observations submission.
+- Checkpoint each view's Observations and feed them into that view's next tuning
+  prompt. Resume interrupted evaluation and tuning passes without repeating
+  accepted submissions, including checkpoints from the preceding combined flow.
+- Enforce a 280-character limit on both hypotheses and Observations at the LLM
+  boundary and display those limits in the prompts.
+
+### Changed
+
+- Align Architecture evaluation headings with the other views and use the same
+  150-epoch comparison windows in its prompt and embedded PNG. Retain final
+  partial windows and shared axes for the Golden and Latest score percentiles.
+- Keep all configuration tuning prompts text-only; move architecture score
+  imagery to result evaluation and add the latest run alongside the golden reference.
+- Share sequence length between Architecture and Training, and gamma between
+  Training and Reward Signals. Once submitted in the shuffled tuning pass,
+  a shared parameter becomes read-only for later views, including after restart.
+- Separate report queries, HTML rendering, and HTTP handling. Keep report templates,
+  animations, and fonts together under `ax3l/presentation/reporting/`.
+- Move database adapters under `ax3l/interface/database/`. Keep SQL and event
+  persistence outside application workflows and database mechanics, preserving
+  constructor-driven event schema initialization and atomic event writes.
+- Group experiment and reporting workflows under `ax3l/app/`. Keep service recovery
+  in application control flow, and put simulation schemas beside their interface.
+- Reuse the bounded ZeroMQ client for SnakeLab requests without changing the
+  protocol, correlation validation, timeout behavior, or submission retry policy.
+- Count distinct compared runs directly during atomic reporting refreshes. Retain
+  incremental completed-run summaries and read-only access to SnakeLab source data.
+- Show the recorded decision in golden configuration history, replacing obsolete
+  individual-parameter and value-change columns.
+- Stage the complete application package before replacement, restore the previous
+  package if replacement fails, and remove retired installed modules on upgrade.
+  Preserve configuration, credentials, the runtime, and generated animations.
+- Keep UC-01 and its realizations focused on fresh installation. Catalog upgrade
+  and uninstall as separate use cases, retaining only brief cleanup guidance in
+  UC-01 and removing duplicated lifecycle details from its realizations.
+- Extract application-file selection and copying into the sourced
+  `scripts/application-files.sh` helper, with explicit checkout, target, and
+  account arguments. Preserve installed paths, ownership, and permission modes.
+- Refuse installation when Ax3l application files, service units, Linux accounts,
+  or database resources already exist. Direct DevOps to uninstall first, while
+  allowing saved credentials to be reused.
+- Retain the database credentials and their private directory during uninstall;
+  remove Ax3l application files and data without changing SnakeLab or LlamaSrv.
+- Document SnakeLab data cleanup as an undetailed external use case and a
+  deployment prerequisite, performed separately by DevOps.
+- Use DevOps as the deployment actor throughout the Use Case View.
+- Flatten the presentation package by removing its SnakeLab subdirectory. Keep
+  prompt templates in `prompts/evaluations/` and `prompts/selections/`, and update
+  module imports, template loading, and installation paths.
+- Finish all four evaluations before starting the next configuration pass. Evaluate
+  the initial baseline too, and include final result evaluations in bounded runs.
+- Match Architecture, Exploration, and Training prompt structure to the updated
+  Reward Signals prompt. Keep the Reward Signals template intact and add
+  shared submission instructions when rendering tuning prompts.
+- Submit only a hypothesis and parameter values in tuning conversations; include
+  the expected observable effect in the short hypothesis.
+
+### Fixed
+
+- Propagate application-file discovery failures so installation cannot continue
+  to service registration and startup after discovery fails. Add a regression
+  check for this failure path.
+- Escape semicolons in deployment sequence-diagram messages so Mermaid can render
+  the analysis realization.
+
+### Removed
+
+- Remove direct numeric seed tuning from Training and the unused legacy
+  `SimulationConfiguration.next_seed` helper. Ax3l owns seed increments.
+- Remove the comparison-image placeholder renderer now that all four evaluations
+  use recorded golden/latest measurements.
+- Remove unused single/pair parameter searches, comparison queries, run-analysis
+  plots, round-robin reporting projections, legacy checkpoint conversion, and
+  their retired-path tests. Retain current workflow and integration coverage.
+- Remove the test-only `GenerateDefaultConfig` wrapper; tests now call
+  `SimulationConfiguration.defaults()` directly.
+
 ## [4.23.2] - 2026-11-24 @ 04:35
 
 ### Summary

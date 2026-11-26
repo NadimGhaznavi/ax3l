@@ -11,22 +11,22 @@ from ax3l.interface.SnakeLab import SnakeLab, SnakeLabQueryError, SimulationUnav
 
 
 class SnakeLabTests(unittest.TestCase):
-    def test_availability_reads_use_the_shared_connection_and_close_it_after_success_or_failure(self):
-        config, parameters = {'seed': 1970}, ['layers']
+    def test_configuration_match_reads_use_the_shared_connection_and_close_it_after_success_or_failure(self):
+        config, run_id = {'seed': 1970}, "run-id"
         for error in (None, RuntimeError('database unavailable')):
             with self.subTest(error=error):
                 db, dal = Mock(), Mock()
-                dal.available_parameters.return_value = parameters
-                dal.available_parameters.side_effect = error
+                dal.find_config_run.return_value = run_id
+                dal.find_config_run.side_effect = error
                 with patch('ax3l.interface.SnakeLab.DbMgr', return_value=db) as factory, \
                         patch('ax3l.interface.SnakeLab.SnakeLabDb', return_value=dal):
                     if error is None:
-                        self.assertEqual(SnakeLab().available_parameters(config, parameters), parameters)
+                        self.assertEqual(SnakeLab().find_config_run(config), run_id)
                     else:
                         with self.assertRaisesRegex(RuntimeError, 'database unavailable'):
-                            SnakeLab().available_parameters(config, parameters)
+                            SnakeLab().find_config_run(config)
                 factory.assert_called_once_with(database='snakelab', initialize_event_tables=False)
-                dal.available_parameters.assert_called_once_with(config, parameters)
+                dal.find_config_run.assert_called_once_with(config)
                 db.close.assert_called_once()
 
     def exchange(self, payload, **overrides):

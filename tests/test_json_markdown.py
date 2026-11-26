@@ -4,9 +4,9 @@ import json
 from html import unescape
 import unittest
 
-from ax3l.activity.JsonMarkdown import json_markdown
-from ax3l.activity.MarkdownReport import markdown_html
-from ax3l.activity.ToolResult import tool_result_html
+from ax3l.presentation.reporting.JsonMarkdown import json_markdown
+from ax3l.presentation.reporting.MarkdownReport import markdown_html
+from ax3l.presentation.reporting.ToolResult import tool_result_html
 
 
 class JsonMarkdownTests(unittest.TestCase):

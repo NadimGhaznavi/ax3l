@@ -95,7 +95,7 @@ class ExperimentLoop:
 
     def _initialize(self) -> ExperimentState:
         golden = self._events.current_golden_config()
-        run_id = golden["process_id"] if golden else self._snake.get_all_time_best_run_id()
+        run_id = golden["process_id"] if golden else None
         config = self._completed_result(run_id)["config"] if run_id else SimulationConfiguration.defaults()
         initial = SyntheticExperimentConfiguration.load()
         previous = {name: ViewProposal(initial[name].hypothesis, view_values(view, config))
@@ -104,8 +104,6 @@ class ExperimentLoop:
                                 baseline=run_id is None, golden_run_id=run_id, latest_run_id=run_id,
                                 reference_run_id=run_id, previous=previous,
                                 synthetic=run_id is None, proposals=initial if run_id is None else {})
-        if run_id and golden is None:
-            self._promote(run_id, "Adopted the best completed simulation as the initial baseline.")
         self._store.save(state)
         return state
 

@@ -12,7 +12,7 @@
 | --- | --- |
 | Deployment interface | [install.sh](../../scripts/install.sh) accepts the request and prints usage, progress, and errors. |
 | Deployment control | [install.sh](../../scripts/install.sh) checks eligibility and provisions accounts and storage, then invokes [install-services.sh](../../scripts/install-services.sh) to prepare the runtime, install files, and activate services. |
-| Host access | The scripts invoke host commands and the MariaDB client. [application-files.sh](../../scripts/application-files.sh) selects and installs application files, [service-configuration.sh](../../scripts/service-configuration.sh) renders and registers service definitions, [services.sh](../../scripts/services.sh) controls their lifecycle, and [install-chrome.py](../../scripts/install-chrome.py) provisions and verifies chart rendering. |
+| Host access | The scripts invoke host commands and the MariaDB client. [application-files.sh](../../scripts/application-files.sh) selects and installs application files, [service-configuration.sh](../../scripts/service-configuration.sh) renders and registers service definitions, and [services.sh](../../scripts/services.sh) controls their lifecycle. |
 | Deployment source | The selected checkout supplies application modules, resources, [requirements.txt](../../requirements.txt), and [service templates](../../systemd/). |
 | Installation resources | Directories, Linux accounts, MariaDB resources, and systemd definitions hold the installation state. The installer detects these resources directly. |
 | Database credentials | A private connection-settings file validated and reused or created by [install.sh](../../scripts/install.sh). |
@@ -27,7 +27,6 @@ flowchart LR
     services -.->|sources| files["application-files.sh"]
     settings --> configuration["Configuration and Network"]
     configuration --> defaults["DAx3l"]
-    services --> browser["install-chrome.py"]
     services --> lifecycle["services.sh"]
     settings --> systemd["systemd tools"]
     lifecycle --> systemd
@@ -46,7 +45,6 @@ and file operations are performed by commands within the scripts.
 | `resolve_service_configuration()` | The caller supplies `checkout_dir`, `install_dir`, and `config_dir`. The function creates or validates application configuration through Python and sets `report_host`, `report_port`, and `ax3l_zmq_endpoint` in the calling shell. |
 | `render_service_units()` | Uses those paths and listener values to render the three service templates. Sets `unit_dir` and `units`, validates the result, and arranges temporary-directory cleanup when the shell exits. |
 | `install_service_units()` | Consumes the rendered units, installs them into systemd's configuration directory, reloads systemd, and enables the services. Starting them is a separate step. |
-| `install-chrome.py --app PATH` | Obtains the chart-rendering browser within the application directory and verifies that it can produce a PNG with the expected dimensions. |
 | `services.sh start` / `stop` | Root-only service control. Start order is reporting, experiment, watchdog. Stop order is watchdog, experiment, reporting, skipping units that are not loaded. |
 
 The three configuration functions are sourced into the service installer's

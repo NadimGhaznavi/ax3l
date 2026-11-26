@@ -1,4 +1,4 @@
-"""Golden/latest placeholders for the reward-signals and training evaluations."""
+"""A golden/latest placeholder for the training evaluation."""
 
 from base64 import b64encode
 from io import BytesIO

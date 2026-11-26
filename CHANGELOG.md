@@ -25,11 +25,16 @@ Refactor the application around explicit experiment, reporting, persistence,
 transport, and presentation responsibilities, removing retired tuning machinery.
 Allow shared tuning parameters across views while preventing conflicting
 proposals within each configuration cycle.
-Show golden/latest training measurements in architecture and exploration evaluation
-prompts, and keep configuration tuning prompts text-only.
+Show golden/latest training measurements in architecture, exploration, and reward
+signals evaluation prompts, and keep configuration tuning prompts text-only.
 
 ### Added
 
+- Add a golden/latest reward-signals comparison PNG to the evaluation prompt.
+  Show food pickups, wall collisions, and snake collisions per 100 moves plus both
+  score percentiles in 150-epoch windows. Preserve the original reference after
+  promotion, retain final partial windows, and leave gaps for missing outcomes or
+  zero moves. Include both runs' high scores in the evaluation text.
 - Generate golden/latest score comparison PNGs for architecture evaluation. Plot
   the 90th and 25th percentiles in 50-epoch windows, with shared axes and at least
   five interior horizontal guides per score panel, and send the image to Qwen.
@@ -61,8 +66,8 @@ prompts, and keep configuration tuning prompts text-only.
   an actor and a Mermaid overview. Capture provisioning, credential reuse,
   service startup, and the limits of installation verification. Keep the
   existing Pages content, navigation, and publishing configuration unchanged.
-- Add four evaluation prompts with a dedicated Observations submission. Reward
-  Signals and Training retain labeled comparison-image placeholders.
+- Add four evaluation prompts with a dedicated Observations submission. Training
+  retains a labeled comparison-image placeholder.
 - Checkpoint each view's Observations and feed them into that view's next tuning
   prompt. Resume interrupted evaluation and tuning passes without repeating
   accepted submissions, including checkpoints from the preceding combined flow.

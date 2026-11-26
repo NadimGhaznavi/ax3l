@@ -1,4 +1,4 @@
-"""Render recorded golden/latest training progress for result evaluations."""
+"""Render recorded golden/latest training progress comparisons."""
 
 from base64 import b64encode
 from io import BytesIO
@@ -7,6 +7,7 @@ from math import ceil, floor, hypot, log10
 from PIL import Image, ImageDraw, ImageFont
 
 from ax3l.activity.ExplorationProgress import exploration_progress
+from ax3l.activity.RewardProgress import reward_progress
 from ax3l.activity.ScorePercentiles import score_percentiles
 from ax3l.entities.ExperimentView import ExperimentView
 
@@ -20,14 +21,16 @@ MUTED = "#b8c8d8"
 def run_comparison_image(view: ExperimentView, reference_episodes: list[dict],
                          latest_episodes: list[dict]) -> str:
     exploration = view.name == "exploration"
-    window_size = 150 if exploration else 50
+    rewards = view.name == "reward-signals"
+    window_size = 50 if view.name == "architecture" else 150
     runs = [("Golden", GOLDEN, reference_episodes), ("Latest", LATEST, latest_episodes)]
     scores = [(color, score_percentiles(episodes, window_size)) for _, color, episodes in runs]
-    height = 1000 if exploration else 768
+    height = {"architecture": 768, "exploration": 1000, "reward-signals": 1254}[view.name]
     image = Image.new("RGB", (1056, height), "#101720")
     draw = ImageDraw.Draw(image)
     fonts = {size: ImageFont.load_default(size=size) for size in (16, 18, 24, 40)}
-    draw.text((118, 20), f"{view.name.title()} run comparison", font=fonts[40], fill=FOREGROUND)
+    title = "Reward signals comparison" if rewards else f"{view.name.title()} run comparison"
+    draw.text((118, 20), title, font=fonts[40], fill=FOREGROUND)
     draw.text((118, 74), f"Recorded results per {window_size}-epoch window (final window may be shorter)",
               font=fonts[16], fill=MUTED)
     for name, color, x in (("Golden", GOLDEN, 770), ("Latest", LATEST, 902)):
@@ -36,10 +39,7 @@ def run_comparison_image(view: ExperimentView, reference_episodes: list[dict],
 
     last_epoch = max((point["epoch"] for _, points in scores for point in points), default=1)
     maximum = max((point["p90"] for _, points in scores for point in points), default=0)
-    target = max(1, maximum) / 6
-    unit = 10 ** floor(log10(target))
-    step = max(value for value in (1, 2, 2.5, 5) if value <= target / unit) * unit
-    ceiling = max(6, ceil(maximum / step)) * step
+    ceiling, step = _axis(maximum)
 
     panels = []
     if exploration:
@@ -51,34 +51,68 @@ def run_comparison_image(view: ExperimentView, reference_episodes: list[dict],
             series.append((color, [(point["epoch"], point["epsilon_nice_rate"])
                                    for point in points if point["post_epsilon"]], True))
         panels.append(("Exploration", "", 1, .25, series))
-    for field, title in (("p90", "90th percentile"), ("p25", "25th percentile")):
-        series = [(color, [(point["epoch"], point[field]) for point in points], False)
-                  for color, points in scores]
-        panels.append((title, "Score", ceiling, step, series))
+    if rewards:
+        rates = [(color, reward_progress(episodes, window_size)) for _, color, episodes in runs]
+        rate_maximum = max((point[field] for _, points in rates for point in points
+                            for field in ("food", "wall", "snake") if point[field] is not None), default=0)
+        rate_ceiling, rate_step = _axis(rate_maximum)
+        for field, title in (("food", "Food collected"), ("wall", "Wall collisions"), ("snake", "Snake collisions")):
+            series = [(color, [(point["epoch"], point[field]) for point in points], False)
+                      for color, points in rates]
+            panels.append((title, "Per 100 moves", rate_ceiling, rate_step, series))
+        series = [(color, [(point["epoch"], point[field]) for point in points], field == "p25")
+                  for color, points in scores for field in ("p90", "p25")]
+        panels.append(("Score percentiles", "Score", ceiling, step, series))
+    else:
+        for field, title in (("p90", "90th percentile"), ("p25", "25th percentile")):
+            series = [(color, [(point["epoch"], point[field]) for point in points], False)
+                      for color, points in scores]
+            panels.append((title, "Score", ceiling, step, series))
 
     for index, (title, label, limit, spacing, series) in enumerate(panels):
-        top = 178 + index * 254 if exploration else 178 + index * 274
-        bottom = top + (170 if exploration else 200)
+        top = 178 + index * (254 if len(panels) > 2 else 274)
+        bottom = top + (170 if len(panels) > 2 else 200)
         draw.text((118, top - 36), title, font=fonts[24], fill=FOREGROUND)
         if exploration and index == 0:
-            draw.line((354, top - 22, 390, top - 22), fill=MUTED, width=3)
-            draw.text((400, top - 22), "Epsilon probability", anchor="lm", font=fonts[16], fill=MUTED)
-            _dashed_line(draw, (626, top - 22), (662, top - 22), MUTED)
-            draw.text((672, top - 22), "Moves overridden by EpsilonNice", anchor="lm", font=fonts[16], fill=MUTED)
+            _line_styles(draw, fonts, top, "Epsilon probability", "Moves overridden by EpsilonNice")
+        if rewards and index == 3:
+            _line_styles(draw, fonts, top, "90th percentile", "25th percentile")
         _panel(image, draw, fonts, top, bottom, last_epoch, limit, spacing, label,
                series, percent=exploration and index == 0, epoch_labels=index == len(panels) - 1)
         missing = [name for name, _, episodes in runs if not episodes]
         if missing:
             draw.text((561, (top + bottom) / 2), "No recorded episodes: " + ", ".join(missing),
                       anchor="mm", font=fonts[24], fill=FOREGROUND)
+        elif rewards and index < 3:
+            field = ("food", "wall", "snake")[index]
+            unavailable = [name for (name, _, _), (_, points) in zip(runs, rates)
+                           if any(point[field] is None for point in points)]
+            if unavailable:
+                draw.text((1004, bottom + 8), "Gaps: " + ", ".join(unavailable) + " rates unavailable",
+                          anchor="rt", font=fonts[16], fill=MUTED)
 
     draw.text((561, height - 72), "Training epoch", anchor="mm", font=fonts[18], fill=FOREGROUND)
-    note = ("Epsilon is sampled at checkpoints; overrides = total EpsilonNice moves / total moves in each window."
+    note = ("Each point summarizes the preceding 150 epochs; rates = total events / total moves x 100."
+            if rewards else "Epsilon is sampled at checkpoints; overrides = total EpsilonNice moves / total moves in each window."
             if exploration else "Score percentiles summarize each run independently on shared epoch and score axes.")
     draw.text((118, height - 36), note, font=fonts[16], fill=MUTED)
     output = BytesIO()
     image.save(output, format="PNG")
     return "data:image/png;base64," + b64encode(output.getvalue()).decode("ascii")
+
+
+def _axis(maximum: float) -> tuple[float, float]:
+    target = max(1, maximum) / 6
+    unit = 10 ** floor(log10(target))
+    step = max(value for value in (1, 2, 2.5, 5) if value <= target / unit) * unit
+    return max(6, ceil(maximum / step)) * step, step
+
+
+def _line_styles(draw, fonts, top, solid, dashed):
+    draw.line((354, top - 22, 390, top - 22), fill=MUTED, width=3)
+    draw.text((400, top - 22), solid, anchor="lm", font=fonts[16], fill=MUTED)
+    _dashed_line(draw, (626, top - 22), (662, top - 22), MUTED)
+    draw.text((672, top - 22), dashed, anchor="lm", font=fonts[16], fill=MUTED)
 
 
 def _panel(image, draw, fonts, top, bottom, last_epoch, ceiling, step, label, series, *, percent, epoch_labels):
@@ -98,8 +132,9 @@ def _panel(image, draw, fonts, top, bottom, last_epoch, ceiling, step, label, se
             draw.text((x, bottom + 22), f"{epoch:,}", anchor="mm", font=fonts[16], fill=MUTED)
     draw.line((left, top, left, bottom, right, bottom), fill="#62758a")
     if label:
-        axis = Image.new("RGBA", (100, 30))
-        ImageDraw.Draw(axis).text((50, 15), label, anchor="mm", font=fonts[18], fill=FOREGROUND)
+        label_width = ceil(draw.textlength(label, font=fonts[18])) + 8
+        axis = Image.new("RGBA", (label_width, 30))
+        ImageDraw.Draw(axis).text((label_width / 2, 15), label, anchor="mm", font=fonts[18], fill=FOREGROUND)
         axis = axis.rotate(90, expand=True)
         image.paste(axis, (42, (top + bottom - axis.height) // 2), axis)
     for color, points, dashed in series:

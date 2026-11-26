@@ -70,6 +70,12 @@ class SnakeLab:
         with self._data() as simulations:
             return simulations.get_exploration_episodes(run_id)
 
+    def get_reward_episodes(self, run_id: str) -> list[dict]:
+        """Read a run's food counts, moves, and terminal collision outcomes."""
+        UUID(run_id)
+        with self._data() as simulations:
+            return simulations.get_reward_episodes(run_id)
+
 
     def get_latest_completed_run_id(self) -> str | None:
         with self._data() as simulations:

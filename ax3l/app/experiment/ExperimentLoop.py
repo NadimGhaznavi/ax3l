@@ -133,9 +133,10 @@ class ExperimentLoop:
         previous = proposals[name]
         context = dict(previous_hypothesis=previous.hypothesis, previous_values=previous.values,
                        reference_run_id=state.reference_run_id, latest_run_id=state.latest_run_id)
-        if name in ("architecture", "exploration"):
-            episodes = (self._snake.get_exploration_episodes if name == "exploration"
-                        else self._snake.get_episode_scores)
+        if name in ("architecture", "exploration", "reward-signals"):
+            episodes = {"architecture": self._snake.get_episode_scores,
+                        "exploration": self._snake.get_exploration_episodes,
+                        "reward-signals": self._snake.get_reward_episodes}[name]
             reference = episodes(state.reference_run_id)
             latest = reference if state.latest_run_id == state.reference_run_id else episodes(state.latest_run_id)
             reference_score = self._completed_result(state.reference_run_id)["high_score"]

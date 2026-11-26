@@ -29,7 +29,7 @@ class ViewPrompts:
         prompt = self._templates.get_template(f"evaluations/{view.name}.md").render(
             **context, observations_max_length=DViewConversation.OBSERVATIONS_MAX_LENGTH,
         )
-        if view.name in ("architecture", "exploration"):
+        if view.name in ("architecture", "exploration", "reward-signals"):
             image = run_comparison_image(view, context["reference_episodes"], context["latest_episodes"])
         else:
             image = comparison_image(view, context["reference_run_id"], context["latest_run_id"])

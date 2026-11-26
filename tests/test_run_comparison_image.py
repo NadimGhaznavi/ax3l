@@ -8,6 +8,7 @@ import unittest
 from PIL import Image
 
 from ax3l.activity.ExplorationProgress import exploration_progress
+from ax3l.activity.RewardProgress import reward_progress
 from ax3l.activity.ScorePercentiles import score_percentiles
 from ax3l.entities.ExperimentView import VIEWS
 from ax3l.presentation.RunComparisonImage import run_comparison_image
@@ -50,6 +51,36 @@ class ExplorationProgressTests(unittest.TestCase):
             dict(epoch=150, epsilon=.4, epsilon_nice_rate=0, post_epsilon=False),
             dict(epoch=300, epsilon=0, epsilon_nice_rate=.2, post_epsilon=True),
             dict(epoch=321, epsilon=0, epsilon_nice_rate=.2, post_epsilon=True),
+        ])
+
+
+class RewardProgressTests(unittest.TestCase):
+    def test_weights_food_and_terminal_collisions_by_total_moves_in_epoch_order(self):
+        episodes = [dict(episode=3, score=3, steps=60, outcome='max_moves'),
+                    dict(episode=2, score=9, steps=90, outcome='snake'),
+                    dict(episode=1, score=1, steps=10, outcome='wall')]
+        original = deepcopy(episodes)
+        self.assertEqual(reward_progress(episodes, window_size=2), [
+            dict(epoch=2, food=10, wall=1, snake=1),
+            dict(epoch=3, food=5, wall=0, snake=0),
+        ])
+        self.assertEqual(episodes, original)
+        self.assertEqual(reward_progress([]), [])
+
+    def test_missing_outcomes_leave_collision_gaps_and_zero_moves_leave_all_rate_gaps(self):
+        self.assertEqual(reward_progress([
+            dict(episode=1, score=2, steps=20, outcome='wall'),
+            dict(episode=2, score=2, steps=20, outcome=None),
+            dict(episode=3, score=0, steps=0, outcome='snake'),
+        ], window_size=2), [
+            dict(epoch=2, food=10, wall=None, snake=None),
+            dict(epoch=3, food=None, wall=None, snake=None),
+        ])
+
+    def test_default_windows_cover_150_epochs_with_final_partial_window(self):
+        episodes = [dict(episode=i, score=1, steps=100, outcome='wall') for i in range(1, 322)]
+        self.assertEqual(reward_progress(episodes), [
+            dict(epoch=epoch, food=1, wall=1, snake=0) for epoch in (150, 300, 321)
         ])
 
 
@@ -106,3 +137,42 @@ class RunComparisonImageTests(unittest.TestCase):
                 with Image.open(BytesIO(b64decode(url.split(',')[1]))) as image:
                     image.load()
                     self.assertEqual(image.format, 'PNG')
+
+    def test_reward_comparison_has_three_shared_rate_panels_and_both_score_percentiles(self):
+        golden = [dict(episode=i, score=10, steps=100, outcome='wall') for i in range(1, 301)]
+        latest = [dict(episode=i, score=20, steps=100, outcome='snake') for i in range(1, 451)]
+        url = run_comparison_image(VIEWS['reward-signals'], golden, latest)
+        with Image.open(BytesIO(b64decode(url.split(',')[1]))) as image:
+            self.assertEqual(image.size, (1056, 1254))
+            # Food rates use the same ceiling of 20 as both collision panels.
+            self.assertEqual(image.getpixel((709, 263)), (255, 189, 112))
+            self.assertEqual(image.getpixel((1004, 178)), (77, 179, 255))
+            self.assertEqual(image.getpixel((709, 593)), (255, 189, 112))
+            self.assertEqual(image.getpixel((1004, 847)), (77, 179, 255))
+            # Golden's score lines end at epoch 300; Latest reaches 450.
+            self.assertEqual(image.getpixel((709, 1025)), (255, 189, 112))
+            self.assertNotEqual(image.getpixel((900, 1025)), (255, 189, 112))
+            self.assertEqual(image.getpixel((1004, 940)), (77, 179, 255))
+
+    def test_reward_score_percentiles_have_distinct_solid_and_dashed_lines(self):
+        episodes = [dict(episode=i, score=i % 10, steps=100, outcome='max_moves') for i in range(1, 601)]
+        url = run_comparison_image(VIEWS['reward-signals'], [], episodes)
+        with Image.open(BytesIO(b64decode(url.split(',')[1]))) as image:
+            # 90th percentile 8.1 and 25th percentile 2 use a shared score ceiling of 9.
+            solid_y = int(1110 - 170 * 8.1 / 9)
+            dashed_y = int(1110 - 170 * 2 / 9)
+            solid = [image.getpixel((x, solid_y)) for x in range(600, 900)]
+            dashed = [image.getpixel((x, dashed_y)) for x in range(600, 900)]
+            self.assertTrue(all(color == (77, 179, 255) for color in solid))
+            self.assertIn((77, 179, 255), dashed)
+            self.assertTrue(any(color != (77, 179, 255) for color in dashed))
+
+    def test_missing_reward_measurements_do_not_draw_false_zero_collision_rates(self):
+        for episodes in ([], [dict(episode=1, score=2, steps=20, outcome=None)],
+                         [dict(episode=1, score=0, steps=0, outcome='wall')]):
+            with self.subTest(episodes=episodes):
+                url = run_comparison_image(VIEWS['reward-signals'], [], episodes)
+                with Image.open(BytesIO(b64decode(url.split(',')[1]))) as image:
+                    for top, bottom in ((432, 602), (686, 856)):
+                        pixels = {color for _, color in image.crop((118, top, 1008, bottom + 4)).getcolors(200000)}
+                        self.assertNotIn((77, 179, 255), pixels)

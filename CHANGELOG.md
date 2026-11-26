@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.0.1] - 2026-11-26 @ 16:45
+
 ### Summary
 
 Run fresh initialization even when SnakeLab retains simulations from an earlier

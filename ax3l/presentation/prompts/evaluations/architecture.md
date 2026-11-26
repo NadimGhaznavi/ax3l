@@ -11,23 +11,23 @@
 
 ## Previous Simulation
 
-### Previous Hypothesis
+### Hypothesis
 
 {{ previous_hypothesis }}
 
-### Previous parameter choices
+### Parameter choices
 
 ```json
 {{ previous_values | tojson(indent=2) }}
 ```
 
-## Latest to Golden Comparison
+## Results Comparison
 
 - Golden reference: {{ reference_run_id }} (high score: {{ reference_high_score }})
 - Latest simulation: {{ latest_run_id }} (high score: {{ latest_high_score }})
 
 The attached image compares the recorded 90th and 25th score percentiles for
-Golden (orange) and Latest (blue), using consecutive 50-epoch windows. The final
+Golden (orange) and Latest (blue), using consecutive 150-epoch windows. The final
 window may be shorter. Both runs share epoch and score axes; curves end at each
 run's last recorded epoch.
 

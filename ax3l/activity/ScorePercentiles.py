@@ -3,7 +3,7 @@
 from math import ceil, floor
 
 
-def score_percentiles(episodes: list[dict], window_size: int = 50) -> list[dict]:
+def score_percentiles(episodes: list[dict], window_size: int = 150) -> list[dict]:
     """Use linear interpolation and retain the final partial window."""
     ordered = sorted(episodes, key=lambda row: row["episode"])
     result = []

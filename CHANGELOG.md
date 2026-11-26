@@ -26,7 +26,8 @@ transport, and presentation responsibilities, removing retired tuning machinery.
 Allow shared tuning parameters across views while preventing conflicting
 proposals within each configuration cycle.
 Show golden/latest training measurements in all four evaluation prompts, and keep
-configuration tuning prompts text-only.
+configuration tuning prompts text-only. Align evaluation headings and use
+150-epoch comparison windows across all four views.
 
 ### Added
 
@@ -41,7 +42,7 @@ configuration tuning prompts text-only.
   promotion, retain final partial windows, and leave gaps for missing outcomes or
   zero moves. Include both runs' high scores in the evaluation text.
 - Generate golden/latest score comparison PNGs for architecture evaluation. Plot
-  the 90th and 25th percentiles in 50-epoch windows, with shared axes and at least
+  the 90th and 25th percentiles in 150-epoch windows, with shared axes and at least
   five interior horizontal guides per score panel, and send the image to Qwen.
 - Add exploration evaluation PNGs with checkpoint epsilon probabilities, observed
   EpsilonNice move override rates, and 90th/25th score percentiles in 150-epoch
@@ -80,6 +81,9 @@ configuration tuning prompts text-only.
 
 ### Changed
 
+- Align Architecture evaluation headings with the other views and use the same
+  150-epoch comparison windows in its prompt and embedded PNG. Retain final
+  partial windows and shared axes for the Golden and Latest score percentiles.
 - Keep all configuration tuning prompts text-only; move architecture score
   imagery to result evaluation and add the latest run alongside the golden reference.
 - Share sequence length between Architecture and Training, and gamma between

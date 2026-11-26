@@ -141,15 +141,10 @@ class ViewCycleTests(unittest.TestCase):
             if tool_name(request) == 'submit_observations':
                 content = request['messages'][0]['content']
                 self.assertEqual([part['type'] for part in content], ['text', 'image_url'])
-                if '## Task: Architecture Evaluation' in prompt_text(request):
-                    self.assertIn('consecutive 50-epoch windows', prompt_text(request))
-                elif '## Task: Exploration Evaluation' in prompt_text(request):
-                    self.assertIn('150-epoch windows', prompt_text(request))
-                elif '## Task: Reward Signals Evaluation' in prompt_text(request):
-                    self.assertIn('150-epoch windows', prompt_text(request))
+                self.assertIn('150-epoch windows', prompt_text(request))
+                if '## Task: Reward Signals Evaluation' in prompt_text(request):
                     self.assertIn('collision events per 100 moves', prompt_text(request))
-                else:
-                    self.assertIn('150-epoch windows', prompt_text(request))
+                elif '## Task: Training Evaluation' in prompt_text(request):
                     self.assertIn('arithmetic mean', prompt_text(request))
                     self.assertIn('no recorded loss is left as a gap', prompt_text(request))
                 self.assertNotIn('placeholder', prompt_text(request))

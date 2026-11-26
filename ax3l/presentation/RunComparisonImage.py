@@ -24,7 +24,7 @@ def run_comparison_image(view: ExperimentView, reference_episodes: list[dict],
     exploration = view.name == "exploration"
     rewards = view.name == "reward-signals"
     training = view.name == "training"
-    window_size = 50 if view.name == "architecture" else 150
+    window_size = 150
     runs = [("Golden", GOLDEN, reference_episodes), ("Latest", LATEST, latest_episodes)]
     scores = [(color, score_percentiles(episodes, window_size)) for _, color, episodes in runs]
     height = {"architecture": 768, "exploration": 1000, "reward-signals": 1254, "training": 768}[view.name]

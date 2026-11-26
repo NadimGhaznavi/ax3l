@@ -26,9 +26,9 @@ class ScorePercentilesTests(unittest.TestCase):
             self.assertAlmostEqual(point['p25'], expected[1])
         self.assertEqual(episodes, original)
 
-    def test_default_windows_cover_50_epochs_with_a_final_partial_window(self):
-        points = score_percentiles([dict(episode=i, score=0) for i in range(1, 122)])
-        self.assertEqual(points, [dict(epoch=epoch, p90=0, p25=0) for epoch in (50, 100, 121)])
+    def test_default_windows_cover_150_epochs_with_a_final_partial_window(self):
+        points = score_percentiles([dict(episode=i, score=0) for i in range(1, 322)])
+        self.assertEqual(points, [dict(epoch=epoch, p90=0, p25=0) for epoch in (150, 300, 321)])
         self.assertEqual(score_percentiles([]), [])
 
 
@@ -119,18 +119,25 @@ class RunComparisonImageTests(unittest.TestCase):
                                   if image.getpixel((128, y)) == (53, 73, 94)]
                         self.assertGreaterEqual(len(guides), 5)
 
-    def test_both_runs_appear_in_each_score_panel_on_shared_axes_without_extending_shorter_run(self):
-        golden = [dict(episode=i, score=10) for i in range(1, 101)]
-        latest = [dict(episode=i, score=20) for i in range(1, 151)]
+    def test_architecture_uses_150_epoch_windows_and_shared_axes_without_extending_shorter_run(self):
+        golden = [dict(episode=i, score=10) for i in range(1, 215)]
+        latest = [dict(episode=i, score=20) for i in range(1, 322)]
         url = run_comparison_image(VIEWS['architecture'], golden, latest)
         with Image.open(BytesIO(b64decode(url.split(',')[1]))) as image:
             for top, bottom in ((178, 378), (452, 652)):
                 pixels = {color for _, color in image.crop((118, top, 1008, bottom + 4)).getcolors(200000)}
                 self.assertIn((77, 179, 255), pixels)
                 self.assertIn((255, 189, 112), pixels)
-                # The shared score ceiling is 20; golden ends at epoch 100, score 10.
+                # Both runs start at epoch 150, without checkpoints from smaller windows.
+                early_pixels = {color for _, color in image.crop((128, top, 520, bottom + 4)).getcolors(200000)}
+                self.assertNotIn((77, 179, 255), early_pixels)
+                self.assertNotIn((255, 189, 112), early_pixels)
+                self.assertEqual(image.getpixel((532, top)), (77, 179, 255))
+                self.assertEqual(image.getpixel((532, (top + bottom) // 2)), (255, 189, 112))
+                # The shared score ceiling is 20; golden ends at epoch 214, score 10.
                 self.assertEqual(image.getpixel((709, (top + bottom) // 2)), (255, 189, 112))
                 self.assertNotEqual(image.getpixel((900, (top + bottom) // 2)), (255, 189, 112))
+                # Latest retains its final partial window, ending at epoch 321.
                 self.assertEqual(image.getpixel((1004, top)), (77, 179, 255))
 
     def test_exploration_panel_shows_sampled_epsilon_and_dashed_observed_overrides(self):

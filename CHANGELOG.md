@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.0.3] - 2026-11-26 @ 17:30
+
+### Summary
+
+Calculate active conversation elapsed time using the database clock.
+
+### Fixed
+
+- Remove the UTC/local-time mismatch that added five hours to active Experiment
+  Status durations. Use MariaDB's current timestamp alongside its stored event
+  timestamps; completed conversations continue using their recorded end time.
+
 ## [5.0.2] - 2026-11-26 @ 17:10
 
 ### Summary

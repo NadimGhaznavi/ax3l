@@ -30,7 +30,8 @@ class ExperimentStatusDb:
             evaluation_id = rows[0]["process_id"] if rows else None
 
         events = self._db.query(f"""
-            SELECT e.event_id, e.occurred_at, e.name, e.category, e.log_level,
+            SELECT e.event_id, e.occurred_at, CURRENT_TIMESTAMP(6) AS observed_at,
+                   e.name, e.category, e.log_level,
                    e.process_id, e.parent_event_id, e.parameter,
                    CASE WHEN e.category = %s AND e.name = %s
                         THEN JSON_TYPE(JSON_EXTRACT(m.content, '$.content')) END AS prompt_type,

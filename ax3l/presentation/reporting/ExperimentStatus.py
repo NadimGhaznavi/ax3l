@@ -1,7 +1,6 @@
 """Present eight view conversations with their saved choices and request costs."""
 
 from collections import defaultdict
-from datetime import datetime, timezone
 import json
 
 from ax3l.activity.ViewConfiguration import view_values
@@ -104,7 +103,7 @@ def experiment_sections(data: dict) -> list[dict]:
                         and choice_values[path] != baseline_values[path],
             ) for path in view.parameters]
             start = by_name.get(Events.LLM.REQUEST_STARTED, prompt)
-            now = datetime.now(timezone.utc).replace(tzinfo=None)
+            now = start["observed_at"] if start else None
             sections.append(dict(
                 id=f"{stage}-{name}", title=f"{VIEW_LABELS[name]} {'Evaluation' if stage == 'evaluation' else 'Selection'}",
                 stage=stage, status=status, saved=bool(accepted), synthetic=synthetic,

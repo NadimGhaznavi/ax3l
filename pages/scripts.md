@@ -33,6 +33,25 @@ use local root socket authentication. Installation requires Python's venv/pip
 support and package-index access. Model binaries, weights, GPU drivers, and
 inference settings belong to LlamaSrv.
 
+PNG/GIF images are generated with Pillow; interactive Plotly charts render in
+the viewer's web browser. Installation does not download Chrome or require
+Kaleido.
+
+Runtime setup shows eight numbered stages. Virtual-environment creation and
+package installation print a working message with elapsed seconds every five
+seconds, followed by completion or failure. Package output and download progress
+remain visible. Existing virtual environments are reported as reused.
+
+If installation fails after creating the account, database, and credentials,
+correct the reported problem and resume runtime preparation and service setup:
+
+```sh
+sudo scripts/install-services.sh
+```
+
+The fresh-installation entry point refuses resources already created by that
+partial installation. Resuming service installation preserves those resources.
+
 ## Network configuration
 
 `DAx3l.CMDB_NETWORK` declares only listeners owned by Ax3l:

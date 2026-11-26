@@ -134,7 +134,6 @@ The responsibilities and ordering were checked against
 [service installation](../../scripts/install-services.sh),
 [service configuration](../../scripts/service-configuration.sh),
 [application configuration](../../ax3l/interface/Configuration.py),
-[runtime chart verification](../../scripts/install-chrome.py), and
 [service control](../../scripts/services.sh).
 
 ## Design realization

@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.0.2] - 2026-11-26 @ 17:10
+
+### Summary
+
+Remove obsolete browser provisioning so installation no longer depends on a
+Chrome download.
+Show installer stages and elapsed-time activity during runtime preparation.
+
+### Added
+
+- Show eight installer stages, including virtual-environment reuse or creation,
+  dependency installation, file copying, and service setup. Report activity every
+  five seconds during venv creation and package installation, preserving package
+  output, download progress, command failures, and interruption handling.
+
+### Removed
+
+- Remove the Chrome installer and Kaleido dependency. Current static images use
+  Pillow and interactive charts use Plotly HTML, so neither needs Chrome on the
+  server. Document resuming a partial installation with `install-services.sh`.
+
 ## [5.0.1] - 2026-11-26 @ 16:45
 
 ### Summary

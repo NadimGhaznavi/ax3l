@@ -2,7 +2,7 @@
 
 Only absolute host paths and EUID checks are redirected in the fixture script.
 Rendering, file copying, chmod, and systemd validation are real.
-Package/browser provisioning, ownership changes, and systemctl are simulated.
+Package provisioning, ownership changes, and systemctl are simulated.
 Set AX3L_TEST_INSTALL_DB=1 to also exercise a full install/uninstall/reinstall
 against a private MariaDB instance created inside the test directory.
 """
@@ -87,6 +87,7 @@ raise SystemExit(subprocess.call(['/usr/bin/install', *clean]))
 ''')
         self.executable(self.bin / 'python3', '''#!/bin/bash
 if [[ ${1:-} == -m && ${2:-} == venv ]]; then
+    if [[ ${TEST_FAIL:-} == venv ]]; then exit 40; fi
     mkdir -p "$3/bin"
     cp "$TEST_ROOT/venv-python" "$3/bin/python"
     exit 0
@@ -96,7 +97,6 @@ exec /usr/bin/python3 "$@"
         self.executable(self.root / 'venv-python', '''#!/bin/sh
 printf 'python %s\n' "$*" >> "$TEST_LOG"
 if [ "${TEST_FAIL:-}" = pip ] && [ "$2" = pip ]; then exit 41; fi
-if [ "${TEST_FAIL:-}" = chrome ] && [ "$1" != -m ]; then exit 42; fi
 ''')
         self.executable(self.bin / 'systemd-analyze', '''#!/bin/sh
 printf 'verify\n' >> "$TEST_LOG"
@@ -148,6 +148,9 @@ exec /usr/bin/systemd-analyze "$@"
                 self.log.write_text('')
                 result = self.run_installer()
                 self.assertEqual(result.returncode, 0, result.stderr)
+                for step in range(1, 9):
+                    self.assertIn(f'[{step}/8]', result.stdout)
+                self.assertIn('Reusing existing Python virtual environment', result.stdout)
                 self.assertEqual({path.name for path in self.units.iterdir()}, {
                     'ax3l-server.service', 'reporting-server.service',
                     'watchdog.service', 'llamasrv-llm.service',
@@ -195,8 +198,12 @@ exec /usr/bin/systemd-analyze "$@"
                     self.assertEqual(installed.read_bytes(), asset.read_bytes(), str(asset))
                     self.assertEqual(installed.stat().st_mode & 0o777, 0o644)
                 smoke = subprocess.run([sys.executable, '-c', '''
+import sys
+sys.modules['kaleido'] = None
+sys.modules['choreographer'] = None
 from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
+from ax3l.activity.ExperimentHighscores import highscores
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 from ax3l.interface.SyntheticExperimentConfiguration import SyntheticExperimentConfiguration
 from ax3l.entities.ExperimentView import VIEWS
@@ -205,6 +212,8 @@ from ax3l.server.Ax3lServer import main
 from ax3l.server.ReportingServer import make_server
 from ax3l.presentation.reporting.ReportRenderer import ReportRenderer
 ReportRenderer()
+assert 'Plotly.newPlot' in highscores([dict(simulations=1, score=0, seed=1,
+    run_id='initial-run', reason='Baseline', matched=False)], 1)['chart']
 assert SimulationConfiguration.defaults()['model']['hidden_size'] == 64
 assert set(SyntheticExperimentConfiguration.load()) == set(VIEWS)
 templates = Environment(loader=FileSystemLoader(Path('ax3l/presentation/reporting/templates')))
@@ -235,6 +244,7 @@ for view in VIEWS.values():
                 self.assertLess(calls.index('verify'), calls.index('systemctl stop'))
                 self.assertNotIn('llamasrv', calls)
                 self.assertNotIn('sleep', calls)
+                self.assertNotIn('install-chrome.py', calls)
                 self.assertIn('chgrp -R ax3l', calls)
                 starts = [line for line in calls.splitlines() if line.startswith('systemctl start')]
                 self.assertEqual(starts, ['systemctl start reporting-server.service',
@@ -258,6 +268,8 @@ for view in VIEWS.values():
         self.prepare()
         result = self.run_installer()
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('[2/8] Creating Python virtual environment', result.stdout)
+        self.assertIn('[3/8] Installing Python dependencies: complete', result.stdout)
         self.assertEqual((self.app / '.venv').stat().st_mode & 0o777, 0o755)
         for module in ('app/reporting/ReportBackground.py', 'interface/database/ReportingDb.py', 'app/ReportingRefresh.py'):
             self.assertTrue((self.app / 'ax3l' / module).is_file(), module)
@@ -320,11 +332,15 @@ exec /usr/bin/mv "$@"
 
     def test_provisioning_failures_do_not_stop_services(self):
         self.prepare()
-        for failure in ('pip', 'chrome', 'verify'):
+        for failure in ('venv', 'pip', 'verify'):
             with self.subTest(failure=failure):
                 self.log.write_text('')
                 result = self.run_installer(fail=failure)
                 self.assertNotEqual(result.returncode, 0)
+                if failure in ('venv', 'pip'):
+                    expected = 40 if failure == 'venv' else 41
+                    self.assertEqual(result.returncode, expected)
+                    self.assertIn(f'FAILED (exit {expected})', result.stdout)
                 self.assertNotIn('systemctl', self.log.read_text())
                 self.assertEqual(list(self.units.iterdir()), [])
 

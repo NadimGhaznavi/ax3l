@@ -12,13 +12,14 @@
 | --- | --- |
 | [install.sh](../../scripts/install.sh) | Fresh-installation entry point. |
 | [install-services.sh](../../scripts/install-services.sh) | Orchestrates runtime preparation, file installation, and service activation. |
+| [install-progress.py](../../scripts/install-progress.py) | Reports elapsed-time activity during virtual-environment creation and package installation while preserving command output and exit status. |
 | [application-files.sh](../../scripts/application-files.sh) | Owns application-file selection and copying through `install_application_files()`. |
-| [service-configuration.sh](../../scripts/service-configuration.sh), [services.sh](../../scripts/services.sh), [install-chrome.py](../../scripts/install-chrome.py) | Configuration and service rendering, lifecycle commands, and chart-browser provisioning. |
+| [service-configuration.sh](../../scripts/service-configuration.sh), [services.sh](../../scripts/services.sh) | Configuration and service rendering and lifecycle commands. |
 | [Configuration.py](../../ax3l/interface/Configuration.py), [Network.py](../../ax3l/interface/Network.py) | Configuration interfaces copied with the application modules. Defaults remain in [DAx3l.py](../../ax3l/constants/DAx3l.py) and [DDbMgr.py](../../ax3l/constants/DDbMgr.py). |
 | [systemd/](../../systemd/), [requirements.txt](../../requirements.txt) | Service templates and Python dependency requirements consumed during installation. |
 | [test_install_services.py](../../tests/test_install_services.py) | Deployment regression tests and private MariaDB checks. |
 
-Deployment commands, shell helpers, browser provisioning, requirements, and
+Deployment commands, shell helpers, requirements, and
 service templates are used from the checkout. The installed application contains
 the selected application files and prepared runtime. Tests and documentation
 remain in the repository.
@@ -56,7 +57,6 @@ In the diagram, `APP` is the fixed application root `/opt/prod/ax3l`.
 flowchart LR
     application["Checkout: selected application files"] -->|copy with relative paths| modules["APP/ax3l/"]
     requirements["Checkout: requirements.txt"] -->|pip install| runtime["APP/.venv/"]
-    browser["Checkout: install-chrome.py"] -->|provision browser| chrome["APP/.chrome/"]
     templates["Checkout: systemd templates"] -->|render and install| units["/etc/systemd/system/"]
 ```
 
@@ -64,6 +64,8 @@ Installation also creates `APP/conf/ax3l.json` and `APP/games/`. Database
 credentials are root-owned with mode `600` in `/etc/ax3l/database.env`; its
 directory has group `ax3l` and mode `750`. Application configuration and installed
 service definitions have mode `644`.
+PNG/GIF rendering uses Pillow; interactive charts are delivered as Plotly HTML.
+No server-side browser installation is required.
 Rendered service definitions are validated in a temporary directory that is
 removed when the service installer exits.
 
@@ -98,12 +100,12 @@ disabled, a private socket, and the disposable `ax3l_test` database/account.
 | Refuse existing installation resources | Directory, service-unit, Linux account/group, database, and database-account cases stop before provisioning. |
 | Reuse saved credentials | Fresh installation validates and reuses saved credentials without changing their contents or private permissions. |
 | Deliver a working package layout | Tests compare installed assets with the checkout and load configuration, prompts, report templates, and service entry points from the installed tree. |
-| Stop on preparation or installation failure | Dependency, browser, service-definition, and file-discovery failures prevent later service activation. |
+| Stop on preparation or installation failure | Dependency, service-definition, and file-discovery failures prevent later service activation. |
 | Respect service ordering and ownership boundaries | Unit rendering and start/stop calls are checked; independently managed service definitions remain untouched. |
 | Provision the application database | Private MariaDB checks verify creation and login, and refusal when the database or account already exists. |
 
 Configuration resolution, package replacement, file copying, permission modes,
-and systemd definition validation run for real. Dependency/browser provisioning,
+and systemd definition validation run for real. Dependency provisioning,
 privileged ownership changes, and service-manager actions are stubbed. These
 checks do not constitute a live deployment or an end-to-end simulation test.
 

@@ -89,8 +89,7 @@ transfer software between hosts, or install or manage SnakeLab or LlamaSrv.
 ## Behavior references
 
 - [Installation entry point](../../scripts/install.sh).
-- [Service installation](../../scripts/install-services.sh) and
-  [chart-browser provisioning](../../scripts/install-chrome.py).
+- [Service installation](../../scripts/install-services.sh).
 - [Service configuration](../../scripts/service-configuration.sh),
   [application configuration](../../ax3l/interface/Configuration.py), and
   [service control](../../scripts/services.sh).

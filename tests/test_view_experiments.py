@@ -143,16 +143,16 @@ class ViewCycleTests(unittest.TestCase):
                 self.assertEqual([part['type'] for part in content], ['text', 'image_url'])
                 if '## Task: Architecture Evaluation' in prompt_text(request):
                     self.assertIn('consecutive 50-epoch windows', prompt_text(request))
-                    self.assertNotIn('placeholder', prompt_text(request))
                 elif '## Task: Exploration Evaluation' in prompt_text(request):
                     self.assertIn('150-epoch windows', prompt_text(request))
-                    self.assertNotIn('placeholder', prompt_text(request))
                 elif '## Task: Reward Signals Evaluation' in prompt_text(request):
                     self.assertIn('150-epoch windows', prompt_text(request))
                     self.assertIn('collision events per 100 moves', prompt_text(request))
-                    self.assertNotIn('placeholder', prompt_text(request))
                 else:
-                    self.assertIn('placeholder with no measurements', prompt_text(request))
+                    self.assertIn('150-epoch windows', prompt_text(request))
+                    self.assertIn('arithmetic mean', prompt_text(request))
+                    self.assertIn('no recorded loss is left as a gap', prompt_text(request))
+                self.assertNotIn('placeholder', prompt_text(request))
                 self.assertIn('280 characters', prompt_text(request))
                 self.assertNotIn('Parameters to tune', prompt_text(request))
                 url = content[1]['image_url']['url']
@@ -172,12 +172,14 @@ class ViewCycleTests(unittest.TestCase):
         state = loop._next_cycle(self.store.load())
         with patch.object(self.snake, 'get_episode_scores') as scores, \
                 patch.object(self.snake, 'get_exploration_episodes') as exploration, \
-                patch.object(self.snake, 'get_reward_episodes') as rewards:
+                patch.object(self.snake, 'get_reward_episodes') as rewards, \
+                patch.object(self.snake, 'get_training_episodes') as training:
             for _ in VIEWS:
                 loop._choose_view(state)
         scores.assert_not_called()
         exploration.assert_not_called()
         rewards.assert_not_called()
+        training.assert_not_called()
         for request in self.model.requests:
             if tool_name(request) == 'submit_view':
                 content = request['messages'][0]['content']
@@ -192,21 +194,21 @@ class ViewCycleTests(unittest.TestCase):
             value = self.snake.results[run_id]['high_score']
             return [dict(episode=i, score=value, epsilon=max(0, 1 - i / 150),
                          steps=100, epsilon_nice_injections=value if i >= 150 else 0,
-                         outcome='wall' if i % 2 else 'snake')
+                         outcome='wall' if i % 2 else 'snake', loss=value / 100)
                     for i in range(1, 301)]
         with patch.object(self.snake, 'get_episode_scores', side_effect=scores) as score_reads, \
                 patch.object(self.snake, 'get_exploration_episodes', side_effect=scores) as exploration_reads, \
-                patch.object(self.snake, 'get_reward_episodes', side_effect=scores) as reward_reads:
+                patch.object(self.snake, 'get_reward_episodes', side_effect=scores) as reward_reads, \
+                patch.object(self.snake, 'get_training_episodes', side_effect=scores) as training_reads:
             self.loop().run(cycles=2)
         baseline, winner, loser = self.snake.results
         expected_reads = [baseline, baseline, winner, winner, loser]
         self.assertEqual([call.args[0] for call in score_reads.call_args_list], expected_reads)
         self.assertEqual([call.args[0] for call in exploration_reads.call_args_list], expected_reads)
         self.assertEqual([call.args[0] for call in reward_reads.call_args_list], expected_reads)
+        self.assertEqual([call.args[0] for call in training_reads.call_args_list], expected_reads)
         for offset, reference, latest in ((0, baseline, baseline), (8, baseline, winner), (16, winner, loser)):
             for name, request in zip(VIEWS, self.model.requests[offset:offset + 4]):
-                if name not in ('architecture', 'exploration', 'reward-signals'):
-                    continue
                 text = prompt_text(request)
                 self.assertIn(f'Golden reference: {reference} (high score: {self.snake.results[reference]["high_score"]})', text)
                 self.assertIn(f'Latest simulation: {latest} (high score: {self.snake.results[latest]["high_score"]})', text)
@@ -214,11 +216,9 @@ class ViewCycleTests(unittest.TestCase):
                 self.assertEqual(request['messages'][0]['content'][1]['image_url']['url'],
                                  run_comparison_image(VIEWS[name], scores(reference), scores(latest)))
         logged = [json.loads(event['content']) for event in self.log.events
-                  if event['name'] == 'prompt_sent' and event.get('parameter') in ('architecture', 'exploration', 'reward-signals')]
+                  if event['name'] == 'prompt_sent' and event.get('parameter') in VIEWS]
         evaluations = [request['messages'][0] for request in self.model.requests
-                       if tool_name(request) == 'submit_observations'
-                       and any(f'## Task: {name} Evaluation' in prompt_text(request)
-                               for name in ('Architecture', 'Exploration', 'Reward Signals'))]
+                       if tool_name(request) == 'submit_observations']
         self.assertEqual([message for message in logged if isinstance(message['content'], list)], evaluations)
 
     def test_restart_keeps_order_and_accepted_views(self):

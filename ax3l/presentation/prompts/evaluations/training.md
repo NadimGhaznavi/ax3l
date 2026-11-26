@@ -23,12 +23,25 @@
 
 ## Results Comparison
 
-- Golden reference: {{ reference_run_id }}
-- Latest simulation: {{ latest_run_id }}
+- Golden reference: {{ reference_run_id }} (high score: {{ reference_high_score }})
+- Latest simulation: {{ latest_run_id }} (high score: {{ latest_high_score }})
 
-The attached image is the place for this view's golden/latest comparison.
-It is currently a placeholder with no measurements. Record that limitation
-instead of inventing a result or drawing an unsupported conclusion.
+The attached image compares Golden (orange) and Latest (blue) in consecutive
+150-epoch windows. The final window may be shorter:
+
+- Score percentiles: solid lines show the 90th percentile; dashed lines show the
+  25th percentile. Both runs share the same score axis.
+- Training loss: each point is the arithmetic mean of the recorded episode
+  losses in that window. Missing loss values are excluded, and a window with
+  no recorded loss is left as a gap. A measured zero loss is included. Both
+  runs share a loss axis that scales to their recorded values.
+
+Judge the hypothesis using high scores, score progress, lower-tail performance,
+and loss trends together. Lower training loss alone does not establish better
+game performance. These are training results from individual runs, not independent
+validation. Curves stop at each run's final recorded epoch. If both run IDs match,
+this is a baseline self-comparison, not evidence of improvement. Treat missing
+measurements as unavailable rather than zero.
 
 ## Submit Observations
 

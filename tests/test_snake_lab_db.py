@@ -114,6 +114,23 @@ class SnakeLabDbTests(unittest.TestCase):
         factory.assert_called_once_with(database='snakelab', initialize_event_tables=False)
         self.assertFalse(db._connection.open)
 
+    def test_training_episodes_are_scoped_ordered_and_preserve_missing_and_zero_losses(self):
+        db = DbMgr(initialize_event_tables=False)
+        self.addCleanup(lambda: db.close() if db._connection.open else None)
+        db.execute('''CREATE TEMPORARY TABLE simulation_episodes (
+            run_id CHAR(36), episode INT, score INT, loss DOUBLE
+        )''')
+        run_id, other = str(uuid4()), str(uuid4())
+        for row in ((run_id, 3, 8, .4), (other, 1, 99, 99), (run_id, 1, 0, None), (run_id, 2, 4, 0)):
+            db.execute('INSERT INTO simulation_episodes VALUES (%s, %s, %s, %s)', row)
+        with patch('ax3l.interface.SnakeLab.DbMgr', return_value=db) as factory:
+            self.assertEqual(SnakeLab().get_training_episodes(run_id), [
+                dict(episode=1, score=0, loss=None), dict(episode=2, score=4, loss=0),
+                dict(episode=3, score=8, loss=.4),
+            ])
+        factory.assert_called_once_with(database='snakelab', initialize_event_tables=False)
+        self.assertFalse(db._connection.open)
+
     def test_high_score_across_runs_and_seeds_through_interface(self):
         def connect(**kwargs):
             self.assertEqual(kwargs.pop("database"), "snakelab")

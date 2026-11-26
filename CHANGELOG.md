@@ -25,11 +25,16 @@ Refactor the application around explicit experiment, reporting, persistence,
 transport, and presentation responsibilities, removing retired tuning machinery.
 Allow shared tuning parameters across views while preventing conflicting
 proposals within each configuration cycle.
-Show golden/latest training measurements in architecture, exploration, and reward
-signals evaluation prompts, and keep configuration tuning prompts text-only.
+Show golden/latest training measurements in all four evaluation prompts, and keep
+configuration tuning prompts text-only.
 
 ### Added
 
+- Add a golden/latest training evaluation PNG with combined 90th/25th score
+  percentiles and mean episode loss in 150-epoch windows. Retain final partial
+  windows, include measured zero losses, exclude missing losses from the mean,
+  and leave wholly unmeasured windows as gaps. Scale shared loss axes to both
+  runs' recorded values and include their high scores in the evaluation text.
 - Add a golden/latest reward-signals comparison PNG to the evaluation prompt.
   Show food pickups, wall collisions, and snake collisions per 100 moves plus both
   score percentiles in 150-epoch windows. Preserve the original reference after
@@ -66,8 +71,7 @@ signals evaluation prompts, and keep configuration tuning prompts text-only.
   an actor and a Mermaid overview. Capture provisioning, credential reuse,
   service startup, and the limits of installation verification. Keep the
   existing Pages content, navigation, and publishing configuration unchanged.
-- Add four evaluation prompts with a dedicated Observations submission. Training
-  retains a labeled comparison-image placeholder.
+- Add four evaluation prompts with a dedicated Observations submission.
 - Checkpoint each view's Observations and feed them into that view's next tuning
   prompt. Resume interrupted evaluation and tuning passes without repeating
   accepted submissions, including checkpoints from the preceding combined flow.
@@ -132,6 +136,8 @@ signals evaluation prompts, and keep configuration tuning prompts text-only.
 
 ### Removed
 
+- Remove the comparison-image placeholder renderer now that all four evaluations
+  use recorded golden/latest measurements.
 - Remove unused single/pair parameter searches, comparison queries, run-analysis
   plots, round-robin reporting projections, legacy checkpoint conversion, and
   their retired-path tests. Retain current workflow and integration coverage.

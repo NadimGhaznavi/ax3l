@@ -10,6 +10,7 @@ from PIL import Image
 from ax3l.activity.ExplorationProgress import exploration_progress
 from ax3l.activity.RewardProgress import reward_progress
 from ax3l.activity.ScorePercentiles import score_percentiles
+from ax3l.activity.TrainingProgress import training_progress
 from ax3l.entities.ExperimentView import VIEWS
 from ax3l.presentation.RunComparisonImage import run_comparison_image
 
@@ -81,6 +82,25 @@ class RewardProgressTests(unittest.TestCase):
         episodes = [dict(episode=i, score=1, steps=100, outcome='wall') for i in range(1, 322)]
         self.assertEqual(reward_progress(episodes), [
             dict(epoch=epoch, food=1, wall=1, snake=0) for epoch in (150, 300, 321)
+        ])
+
+
+class TrainingProgressTests(unittest.TestCase):
+    def test_averages_recorded_losses_in_epoch_order_including_zero_and_keeps_gaps(self):
+        episodes = [dict(episode=i, loss=loss) for i, loss in reversed(list(enumerate(
+            (None, 0, .6, None, None, None, 2.4), 1)))]
+        original = deepcopy(episodes)
+        self.assertEqual(training_progress(episodes, window_size=3), [
+            dict(epoch=3, loss=.3), dict(epoch=6, loss=None), dict(epoch=7, loss=2.4),
+        ])
+        self.assertEqual(episodes, original)
+        self.assertEqual(training_progress([]), [])
+
+    def test_default_150_epoch_windows_retain_final_partial_window(self):
+        episodes = [dict(episode=i, loss=.5 if i <= 150 else 0 if i <= 300 else 2)
+                    for i in range(1, 322)]
+        self.assertEqual(training_progress(episodes), [
+            dict(epoch=150, loss=.5), dict(epoch=300, loss=0), dict(epoch=321, loss=2),
         ])
 
 
@@ -176,3 +196,48 @@ class RunComparisonImageTests(unittest.TestCase):
                     for top, bottom in ((432, 602), (686, 856)):
                         pixels = {color for _, color in image.crop((118, top, 1008, bottom + 4)).getcolors(200000)}
                         self.assertNotIn((77, 179, 255), pixels)
+
+    def test_training_losses_share_an_axis_above_one_and_stop_at_each_runs_last_epoch(self):
+        golden = [dict(episode=i, score=i % 10, loss=4) for i in range(1, 301)]
+        latest = [dict(episode=i, score=i % 20, loss=2) for i in range(1, 451)]
+        url = run_comparison_image(VIEWS['training'], golden, latest)
+        with Image.open(BytesIO(b64decode(url.split(',')[1]))) as image:
+            self.assertEqual(image.size, (1056, 768))
+            # The shared loss ceiling is 4, with golden ending at epoch 300.
+            self.assertEqual(image.getpixel((709, 452)), (255, 189, 112))
+            self.assertNotEqual(image.getpixel((900, 452)), (255, 189, 112))
+            self.assertEqual(image.getpixel((1004, 552)), (77, 179, 255))
+            score_pixels = {color for _, color in image.crop((118, 178, 1008, 382)).getcolors(200000)}
+            self.assertIn((77, 179, 255), score_pixels)
+            self.assertIn((255, 189, 112), score_pixels)
+
+    def test_training_score_panel_distinguishes_solid_90th_and_dashed_25th_percentiles(self):
+        episodes = [dict(episode=i, score=i % 10, loss=.5) for i in range(1, 601)]
+        url = run_comparison_image(VIEWS['training'], [], episodes)
+        with Image.open(BytesIO(b64decode(url.split(',')[1]))) as image:
+            solid_y = int(378 - 200 * 8.1 / 9)
+            dashed_y = int(378 - 200 * 2 / 9)
+            solid = [image.getpixel((x, solid_y)) for x in range(600, 900)]
+            dashed = [image.getpixel((x, dashed_y)) for x in range(600, 900)]
+            self.assertTrue(all(color == (77, 179, 255) for color in solid))
+            self.assertIn((77, 179, 255), dashed)
+            self.assertTrue(any(color != (77, 179, 255) for color in dashed))
+
+    def test_training_loss_gaps_do_not_connect_windows_or_hide_a_measured_zero(self):
+        episodes = [dict(episode=i, score=1, loss=None if i <= 150 or 300 < i <= 450
+                         else 0 if i <= 300 else .4) for i in range(1, 601)]
+        url = run_comparison_image(VIEWS['training'], [], episodes)
+        with Image.open(BytesIO(b64decode(url.split(',')[1]))) as image:
+            self.assertEqual(image.getpixel((561, 652)), (77, 179, 255))
+            for left, right in ((335, 345), (700, 800)):
+                pixels = {color for _, color in image.crop((left, 452, right, 656)).getcolors(100000)}
+                self.assertNotIn((77, 179, 255), pixels)
+
+    def test_empty_training_and_unmeasured_losses_do_not_draw_false_zero_losses(self):
+        for episodes in ([], [dict(episode=1, score=1, loss=None)]):
+            with self.subTest(episodes=episodes):
+                url = run_comparison_image(VIEWS['training'], [], episodes)
+                with Image.open(BytesIO(b64decode(url.split(',')[1]))) as image:
+                    self.assertEqual(image.format, 'PNG')
+                    pixels = {color for _, color in image.crop((118, 452, 1008, 656)).getcolors(200000)}
+                    self.assertNotIn((77, 179, 255), pixels)

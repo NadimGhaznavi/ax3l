@@ -9,6 +9,7 @@ from PIL import Image, ImageDraw, ImageFont
 from ax3l.activity.ExplorationProgress import exploration_progress
 from ax3l.activity.RewardProgress import reward_progress
 from ax3l.activity.ScorePercentiles import score_percentiles
+from ax3l.activity.TrainingProgress import training_progress
 from ax3l.entities.ExperimentView import ExperimentView
 
 
@@ -22,14 +23,16 @@ def run_comparison_image(view: ExperimentView, reference_episodes: list[dict],
                          latest_episodes: list[dict]) -> str:
     exploration = view.name == "exploration"
     rewards = view.name == "reward-signals"
+    training = view.name == "training"
     window_size = 50 if view.name == "architecture" else 150
     runs = [("Golden", GOLDEN, reference_episodes), ("Latest", LATEST, latest_episodes)]
     scores = [(color, score_percentiles(episodes, window_size)) for _, color, episodes in runs]
-    height = {"architecture": 768, "exploration": 1000, "reward-signals": 1254}[view.name]
+    height = {"architecture": 768, "exploration": 1000, "reward-signals": 1254, "training": 768}[view.name]
     image = Image.new("RGB", (1056, height), "#101720")
     draw = ImageDraw.Draw(image)
     fonts = {size: ImageFont.load_default(size=size) for size in (16, 18, 24, 40)}
-    title = "Reward signals comparison" if rewards else f"{view.name.title()} run comparison"
+    title = ("Training performance comparison" if training else "Reward signals comparison"
+             if rewards else f"{view.name.title()} run comparison")
     draw.text((118, 20), title, font=fonts[40], fill=FOREGROUND)
     draw.text((118, 74), f"Recorded results per {window_size}-epoch window (final window may be shorter)",
               font=fonts[16], fill=MUTED)
@@ -60,9 +63,18 @@ def run_comparison_image(view: ExperimentView, reference_episodes: list[dict],
             series = [(color, [(point["epoch"], point[field]) for point in points], False)
                       for color, points in rates]
             panels.append((title, "Per 100 moves", rate_ceiling, rate_step, series))
+    if rewards or training:
         series = [(color, [(point["epoch"], point[field]) for point in points], field == "p25")
                   for color, points in scores for field in ("p90", "p25")]
         panels.append(("Score percentiles", "Score", ceiling, step, series))
+        if training:
+            losses = [(color, training_progress(episodes, window_size)) for _, color, episodes in runs]
+            loss_maximum = max((point["loss"] for _, points in losses for point in points
+                                if point["loss"] is not None), default=0)
+            loss_ceiling, loss_step = _axis(loss_maximum)
+            series = [(color, [(point["epoch"], point["loss"]) for point in points], False)
+                      for color, points in losses]
+            panels.append(("Training loss", "Mean loss", loss_ceiling, loss_step, series))
     else:
         for field, title in (("p90", "90th percentile"), ("p25", "25th percentile")):
             series = [(color, [(point["epoch"], point[field]) for point in points], False)
@@ -75,7 +87,7 @@ def run_comparison_image(view: ExperimentView, reference_episodes: list[dict],
         draw.text((118, top - 36), title, font=fonts[24], fill=FOREGROUND)
         if exploration and index == 0:
             _line_styles(draw, fonts, top, "Epsilon probability", "Moves overridden by EpsilonNice")
-        if rewards and index == 3:
+        if (rewards and index == 3) or (training and index == 0):
             _line_styles(draw, fonts, top, "90th percentile", "25th percentile")
         _panel(image, draw, fonts, top, bottom, last_epoch, limit, spacing, label,
                series, percent=exploration and index == 0, epoch_labels=index == len(panels) - 1)
@@ -90,9 +102,16 @@ def run_comparison_image(view: ExperimentView, reference_episodes: list[dict],
             if unavailable:
                 draw.text((1004, bottom + 8), "Gaps: " + ", ".join(unavailable) + " rates unavailable",
                           anchor="rt", font=fonts[16], fill=MUTED)
+        elif training and index == 1:
+            unavailable = [name for (name, _, _), (_, points) in zip(runs, losses)
+                           if any(point["loss"] is None for point in points)]
+            if unavailable:
+                draw.text((1004, top - 22), "Gaps: " + ", ".join(unavailable) + " loss unavailable",
+                          anchor="rm", font=fonts[16], fill=MUTED)
 
     draw.text((561, height - 72), "Training epoch", anchor="mm", font=fonts[18], fill=FOREGROUND)
-    note = ("Each point summarizes the preceding 150 epochs; rates = total events / total moves x 100."
+    note = ("Each point summarizes the preceding 150 epochs; mean loss excludes missing values."
+            if training else "Each point summarizes the preceding 150 epochs; rates = total events / total moves x 100."
             if rewards else "Epsilon is sampled at checkpoints; overrides = total EpsilonNice moves / total moves in each window."
             if exploration else "Score percentiles summarize each run independently on shared epoch and score axes.")
     draw.text((118, height - 36), note, font=fonts[16], fill=MUTED)

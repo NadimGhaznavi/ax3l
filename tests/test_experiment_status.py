@@ -26,6 +26,7 @@ def conversation(process, name, stage, start=10, accepted=True, error=None, ende
     rows = []
     def event(category, name, content, **fields):
         row = dict(event_id=start + len(rows), occurred_at=now + timedelta(seconds=len(rows)),
+                   observed_at=now + timedelta(seconds=5),
                    name=name, category=category, log_level='INFO', process_id=process,
                    parent_event_id=start - 1, parameter=parameter, content=content,
                    prompt_type=None)
@@ -124,6 +125,29 @@ class ExperimentStatusTests(unittest.TestCase):
         data['state'].phase = 'evaluating'
         data['evaluation_id'] = data['state'].experiment_id
         self.assertEqual(experiment_sections(data)[0]['hypothesis'], 'New hypothesis, not evaluated yet.')
+
+    def test_active_elapsed_uses_database_clock_without_adding_the_utc_offset(self):
+        data = status_data()
+        data['events'] = conversation('evaluation-cycle', 'reward-signals', 'evaluation',
+                                      accepted=False, ended=False)
+        started = datetime(2026, 11, 26, 12, 0, 0)
+        observed = started + timedelta(minutes=4, seconds=6)
+        for event in data['events']:
+            event['occurred_at'] = started
+            event['observed_at'] = observed
+        section = experiment_sections(data)[0]
+        self.assertEqual(section['status'], 'In progress')
+        self.assertEqual(section['elapsed'], '04:06')
+        html = render_status(data)
+        self.assertIn('04:06', html)
+        self.assertNotIn('05:04:06', html)
+
+    def test_completed_elapsed_uses_the_recorded_end_time(self):
+        data = status_data()
+        data['events'] = conversation('evaluation-cycle', 'reward-signals', 'evaluation')
+        for event in data['events']:
+            event['observed_at'] += timedelta(hours=5)
+        self.assertEqual(experiment_sections(data)[0]['elapsed'], '00:03')
 
     def test_shared_values_identify_the_view_that_saved_them(self):
         data = status_data()
@@ -244,3 +268,24 @@ class ExperimentStatusDatabaseTests(unittest.TestCase):
         data = ExperimentStatusDb(self.db).read()
         data.update(reference_config=config, latest_config=state.config)
         self.assertTrue(all(s['status'] == 'Waiting' for s in experiment_sections(data)[:4]))
+
+    def test_active_elapsed_uses_mariadb_time_in_a_non_utc_session(self):
+        self.db.execute("SET time_zone = '-05:00'")
+        frozen = int(datetime(2026, 11, 26, 17, 4, 6, tzinfo=timezone.utc).timestamp())
+        self.db.execute('SET timestamp = %s', (frozen,))
+        process = self.ids[0]
+        config = SimulationConfiguration.defaults()
+        ExperimentDb(self.db).save(ExperimentState(process, 'evaluating', config))
+        parent = self.log.log('conversation_started', 'Conversation', 'INFO', 'Evaluating.', process_id=process)
+        self.log.log('prompt_sent', 'Conversation', 'INFO', json.dumps(dict(role='user', content=[
+            dict(type='text', text='Evaluate results.')])), process_id=process,
+            parent_event_id=parent, parameter='reward-signals', source_name='reward-signals')
+        request = self.log.log('llm_request_started', 'LLM', 'INFO', 'Evaluating.', process_id=process,
+                               parent_event_id=parent, parameter='reward-signals', source_name='reward-signals')
+        self.db.execute('''UPDATE events SET occurred_at = CURRENT_TIMESTAMP(6) - INTERVAL 246 SECOND
+                           WHERE event_id = %s''', (request,))
+        data = ExperimentStatusDb(self.db).read()
+        data.update(reference_config=config, latest_config=config)
+        section = experiment_sections(data)[0]
+        self.assertEqual(section['status'], 'In progress')
+        self.assertEqual(section['elapsed'], '04:06')

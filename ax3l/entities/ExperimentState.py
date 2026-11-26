@@ -21,3 +21,5 @@ class ExperimentState:
     observations: dict[str, str] = field(default_factory=dict)
     run_id: str | None = None
     preceding_match: str | None = None
+    new_seed: bool = False
+    seed_baseline: bool = False

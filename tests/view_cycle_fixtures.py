@@ -9,6 +9,7 @@ from uuid import uuid4
 import zmq
 
 from ax3l.entities.ExperimentView import VIEWS
+from ax3l.constants.DViewConversation import DViewConversation
 from ax3l.interface.LLM import LLM
 
 
@@ -154,6 +155,7 @@ class LocalLLM:
                    'exploration': {'epsilon.initial': .9}}[view.name]
         changed.update({name: value for name, value in {
             'training.sequence_length': 8, 'training.gamma': .95,
+            DViewConversation.NEW_SEED: False,
         }.items() if name in properties})
         arguments = dict(hypothesis=f'Hypothesis for {view.name}.',
                          values=changed)
@@ -165,6 +167,17 @@ class LocalLLM:
         self.server.shutdown()
         self.thread.join()
         self.server.server_close()
+
+
+def new_seed_proposal(request):
+    response = LocalLLM.proposal(request)
+    if request['tools'][0]['function']['name'] == 'submit_view':
+        function = response['choices'][0]['message']['tool_calls'][0]['function']
+        arguments = json.loads(function['arguments'])
+        if DViewConversation.NEW_SEED in arguments['values']:
+            arguments['values'][DViewConversation.NEW_SEED] = True
+            function['arguments'] = json.dumps(arguments)
+    return response
 
 
 class LocalSnakeControl:

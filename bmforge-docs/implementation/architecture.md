@@ -41,6 +41,13 @@ flowchart TD
 - Each experiment evaluates four views before assembling four proposals.
   Checkpoints retain accepted work. An uncertain simulation submission is
   reconciled against stored runs and is never automatically resubmitted.
+- Every view can request `new seed`; false remains editable, while true becomes
+  read-only for subsequent views. After all proposals,
+  [ExperimentLoop](../../ax3l/app/experiment/ExperimentLoop.py) increments the seed
+  and runs the golden settings followed by the candidate on that same seed.
+  The first run establishes the new golden baseline, including lower scores.
+  [ExperimentState](../../ax3l/entities/ExperimentState.py) checkpoints the request
+  and active run kind. Both runs retain submission and promotion recovery.
 - Event envelopes, messages, and optional high-score records commit together
   through [EventLogDb](../../ax3l/interface/database/EventLogDb.py).
   [DbMgr](../../ax3l/interface/database/DbMgr.py) alone owns connections, cursors,

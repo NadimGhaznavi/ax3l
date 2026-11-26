@@ -18,7 +18,7 @@ from ax3l.entities.ExperimentState import ExperimentState
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 from ax3l.interface.SnakeLab import SnakeLab
 from ax3l.server.Ax3lServer import main
-from view_cycle_fixtures import LocalLLM, LocalSnakeControl, episodes
+from view_cycle_fixtures import LocalLLM, LocalSnakeControl, episodes, new_seed_proposal
 
 
 @unittest.skipUnless(os.environ.get('AX3L_TEST_DB') == '1', 'requires disposable MariaDB test database')
@@ -201,3 +201,83 @@ class ViewCycleIntegrationTests(unittest.TestCase):
                 store.save(state)
         self.assertEqual(store.load(), previous)
         self.assertEqual(self.count_events('view_experiment_state_saved'), 1)
+
+    def test_seed_request_runs_golden_then_candidate_on_the_incremented_seed(self):
+        self.model.respond = new_seed_proposal
+        self.scores = iter((10, 4, 8))
+        self.assertEqual(self.service(), 0)
+        rows = self.db.query('''SELECT r.run_id, r.high_score, c.seed, c.training_learning_rate
+            FROM simulation_runs r JOIN configurations c USING (run_id) ORDER BY r.id''')
+        self.assertEqual([row['seed'] for row in rows], [1970, 1971, 1971])
+        self.assertEqual([row['training_learning_rate'] for row in rows], [.001, .001, .002])
+        state = ExperimentDb(self.db).load()
+        self.assertTrue(state.new_seed)
+        self.assertFalse(state.seed_baseline)
+        self.assertEqual(state.reference_run_id, rows[1]['run_id'])
+        self.assertEqual(state.golden_run_id, rows[2]['run_id'])
+        comparison = ExperimentDb(self.db).comparison(rows[2]['run_id'])
+        self.assertEqual(comparison['golden_run_id'], rows[1]['run_id'])
+        self.assertEqual(self.count_events('golden_config_created'), 3)
+        self.assertEqual(self.count_events('configuration_compared'), 1)
+        self.assertEqual(len(self.model.requests), 12)
+
+    def test_seed_request_stays_read_only_after_restart_during_view_selection(self):
+        self.model.respond = new_seed_proposal
+        save = ExperimentDb.save
+        def stop(store, state):
+            save(store, state)
+            if state.phase == 'choosing' and len(state.proposals) == 1:
+                raise KeyboardInterrupt()
+        with patch.object(ExperimentDb, 'save', stop):
+            self.assertEqual(self.service(), 130)
+        self.assertTrue(ExperimentDb(self.db).load().new_seed)
+        self.assertEqual(self.service(), 0)
+        for request in self.model.requests[5:8]:
+            properties = request['tools'][0]['function']['parameters']['properties']['values']['properties']
+            self.assertNotIn('new seed', properties)
+            self.assertIn('"new seed": true', request['messages'][0]['content'])
+        self.assertEqual(self.count_events('simulation_submitted'), 3)
+
+    def test_restart_after_seed_baseline_promotion_does_not_run_it_again(self):
+        self.model.respond = new_seed_proposal
+        self.scores = iter((10, 4, 8))
+        save = ExperimentDb.save
+        def stop(store, state):
+            if state.new_seed and not state.seed_baseline and state.phase == 'ready':
+                raise KeyboardInterrupt()
+            save(store, state)
+        with patch.object(ExperimentDb, 'save', stop):
+            self.assertEqual(self.service(), 130)
+        state = ExperimentDb(self.db).load()
+        self.assertEqual(state.phase, 'comparing')
+        self.assertTrue(state.seed_baseline)
+        self.assertEqual(self.count_events('golden_config_created'), 2)
+        self.assertEqual(self.service(), 0)
+        self.assertEqual(self.count_events('golden_config_created'), 3)
+        self.assertEqual(self.count_events('simulation_submitted'), 3)
+        self.assertEqual(len(self.model.requests), 12)
+
+    def check_lost_seed_run_reply(self, submission_number):
+        self.model.respond = new_seed_proposal
+        submit = SnakeLab.submit_simulation
+        def lost_reply(snake, config):
+            run_id = submit(snake, config)
+            if self.db.query('SELECT COUNT(*) AS n FROM simulation_runs')[0]['n'] == submission_number:
+                raise TimeoutError('Lost acknowledgement')
+            return run_id
+        with patch.object(SnakeLab, 'submit_simulation', lost_reply):
+            with self.assertRaises(TimeoutError):
+                self.service()
+        state = ExperimentDb(self.db).load()
+        self.assertEqual(state.phase, 'submitting')
+        self.assertEqual(state.seed_baseline, submission_number == 2)
+        self.assertEqual(self.service(), 0)
+        self.assertEqual(self.db.query('SELECT COUNT(*) AS n FROM simulation_runs')[0]['n'], 3)
+        self.assertEqual(self.count_events('simulation_submitted'), 3)
+        self.assertEqual(len(self.model.requests), 12)
+
+    def test_lost_seed_baseline_reply_is_reconciled_without_resubmission(self):
+        self.check_lost_seed_run_reply(2)
+
+    def test_lost_seed_candidate_reply_is_reconciled_without_resubmission(self):
+        self.check_lost_seed_run_reply(3)

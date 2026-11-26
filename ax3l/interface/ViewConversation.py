@@ -6,7 +6,7 @@ from typing import TypeVar
 
 from jsonschema import Draft202012Validator
 
-from ax3l.activity.ViewConfiguration import apply_values
+from ax3l.activity.ViewConfiguration import apply_values, parameter_schema
 from ax3l.interface.database.EventLogDb import EventLogDb
 from ax3l.constants.DEventCategory import DEventCategory as Events
 from ax3l.constants.DViewConversation import DViewConversation
@@ -35,7 +35,7 @@ class ViewConversation:
             "hypothesis": dict(type="string", minLength=1, pattern=r"\S",
                                maxLength=DViewConversation.HYPOTHESIS_MAX_LENGTH),
             "values": dict(type="object", minProperties=1, additionalProperties=False, properties={
-                name: SimulationConfiguration.field(tuple(name.split("."))) for name in view.parameters
+                name: parameter_schema(name) for name in view.parameters
             }),
         })
 

@@ -28,9 +28,19 @@ proposals within each configuration cycle.
 Show golden/latest training measurements in all four evaluation prompts, and keep
 configuration tuning prompts text-only. Align evaluation headings and use
 150-epoch comparison windows across all four views.
+Restore seed rotation as a shared request, running the golden and proposed
+settings on the same incremented seed before comparing their results.
 
 ### Added
 
+- Add an optional `new seed` boolean to every tuning view. Start false each
+  cycle, keep it editable while false, and move it into read-only parameters
+  after any view requests true. Preserve the choice across restarts.
+- On a new seed request, increment the numeric seed and run two full SnakeLab
+  simulations: current golden settings first, then Qwen's proposed settings.
+  Establish the first result as the new baseline even if lower, and compare the
+  candidate against it. Recover either run and committed promotions without
+  duplicate submissions or repeated conversations.
 - Add a golden/latest training evaluation PNG with combined 90th/25th score
   percentiles and mean episode loss in 150-epoch windows. Retain final partial
   windows, include measured zero losses, exclude missing losses from the mean,
@@ -140,6 +150,8 @@ configuration tuning prompts text-only. Align evaluation headings and use
 
 ### Removed
 
+- Remove direct numeric seed tuning from Training and the unused legacy
+  `SimulationConfiguration.next_seed` helper. Ax3l owns seed increments.
 - Remove the comparison-image placeholder renderer now that all four evaluations
   use recorded golden/latest measurements.
 - Remove unused single/pair parameter searches, comparison queries, run-analysis

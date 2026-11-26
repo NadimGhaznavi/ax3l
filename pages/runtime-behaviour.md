@@ -4,10 +4,12 @@ author_profile: true
 layout: single
 ---
 
-Ax3l evaluates each completed simulation in four focused conversations, then
+Ax3l evaluates experiment results in four focused conversations, then
 runs another four conversations to assemble the next SnakeLab configuration.
-It submits that configuration once, waits for the simulation, compares its high
+It submits that configuration, waits for the simulation, compares its high
 score with the golden reference, and evaluates the results again.
+When a new seed is requested, it first runs the golden settings on that seed to
+establish the comparison baseline.
 
 ## Four views
 
@@ -19,8 +21,10 @@ the views; that order is saved and retained across restarts.
 | --- | --- |
 | Reward Signals | Food, wall, snake, empty-space, closer-to-food, and farther-from-food rewards, and gamma |
 | Architecture | Hidden size, encoder layers, dropout, and sequence length |
-| Training | Learning rate, batch size, sequence length, gamma, and random seed |
+| Training | Learning rate, batch size, sequence length, and gamma |
 | Exploration | Epsilon initial/decay and EpsilonNice probability/steps |
+
+All four views can request `new seed`. The numeric random seed is read-only.
 
 ### Result evaluation
 
@@ -52,6 +56,12 @@ later views and is excluded from their submission tools. If the earlier view
 omits it, the next eligible view can still tune it. These restrictions survive
 restarts and reset at the start of each configuration cycle.
 
+The shared `new seed` choice starts as `false` each cycle. A view can omit it,
+leave it `false`, or submit `"new seed": true` in its parameter values. False
+does not prevent a later view from requesting a new seed. Once true, the choice
+moves into read-only parameters for every remaining view and cannot be changed,
+including after restart.
+
 Qwen returns a new hypothesis and parameter values through the required native
 `submit_view` function. The hypothesis must contain nonblank text and have at
 most 280 characters, including its expected observable effect. It may change several
@@ -62,7 +72,8 @@ errors; there are no repair prompts or automatic inference retries.
 
 The shuffle, draft assembly, and submission sequence are internal to Ax3l. The
 model receives one view at a time, with a fresh context for every conversation.
-After all four accepted proposals, Ax3l submits the complete configuration.
+After all four accepted proposals, Ax3l submits the complete configuration,
+running the new-seed baseline first when requested.
 
 ## Baseline and results
 
@@ -77,8 +88,20 @@ origin is recorded in the experiment checkpoint through `previous_seeded`;
 Qwen receives the same prompt shape as on later cycles.
 
 Every later cycle starts from the current golden configuration. A strictly higher
-high score becomes golden; ties and losses retain the previous golden. Random
-seed remains a normal Training parameter in this initial implementation.
+high score becomes golden; ties and losses retain the comparison baseline.
+
+If `new seed` is true, Ax3l increments the golden configuration's seed by one
+after assembling all proposals. It performs two full SnakeLab simulations in order:
+
+1. Run the current golden settings with only the seed changed. This result becomes
+   the new golden baseline even if its high score is lower than the previous seed's.
+2. Run Qwen's proposed settings with that same new seed. Promote this configuration
+   only if it beats the new baseline; retain the new baseline on a tie or loss.
+
+Both simulations run even when Qwen changes no other settings. No evaluation or
+tuning conversations take place between them. `new seed` controls the experiment
+and is never sent as a SnakeLab configuration field. Without a new seed request,
+the cycle runs just the proposed configuration on the current seed.
 
 The next conversations compare the preceding trial against the golden reference
 used for that trial. That reference is retained even when the trial is promoted,
@@ -103,6 +126,9 @@ already existed before submission. An unresolved submission raises an error and
 is never automatically resent. Failed or cancelled simulations stop the loop;
 the saved run must be resolved before the cycle can continue. Interrupted
 comparison and promotion work is reconciled before beginning another cycle.
+The golden baseline and candidate runs use the same submission recovery rules.
+Checkpoints retain which of the two is in progress, so a restart does not repeat
+the baseline or increment the seed again.
 
 ## Running
 
@@ -119,7 +145,7 @@ The default is continuous operation. For one complete four-view experiment:
 ```
 
 Baseline creation and its evaluations do not count toward `--cycles`. A cycle
-finishes after its simulation and all four result evaluations complete.
+finishes after its simulation or pair of simulations and all four result evaluations complete.
 `--llm-url http://HOST:PORT`
 overrides the configured LlamaSrv URL. `--zmq-endpoint` and `AX3L_ZMQ_ENDPOINT`
 select the Ax3l listener. The LlamaSrv model must support native function calling;

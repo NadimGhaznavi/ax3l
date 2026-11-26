@@ -1,4 +1,4 @@
-"""One view's next hypothesis and proposed parameter values."""
+"""One view's hypothesis, parameter values, and optional seed request."""
 
 from dataclasses import dataclass
 
@@ -6,4 +6,4 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class ViewProposal:
     hypothesis: str
-    values: dict[str, int | float]
+    values: dict[str, int | float | bool]

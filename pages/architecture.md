@@ -41,6 +41,12 @@ use native function calls through the shared LLM HTTP interface. View sequencing
 and draft assembly are internal to Ax3l; no MCP process or external registration
 is required.
 
+Each view can request `new seed`. It starts false and becomes read-only once
+requested. After assembling the proposals, Ax3l increments the numeric seed and
+runs the golden settings first, then the proposed configuration, on that same
+seed. The golden run establishes a fresh baseline even if lower than before;
+the candidate must beat that baseline. Both runs are checkpointed for restart.
+
 `ExperimentState` and `ViewProposal` hold data. The view configuration activity
 prepares settings context without external access. `ViewPrompts` owns the tuning
 and evaluation presentation resources, and `ComparisonImage` supplies the image

@@ -16,6 +16,7 @@ from ax3l.interface.database.ExperimentDb import ExperimentDb
 from ax3l.constants.DAx3l import DAx3l
 from ax3l.constants.DEventCategory import DEventCategory as Events
 from ax3l.constants.DSnakeLab import DSnakeLab
+from ax3l.constants.DViewConversation import DViewConversation
 from ax3l.entities.ExperimentState import ExperimentState
 from ax3l.entities.ExperimentView import VIEWS
 from ax3l.entities.ViewProposal import ViewProposal
@@ -50,15 +51,16 @@ class ExperimentLoop:
             elif state.phase == "choosing":
                 self._choose_view(state)
             elif state.phase == "ready":
-                SimulationConfiguration.validate(state.config)
-                state.preceding_match = self._snake.find_config_run(state.config)
+                config = self._simulation_config(state)
+                SimulationConfiguration.validate(config)
+                state.preceding_match = self._snake.find_config_run(config)
                 state.phase = "submitting"
                 self._store.save(state)
-                state.run_id = self._snake.submit_simulation(state.config)
+                state.run_id = self._snake.submit_simulation(config)
                 state.phase = "running"
                 self._store.save(state)
             elif state.phase == "submitting":
-                match = self._snake.find_config_run(state.config)
+                match = self._snake.find_config_run(self._simulation_config(state))
                 if match is None or match == state.preceding_match:
                     raise RuntimeError("Simulation submission is unresolved; it will not be retried automatically.")
                 state.run_id, state.phase = match, "running"
@@ -154,33 +156,50 @@ class ExperimentLoop:
         name = state.order[len(state.proposals)]
         view = VIEWS[name]
         previous = state.previous[name]
-        proposed = {path for proposal in state.proposals.values() for path in proposal.values}
+        proposed = {path for proposal in state.proposals.values() for path in proposal.values
+                    if path != DViewConversation.NEW_SEED or state.new_seed}
         view = replace(view, parameters=tuple(path for path in view.parameters if path not in proposed))
         context = dict(
             previous_hypothesis=previous.hypothesis,
             previous_values=previous.values,
             previous_observations=state.observations[name],
             parameters=editable_parameters(view, state.config),
-            other_parameters=other_parameters(view, state.config, proposed),
+            other_parameters=other_parameters(view, state.config, proposed, new_seed=state.new_seed),
         )
         prompt = self._prompts.render(view, context)
         proposal = self._conversation.propose(view, prompt, state.config, state.experiment_id)
         state.config = apply_values(state.config, proposal.values)
+        state.new_seed = state.new_seed or proposal.values.get(DViewConversation.NEW_SEED, False)
         state.proposals[name] = proposal
         if len(state.proposals) == len(state.order):
+            if state.new_seed:
+                state.config["seed"] = SimulationConfiguration.value(("seed",), state.config["seed"] + 1)
+                state.seed_baseline = True
             state.phase = "ready"
         self._store.save(state)
+
+    def _simulation_config(self, state: ExperimentState) -> dict:
+        if state.seed_baseline:
+            config = deepcopy(self._completed_result(state.golden_run_id)["config"])
+            config["seed"] = state.config["seed"]
+            return config
+        return state.config
 
     def _record_submission(self, state: ExperimentState) -> None:
         recorded = self._store.run_events(state.run_id)
         parent = recorded.get(Events.Configuration.PROPOSAL_ACCEPTED)
-        if not state.baseline and parent is None:
+        if not state.baseline and not state.seed_baseline and parent is None:
             parent = self._events.log(Events.Configuration.PROPOSAL_ACCEPTED, Events.Configuration.CATEGORY, "INFO",
                                   json.dumps(dict(draft_id=state.experiment_id, config=state.config), allow_nan=False),
                                   process_id=state.run_id)
         if Events.SnakeLab.SUBMITTED not in recorded:
+            description = "Submitted four-view configuration."
+            if state.baseline:
+                description = "Submitted baseline configuration."
+            elif state.seed_baseline:
+                description = "Submitted golden configuration with a new seed."
             self._events.log(Events.SnakeLab.SUBMITTED, Events.SnakeLab.CATEGORY, "INFO",
-                         "Submitted baseline configuration." if state.baseline else "Submitted four-view configuration.",
+                         description,
                          process_id=state.run_id, parent_event_id=parent, ax3l_version=DAx3l.VERSION)
 
     def _promote(self, run_id: str, reason: str) -> None:
@@ -192,7 +211,10 @@ class ExperimentLoop:
     def _finish(self, state: ExperimentState) -> None:
         self._record_submission(state)
         latest = self._completed_result(state.run_id)
-        if state.baseline:
+        if state.seed_baseline:
+            winner = state.run_id
+            reason = f"Established the golden baseline on seed {latest['config']['seed']}."
+        elif state.baseline:
             winner = state.run_id
             reason = "Established the default configuration baseline."
         else:
@@ -210,6 +232,13 @@ class ExperimentLoop:
         current = self._events.current_golden_config()
         if current is None or current["process_id"] != winner:
             self._promote(winner, reason)
+        if state.seed_baseline:
+            state.golden_run_id = winner
+            state.run_id, state.preceding_match = None, None
+            state.seed_baseline = False
+            state.phase = "ready"
+            self._store.save(state)
+            return
         state.reference_run_id = state.run_id if state.baseline else state.golden_run_id
         state.golden_run_id, state.latest_run_id = winner, state.run_id
         state.observations = {}

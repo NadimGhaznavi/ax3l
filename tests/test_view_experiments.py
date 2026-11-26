@@ -52,12 +52,13 @@ class ViewConfigurationTests(unittest.TestCase):
                 elif 'const' not in value:
                     yield name
         editable = [name for view in VIEWS.values() for name in view.parameters]
-        self.assertEqual(set(editable), set(fields(SCHEMA)))
+        self.assertEqual(set(editable), (set(fields(SCHEMA)) - {'seed'}) | {DViewConversation.NEW_SEED})
         shared = {name: {view.name for view in VIEWS.values() if name in view.parameters}
                   for name, count in Counter(editable).items() if count > 1}
         self.assertEqual(shared, {
             'training.sequence_length': {'architecture', 'training'},
             'training.gamma': {'training', 'reward-signals'},
+            DViewConversation.NEW_SEED: set(VIEWS),
         })
 
     def test_read_only_context_removes_owned_values_and_marks_only_proposals(self):
@@ -65,7 +66,7 @@ class ViewConfigurationTests(unittest.TestCase):
         original = deepcopy(config)
         view = VIEWS['training']
         other = other_parameters(view, config, {'model.layers'})
-        self.assertNotIn('seed', other)
+        self.assertEqual(other['seed'], config['seed'])
         self.assertNotIn('batch_size', other['training'])
         self.assertEqual(other['model']['layers'], '1 (draft)')
         self.assertEqual(other['model']['hidden_size'], 64)
@@ -121,7 +122,7 @@ class ViewCycleTests(unittest.TestCase):
             previous_values, parameters, readonly = blocks(request)
             name = state.order[index]
             self.assertEqual(set(parameters), set(VIEWS[name].parameters) - proposed)
-            proposed.update(state.proposals[name].values)
+            proposed.update(path for path in state.proposals[name].values if path != DViewConversation.NEW_SEED)
             if index == 0:
                 self.assertNotIn('(draft)', json.dumps(readonly))
             else:

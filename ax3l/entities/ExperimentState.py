@@ -24,3 +24,4 @@ class ExperimentState:
     new_seed: bool = False
     seed_baseline: bool = False
     synthetic: bool = False
+    revision_view: str | None = None

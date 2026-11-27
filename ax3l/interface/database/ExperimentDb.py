@@ -8,7 +8,6 @@ from ax3l.interface.database.EventLogDb import EventLogDb
 from ax3l.constants.DEventCategory import DEventCategory as Events
 from ax3l.entities.ExperimentState import ExperimentState
 from ax3l.entities.ViewProposal import ViewProposal
-from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 
 
 class ExperimentDb:
@@ -23,7 +22,6 @@ class ExperimentDb:
         if not rows:
             return None
         data = json.loads(rows[0]["content"])
-        SimulationConfiguration.validate(data["config"])
         for key in ("previous", "proposals"):
             data[key] = {name: ViewProposal(proposal["hypothesis"], proposal["values"])
                          for name, proposal in data[key].items()}
@@ -40,9 +38,7 @@ class ExperimentDb:
             WHERE e.category = %s AND e.name = %s AND e.process_id = %s
             ORDER BY e.event_id LIMIT 1
         """, (Events.Configuration.CATEGORY, Events.Configuration.STATE_SAVED, experiment_id))
-        config = json.loads(rows[0]["config"])
-        SimulationConfiguration.validate(config)
-        return config
+        return json.loads(rows[0]["config"])
 
     def comparison(self, run_id: str) -> dict | None:
         rows = self._db.query("""

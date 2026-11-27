@@ -19,13 +19,22 @@ def _value(value):
     return "—" if value is None else json.dumps(value, ensure_ascii=False)
 
 
-def _elapsed(start, end):
-    if start is None:
+def _elapsed(seconds: int | None) -> str:
+    if seconds is None:
         return "—"
-    seconds = max(0, int((end - start).total_seconds()))
     minutes, seconds = divmod(seconds, 60)
     hours, minutes = divmod(minutes, 60)
     return f"{hours:02}:{minutes:02}:{seconds:02}" if hours else f"{minutes:02}:{seconds:02}"
+
+
+def experiment_totals(sections: list[dict]) -> dict:
+    """Sum the recorded conversation metrics across the eight displayed views."""
+    totals = {}
+    for key in ("elapsed_seconds", "input_tokens", "output_tokens"):
+        recorded = [section[key] for section in sections if section[key] is not None]
+        totals[key] = sum(recorded) if recorded else None
+    totals["elapsed"] = _elapsed(totals.pop("elapsed_seconds"))
+    return totals
 
 
 def experiment_sections(data: dict) -> list[dict]:
@@ -103,15 +112,17 @@ def experiment_sections(data: dict) -> list[dict]:
                         and choice_values[path] != baseline_values[path],
             ) for path in view.parameters]
             start = by_name.get(Events.LLM.REQUEST_STARTED, prompt)
-            now = start["observed_at"] if start else None
+            elapsed_seconds = None
+            if start:
+                end = ended["occurred_at"] if ended else start["observed_at"]
+                elapsed_seconds = max(0, int((end - start["occurred_at"]).total_seconds()))
             sections.append(dict(
                 id=f"{stage}-{name}", title=f"{VIEW_LABELS[name]} {'Evaluation' if stage == 'evaluation' else 'Selection'}",
                 stage=stage, status=status, saved=bool(accepted), synthetic=synthetic,
                 prompt_id=prompt["event_id"] if prompt else None,
                 response_id=response["event_id"] if response else None,
                 has_reason=bool(response and reasoning_content(response["content"])),
-                elapsed=_elapsed(start["occurred_at"] if start else None,
-                                 ended["occurred_at"] if ended else now),
+                elapsed=_elapsed(elapsed_seconds), elapsed_seconds=elapsed_seconds,
                 input_tokens=usage.get("prompt_tokens"), output_tokens=usage.get("completion_tokens"),
                 hypothesis=hypothesis, observations=submission.get("observations"),
                 error=ended["content"] if status in ("Failed", "Interrupted") else None,

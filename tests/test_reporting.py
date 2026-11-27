@@ -119,6 +119,7 @@ class ExperimentStatusTests(unittest.TestCase):
                 page = templates.get_template('events.html').render(
                     events=[event], high_score=None, all_time_high_score=None,
                     experiment_cycles=0, simulations_submitted=0, games_played=0, moves_made=0,
+                    experiment_totals=dict(elapsed='—', input_tokens=None, output_tokens=None),
                     event_label=Events.label, event_choices={},
                     prompt_label='Prompt', simulation_events=Events.SnakeLab, request_timeout_seconds=10)
                 self.assertIn('id="parameter-filter"', page)

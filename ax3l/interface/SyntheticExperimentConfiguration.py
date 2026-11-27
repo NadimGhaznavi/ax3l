@@ -3,8 +3,6 @@
 import json
 from pathlib import Path
 
-from jsonschema import ValidationError
-
 from ax3l.activity.ViewConfiguration import view_values
 from ax3l.constants.DViewConversation import DViewConversation
 from ax3l.entities.ExperimentView import VIEWS
@@ -23,9 +21,6 @@ class SyntheticExperimentConfiguration:
         path = directory / "config.json"
         try:
             config = json.loads(path.read_text(), parse_constant=_nonfinite)
-            SimulationConfiguration.validate(config)
-        except ValidationError as error:
-            raise ValueError(f"{path}: {error.json_path}: {error.message}") from error
         except ValueError as error:
             raise ValueError(f"{path}: {error}") from error
         baseline = SimulationConfiguration.defaults()

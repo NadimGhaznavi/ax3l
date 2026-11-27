@@ -3,6 +3,7 @@
 from copy import deepcopy
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import re
 from threading import Event, Thread
 from uuid import uuid4
 
@@ -153,6 +154,14 @@ class LocalLLM:
                    'architecture': {'model.hidden_size': 72},
                    'training': {'training.learning_rate': .002},
                    'exploration': {'epsilon.initial': .9}}[view.name]
+        parameters = json.loads(re.findall(r'```json\n(.*?)\n```', request['messages'][0]['content'], re.S)[1])
+        primary = next(iter(changed))
+        current = parameters[primary]['value']
+        if current == changed[primary] or request['messages'][0]['content'].startswith('This configuration is a duplicate,'):
+            changed[primary] = {'reward-signals': current + 1,
+                               'architecture': current + 8,
+                               'training': current / 2,
+                               'exploration': current - .05}[view.name]
         changed.update({name: value for name, value in {
             'training.sequence_length': 8, 'training.gamma': .95,
             DViewConversation.NEW_SEED: False,

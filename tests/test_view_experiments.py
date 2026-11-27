@@ -1,30 +1,22 @@
 """Exercise the view cycle through real prompt rendering and local HTTP inference."""
 
-from base64 import b64decode
 from collections import Counter
 from copy import deepcopy
-from dataclasses import asdict
-from io import BytesIO
-from itertools import permutations
 import json
 import re
 import unittest
 from unittest.mock import Mock, patch
 
 from jsonschema import ValidationError
-from PIL import Image
 
 from ax3l.activity.ViewConfiguration import apply_values, other_parameters
-from ax3l.app.experiment.ExperimentLoop import ExperimentLoop
-from ax3l.interface.database.ExperimentDb import ExperimentDb
 from ax3l.constants.DViewConversation import DViewConversation
 from ax3l.entities.ExperimentView import VIEWS
 from ax3l.entities.ExperimentState import ExperimentState
-from ax3l.entities.ViewProposal import ViewProposal
 from ax3l.interface.SimulationConfiguration import SCHEMA, SimulationConfiguration
 from ax3l.interface.ViewConversation import ViewConversation
-from ax3l.presentation.RunComparisonImage import run_comparison_image
-from view_cycle_fixtures import FakeSnake, LocalLLM, MemoryEvents, MemoryLog, MemoryStore
+from experiment_fixture import ExperimentFixture
+from view_cycle_fixtures import FakeSnake, MemoryLog
 
 
 def prompt_text(request):
@@ -40,404 +32,6 @@ def blocks(request):
 
 def tool_name(request):
     return request['tools'][0]['function']['name']
-
-
-class ViewConfigurationTests(unittest.TestCase):
-    def test_four_views_cover_every_tunable_field_with_only_the_intended_sharing(self):
-        def fields(schema, path=''):
-            for key, value in schema['properties'].items():
-                name = f'{path}.{key}' if path else key
-                if value['type'] == 'object':
-                    yield from fields(value, name)
-                elif 'const' not in value:
-                    yield name
-        editable = [name for view in VIEWS.values() for name in view.parameters]
-        self.assertEqual(set(editable), (set(fields(SCHEMA)) - {'seed'}) | {DViewConversation.NEW_SEED})
-        shared = {name: {view.name for view in VIEWS.values() if name in view.parameters}
-                  for name, count in Counter(editable).items() if count > 1}
-        self.assertEqual(shared, {
-            'training.sequence_length': {'architecture', 'training'},
-            'training.gamma': {'training', 'reward-signals'},
-            DViewConversation.NEW_SEED: set(VIEWS),
-        })
-
-    def test_read_only_context_removes_owned_values_and_marks_only_proposals(self):
-        config = SimulationConfiguration.defaults()
-        original = deepcopy(config)
-        view = VIEWS['training']
-        other = other_parameters(view, config, {'model.layers'})
-        self.assertEqual(other['seed'], config['seed'])
-        self.assertNotIn('batch_size', other['training'])
-        self.assertEqual(other['model']['layers'], '1 (draft)')
-        self.assertEqual(other['model']['hidden_size'], 64)
-        self.assertNotIn('sequence_length', other['training'])
-        changed = apply_values(config, {'model.layers': 2})
-        self.assertEqual(changed['model']['layers'], 2)
-        self.assertEqual(config, original)
-
-
-class ViewCycleTests(unittest.TestCase):
-    def setUp(self):
-        self.log = MemoryLog()
-        self.store = MemoryStore(self.log)
-        self.snake = FakeSnake()
-        self.model = LocalLLM()
-        self.addCleanup(self.model.close)
-        self.enterContext(patch('ax3l.app.experiment.ExperimentLoop.ExperimentDb', return_value=self.store))
-        self.enterContext(patch('ax3l.app.experiment.ExperimentLoop.EventLogDb',
-                               return_value=MemoryEvents(self.log)))
-        self.shuffle = self.enterContext(patch('ax3l.app.experiment.ExperimentLoop.shuffle',
-                                               side_effect=lambda names: names.reverse()))
-
-    def loop(self):
-        return ExperimentLoop(self.log, self.model.llm, self.snake)
-
-    def test_complete_cycles_submit_once_after_four_views_and_keep_winning_reference(self):
-        self.loop().run(cycles=2)
-        self.assertEqual([tool_name(request) for request in self.model.requests],
-                         ['submit_observations'] * 4 + ['submit_view'] * 4 +
-                         ['submit_observations'] * 4 + ['submit_view'] * 4 + ['submit_observations'] * 4)
-        self.assertEqual(len(self.snake.submissions), 4)  # Baseline, synthetic, and two autonomous experiments.
-        self.assertEqual(self.shuffle.call_count, 2)
-        state = self.store.load()
-        self.assertEqual(state.order, list(reversed(VIEWS)))
-        self.assertEqual(state.phase, 'completed')
-        self.assertEqual(set(state.observations), set(VIEWS))
-        winner = list(self.snake.results)[2]
-        self.assertEqual(state.golden_run_id, winner)  # Second experiment loses.
-        first_trial = self.snake.submissions[2]
-        for path, expected in {'game.rewards.food': 12, 'model.hidden_size': 72,
-                               'training.learning_rate': .002, 'epsilon.initial': .9,
-                               'training.sequence_length': 8, 'training.gamma': .95}.items():
-            self.assertEqual(SimulationConfiguration.value_at(first_trial, tuple(path.split('.'))), expected)
-        self.assertIn('Hypothesis for exploration.', prompt_text(self.model.requests[12]))
-        self.assertIn('Exploration: recorded training results evaluated.',
-                      prompt_text(self.model.requests[12]))
-        baseline = list(self.snake.results)[0]
-        self.assertIn(f'Golden reference: {baseline}', prompt_text(self.model.requests[8]))
-        self.assertIn(f'Latest simulation: {winner}', prompt_text(self.model.requests[8]))
-        self.assertIn(f'Golden reference: {winner}', prompt_text(self.model.requests[16]))
-        proposed = set()
-        for index, request in enumerate(self.model.requests[4:8]):
-            previous_values, parameters, readonly = blocks(request)
-            name = state.order[index]
-            self.assertEqual(set(parameters), set(VIEWS[name].parameters) - proposed)
-            proposed.update(path for path in state.proposals[name].values if path != DViewConversation.NEW_SEED)
-            if index == 0:
-                self.assertNotIn('(draft)', json.dumps(readonly))
-            else:
-                self.assertIn('(draft)', json.dumps(readonly))
-            content = prompt_text(request)
-            self.assertIn('### Previous observations', content)
-            self.assertIn('280 characters', content)
-            self.assertNotIn('## Golden and latest results', content)
-            for internal in ('round-robin', 'randomized', 'seeded', 'synthetic', 'four views'):
-                self.assertNotIn(internal, content.lower())
-        for offset in (4, 12):
-            parameters = blocks(self.model.requests[offset + 1])[1]
-            self.assertIn('training.sequence_length', parameters)
-            self.assertIn('training.gamma', parameters)
-        for request in self.model.requests:
-            self.assertEqual(len(request['messages']), 1)
-            if tool_name(request) == 'submit_observations':
-                content = request['messages'][0]['content']
-                self.assertEqual([part['type'] for part in content], ['text', 'image_url'])
-                self.assertIn('150-epoch windows', prompt_text(request))
-                if '## Task: Reward Signals Evaluation' in prompt_text(request):
-                    self.assertIn('collision events per 100 moves', prompt_text(request))
-                elif '## Task: Training Evaluation' in prompt_text(request):
-                    self.assertIn('arithmetic mean', prompt_text(request))
-                    self.assertIn('no recorded loss is left as a gap', prompt_text(request))
-                self.assertNotIn('placeholder', prompt_text(request))
-                self.assertIn('280 characters', prompt_text(request))
-                self.assertNotIn('Parameters to tune', prompt_text(request))
-                url = content[1]['image_url']['url']
-                with Image.open(BytesIO(b64decode(url.split(',')[1]))) as image:
-                    self.assertEqual(image.format, 'PNG')
-                    self.assertGreaterEqual(image.width, 400)
-        names = [event['name'] for event in self.log.events]
-        self.assertEqual(names.count('proposal_accepted'), 3)
-        self.assertEqual(names.count('configuration_compared'), 3)
-        self.assertEqual(names.count('golden_config_created'), 2)
-        self.assertEqual(names.count('simulation_completed'), 4)
-        self.assertLess(names.index('simulation_completed'), names.index('golden_config_created'))
-
-    def test_all_tuning_prompts_are_text_only_and_do_not_read_chart_data(self):
-        loop = self.loop()
-        loop.run(cycles=1)
-        state = loop._next_cycle(self.store.load())
-        with patch.object(self.snake, 'get_episode_scores') as scores, \
-                patch.object(self.snake, 'get_exploration_episodes') as exploration, \
-                patch.object(self.snake, 'get_reward_episodes') as rewards, \
-                patch.object(self.snake, 'get_training_episodes') as training:
-            for _ in VIEWS:
-                loop._choose_view(state)
-        scores.assert_not_called()
-        exploration.assert_not_called()
-        rewards.assert_not_called()
-        training.assert_not_called()
-        for request in self.model.requests:
-            if tool_name(request) == 'submit_view':
-                content = request['messages'][0]['content']
-                self.assertIsInstance(content, str)
-                self.assertIn('### Previous observations', content)
-                self.assertIn('## Parameters to tune', content)
-                self.assertIn('submit_view', content)
-                self.assertNotIn('{{', content)
-
-    def test_evaluation_images_use_the_original_reference_and_latest_even_after_promotion(self):
-        def scores(run_id):
-            value = self.snake.results[run_id]['high_score']
-            return [dict(episode=i, score=value, epsilon=max(0, 1 - i / 150),
-                         steps=100, epsilon_nice_injections=value if i >= 150 else 0,
-                         outcome='wall' if i % 2 else 'snake', loss=value / 100)
-                    for i in range(1, 301)]
-        with patch.object(self.snake, 'get_episode_scores', side_effect=scores) as score_reads, \
-                patch.object(self.snake, 'get_exploration_episodes', side_effect=scores) as exploration_reads, \
-                patch.object(self.snake, 'get_reward_episodes', side_effect=scores) as reward_reads, \
-                patch.object(self.snake, 'get_training_episodes', side_effect=scores) as training_reads:
-            self.loop().run(cycles=2)
-        baseline, synthetic, winner, loser = self.snake.results
-        expected_reads = [baseline, synthetic, baseline, winner, winner, loser]
-        self.assertEqual([call.args[0] for call in score_reads.call_args_list], expected_reads)
-        self.assertEqual([call.args[0] for call in exploration_reads.call_args_list], expected_reads)
-        self.assertEqual([call.args[0] for call in reward_reads.call_args_list], expected_reads)
-        self.assertEqual([call.args[0] for call in training_reads.call_args_list], expected_reads)
-        for offset, reference, latest in ((0, baseline, synthetic), (8, baseline, winner), (16, winner, loser)):
-            for name, request in zip(VIEWS, self.model.requests[offset:offset + 4]):
-                text = prompt_text(request)
-                self.assertIn(f'Golden reference: {reference} (high score: {self.snake.results[reference]["high_score"]})', text)
-                self.assertIn(f'Latest simulation: {latest} (high score: {self.snake.results[latest]["high_score"]})', text)
-                self.assertIn('baseline self-comparison', text)
-                self.assertEqual(request['messages'][0]['content'][1]['image_url']['url'],
-                                 run_comparison_image(VIEWS[name], scores(reference), scores(latest)))
-        logged = [json.loads(event['content']) for event in self.log.events
-                  if event['name'] == 'prompt_sent' and event.get('parameter') in VIEWS]
-        evaluations = [request['messages'][0] for request in self.model.requests
-                       if tool_name(request) == 'submit_observations']
-        self.assertEqual([message for message in logged if isinstance(message['content'], list)], evaluations)
-
-    def test_restart_keeps_order_and_accepted_views(self):
-        normal = self.store.save
-        def stop_after_two(state):
-            normal(state)
-            if state.phase == 'choosing' and len(state.proposals) == 2:
-                raise KeyboardInterrupt()
-        with patch.object(self.store, 'save', side_effect=stop_after_two):
-            with self.assertRaises(KeyboardInterrupt):
-                self.loop().run(cycles=1)
-        self.assertEqual(len(self.model.requests), 6)
-        self.loop().run(cycles=1)
-        self.assertEqual(len(self.model.requests), 12)
-        self.assertEqual(len(self.snake.submissions), 3)
-        self.shuffle.assert_called_once()
-        for index, field, value in ((6, 'sequence_length', 8), (7, 'gamma', .95)):
-            _, parameters, readonly = blocks(self.model.requests[index])
-            self.assertNotIn(f'training.{field}', parameters)
-            self.assertEqual(readonly['training'][field], f'{value} (draft)')
-            properties = self.model.requests[index]['tools'][0]['function']['parameters']['properties']
-            self.assertNotIn(f'training.{field}', properties['values']['properties'])
-
-    def test_shared_parameters_are_tuned_once_in_every_possible_view_order(self):
-        loop = self.loop()
-        shared = {
-            'training.sequence_length': ({'architecture', 'training'}, 8),
-            'training.gamma': ({'training', 'reward-signals'}, .95),
-        }
-        for order in permutations(VIEWS):
-            with self.subTest(order=order):
-                state = ExperimentState(
-                    'shared-parameters', 'choosing', SimulationConfiguration.defaults(), order=list(order),
-                    previous={name: ViewProposal('Previous hypothesis.', {}) for name, view in VIEWS.items()},
-                    observations={name: 'Baseline observations.' for name in VIEWS},
-                )
-                start = len(self.model.requests)
-                for _ in order:
-                    loop._choose_view(state)
-                requests = dict(zip(order, self.model.requests[start:]))
-                self.assertEqual(state.phase, 'ready')
-                for name, request in requests.items():
-                    parameters = blocks(request)[1]
-                    properties = request['tools'][0]['function']['parameters']['properties']
-                    self.assertEqual(set(parameters), set(properties['values']['properties']))
-                for path, (owners, value) in shared.items():
-                    first, second = [name for name in order if name in owners]
-                    self.assertIn(path, blocks(requests[first])[1])
-                    self.assertNotIn(path, blocks(requests[second])[1])
-                    self.assertEqual(blocks(requests[second])[2]['training'][path.split('.')[1]],
-                                     f'{value} (draft)')
-                    self.assertEqual(state.proposals[first].values[path], value)
-                    self.assertNotIn(path, state.proposals[second].values)
-                    self.assertEqual(SimulationConfiguration.value_at(state.config, tuple(path.split('.'))), value)
-
-    def test_shared_parameters_remain_available_when_an_earlier_view_omits_them(self):
-        original = self.model.respond
-        def omit_shared(request):
-            response = original(request)
-            if tool_name(request) == 'submit_view':
-                function = response['choices'][0]['message']['tool_calls'][0]['function']
-                arguments = json.loads(function['arguments'])
-                if 'training.learning_rate' in arguments['values']:
-                    del arguments['values']['training.sequence_length']
-                    del arguments['values']['training.gamma']
-                    function['arguments'] = json.dumps(arguments)
-            return response
-        self.model.respond = omit_shared
-        self.loop().run(cycles=1)
-        proposals = self.store.load().proposals
-        for index, field, owner in ((6, 'sequence_length', 'architecture'), (7, 'gamma', 'reward-signals')):
-            path = f'training.{field}'
-            self.assertNotIn(path, proposals['training'].values)
-            self.assertIn(path, blocks(self.model.requests[index])[1])
-            self.assertIn(path, proposals[owner].values)
-
-    def test_unchanged_shared_values_cannot_be_resubmitted_by_later_views(self):
-        original = self.model.respond
-        for name, path, value in (('architecture', 'training.sequence_length', 12),
-                                  ('reward-signals', 'training.gamma', .94)):
-            with self.subTest(view=name, parameter=path):
-                def conflict(request):
-                    response = original(request)
-                    function = response['choices'][0]['message']['tool_calls'][0]['function']
-                    arguments = json.loads(function['arguments'])
-                    arguments['values'][path] = value
-                    function['arguments'] = json.dumps(arguments)
-                    return response
-                self.model.respond = conflict
-                state = ExperimentState(
-                    'unchanged-parameters', 'choosing', SimulationConfiguration.defaults(),
-                    order=['training', name],
-                    previous={name: ViewProposal('Previous hypothesis.', {})},
-                    observations={name: 'Baseline observations.'},
-                    proposals={'training': ViewProposal('Keep current values.', {
-                        'training.sequence_length': 4, 'training.gamma': .96,
-                    })},
-                )
-                self.store.save(state)
-                with self.assertRaises(ValidationError):
-                    self.loop()._choose_view(state)
-                self.assertNotIn(path, blocks(self.model.requests[-1])[1])
-                self.assertEqual(self.store.load(), state)
-                self.assertEqual(state.config, SimulationConfiguration.defaults())
-                self.assertNotIn(name, state.proposals)
-        self.assertEqual(self.snake.submissions, [])
-
-    def test_restart_skips_saved_evaluations_before_choosing_any_parameters(self):
-        normal = self.store.save
-        def stop_after_two(state):
-            normal(state)
-            if state.phase == 'evaluating' and len(state.observations) == 2:
-                raise KeyboardInterrupt()
-        with patch.object(self.store, 'save', side_effect=stop_after_two):
-            with self.assertRaises(KeyboardInterrupt):
-                self.loop().run(cycles=1)
-        self.assertEqual(len(self.model.requests), 2)
-        self.assertEqual(set(self.store.load().proposals), set(VIEWS))
-        self.assertEqual(len(self.snake.submissions), 2)
-        self.loop().run(cycles=1)
-        self.assertEqual(len(self.model.requests), 12)
-        self.assertEqual([tool_name(request) for request in self.model.requests[:4]],
-                         ['submit_observations'] * 4)
-        self.assertEqual(len(self.snake.submissions), 3)
-
-    def test_existing_golden_is_evaluated_before_new_proposals(self):
-        run_id = self.snake.submit_simulation(SimulationConfiguration.defaults())
-        self.log.log('golden_config_created', 'Configuration', 'INFO', 'Existing golden.', process_id=run_id)
-        self.loop().run(cycles=1)
-        self.assertEqual(len(self.model.requests), 12)
-        self.assertIn(f'Latest simulation: {run_id}', prompt_text(self.model.requests[0]))
-        self.assertEqual(len(self.snake.submissions), 2)
-
-
-    def test_restart_during_trial_evaluations_does_not_resubmit_the_simulation(self):
-        normal = self.store.save
-        def stop_after_two(state):
-            normal(state)
-            if state.phase == 'evaluating' and not state.synthetic and state.proposals and len(state.observations) == 2:
-                raise KeyboardInterrupt()
-        with patch.object(self.store, 'save', side_effect=stop_after_two):
-            with self.assertRaises(KeyboardInterrupt):
-                self.loop().run(cycles=1)
-        self.assertEqual(len(self.model.requests), 10)
-        self.assertEqual(len(self.snake.submissions), 3)
-        self.loop().run(cycles=1)
-        self.assertEqual(len(self.model.requests), 12)
-        self.assertEqual(len(self.snake.submissions), 3)
-
-    def test_lost_submission_reply_reconciles_new_run_without_resubmitting(self):
-        submit = self.snake.submit_simulation
-        def lost_reply(config):
-            submit(config)
-            raise TimeoutError('Lost acknowledgement')
-        with patch.object(self.snake, 'submit_simulation', side_effect=lost_reply):
-            with self.assertRaises(TimeoutError):
-                self.loop().run(cycles=1)
-        self.assertEqual(self.store.load().phase, 'submitting')
-        self.loop().run(cycles=1)
-        self.assertEqual(len(self.snake.submissions), 3)
-        self.assertEqual(len(self.model.requests), 12)
-
-    def test_unresolved_submission_is_never_sent_again(self):
-        with patch.object(self.snake, 'submit_simulation', side_effect=TimeoutError('No reply')) as submit:
-            with self.assertRaises(TimeoutError):
-                self.loop().run(cycles=1)
-            with self.assertRaisesRegex(RuntimeError, 'will not be retried'):
-                self.loop().run(cycles=1)
-            submit.assert_called_once()
-        self.assertEqual(self.model.requests, [])
-
-    def test_an_identical_control_baseline_does_not_resolve_a_new_submission(self):
-        config = SimulationConfiguration.defaults()
-        previous = self.snake.submit_simulation(config)
-        self.store.save(ExperimentState('baseline-attempt', 'ready', config, baseline=True))
-        with patch.object(self.snake, 'submit_simulation', side_effect=TimeoutError('No reply')) as submit:
-            with self.assertRaises(TimeoutError):
-                self.loop().run(cycles=1)
-            self.assertEqual(self.store.load().preceding_match, previous)
-            with self.assertRaisesRegex(RuntimeError, 'will not be retried'):
-                self.loop().run(cycles=1)
-            submit.assert_called_once()
-        self.assertEqual(len(self.snake.submissions), 1)
-
-    def test_invalid_proposal_stops_before_candidate_submission_and_can_resume(self):
-        original = self.model.respond
-        def invalid(request):
-            response = original(request)
-            if tool_name(request) == 'submit_observations':
-                return response
-            response['choices'][0]['message']['tool_calls'][0]['function']['arguments'] = json.dumps(dict(
-                hypothesis='An invalid edit.',
-                values={'model.heads': 8}))
-            return response
-        self.model.respond = invalid
-        with self.assertRaises(ValidationError):
-            self.loop().run(cycles=1)
-        self.assertEqual(len(self.snake.submissions), 2)
-        self.assertEqual(self.store.load().proposals, {})
-        self.model.respond = original
-        self.loop().run(cycles=1)
-        self.assertEqual(len(self.snake.submissions), 3)
-        self.assertEqual(len(self.model.requests), 13)
-        self.assertEqual(self.store.load().phase, 'completed')
-
-    def test_invalid_observations_block_configuration_and_resume_without_repeating_accepted_views(self):
-        original = self.model.respond
-        def invalid(request):
-            response = original(request)
-            if len(self.model.requests) == 3:
-                response['choices'][0]['message']['tool_calls'][0]['function']['arguments'] = json.dumps(
-                    dict(observations='x' * (DViewConversation.OBSERVATIONS_MAX_LENGTH + 1)))
-            return response
-        self.model.respond = invalid
-        with self.assertRaises(ValidationError):
-            self.loop().run(cycles=1)
-        self.assertEqual(len(self.store.load().observations), 2)
-        self.assertEqual(set(self.store.load().proposals), set(VIEWS))
-        self.assertEqual(len(self.snake.submissions), 2)
-        self.model.respond = original
-        self.loop().run(cycles=1)
-        self.assertEqual(len(self.model.requests), 13)
-        self.assertEqual(self.store.load().phase, 'completed')
 
 
 class ProposalBoundaryTests(unittest.TestCase):
@@ -533,3 +127,215 @@ class ProposalBoundaryTests(unittest.TestCase):
                     ViewConversation(llm, log).propose(VIEWS['training'], 'Tune training.', 'experiment')
                 llm.complete.assert_called_once()
                 self.assertEqual(log.events[-1]['name'], 'conversation_ended')
+
+
+class ViewConfigurationTests(unittest.TestCase):
+    def test_views_cover_tunable_fields_and_share_only_sequence_length_and_gamma(self):
+        def fields(schema, prefix=''):
+            for key, value in schema['properties'].items():
+                name = f'{prefix}.{key}' if prefix else key
+                if value['type'] == 'object':
+                    yield from fields(value, name)
+                elif 'const' not in value:
+                    yield name
+        editable = [path for view in VIEWS.values() for path in view.parameters]
+        self.assertEqual(set(editable), set(fields(SCHEMA)) - {'seed'})
+        self.assertEqual({path for path, count in Counter(editable).items() if count > 1},
+                         {'training.sequence_length', 'training.gamma'})
+        config = SimulationConfiguration.defaults()
+        original = deepcopy(config)
+        readonly = other_parameters(VIEWS['training'], config)
+        self.assertEqual(readonly['seed'], config['seed'])
+        self.assertNotIn('learning_rate', readonly['training'])
+        self.assertEqual(apply_values(config, {'model.layers': 2})['model']['layers'], 2)
+        self.assertEqual(config, original)
+
+
+class ViewCycleTests(ExperimentFixture):
+    def test_each_view_submits_and_evaluates_before_the_next_view(self):
+        self.loop().run(cycles=4)
+        self.assertEqual([tool_name(r) for r in self.model.requests],
+                         ['submit_view', 'submit_observations'] * 4)
+        self.assertEqual(len(self.snake.submissions), 5)
+        self.assertEqual(self.snake.submissions[0], SimulationConfiguration.defaults())
+        self.shuffle.assert_called_once()
+        for index, name in enumerate(reversed(VIEWS)):
+            request = self.model.requests[index * 2]
+            parameters, readonly = blocks(request)
+            self.assertEqual(set(parameters), set(VIEWS[name].parameters))
+            self.assertNotIn('new seed', parameters)
+            self.assertIn('Baseline Results', prompt_text(request))
+            self.assertNotIn('Previous hypothesis', prompt_text(request))
+            self.assertNotIn('(draft)', json.dumps(readonly))
+            proposal = json.loads([e['content'] for e in self.log.events
+                                   if e['name'] == 'tool_execution_completed'][index * 2])
+            self.assertEqual(self.snake.submissions[index + 1], apply_values(
+                self.snake.submissions[0], proposal['values']))
+        self.loop().run(cycles=1)
+        self.assertEqual(self.shuffle.call_count, 2)
+        self.assertEqual(self.store.load().view_index, 0)
+
+    def test_only_current_golden_owner_gets_history_even_after_a_losing_attempt(self):
+        self.snake = FakeSnake((10, 12, 9, 9, 9, 9, 12, 9, 9, 9))
+        self.loop().run(cycles=5)
+        history = self.store.load().golden_history
+        self.assertEqual(history.view, 'exploration')
+        owner_request = self.model.requests[8]
+        self.assertIn('Previous hypothesis', prompt_text(owner_request))
+        self.assertIn(history.reference_run_id, prompt_text(owner_request))
+        self.assertIn(history.latest_run_id, prompt_text(owner_request))
+        self.assertIn(history.observations, prompt_text(owner_request))
+        for index in (2, 4, 6):
+            self.assertIn('Baseline Results', prompt_text(self.model.requests[index]))
+        # Training ties the golden and takes ownership; Exploration loses its history.
+        self.loop().run(cycles=4)
+        self.assertEqual(self.store.load().golden_history.view, 'training')
+        self.assertIn('Baseline Results', prompt_text(self.model.requests[-2]))
+        self.assertEqual(self.store.load().golden_history.latest_run_id, list(self.snake.results)[6])
+
+    def test_tie_promotes_candidate_and_resets_failures(self):
+        self.snake = FakeSnake((10, 9, 10))
+        self.loop().run(cycles=1)
+        self.assertEqual(self.store.load().failures, 1)
+        self.loop().run(cycles=1)
+        state = self.store.load()
+        self.assertEqual(state.golden_run_id, state.run_id)
+        self.assertEqual(state.failures, 0)
+        self.assertEqual(state.golden_history.view, 'training')
+        self.assertEqual(self.event_count('golden_config_created'), 2)
+
+    def test_new_view_uses_latest_golden_and_can_retune_shared_parameters(self):
+        self.snake = FakeSnake((10, 11, 12, 13, 14))
+        self.loop().run(cycles=4)
+        for index in range(1, 4):
+            prior = self.snake.submissions[index]
+            current = self.snake.submissions[index + 1]
+            request = self.model.requests[2 * index]
+            self.assertIn(list(self.snake.results)[index], prompt_text(request))
+            if index == 2:  # Architecture follows Training and can tune sequence_length again.
+                self.assertEqual(blocks(request)[0]['training.sequence_length']['value'],
+                                 prior['training']['sequence_length'])
+                self.assertIn('training.sequence_length', request['tools'][0]['function'][
+                    'parameters']['properties']['values']['properties'])
+            self.assertEqual(current['seed'], prior['seed'])
+
+    def test_existing_golden_is_reused_without_fake_hypotheses_or_evaluations(self):
+        run_id = self.snake.submit_simulation(SimulationConfiguration.defaults())
+        self.log.log('golden_config_created', 'Configuration', 'INFO', 'Existing.', process_id=run_id)
+        self.loop().run(cycles=1)
+        self.assertEqual(len(self.snake.submissions), 2)
+        self.assertIn(run_id, prompt_text(self.model.requests[0]))
+        self.assertEqual(tool_name(self.model.requests[0]), 'submit_view')
+
+    def test_old_snakelab_history_does_not_replace_the_default_baseline(self):
+        old = self.snake.submit_simulation(apply_values(SimulationConfiguration.defaults(), {'model.layers': 3}))
+        self.snake.results[old]['high_score'] = 999
+        self.loop().run(cycles=1)
+        self.assertEqual(self.snake.submissions[1], SimulationConfiguration.defaults())
+        self.assertNotIn(old, prompt_text(self.model.requests[0]))
+
+    def test_restarts_keep_order_and_do_not_repeat_accepted_selection_or_evaluation(self):
+        save = self.store.save
+        def stop(state):
+            save(state)
+            if state.phase == 'ready' and state.proposals:
+                raise KeyboardInterrupt()
+        with patch.object(self.store, 'save', side_effect=stop):
+            with self.assertRaises(KeyboardInterrupt):
+                self.loop().run(cycles=1)
+        self.assertEqual(len(self.model.requests), 1)
+        order = self.store.load().order
+        self.loop().run(cycles=1)
+        self.assertEqual(len(self.model.requests), 2)
+        self.assertEqual(len(self.snake.submissions), 2)
+        self.loop().run(cycles=1)
+        self.assertEqual(self.store.load().order, order)
+        self.assertEqual(self.store.load().view_index, 1)
+        self.shuffle.assert_called_once()
+
+    def test_comparison_replay_does_not_count_failure_or_promote_twice(self):
+        for score in (9, 10, 11):
+            with self.subTest(score=score):
+                self.log.events.clear()
+                self.store.state = None
+                self.model.requests.clear()
+                self.snake = FakeSnake((10, score))
+                save = self.store.save
+                def stop(state):
+                    if state.phase == 'evaluating':
+                        raise KeyboardInterrupt()
+                    save(state)
+                with patch.object(self.store, 'save', side_effect=stop):
+                    with self.assertRaises(KeyboardInterrupt):
+                        self.loop().run(cycles=1)
+                self.assertEqual(self.store.load().phase, 'comparing')
+                self.loop().run(cycles=1)
+                self.assertEqual(self.event_count('configuration_compared'), 1)
+                self.assertEqual(self.event_count('golden_config_created'), 1 + (score >= 10))
+                self.assertEqual(self.store.load().failures, int(score < 10))
+                self.assertEqual(len(self.snake.submissions), 2)
+
+    def test_lost_submission_reply_is_reconciled_without_resubmitting(self):
+        submit = self.snake.submit_simulation
+        for boundary in (1, 2):
+            with self.subTest(boundary=boundary):
+                self.log.events.clear()
+                self.store.state = None
+                self.snake = FakeSnake((10, 9))
+                submit = self.snake.submit_simulation
+                def lost(config):
+                    run_id = submit(config)
+                    if len(self.snake.submissions) == boundary:
+                        raise TimeoutError('Lost reply')
+                    return run_id
+                with patch.object(self.snake, 'submit_simulation', side_effect=lost):
+                    with self.assertRaises(TimeoutError):
+                        self.loop().run(cycles=1)
+                self.assertEqual(self.store.load().phase, 'submitting')
+                self.loop().run(cycles=1)
+                self.assertEqual(len(self.snake.submissions), 2)
+
+    def test_unresolved_or_old_matching_submission_is_never_retried(self):
+        config = SimulationConfiguration.defaults()
+        old = self.snake.submit_simulation(config)
+        self.store.save(ExperimentState('baseline-attempt', 'ready', config, baseline=True))
+        with patch.object(self.snake, 'submit_simulation', side_effect=TimeoutError('No reply')) as submit:
+            with self.assertRaises(TimeoutError):
+                self.loop().run(cycles=1)
+            self.assertEqual(self.store.load().preceding_match, old)
+            with self.assertRaisesRegex(RuntimeError, 'will not be retried'):
+                self.loop().run(cycles=1)
+            submit.assert_called_once()
+
+    def test_failed_run_blocks_progress_and_resumes_without_resubmission(self):
+        submit = self.snake.submit_simulation
+        def fail(config):
+            run_id = submit(config)
+            if len(self.snake.submissions) == 2:
+                self.snake.results[run_id]['status'] = 'failed'
+            return run_id
+        with patch.object(self.snake, 'submit_simulation', side_effect=fail):
+            with self.assertRaisesRegex(RuntimeError, 'failed'):
+                self.loop().run(cycles=1)
+        self.assertEqual(len(self.model.requests), 1)
+        self.assertEqual(self.store.load().failures, 0)
+        self.snake.results[self.store.load().run_id]['status'] = 'completed'
+        self.loop().run(cycles=1)
+        self.assertEqual(len(self.snake.submissions), 2)
+        self.assertEqual(len(self.model.requests), 2)
+
+    def test_invalid_observations_retry_only_the_unaccepted_evaluation(self):
+        respond = self.model.respond
+        def invalid(request):
+            response = respond(request)
+            if tool_name(request) == 'submit_observations':
+                response['choices'][0]['message']['tool_calls'][0]['function']['arguments'] = '{}'
+            return response
+        self.model.respond = invalid
+        with self.assertRaises(ValidationError):
+            self.loop().run(cycles=1)
+        self.assertEqual(self.store.load().phase, 'evaluating')
+        self.model.respond = respond
+        self.loop().run(cycles=1)
+        self.assertEqual(len(self.snake.submissions), 2)
+        self.assertEqual(len(self.model.requests), 3)

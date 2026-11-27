@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Run and evaluate one view at a time, retain comparison history only for the
+current golden's owner, and rotate seeds after sixteen consecutive losses.
+
+### Changed
+
+- Shuffle the four views each round, starting each view's proposal from the
+  current golden and running a separate simulation and evaluation immediately.
+  Shared parameters remain editable on each eligible view's turn.
+- Promote candidates that match or beat the golden high score. Reset the
+  consecutive-loss count on either outcome; rotate the seed after sixteen
+  strictly lower candidate scores and establish a fresh golden baseline.
+- Give only the current golden's producing view its winning comparison history.
+  Other views use no-history prompts with baseline-only charts. Clear ownership
+  on seed rotation and checkpoint ownership, order, active view, and loss count.
+- Return duplicate candidates to their owning view with the shared notice and
+  rejected proposal. Log selection/evaluation stages explicitly and update
+  reports for multimodal selections, tie promotions, and evaluation costs.
+
+### Removed
+
+- Remove the synthetic startup configuration, hypotheses, loader, and installation
+  copying rules. Fresh startup runs only the default baseline before tuning.
+- Remove the LLM's seed choice and shared-parameter draft locks.
+
 ## [5.0.4] - 2026-11-26 @ 19:48
 
 ### Summary

@@ -6,7 +6,6 @@ import json
 from ax3l.activity.ViewConfiguration import view_values
 from ax3l.constants.DEventCategory import DEventCategory as Events
 from ax3l.constants.DLabel import FIELD_TO_DESCRIPTION_MAP, FIELD_TO_LABEL_MAP
-from ax3l.constants.DViewConversation import DViewConversation
 from ax3l.entities.ExperimentView import VIEWS
 from ax3l.presentation.reporting.ReplyReport import reasoning_content, response_usage
 
@@ -48,7 +47,7 @@ def experiment_sections(data: dict) -> list[dict]:
                        and event["name"] == Events.Conversation.PROMPT), None)
         if prompt is None:
             continue
-        stage = "evaluation" if prompt["prompt_type"] == "ARRAY" else "selection"
+        stage = prompt["source_name"]
         process_id = data["evaluation_id"] if stage == "evaluation" else state.experiment_id
         if prompt["process_id"] == process_id:
             latest[stage, prompt["parameter"]] = events
@@ -66,9 +65,8 @@ def experiment_sections(data: dict) -> list[dict]:
             accepted = by_name.get(Events.Tool.COMPLETED)
             submission = json.loads(accepted["content"]) if accepted else {}
             usage = response_usage(response["content"]) if response else {}
-            synthetic = bool(state and state.synthetic and stage == "selection")
             proposal = state.proposals.get(name) if state else None
-            selected = submission.get("values", proposal.values if synthetic and proposal else {})
+            selected = submission.get("values", {})
             status = "Saved" if accepted else "Waiting"
             if ended and ended["log_level"] == "ERROR":
                 status = "Failed"
@@ -76,38 +74,20 @@ def experiment_sections(data: dict) -> list[dict]:
                 status = "Interrupted"
             elif prompt and not ended and not accepted:
                 status = "In progress"
-            if synthetic:
-                status = "Synthetic startup"
 
             baseline = data["reference_config"] if stage == "evaluation" else data["selection_config"]
             choices = data["latest_config"] if stage == "evaluation" else None
             baseline_values = view_values(view, baseline) if baseline else {}
             choice_values = view_values(view, choices) if choices else selected.copy()
-            previous = (state.previous if data["evaluation_id"] != state.experiment_id
-                        else state.proposals or state.previous) \
-                if state else {}
-            if stage == "evaluation" and choices:
-                choice_values[DViewConversation.NEW_SEED] = any(
-                    proposal.values.get(DViewConversation.NEW_SEED, False) for proposal in previous.values())
-            hypothesis = previous[name].hypothesis if name in previous else None
+            hypothesis = proposal.hypothesis if stage == "evaluation" and proposal else None
             if stage == "selection":
-                hypothesis = submission.get("hypothesis", proposal.hypothesis if synthetic and proposal else None)
-            shared = {}
-            if state and stage == "selection":
-                for owner, proposal in state.proposals.items():
-                    if owner == name:
-                        continue
-                    for path, value in proposal.values.items():
-                        if path not in selected and (path != DViewConversation.NEW_SEED or value):
-                            shared[path] = dict(id=f"selection-{owner}", label=VIEW_LABELS[owner])
-                            choice_values[path] = value
+                hypothesis = submission.get("hypothesis")
             rows = [dict(
-                label=FIELD_TO_LABEL_MAP.get(path, "New seed" if path == DViewConversation.NEW_SEED else path),
-                description=FIELD_TO_DESCRIPTION_MAP.get(path, "Request a different simulation seed."
-                                                         if path == DViewConversation.NEW_SEED else ""),
+                label=FIELD_TO_LABEL_MAP.get(path, path),
+                description=FIELD_TO_DESCRIPTION_MAP.get(path, ""),
                 baseline=_value(baseline_values.get(path)), choice=_value(choice_values.get(path)),
-                saved=stage == "selection" and (path in selected or path in shared),
-                shared=shared.get(path),
+                saved=stage == "selection" and path in selected,
+                shared=None,
                 changed=path in choice_values and path in baseline_values
                         and choice_values[path] != baseline_values[path],
             ) for path in view.parameters]
@@ -118,7 +98,7 @@ def experiment_sections(data: dict) -> list[dict]:
                 elapsed_seconds = max(0, int((end - start["occurred_at"]).total_seconds()))
             sections.append(dict(
                 id=f"{stage}-{name}", title=f"{VIEW_LABELS[name]} {'Evaluation' if stage == 'evaluation' else 'Selection'}",
-                stage=stage, status=status, saved=bool(accepted), synthetic=synthetic,
+                stage=stage, status=status, saved=bool(accepted),
                 prompt_id=prompt["event_id"] if prompt else None,
                 response_id=response["event_id"] if response else None,
                 has_reason=bool(response and reasoning_content(response["content"])),

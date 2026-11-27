@@ -40,10 +40,7 @@ class ViewConversation:
         })
 
         arguments_schema = deepcopy(schema)
-        arguments_schema["properties"]["values"]["properties"] = {
-            name: parameter_schema(name) if name == DViewConversation.NEW_SEED else {}
-            for name in view.parameters
-        }
+        arguments_schema["properties"]["values"]["properties"] = {name: {} for name in view.parameters}
 
         return self._request(view, prompt, schema, "submit_view", "Tuning",
                              "Record your next hypothesis and proposed parameter values.", experiment_id,
@@ -69,7 +66,8 @@ class ViewConversation:
 
         def log(category, name, content, level="INFO"):
             return self._events.log(name, category.CATEGORY, level, content, process_id=experiment_id,
-                                parent_event_id=conversation, parameter=view.name, source_name=view.name)
+                                parent_event_id=conversation, parameter=view.name,
+                                source_name="selection" if tool_name == "submit_view" else "evaluation")
 
         outcome, level = "View submission accepted.", "INFO"
         executing_tool = False

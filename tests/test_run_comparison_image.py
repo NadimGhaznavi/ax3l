@@ -3,9 +3,10 @@
 from base64 import b64decode
 from copy import deepcopy
 from io import BytesIO
+from unittest.mock import patch
 import unittest
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from ax3l.activity.ExplorationProgress import exploration_progress
 from ax3l.activity.RewardProgress import reward_progress
@@ -248,3 +249,21 @@ class RunComparisonImageTests(unittest.TestCase):
                     self.assertEqual(image.format, 'PNG')
                     pixels = {color for _, color in image.crop((118, 452, 1008, 656)).getcolors(200000)}
                     self.assertNotIn((77, 179, 255), pixels)
+
+    def test_baseline_images_show_only_one_recorded_run_for_every_view(self):
+        episodes = [dict(episode=i, score=i % 10, epsilon=.5 if i <= 150 else 0,
+                         steps=100, epsilon_nice_injections=2, outcome='wall', loss=.4)
+                    for i in range(1, 322)]
+        for name, view in VIEWS.items():
+            with self.subTest(view=name), patch.object(
+                    ImageDraw.ImageDraw, 'text', autospec=True, side_effect=ImageDraw.ImageDraw.text) as draw_text:
+                url = run_comparison_image(view, episodes)
+                labels = [call.args[2] for call in draw_text.call_args_list]
+                self.assertIn('Baseline', labels)
+                self.assertNotIn('Golden', labels)
+                self.assertNotIn('Latest', labels)
+                self.assertTrue(any('baseline results' in label for label in labels))
+                with Image.open(BytesIO(b64decode(url.split(',')[1]))) as image:
+                    colors = {color for _, color in image.getcolors(image.width * image.height)}
+                    self.assertIn((255, 189, 112), colors)
+                    self.assertNotIn((77, 179, 255), colors)

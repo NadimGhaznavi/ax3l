@@ -11,7 +11,6 @@
   <div class="view-body">
     <div class="view-links">
       {% if view.prompt_id %}<a href="/events/{{ view.prompt_id }}">View prompt sent to LLM</a>
-      {% elif view.synthetic %}<span>Configuration and hypotheses loaded from startup files.</span>
       {% else %}<span>Prompt not sent yet.</span>{% endif %}
     </div>
     {% if view.hypothesis %}<p class="view-hypothesis"><strong>Hypothesis:</strong> {{ view.hypothesis }}</p>{% endif %}
@@ -40,7 +39,7 @@
             <td>Select parameters</td>
             <td>{% if view.response_id %}<a href="/events/{{ view.response_id }}">Response</a>{% if view.has_reason %}<br><a href="/events/{{ view.response_id }}/reason">Reasoning</a>{% endif %}{% else %}—{% endif %}</td>
             <td>—</td>
-            <td>{{ 'Hypothesis and parameters saved.' if view.saved else ('Startup file values.' if view.synthetic else 'Awaiting LLM submission.') }}</td>
+            <td>{{ 'Hypothesis and parameters saved.' if view.saved else 'Awaiting LLM submission.' }}</td>
           </tr>
           {% endif %}
           {% for row in view.rows %}

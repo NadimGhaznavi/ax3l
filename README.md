@@ -4,11 +4,11 @@ If you like this project, please give it a star (top right corner)! :)
 
 ## First experiment
 
-A fresh history runs the default baseline, then a real synthetic experiment,
-before Qwen evaluates the results and starts autonomous tuning. Edit the synthetic
-configuration and four hypothesis files in [`conf/synthetic/`](conf/synthetic/).
-Installed copies live at `/opt/prod/ax3l/conf/synthetic/`; upgrades preserve local
-edits. See [startup behavior](pages/runtime-behaviour.md#editable-first-experiment).
+A fresh history runs the default baseline, then tunes one view at a time in
+shuffled four-view rounds. Each selection runs its own simulation and evaluation.
+Candidates that match or beat the golden score become golden. After 16 consecutive
+strictly lower scores, Ax3l increments the seed and runs the golden settings to
+establish a fresh baseline. See [runtime behavior](pages/runtime-behaviour.md).
 
 ## Tests
 

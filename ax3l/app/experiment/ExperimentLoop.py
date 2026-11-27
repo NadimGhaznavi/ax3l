@@ -4,7 +4,7 @@ from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import replace
 import json
-from random import shuffle
+from random import choice, shuffle
 from time import sleep
 from uuid import uuid4
 
@@ -49,12 +49,16 @@ class ExperimentLoop:
             check()
             if state.phase == "completed":
                 state = self._next_cycle(state)
-            elif state.phase == "choosing":
+            elif state.phase in ("choosing", "revising"):
                 self._choose_view(state)
             elif state.phase == "ready":
                 config = self._simulation_config(state)
-                SimulationConfiguration.validate(config)
                 state.preceding_match = self._snake.find_config_run(config)
+                if state.preceding_match and not (state.baseline or state.seed_baseline):
+                    state.revision_view = choice(list(VIEWS))
+                    state.phase = "revising"
+                    self._store.save(state)
+                    continue
                 state.phase = "submitting"
                 self._store.save(state)
                 state.run_id = self._snake.submit_simulation(config)
@@ -152,28 +156,35 @@ class ExperimentLoop:
         self._store.save(state)
 
     def _choose_view(self, state: ExperimentState) -> None:
-        name = state.order[len(state.proposals)]
+        revising = state.phase == "revising"
+        name = state.revision_view if revising else state.order[len(state.proposals)]
         view = VIEWS[name]
-        previous = state.previous[name]
-        proposed = {path for proposal in state.proposals.values() for path in proposal.values
-                    if path != DViewConversation.NEW_SEED or state.new_seed}
+        previous = state.proposals[name] if revising else state.previous[name]
+        proposed = {path for owner, proposal in state.proposals.items() if owner != name
+                    for path in proposal.values if path != DViewConversation.NEW_SEED}
+        if state.new_seed:
+            proposed.add(DViewConversation.NEW_SEED)
         view = replace(view, parameters=tuple(path for path in view.parameters if path not in proposed))
         context = dict(
             previous_hypothesis=previous.hypothesis,
             previous_values=previous.values,
-            previous_observations=state.observations[name],
+            previous_observations="" if state.synthetic else state.observations[name],
             parameters=editable_parameters(view, state.config),
             other_parameters=other_parameters(view, state.config, proposed, new_seed=state.new_seed),
         )
-        prompt = self._prompts.render(view, context)
-        proposal = self._conversation.propose(view, prompt, state.config, state.experiment_id)
+        prompt = self._prompts.render(view, context, duplicate=revising)
+        proposal = self._conversation.propose(view, prompt, state.experiment_id)
+        if revising:
+            proposal = ViewProposal(proposal.hypothesis, {**previous.values, **proposal.values})
         state.config = apply_values(state.config, proposal.values)
+        seed_requested = state.new_seed
         state.new_seed = state.new_seed or proposal.values.get(DViewConversation.NEW_SEED, False)
         state.proposals[name] = proposal
-        if len(state.proposals) == len(state.order):
-            if state.new_seed:
-                state.config["seed"] = SimulationConfiguration.value(("seed",), state.config["seed"] + 1)
+        if revising or len(state.proposals) == len(state.order):
+            if state.new_seed and (not revising or not seed_requested):
+                state.config["seed"] += 1
                 state.seed_baseline = True
+            state.revision_view = None
             state.phase = "ready"
         self._store.save(state)
 

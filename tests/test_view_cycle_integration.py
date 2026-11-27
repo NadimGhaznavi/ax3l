@@ -144,6 +144,33 @@ class ViewCycleIntegrationTests(unittest.TestCase):
             properties = self.model.requests[index]['tools'][0]['function']['parameters']['properties']
             self.assertNotIn(path, properties['values']['properties'])
 
+    def test_restart_resumes_the_saved_duplicate_selection(self):
+        self.assertEqual(self.service(), 0)
+        store = ExperimentDb(self.db)
+        state = store.load()
+        state.phase = 'ready'
+        store.save(state)
+        save = ExperimentDb.save
+        def interrupt(store, state):
+            save(store, state)
+            if state.phase == 'revising':
+                raise KeyboardInterrupt()
+        with patch('ax3l.app.experiment.ExperimentLoop.choice', return_value='architecture') as choose, \
+                patch.object(ExperimentDb, 'save', interrupt):
+            self.assertEqual(self.service(), 130)
+        choose.assert_called_once()
+        pending = store.load()
+        self.assertEqual(pending.phase, 'revising')
+        self.assertEqual(pending.revision_view, 'architecture')
+        with patch('ax3l.app.experiment.ExperimentLoop.choice') as choose:
+            self.assertEqual(self.service(), 0)
+        choose.assert_not_called()
+        self.assertTrue(self.model.requests[12]['messages'][0]['content'].startswith(
+            'This configuration is a duplicate, please select different values.'))
+        self.assertIn('Architecture Tuning', self.model.requests[12]['messages'][0]['content'])
+        self.assertEqual(store.load().phase, 'completed')
+        self.assertEqual(self.db.query('SELECT COUNT(*) AS n FROM simulation_runs')[0]['n'], 4)
+
     def test_restart_skips_saved_observations(self):
         save = ExperimentDb.save
         def stop(store, state):

@@ -67,15 +67,31 @@ including after restart.
 Qwen returns a new hypothesis and parameter values through the required native
 `submit_view` function. The hypothesis must contain nonblank text and have at
 most 280 characters, including its expected observable effect. It may change several
-settings within the current view. The application validates that response at the
-LLM boundary, including the view's available settings, numeric limits, and the combined
-closer/farther reward constraint. Invalid responses stop the run with logged
-errors; there are no repair prompts or automatic inference retries.
+settings within the current view. Ax3l checks the LLM response format and the
+view's available settings. The JSON field rules guide the model; SnakeLab owns
+simulation-configuration validation against its JSON schema. Ax3l does not add
+cross-field reward restrictions or revalidate configurations while loading,
+assembling, or submitting them. Malformed LLM responses stop the run with logged
+errors; they do not trigger repair prompts or automatic inference retries.
 
 The shuffle, draft assembly, and submission sequence are internal to Ax3l. The
 model receives one view at a time, with a fresh context for every conversation.
 After all four accepted proposals, Ax3l submits the complete configuration,
 running the new-seed baseline first when requested.
+
+Before submitting a proposed configuration, Ax3l checks for an existing run with
+all the same settings, including the seed. For a duplicate, it randomly selects
+one of the four Selection views and prepends this prompt:
+
+> This configuration is a duplicate, please select different values.
+
+The selected view receives the current draft and its preceding observations.
+It may revise its own settings; settings owned by the other three views stay
+read-only. Ax3l checks the revised configuration again and selects another view
+if it is still a duplicate. The selected view is checkpointed before inference,
+so a restart resumes that revision. Initial default baselines and new-seed
+control baselines keep their established submission flow; proposed candidates,
+including a candidate identical to its new-seed baseline, use the duplicate check.
 
 ## Baseline and results
 
@@ -108,9 +124,11 @@ Install and upgrade copy missing startup files and preserve existing edits.
 When upgrading from 750 episodes, update `epochs` in the installed synthetic
 configuration to `1500` and start a fresh experiment history so the baseline and
 candidate simulations use the same length.
-Ax3l validates all five files before submitting the initial baseline. It saves
-the resolved per-view choices and hypotheses in the first checkpoint; restarting
-resumes those saved inputs even if the files have since changed. File edits apply
+Ax3l reads the configuration JSON and checks the startup hypotheses, baseline
+seed, and presence of an edited value before submitting the initial baseline.
+SnakeLab validates simulation settings. Ax3l saves the resolved per-view choices
+and hypotheses in the first checkpoint; restarting resumes those saved inputs
+even if the files have since changed. File edits apply
 to the next fresh experiment history, not a running or completed initialization.
 The synthetic origin is recorded in checkpoints and the accepted-configuration
 event. Qwen receives the same prompt shape as on later cycles. All scores and
@@ -127,10 +145,11 @@ after assembling all proposals. It performs two full SnakeLab simulations in ord
 2. Run Qwen's proposed settings with that same new seed. Promote this configuration
    only if it beats the new baseline; retain the new baseline on a tie or loss.
 
-Both simulations run even when Qwen changes no other settings. No evaluation or
-tuning conversations take place between them. `new seed` controls the experiment
-and is never sent as a SnakeLab configuration field. Without a new seed request,
-the cycle runs just the proposed configuration on the current seed.
+Both simulations run on the new seed. If the candidate duplicates the completed
+baseline, a randomly selected Selection view revises it before submission.
+`new seed` controls the experiment and is never sent as a SnakeLab configuration
+field. Without a new seed request, the cycle runs just the proposed configuration
+on the current seed.
 
 The next conversations compare the preceding trial against the golden reference
 used for that trial. That reference is retained even when the trial is promoted,
@@ -146,8 +165,13 @@ The reporting homepage shows eight collapsible Experiment Status sections: the
 four result evaluations followed by the four parameter selections in their saved
 order. Each section links to its recorded LLM prompt and response and shows its
 hypothesis, observations where applicable, parameter descriptions, baseline and
-chosen values, and saved state. Elapsed time and input/output tokens appear once
-per conversation. Shared parameter choices identify the view that submitted them.
+chosen values, and saved state. Elapsed time and input/output tokens appear in
+each section's title bar, including when collapsed. The Totals box sums the
+recorded conversation metrics across all eight sections and updates on refresh.
+Shared parameter choices identify the view that submitted them.
+Evaluation sections show Observations beneath the hypothesis, using the current
+status until observations are submitted, followed by Reasoning and Response
+(details) links. Their tables compare Configuration Setting, Baseline, and Latest.
 Waiting views do not reuse submissions from an older selection pass. Synthetic
 startup choices are identified separately and have no fabricated prompt or token
 counts. Automatic refresh retains expanded sections and horizontal table scroll.

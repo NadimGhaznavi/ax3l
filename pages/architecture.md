@@ -37,8 +37,11 @@ experiment from editable files in `conf/synthetic/` before the first LLM request
 Each view receives its previous hypothesis, choices,
 and Observations, editable setting rules, and read-only configuration context.
 Hypotheses and Observations each have a hard limit of 280 characters. The
-application assembles and validates the complete draft, submits it through
-SnakeLab, and compares the completed result before evaluating it. Both passes
+application assembles the complete draft and checks for an existing simulation
+with the same settings and seed. Duplicate drafts return to a randomly selected
+Selection view with a duplicate notice; the saved choice survives restarts.
+SnakeLab validates submitted configurations against its JSON schema. Ax3l
+compares the completed result before evaluating it. Both passes
 use native function calls through the shared LLM HTTP interface. View sequencing
 and draft assembly are internal to Ax3l; no MCP process or external registration
 is required.

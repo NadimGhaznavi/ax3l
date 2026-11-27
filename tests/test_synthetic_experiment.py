@@ -7,7 +7,7 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
-from ax3l.activity.ViewConfiguration import apply_values, view_values
+from ax3l.activity.ViewConfiguration import view_values
 from ax3l.app.experiment.ExperimentLoop import ExperimentLoop
 from ax3l.entities.ExperimentView import VIEWS
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
@@ -30,6 +30,7 @@ class SyntheticConfigurationTests(unittest.TestCase):
     def test_edits_are_loaded_as_the_actual_per_view_choices(self):
         config = json.loads((self.directory / 'config.json').read_text())
         config['model']['hidden_size'] = 80
+        config['game']['rewards'].update(closer_to_food=5, further_from_food=0)
         self.write_config(config)
         (self.directory / 'architecture.md').write_text('A wider model should improve the high score.\n')
         proposals = SyntheticExperimentConfiguration.load(self.directory)
@@ -47,9 +48,6 @@ class SyntheticConfigurationTests(unittest.TestCase):
         cases = [
             (default, 'change at least one'),
             (dict(valid, seed=1971), 'seed'),
-            (apply_values(valid, {'model.hidden_size': 73}), 'hidden_size'),
-            (apply_values(valid, {'game.rewards.closer_to_food': 5}), 'rewards'),
-            (dict(valid, epochs=100), 'epochs'),
         ]
         for config, field in cases:
             with self.subTest(field=field):
@@ -62,6 +60,13 @@ class SyntheticConfigurationTests(unittest.TestCase):
                 (self.directory / 'config.json').write_text(text)
                 with self.assertRaisesRegex(ValueError, 'config.json'):
                     SyntheticExperimentConfiguration.load(self.directory)
+
+    def test_simulation_field_validation_is_left_to_snakelab(self):
+        config = json.loads((self.directory / 'config.json').read_text())
+        config['model']['hidden_size'] = 73
+        self.write_config(config)
+        proposals = SyntheticExperimentConfiguration.load(self.directory)
+        self.assertEqual(proposals['architecture'].values['model.hidden_size'], 73)
 
     def test_all_four_hypotheses_are_required_nonblank_and_short(self):
         for name in VIEWS:

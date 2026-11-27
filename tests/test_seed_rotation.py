@@ -46,6 +46,8 @@ class SeedRotationTests(unittest.TestCase):
     def unchanged_proposal(self, request):
         response = new_seed_proposal(request)
         if tool_name(request) == 'submit_view':
+            if request['messages'][0]['content'].startswith('This configuration is a duplicate,'):
+                return response
             function = response['choices'][0]['message']['tool_calls'][0]['function']
             arguments = json.loads(function['arguments'])
             arguments['values'] = {name: True if name == DViewConversation.NEW_SEED else field['value']
@@ -106,7 +108,6 @@ class SeedRotationTests(unittest.TestCase):
                 self.assertEqual(new_baseline['training'], old_config['training'])
                 self.assertEqual(new_candidate['training']['learning_rate'], .002)
                 for config in self.snake.submissions:
-                    SimulationConfiguration.validate(config)
                     self.assertNotIn(DViewConversation.NEW_SEED, config)
                 state = self.store.load()
                 won = candidate_score > baseline_score
@@ -125,12 +126,15 @@ class SeedRotationTests(unittest.TestCase):
                 self.assertFalse(next_cycle.seed_baseline)
                 self.assertEqual(next_cycle.config['seed'], new_baseline['seed'])
 
-    def test_seed_only_request_still_runs_both_complete_simulations(self):
+    def test_seed_only_request_revises_the_duplicate_candidate_after_the_baseline(self):
         self.model.respond = self.unchanged_proposal
         self.loop().run(cycles=1)
         self.assertEqual(len(self.snake.submissions), 4)
-        self.assertEqual(self.snake.submissions[2], self.snake.submissions[3])
+        self.assertNotEqual(self.snake.submissions[2], self.snake.submissions[3])
+        self.assertEqual(self.snake.submissions[2]['seed'], self.snake.submissions[3]['seed'])
         self.assertNotEqual(self.snake.submissions[0]['seed'], self.snake.submissions[2]['seed'])
+        self.assertTrue(self.model.requests[8]['messages'][0]['content'].startswith(
+            'This configuration is a duplicate, please select different values.'))
 
     def test_omitting_the_request_keeps_a_single_candidate_run_on_the_current_seed(self):
         def omit(request):
@@ -182,7 +186,7 @@ class SeedRotationTests(unittest.TestCase):
                 self.assertEqual(names.count('simulation_completed'), 4)
                 self.assertEqual(names.count('configuration_compared'), 2)
 
-    def test_lost_replies_reconcile_both_runs_including_identical_configurations(self):
+    def test_lost_replies_reconcile_both_runs_including_a_revised_duplicate(self):
         for submission, unchanged in ((3, False), (4, False), (4, True)):
             with self.subTest(submission=submission, unchanged=unchanged):
                 self.reset()
@@ -201,7 +205,7 @@ class SeedRotationTests(unittest.TestCase):
                 self.loop().run(cycles=1)
                 self.assertEqual(len(self.snake.submissions), 4)
                 self.assertEqual(self.store.load().phase, 'completed')
-                self.assertEqual(len(self.model.requests), 12)
+                self.assertEqual(len(self.model.requests), 13 if unchanged else 12)
 
     def test_failed_seed_baseline_blocks_candidate_until_resolved(self):
         for status in ('failed', 'cancelled'):
@@ -224,7 +228,7 @@ class SeedRotationTests(unittest.TestCase):
                 self.loop().run(cycles=1)
                 self.assertEqual(len(self.snake.submissions), 4)
 
-    def test_an_existing_identical_seed_baseline_does_not_replace_the_second_run(self):
+    def test_an_existing_seed_baseline_does_not_replace_an_unacknowledged_revised_candidate(self):
         self.model.respond = self.unchanged_proposal
         submit = self.snake.submit_simulation
         def no_reply(config):
@@ -236,19 +240,20 @@ class SeedRotationTests(unittest.TestCase):
                 self.loop().run(cycles=1)
         state = self.store.load()
         self.assertFalse(state.seed_baseline)
-        self.assertEqual(state.preceding_match, state.golden_run_id)
+        self.assertIsNone(state.preceding_match)
         with self.assertRaisesRegex(RuntimeError, 'will not be retried'):
             self.loop().run(cycles=1)
         self.assertEqual(len(self.snake.submissions), 3)
 
-    def test_seed_overflow_stops_before_submitting_either_run(self):
+    def test_seed_limits_are_left_to_snakelab(self):
         config = SimulationConfiguration.defaults()
         config['seed'] = SimulationConfiguration.field(('seed',))['maximum']
         run_id = self.snake.submit_simulation(config)
         self.log.log('golden_config_created', 'Configuration', 'INFO', 'Existing golden.', process_id=run_id)
-        with self.assertRaises(ValidationError):
-            self.loop().run(cycles=1)
-        self.assertEqual(len(self.snake.submissions), 1)
+        self.loop().run(cycles=1)
+        self.assertEqual(len(self.snake.submissions), 3)
+        self.assertEqual(self.snake.submissions[1]['seed'], config['seed'] + 1)
+        self.assertEqual(self.snake.submissions[2]['seed'], config['seed'] + 1)
 
 
 class SeedRequestBoundaryTests(unittest.TestCase):
@@ -258,7 +263,7 @@ class SeedRequestBoundaryTests(unittest.TestCase):
         llm.complete.return_value = 200, '', json.dumps(dict(choices=[dict(message=dict(tool_calls=[
             dict(function=dict(name='submit_view', arguments=json.dumps(arguments)))
         ]))])).encode()
-        return ViewConversation(llm, log).propose(view, 'Tune.', SimulationConfiguration.defaults(), 'test')
+        return ViewConversation(llm, log).propose(view, 'Tune.', 'test')
 
     def test_a_view_can_submit_just_the_seed_request(self):
         for view in VIEWS.values():

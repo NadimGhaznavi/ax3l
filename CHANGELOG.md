@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.0.4] - 2026-11-26 @ 19:48
+
 ### Summary
 
 Keep experiment timing and token usage visible in section title bars and a

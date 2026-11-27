@@ -150,6 +150,9 @@ chosen values, and saved state. Elapsed time and input/output tokens appear in
 each section's title bar, including when collapsed. The Totals box sums the
 recorded conversation metrics across all eight sections and updates on refresh.
 Shared parameter choices identify the view that submitted them.
+Evaluation sections show Observations beneath the hypothesis, using the current
+status until observations are submitted, followed by Reasoning and Response
+(details) links. Their tables compare Configuration Setting, Baseline, and Latest.
 Waiting views do not reuse submissions from an older selection pass. Synthetic
 startup choices are identified separately and have no fabricated prompt or token
 counts. Automatic refresh retains expanded sections and horizontal table scroll.

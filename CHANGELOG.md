@@ -12,7 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Summary
 
 Keep experiment timing and token usage visible in section title bars and a
-combined totals box.
+combined totals box, and give evaluation observations their own space above the
+configuration comparison.
 
 ### Changed
 
@@ -20,6 +21,9 @@ combined totals box.
   section's title bar and remove their three table columns. Widen the remaining
   settings and choice columns, and add a Totals box that sums recorded metrics
   across all eight sections and updates with the existing refresh.
+- Move Evaluation observations beneath the hypothesis, showing the current status
+  until observations are submitted, followed by Reasoning and Response (details)
+  links. Simplify Evaluation tables to Configuration Setting, Baseline, and Latest.
 
 ## [5.0.3] - 2026-11-26 @ 17:30
 

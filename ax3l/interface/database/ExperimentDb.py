@@ -8,6 +8,7 @@ from ax3l.interface.database.EventLogDb import EventLogDb
 from ax3l.constants.DEventCategory import DEventCategory as Events
 from ax3l.entities.ExperimentState import ExperimentState
 from ax3l.entities.ViewProposal import ViewProposal
+from ax3l.entities.ViewHistory import ViewHistory
 
 
 class ExperimentDb:
@@ -22,9 +23,11 @@ class ExperimentDb:
         if not rows:
             return None
         data = json.loads(rows[0]["content"])
-        for key in ("previous", "proposals"):
-            data[key] = {name: ViewProposal(proposal["hypothesis"], proposal["values"])
-                         for name, proposal in data[key].items()}
+        data["proposals"] = {name: ViewProposal(**proposal) for name, proposal in data["proposals"].items()}
+        if data["golden_history"] is not None:
+            history = data["golden_history"]
+            history["proposal"] = ViewProposal(**history["proposal"])
+            data["golden_history"] = ViewHistory(**history)
         return ExperimentState(**data)
 
     def save(self, state: ExperimentState) -> None:

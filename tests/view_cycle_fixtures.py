@@ -10,7 +10,6 @@ from uuid import uuid4
 import zmq
 
 from ax3l.entities.ExperimentView import VIEWS
-from ax3l.constants.DViewConversation import DViewConversation
 from ax3l.interface.LLM import LLM
 
 
@@ -154,17 +153,19 @@ class LocalLLM:
                    'architecture': {'model.hidden_size': 72},
                    'training': {'training.learning_rate': .002},
                    'exploration': {'epsilon.initial': .9}}[view.name]
-        parameters = json.loads(re.findall(r'```json\n(.*?)\n```', request['messages'][0]['content'], re.S)[1])
+        content = request['messages'][0]['content']
+        text = content if isinstance(content, str) else content[0]['text']
+        tuning = text.split('## Parameters to tune', 1)[1]
+        parameters = json.loads(re.findall(r'```json\n(.*?)\n```', tuning, re.S)[0])
         primary = next(iter(changed))
         current = parameters[primary]['value']
-        if current == changed[primary] or request['messages'][0]['content'].startswith('This configuration is a duplicate,'):
+        if current == changed[primary] or text.startswith('This configuration is a duplicate,'):
             changed[primary] = {'reward-signals': current + 1,
                                'architecture': current + 8,
                                'training': current / 2,
                                'exploration': current - .05}[view.name]
         changed.update({name: value for name, value in {
             'training.sequence_length': 8, 'training.gamma': .95,
-            DViewConversation.NEW_SEED: False,
         }.items() if name in properties})
         arguments = dict(hypothesis=f'Hypothesis for {view.name}.',
                          values=changed)
@@ -177,16 +178,6 @@ class LocalLLM:
         self.thread.join()
         self.server.server_close()
 
-
-def new_seed_proposal(request):
-    response = LocalLLM.proposal(request)
-    if request['tools'][0]['function']['name'] == 'submit_view':
-        function = response['choices'][0]['message']['tool_calls'][0]['function']
-        arguments = json.loads(function['arguments'])
-        if DViewConversation.NEW_SEED in arguments['values']:
-            arguments['values'][DViewConversation.NEW_SEED] = True
-            function['arguments'] = json.dumps(arguments)
-    return response
 
 
 class LocalSnakeControl:
@@ -228,3 +219,17 @@ class LocalSnakeControl:
             raise RuntimeError('Control fixture did not stop')
         if self.error:
             raise self.error
+
+
+class FixtureLLM:
+    """Use native tool responses without a listener for state-machine tests."""
+    url = 'http://fixture/v1/chat/completions'
+
+    def __init__(self):
+        self.requests = []
+        self.respond = LocalLLM.proposal
+
+    def complete(self, payload):
+        request = json.loads(payload)
+        self.requests.append(request)
+        return 200, '', json.dumps(self.respond(request)).encode()

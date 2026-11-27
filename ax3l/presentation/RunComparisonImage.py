@@ -20,12 +20,13 @@ MUTED = "#b8c8d8"
 
 
 def run_comparison_image(view: ExperimentView, reference_episodes: list[dict],
-                         latest_episodes: list[dict]) -> str:
+                         latest_episodes: list[dict] | None = None) -> str:
     exploration = view.name == "exploration"
     rewards = view.name == "reward-signals"
     training = view.name == "training"
     window_size = 150
-    runs = [("Golden", GOLDEN, reference_episodes), ("Latest", LATEST, latest_episodes)]
+    runs = ([("Baseline", GOLDEN, reference_episodes)] if latest_episodes is None else
+            [("Golden", GOLDEN, reference_episodes), ("Latest", LATEST, latest_episodes)])
     scores = [(color, score_percentiles(episodes, window_size)) for _, color, episodes in runs]
     height = {"architecture": 768, "exploration": 1000, "reward-signals": 1254, "training": 768}[view.name]
     image = Image.new("RGB", (1056, height), "#101720")
@@ -33,10 +34,12 @@ def run_comparison_image(view: ExperimentView, reference_episodes: list[dict],
     fonts = {size: ImageFont.load_default(size=size) for size in (16, 18, 24, 40)}
     title = ("Training performance comparison" if training else "Reward signals comparison"
              if rewards else f"{view.name.title()} run comparison")
+    if latest_episodes is None:
+        title = f"{view.name.replace('-', ' ').title()} baseline results"
     draw.text((118, 20), title, font=fonts[40], fill=FOREGROUND)
     draw.text((118, 74), f"Recorded results per {window_size}-epoch window (final window may be shorter)",
               font=fonts[16], fill=MUTED)
-    for name, color, x in (("Golden", GOLDEN, 770), ("Latest", LATEST, 902)):
+    for (name, color, _), x in zip(runs, (770, 902)):
         draw.line((x, 112, x + 32, 112), fill=color, width=4)
         draw.text((x + 42, 112), name, anchor="lm", font=fonts[18], fill=FOREGROUND)
 
@@ -113,7 +116,7 @@ def run_comparison_image(view: ExperimentView, reference_episodes: list[dict],
     note = ("Each point summarizes the preceding 150 epochs; mean loss excludes missing values."
             if training else "Each point summarizes the preceding 150 epochs; rates = total events / total moves x 100."
             if rewards else "Epsilon is sampled at checkpoints; overrides = total EpsilonNice moves / total moves in each window."
-            if exploration else "Score percentiles summarize each run independently on shared epoch and score axes.")
+            if exploration else "Score percentiles summarize recorded episodes on shared epoch and score axes.")
     draw.text((118, height - 36), note, font=fonts[16], fill=MUTED)
     output = BytesIO()
     image.save(output, format="PNG")

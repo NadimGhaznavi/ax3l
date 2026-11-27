@@ -147,6 +147,9 @@ class EventLogDb:
                     SELECT MAX(event_id) FROM experiment_highscores WHERE event_id < e.event_id)
                 WHERE e.category = 'Configuration' AND e.name = 'configuration_compared'
                   AND r.status = 'completed' AND r.high_score = h.score AND c.seed = h.seed
+                  AND NOT EXISTS (SELECT 1 FROM events g
+                      WHERE g.category = 'Configuration' AND g.name = 'golden_config_created'
+                        AND g.process_id = e.process_id)
             )
             SELECT simulations, score, seed, run_id, reason, matched
             FROM history ORDER BY event_id
@@ -185,7 +188,7 @@ class EventLogDb:
             LEFT JOIN proposals t ON t.event_id = (
                 SELECT MIN(event_id) FROM proposals
                 WHERE run_id COLLATE utf8mb4_unicode_ci = s.run_id)
-            LEFT JOIN requests q ON (q.process_id = t.draft_id AND q.event_id < t.event_id)
+            LEFT JOIN requests q ON q.process_id = t.draft_id
                 OR q.process_id COLLATE utf8mb4_unicode_ci = s.run_id
             WHERE s.status = 'completed'
             GROUP BY s.id, s.run_id, s.started_at, s.completed_at, s.high_score, ep.total_steps, ep.episodes

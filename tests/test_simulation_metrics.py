@@ -198,11 +198,13 @@ class MetricsDatabaseTests(unittest.TestCase):
         event('reply_received', 56, process='retry', parent=3)  # Vision analysis: 4 seconds.
         event('prompt_sent', 11, process='baseline', parent=4)
         event('reply_received', 13, process='baseline', parent=4)
+        event('prompt_sent', 70, process='conversation', parent=5)
+        event('reply_received', 73, process='conversation', parent=5)  # Same experiment's evaluation.
         rows = EventLogDb(db).simulation_metrics()
         self.assertEqual([row['run_id'] for row in rows], ['baseline', 'retry', 'missing'])
         self.assertEqual([float(row['runtime_seconds']) for row in rows], [10, 20, 10])
         self.assertEqual(float(rows[0]['llm_seconds']), 2)
-        self.assertEqual(float(rows[1]['llm_seconds']), 19.5)
+        self.assertEqual(float(rows[1]['llm_seconds']), 22.5)
         self.assertIsNone(rows[2]['llm_seconds'])
         self.assertEqual(rows[1]['total_steps'], 400)
         self.assertEqual(rows[1]['steps_per_episode'], 200)

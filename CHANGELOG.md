@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.0.5] - 2026-11-27 @ 18:56
+
 ### Summary
 
 Run and evaluate one view at a time, retain comparison history only for the

@@ -146,8 +146,10 @@ The reporting homepage shows eight collapsible Experiment Status sections: the
 four result evaluations followed by the four parameter selections in their saved
 order. Each section links to its recorded LLM prompt and response and shows its
 hypothesis, observations where applicable, parameter descriptions, baseline and
-chosen values, and saved state. Elapsed time and input/output tokens appear once
-per conversation. Shared parameter choices identify the view that submitted them.
+chosen values, and saved state. Elapsed time and input/output tokens appear in
+each section's title bar, including when collapsed. The Totals box sums the
+recorded conversation metrics across all eight sections and updates on refresh.
+Shared parameter choices identify the view that submitted them.
 Waiting views do not reuse submissions from an older selection pass. Synthetic
 startup choices are identified separately and have no fabricated prompt or token
 counts. Automatic refresh retains expanded sections and horizontal table scroll.

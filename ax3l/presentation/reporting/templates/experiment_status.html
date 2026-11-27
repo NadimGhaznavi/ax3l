@@ -1,6 +1,12 @@
+{% macro metrics(values) -%}
+<span class="view-metrics"><span>Elapsed ({{ values.elapsed }})</span>, <span>tokens in ({{ '{:,}'.format(values.input_tokens) if values.input_tokens is not none else '—' }})</span>, <span>tokens out ({{ '{:,}'.format(values.output_tokens) if values.output_tokens is not none else '—' }})</span></span>
+{%- endmacro %}
+<div class="view-totals" id="experiment-totals" role="status" aria-label="Experiment totals">
+  <strong>Totals:</strong> {{ metrics(experiment_totals) }}
+</div>
 {% for view in experiment_sections %}
 <details class="view-section" id="{{ view.id }}"{% if view.open %} open{% endif %}>
-  <summary><span>{{ view.title }}</span><span class="view-state{% if view.status == 'Failed' %} failed{% endif %}">{{ view.status }}</span></summary>
+  <summary><span class="view-heading"><span>{{ view.title }}: {{ metrics(view) }}</span><span class="view-state{% if view.status == 'Failed' %} failed{% endif %}">{{ view.status }}</span></span></summary>
   <div class="view-body">
     <div class="view-links">
       {% if view.prompt_id %}<a href="/events/{{ view.prompt_id }}">View prompt sent to LLM</a>
@@ -14,8 +20,7 @@
       <table class="view-table" aria-label="{{ view.title }} status">
         <thead><tr>
           <th scope="col">Saved</th><th scope="col">Setting or step</th><th scope="col">LLM details</th>
-          <th scope="col">Baseline</th><th scope="col">LLM choice</th><th scope="col">Elapsed</th>
-          <th scope="col">Input tokens</th><th scope="col">Output tokens</th>
+          <th scope="col">Baseline</th><th scope="col">LLM choice</th>
         </tr></thead>
         <tbody>
           <tr class="view-conversation">
@@ -24,16 +29,12 @@
             <td>{% if view.response_id %}<a href="/events/{{ view.response_id }}">Response</a>{% if view.has_reason %}<br><a href="/events/{{ view.response_id }}/reason">Reasoning</a>{% endif %}{% else %}—{% endif %}</td>
             <td>—</td>
             <td>{{ view.observations or ('Hypothesis and parameters saved.' if view.saved else ('Startup file values.' if view.synthetic else 'Awaiting LLM submission.')) }}</td>
-            <td class="view-metric">{{ view.elapsed }}</td>
-            <td class="view-metric">{{ '{:,}'.format(view.input_tokens) if view.input_tokens is not none else '—' }}</td>
-            <td class="view-metric">{{ '{:,}'.format(view.output_tokens) if view.output_tokens is not none else '—' }}</td>
           </tr>
           {% for row in view.rows %}
           <tr>
             <td class="saved-cell">{% if view.stage == 'selection' %}<input type="checkbox" disabled{% if row.saved %} checked{% endif %} aria-label="{{ row.label }} saved">{% else %}—{% endif %}</td>
             <td>{{ row.label }}{% if row.description %} <span class="metadata">{{ row.description }}</span>{% endif %}</td>
             <td>{% if row.shared %}Set by <a href="#{{ row.shared.id }}">{{ row.shared.label }}</a>{% else %}—{% endif %}</td><td>{{ row.baseline }}</td><td{% if row.changed %} class="choice-changed"{% endif %}>{{ row.choice }}</td>
-            <td>—</td><td>—</td><td>—</td>
           </tr>
           {% endfor %}
         </tbody>

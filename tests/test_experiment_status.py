@@ -17,7 +17,7 @@ from ax3l.interface.database.EventLogDb import EventLogDb
 from ax3l.interface.database.ExperimentDb import ExperimentDb
 from ax3l.interface.database.ExperimentStatusDb import ExperimentStatusDb
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
-from ax3l.presentation.reporting.ExperimentStatus import experiment_sections
+from ax3l.presentation.reporting.ExperimentStatus import experiment_sections, experiment_totals
 from ax3l.presentation.reporting.ReportRenderer import ReportRenderer
 
 
@@ -70,6 +70,9 @@ class PanelParser(HTMLParser):
     def __init__(self, html):
         super().__init__()
         self.panels, self.links = [], []
+        self.summaries, self.totals, self.table_rows = [], [], []
+        self._text = None
+        self._view_table = False
         self.feed(html)
 
     def handle_starttag(self, tag, attrs):
@@ -78,6 +81,28 @@ class PanelParser(HTMLParser):
             self.panels.append(attrs)
         if tag == 'a':
             self.links.append(attrs['href'])
+        if tag == 'summary':
+            self.summaries.append([])
+            self._text = self.summaries[-1]
+        if tag == 'div' and attrs.get('id') == 'experiment-totals':
+            self._text = self.totals
+        if tag == 'table' and attrs.get('class') == 'view-table':
+            self._view_table = True
+        if self._view_table:
+            if tag == 'tr':
+                self.table_rows.append([])
+            elif tag in ('td', 'th'):
+                self.table_rows[-1].append(tag)
+
+    def handle_endtag(self, tag):
+        if tag == 'summary' or (tag == 'div' and self._text is self.totals):
+            self._text = None
+        if tag == 'table':
+            self._view_table = False
+
+    def handle_data(self, data):
+        if self._text is not None:
+            self._text.append(data)
 
 
 class ExperimentStatusTests(unittest.TestCase):
@@ -107,14 +132,54 @@ class ExperimentStatusTests(unittest.TestCase):
         self.assertIn('/events/30', parsed.links)
         self.assertIn('/events/32', parsed.links)
         self.assertIn('/events/32/reason', parsed.links)
-        for heading in ('Saved', 'Setting or step', 'LLM details', 'Baseline', 'LLM choice',
-                        'Elapsed', 'Input tokens', 'Output tokens'):
+        for heading in ('Saved', 'Setting or step', 'LLM details', 'Baseline', 'LLM choice'):
             self.assertEqual(html.count(f'>{heading}</th>'), 8)
+        for heading in ('Elapsed', 'Input tokens', 'Output tokens'):
+            self.assertNotIn(f'>{heading}</th>', html)
+        self.assertTrue(all(len(row) == 5 for row in parsed.table_rows))
+        self.assertIn('Reward Signals Evaluation: Elapsed (00:03), tokens in (2,241), tokens out (578)',
+                      ''.join(parsed.summaries[0]))
+        self.assertEqual(''.join(parsed.totals).strip(),
+                         'Totals: Elapsed (00:06), tokens in (4,482), tokens out (1,156)')
         self.assertIn('Food Reward', html)
         self.assertIn('Reward for eating food.', html)
         self.assertEqual(html.count('2,241'), 2)
         self.assertIn('viewStatus.replaceChildren', html)
         self.assertIn('section.open = saved.open', html)
+
+    def test_totals_combine_all_eight_sections_including_active_elapsed(self):
+        data = status_data()
+        data['events'] = []
+        for index, (stage, name) in enumerate((stage, name) for stage in ('evaluation', 'selection')
+                                             for name in VIEWS):
+            events = conversation(data['evaluation_id'] if stage == 'evaluation' else data['state'].experiment_id,
+                                  name, stage, start=10 + index * 10, accepted=index != 7, ended=index != 7)
+            seconds = (3, 63, 1801, 2403, 0, 4800, 97, 1)[index]
+            start = events[1]['occurred_at']
+            for event in events:
+                event['observed_at'] = start + timedelta(seconds=seconds)
+            if index != 7:
+                events[-1]['occurred_at'] = start + timedelta(seconds=seconds)
+            data['events'].extend(events)
+        totals = experiment_totals(experiment_sections(data))
+        self.assertEqual(totals, dict(elapsed='02:32:48', input_tokens=17928, output_tokens=4624))
+        parsed = PanelParser(render_status(data))
+        self.assertEqual(''.join(parsed.totals).strip(),
+                         'Totals: Elapsed (02:32:48), tokens in (17,928), tokens out (4,624)')
+
+    def test_totals_preserve_missing_metrics_and_measured_zero_usage(self):
+        data = status_data()
+        self.assertEqual(experiment_totals(experiment_sections(data)),
+                         dict(elapsed='—', input_tokens=None, output_tokens=None))
+        data['events'] = conversation('selection-cycle', 'training', 'selection')
+        response = json.loads(data['events'][2]['content'])
+        response['usage'] = dict(prompt_tokens=0)
+        data['events'][2]['content'] = json.dumps(response)
+        self.assertEqual(experiment_totals(experiment_sections(data)),
+                         dict(elapsed='00:03', input_tokens=0, output_tokens=None))
+        parsed = PanelParser(render_status(data))
+        self.assertEqual(''.join(parsed.totals).strip(),
+                         'Totals: Elapsed (00:03), tokens in (0), tokens out (—)')
 
     def test_prior_evaluation_hypothesis_survives_selection_and_simulation_phases(self):
         data = status_data()

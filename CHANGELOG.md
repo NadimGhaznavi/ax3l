@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Keep experiment timing and token usage visible in section title bars and a
+combined totals box.
+
+### Changed
+
+- Move elapsed time and input/output token counts into each Experiment Status
+  section's title bar and remove their three table columns. Widen the remaining
+  settings and choice columns, and add a Totals box that sums recorded metrics
+  across all eight sections and updates with the existing refresh.
+
 ## [5.0.3] - 2026-11-26 @ 17:30
 
 ### Summary

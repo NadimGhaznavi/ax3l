@@ -386,17 +386,18 @@ class ViewCycleTests(unittest.TestCase):
             submit.assert_called_once()
         self.assertEqual(self.model.requests, [])
 
-    def test_existing_identical_run_does_not_resolve_a_new_submission(self):
-        self.loop().run(cycles=1)
-        winner = self.store.load().golden_run_id
+    def test_an_identical_control_baseline_does_not_resolve_a_new_submission(self):
+        config = SimulationConfiguration.defaults()
+        previous = self.snake.submit_simulation(config)
+        self.store.save(ExperimentState('baseline-attempt', 'ready', config, baseline=True))
         with patch.object(self.snake, 'submit_simulation', side_effect=TimeoutError('No reply')) as submit:
             with self.assertRaises(TimeoutError):
                 self.loop().run(cycles=1)
-            self.assertEqual(self.store.load().preceding_match, winner)
+            self.assertEqual(self.store.load().preceding_match, previous)
             with self.assertRaisesRegex(RuntimeError, 'will not be retried'):
                 self.loop().run(cycles=1)
             submit.assert_called_once()
-        self.assertEqual(len(self.snake.submissions), 3)
+        self.assertEqual(len(self.snake.submissions), 1)
 
     def test_invalid_proposal_stops_before_candidate_submission_and_can_resume(self):
         original = self.model.respond
@@ -468,9 +469,25 @@ class ProposalBoundaryTests(unittest.TestCase):
         hypothesis = 'x' * DViewConversation.HYPOTHESIS_MAX_LENGTH
         llm.complete.return_value = 200, '', self.response('submit_view', dict(
             hypothesis=hypothesis, values={'training.gamma': .95}))
-        result = conversation.propose(VIEWS['training'], 'Tune training.',
-                                      SimulationConfiguration.defaults(), 'experiment')
+        result = conversation.propose(VIEWS['training'], 'Tune training.', 'experiment')
         self.assertEqual(result.hypothesis, hypothesis)
+
+    def test_simulation_values_are_left_for_snakelab_to_validate(self):
+        for values in (
+            {'game.rewards.closer_to_food': 5, 'game.rewards.further_from_food': -1},
+            {'game.rewards.closer_to_food': 5},
+            {'game.rewards.further_from_food': 0},
+            {'game.rewards.food': 21},
+            {'game.rewards.food': True},
+        ):
+            with self.subTest(values=values):
+                llm, log = Mock(url='http://local'), MemoryLog()
+                arguments = dict(hypothesis='Test reward signals.', values=values)
+                llm.complete.return_value = 200, '', self.response('submit_view', arguments)
+                result = ViewConversation(llm, log).propose(VIEWS['reward-signals'], 'Tune rewards.', 'experiment')
+                self.assertEqual(result.values, values)
+                self.assertEqual(log.events[-1]['log_level'], 'INFO')
+                llm.complete.assert_called_once()
 
     def test_evaluation_rejects_a_configuration_submission(self):
         llm, log = Mock(url='http://local'), MemoryLog()
@@ -485,11 +502,8 @@ class ProposalBoundaryTests(unittest.TestCase):
         template = dict(hypothesis='Test rewards.',
                         values={'game.rewards.food': 12})
         cases = [
-            dict(template, values={'game.rewards.food': True}),
-            dict(template, values={'game.rewards.food': 21}),
             dict(template, values={'game.rewards.food': float('nan')}),
             dict(template, values={'training.sequence_length': 8}),
-            dict(template, values={'game.rewards.closer_to_food': 5, 'game.rewards.further_from_food': -1}),
             dict(template, hypothesis='  '),
             dict(template, hypothesis='x' * (DViewConversation.HYPOTHESIS_MAX_LENGTH + 1)),
             dict(template, evaluation='Evaluation belongs in its own conversation.'),
@@ -503,8 +517,7 @@ class ProposalBoundaryTests(unittest.TestCase):
                 ]))])).encode())
                 log = MemoryLog()
                 with self.assertRaises((ValueError, ValidationError)):
-                    ViewConversation(llm, log).propose(view, 'Tune rewards.',
-                                                       SimulationConfiguration.defaults(), 'experiment')
+                    ViewConversation(llm, log).propose(view, 'Tune rewards.', 'experiment')
                 llm.complete.assert_called_once()
                 self.assertEqual(log.events[-1]['name'], 'conversation_ended')
                 self.assertEqual(log.events[-1]['log_level'], 'ERROR')
@@ -517,7 +530,6 @@ class ProposalBoundaryTests(unittest.TestCase):
                 llm, log = Mock(url='http://local'), MemoryLog()
                 llm.complete.return_value = status, '', body
                 with self.assertRaises((ValueError, ValidationError, RuntimeError)):
-                    ViewConversation(llm, log).propose(VIEWS['training'], 'Tune training.',
-                                                       SimulationConfiguration.defaults(), 'experiment')
+                    ViewConversation(llm, log).propose(VIEWS['training'], 'Tune training.', 'experiment')
                 llm.complete.assert_called_once()
                 self.assertEqual(log.events[-1]['name'], 'conversation_ended')

@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Keep experiment timing and token usage visible in section title bars and a
 combined totals box, and give evaluation observations their own space above the
 configuration comparison.
+Return duplicate configurations to a randomly selected Selection view, and leave
+simulation validation to SnakeLab's JSON schema.
 
 ### Changed
 
@@ -24,6 +26,19 @@ configuration comparison.
 - Move Evaluation observations beneath the hypothesis, showing the current status
   until observations are submitted, followed by Reasoning and Response (details)
   links. Simplify Evaluation tables to Configuration Setting, Baseline, and Latest.
+- Check proposed configurations against existing simulations, including their
+  seed, before submission. For duplicates, randomly select one of the four
+  Selection views and prepend "This configuration is a duplicate, please select
+  different values." Preserve the other choices, checkpoint the selected view
+  for restart, and check each revised configuration again.
+
+### Removed
+
+- Remove Ax3l's combined closer/farther reward restriction and local simulation
+  configuration validation from proposal acceptance, startup loading, checkpoint
+  reads, seed increments, and submission. Keep JSON rules as LLM guidance and let
+  SnakeLab validate simulation settings; retain LLM response-format and view-scope
+  checks.
 
 ## [5.0.3] - 2026-11-26 @ 17:30
 

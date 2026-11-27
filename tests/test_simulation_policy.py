@@ -1,4 +1,4 @@
-"""Ax3l's experiment policy remains compatible with the bundled Snake Lab schema."""
+"""JSON rules used as LLM guidance remain compatible with SnakeLab's schema."""
 
 import json
 from pathlib import Path
@@ -6,7 +6,10 @@ import unittest
 
 from jsonschema import Draft202012Validator, ValidationError
 
-from ax3l.interface.SimulationConfiguration import SimulationConfiguration
+from ax3l.interface.SimulationConfiguration import SCHEMA, SimulationConfiguration
+
+
+POLICY_SCHEMA = Draft202012Validator(SCHEMA)
 
 
 class SimulationPolicyTests(unittest.TestCase):
@@ -35,10 +38,10 @@ class SimulationPolicyTests(unittest.TestCase):
                 node = node[key]
             node[path[-1]] = value
             with self.subTest(path=path), self.assertRaises(ValidationError):
-                SimulationConfiguration.validate(config)
+                POLICY_SCHEMA.validate(config)
         config = SimulationConfiguration.defaults()
         config['epsilon']['decay'] = .999
-        SimulationConfiguration.validate(config)
+        POLICY_SCHEMA.validate(config)
 
     def test_model_boundaries_are_accepted_by_the_server_schema(self):
         root = Path(__file__).resolve().parents[1]
@@ -49,9 +52,9 @@ class SimulationPolicyTests(unittest.TestCase):
             for value in ((32, 64, 128) if field == 'hidden_size' else (1, 2, 3) if field == 'layers' else (0, .05, .1)):
                 value = float(value) if field == 'dropout' else int(value)
                 with self.subTest(field=field, value=value):
-                    self.assertEqual(SimulationConfiguration.value(('model', field), value), value)
+                    Draft202012Validator(SimulationConfiguration.field(('model', field))).validate(value)
                     config['model'][field] = value
-                    SimulationConfiguration.validate(config)
+                    POLICY_SCHEMA.validate(config)
                     upstream.validate(config)
 
     def test_reward_policy_boundaries_match_the_server_schema(self):
@@ -60,42 +63,33 @@ class SimulationPolicyTests(unittest.TestCase):
             (root / 'pages/snake-lab/simulation-config-v2.schema.json').read_text()))
         config = SimulationConfiguration.defaults()
         upstream.validate(config)
-        for closer, further in ((0, -5), (.1, -.1), (1, -1), (5, -5)):
+        for closer, further in ((0, -5), (.1, -.1), (1, -1), (5, -5), (5, -1), (5, 0)):
             config['game']['rewards'].update(closer_to_food=float(closer), further_from_food=float(further))
-            SimulationConfiguration.validate(config)
+            POLICY_SCHEMA.validate(config)
             upstream.validate(config)
         for probability, steps in ((.0001, 1), (.01, 20), (.1, 40)):
             config['epsilon_nice'].update(probability=probability, steps=steps)
-            SimulationConfiguration.validate(config)
+            POLICY_SCHEMA.validate(config)
             upstream.validate(config)
 
     def test_epsilon_nice_limits_apply_to_field_choices_and_complete_configurations(self):
         for probability, steps in ((.0001, 1), (.05, 20), (.1, 40)):
             with self.subTest(probability=probability, steps=steps):
-                self.assertEqual(SimulationConfiguration.value(('epsilon_nice', 'probability'), probability), probability)
-                self.assertEqual(SimulationConfiguration.value(('epsilon_nice', 'steps'), steps), steps)
+                Draft202012Validator(SimulationConfiguration.field(('epsilon_nice', 'probability'))).validate(probability)
+                Draft202012Validator(SimulationConfiguration.field(('epsilon_nice', 'steps'))).validate(steps)
                 config = SimulationConfiguration.defaults()
                 config['epsilon_nice'].update(probability=probability, steps=steps)
-                SimulationConfiguration.validate(config)
+                POLICY_SCHEMA.validate(config)
         for field, values in (('probability', (0, .100001, .11, 1)), ('steps', (0, 41, 60, 1000))):
             for value in values:
                 with self.subTest(field=field, value=value):
                     with self.assertRaises(ValidationError):
-                        SimulationConfiguration.value(('epsilon_nice', field), value)
+                        Draft202012Validator(SimulationConfiguration.field(('epsilon_nice', field))).validate(value)
                     config = SimulationConfiguration.defaults()
                     config['epsilon_nice'][field] = value
                     with self.assertRaises(ValidationError) as error:
-                        SimulationConfiguration.validate(config)
+                        POLICY_SCHEMA.validate(config)
                     self.assertEqual(list(error.exception.absolute_path), ['epsilon_nice', field])
-
-    def test_positive_reward_loops_and_nonfinite_proposals_are_rejected(self):
-        config = SimulationConfiguration.defaults()
-        config['game']['rewards'].update(closer_to_food=5, further_from_food=0)
-        with self.assertRaisesRegex(ValidationError, 'rewarding loops'):
-            SimulationConfiguration.validate(config)
-        for value in (True, '.01', float('nan'), float('inf')):
-            with self.subTest(value=value), self.assertRaises(ValidationError):
-                SimulationConfiguration.value(('epsilon_nice', 'probability'), value)
 
     def test_food_move_and_collision_rewards_accept_boundaries_and_fractional_values(self):
         root = Path(__file__).resolve().parents[1]
@@ -106,10 +100,10 @@ class SimulationPolicyTests(unittest.TestCase):
             for value in values:
                 with self.subTest(field=field, value=value):
                     path = ('game', 'rewards', field)
-                    self.assertEqual(SimulationConfiguration.value(path, value), value)
+                    Draft202012Validator(SimulationConfiguration.field(path)).validate(value)
                     config = SimulationConfiguration.defaults()
                     config['game']['rewards'][field] = value
-                    SimulationConfiguration.validate(config)
+                    POLICY_SCHEMA.validate(config)
                     upstream.validate(config)
 
     def test_reward_limits_apply_to_choices_and_complete_configurations(self):
@@ -120,9 +114,9 @@ class SimulationPolicyTests(unittest.TestCase):
                 with self.subTest(field=field, value=value):
                     path = ('game', 'rewards', field)
                     with self.assertRaises(ValidationError):
-                        SimulationConfiguration.value(path, value)
+                        Draft202012Validator(SimulationConfiguration.field(path)).validate(value)
                     config = SimulationConfiguration.defaults()
                     config['game']['rewards'][field] = value
                     with self.assertRaises(ValidationError) as error:
-                        SimulationConfiguration.validate(config)
+                        POLICY_SCHEMA.validate(config)
                     self.assertEqual(tuple(error.exception.absolute_path), path)

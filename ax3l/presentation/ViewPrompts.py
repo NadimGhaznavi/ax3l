@@ -16,12 +16,15 @@ class ViewPrompts:
             undefined=StrictUndefined, autoescape=False, keep_trailing_newline=True,
         )
 
-    def render(self, view: ExperimentView, context: dict) -> str:
+    def render(self, view: ExperimentView, context: dict, *, duplicate: bool = False) -> str:
         prompt = self._templates.get_template(f"selections/{view.name}.md").render(**context)
         submission = self._templates.get_template("selections/proposal-submission.md").render(
             hypothesis_max_length=DViewConversation.HYPOTHESIS_MAX_LENGTH,
         )
         prompt += "\n\n" + submission
+        if duplicate:
+            notice = self._templates.get_template("selections/duplicate-configuration.md").render()
+            prompt = notice.strip() + "\n\n" + prompt
         return prompt
 
     def render_evaluation(self, view: ExperimentView, context: dict) -> list[dict]:

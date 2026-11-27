@@ -189,3 +189,10 @@ class HighscoreDatabaseTests(unittest.TestCase):
                           (7, 40, 2, 0), (8, 40, 2, 1), (14, 0, 3, 0), (15, 0, 3, 1)])
         self.assertEqual(history[1]['run_id'], 'run-2')
         self.assertEqual(history[1]['reason'], 'Comparison 2')
+
+        # Promoting a tie replaces its legacy match point with one golden point.
+        event(17, 15, golden=True)
+        db.execute('INSERT INTO experiment_highscores VALUES (17, 15, 0, 3)')
+        promoted = [row for row in EventLogDb(db).experiment_highscores() if row['run_id'] == 'run-15']
+        self.assertEqual(len(promoted), 1)
+        self.assertEqual(promoted[0]['matched'], 0)

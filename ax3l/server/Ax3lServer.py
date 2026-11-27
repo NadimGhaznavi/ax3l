@@ -16,7 +16,7 @@ def main() -> int:
     parser.add_argument("--zmq-endpoint", default=None)
     parser.add_argument("--llm-url", type=Configuration.validate_llamasrv_url,
                         help="Override the configured LlamaSrv base URL")
-    parser.add_argument("--cycles", type=int, help="Stop after this many completed configuration experiments")
+    parser.add_argument("--cycles", type=int, help="Stop after this many completed single-view experiments")
     args = parser.parse_args()
     if args.cycles is not None and args.cycles < 1:
         parser.error("--cycles must be a positive integer")

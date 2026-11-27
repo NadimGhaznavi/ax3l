@@ -193,10 +193,6 @@ exec /usr/bin/systemd-analyze "$@"
                 for asset in (ROOT / 'ax3l/presentation/prompts').rglob('*.md'):
                     installed = self.app / asset.relative_to(ROOT)
                     self.assertEqual(installed.read_bytes(), asset.read_bytes(), str(asset))
-                for asset in (ROOT / 'conf/synthetic').iterdir():
-                    installed = self.app / asset.relative_to(ROOT)
-                    self.assertEqual(installed.read_bytes(), asset.read_bytes(), str(asset))
-                    self.assertEqual(installed.stat().st_mode & 0o777, 0o644)
                 smoke = subprocess.run([sys.executable, '-c', '''
 import sys
 sys.modules['kaleido'] = None
@@ -205,7 +201,6 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 from ax3l.activity.ExperimentHighscores import highscores
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
-from ax3l.interface.SyntheticExperimentConfiguration import SyntheticExperimentConfiguration
 from ax3l.entities.ExperimentView import VIEWS
 from ax3l.presentation.ViewPrompts import ViewPrompts
 from ax3l.server.Ax3lServer import main
@@ -215,7 +210,6 @@ ReportRenderer()
 assert 'Plotly.newPlot' in highscores([dict(simulations=1, score=0, seed=1,
     run_id='initial-run', reason='Baseline', matched=False)], 1)['chart']
 assert SimulationConfiguration.defaults()['model']['hidden_size'] == 64
-assert set(SyntheticExperimentConfiguration.load()) == set(VIEWS)
 templates = Environment(loader=FileSystemLoader(Path('ax3l/presentation/reporting/templates')))
 assert templates.get_template('events.html')
 for view in VIEWS.values():
@@ -232,7 +226,8 @@ for view in VIEWS.values():
     )
     content = ViewPrompts().render(view, context)
     assert content
-    assert isinstance(content, str)
+    assert content[1]['type'] == 'image_url'
+    assert ViewPrompts().render(view, context, no_history=True)[1]['type'] == 'image_url'
     assert ViewPrompts().render_evaluation(view, context)[1]['type'] == 'image_url'
 '''], cwd=self.app, env=dict(os.environ, PYTHONPATH=str(self.app), PYTHONDONTWRITEBYTECODE='1'),
                     capture_output=True, text=True, timeout=10)
@@ -250,19 +245,6 @@ for view in VIEWS.values():
                 self.assertEqual(starts, ['systemctl start reporting-server.service',
                                           'systemctl start ax3l-server.service',
                                           'systemctl start watchdog.service'])
-
-    def test_upgrade_preserves_edits_to_synthetic_configuration_and_hypotheses(self):
-        self.prepare()
-        self.assertEqual(self.run_installer().returncode, 0)
-        directory = self.app / 'conf/synthetic'
-        config = json.loads((directory / 'config.json').read_text())
-        config['model']['hidden_size'] = 80
-        (directory / 'config.json').write_text(json.dumps(config))
-        for path in directory.glob('*.md'):
-            path.write_text('An edited hypothesis should be preserved.\n')
-        edited = {path.name: path.read_bytes() for path in directory.iterdir()}
-        self.assertEqual(self.run_installer().returncode, 0)
-        self.assertEqual({path.name: path.read_bytes() for path in directory.iterdir()}, edited)
 
     def test_fresh_install_needs_no_model_binary_or_files(self):
         self.prepare()

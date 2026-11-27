@@ -25,40 +25,41 @@ The LLM used by the project is [Qwen 3.5 - 4B](https://huggingface.co/Qwen/Qwen3
 
 ## Conversation workflows
 
-After a simulation finishes, Ax3l runs four result evaluation conversations,
-one each for Reward Signals, Architecture, Training, and Exploration. Each
-receives its hypothesis, choices, and a comparison image, and submits short
-Observations. The images are currently labeled placeholders; the four evaluation
-templates provide a skeleton for future comparison content.
+Fresh startup submits the default baseline before the first LLM request.
+Ax3l shuffles Reward Signals, Architecture, Training, and Exploration each round,
+and runs one selection, simulation, comparison, and evaluation per view before
+moving to the next view. Each candidate starts from the current golden settings.
+A candidate with an equal or higher high score becomes golden.
 
-After all four evaluations, Ax3l shuffles the views and requests four new
-configuration proposals. Fresh startup runs the default baseline and a synthetic
-experiment from editable files in `conf/synthetic/` before the first LLM request.
-Each view receives its previous hypothesis, choices,
-and Observations, editable setting rules, and read-only configuration context.
-Hypotheses and Observations each have a hard limit of 280 characters. The
-application assembles the complete draft and checks for an existing simulation
-with the same settings and seed. Duplicate drafts return to a randomly selected
-Selection view with a duplicate notice; the saved choice survives restarts.
-SnakeLab validates submitted configurations against its JSON schema. Ax3l
-compares the completed result before evaluating it. Both passes
-use native function calls through the shared LLM HTTP interface. View sequencing
-and draft assembly are internal to Ax3l; no MCP process or external registration
-is required.
+Only the view that produced the current golden receives its winning hypothesis,
+choices, Observations, and original golden/latest comparison on its next turn.
+Other views receive no-history prompts and a chart of the current golden alone.
+Each evaluation uses the active view's hypothesis and the actual reference and
+candidate results, even after promotion. Hypotheses and Observations are limited
+to 280 characters. Both conversation stages use native function calls through
+the shared LLM HTTP interface.
 
-Each view can request `new seed`. It starts false and becomes read-only once
-requested. After assembling the proposals, Ax3l increments the numeric seed and
-runs the golden settings first, then the proposed configuration, on that same
-seed. The golden run establishes a fresh baseline even if lower than before;
-the candidate must beat that baseline. Both runs are checkpointed for restart.
+Sequence length remains editable by Architecture and Training; gamma remains
+editable by Training and Reward Signals. Since each proposal is simulated
+separately, shared settings are available on every eligible turn. Duplicate
+candidates return to the same view with a notice and the rejected proposal.
+SnakeLab validates submitted configurations against its JSON schema.
 
-`ExperimentState` and `ViewProposal` hold data. The view configuration activity
-prepares settings context without external access. `ViewPrompts` owns the tuning
-and evaluation presentation resources, and `ComparisonImage` supplies the image
-placeholder. `ViewConversation` owns the inference response boundary,
-and `ExperimentDb` owns checkpoint queries through the shared `DbMgr`.
-`ExperimentLoop` sequences their work. Snapshots, submission intent, and accepted
-choices and Observations survive restarts. See [Runtime Behaviour](/pages/runtime-behaviour).
+Seed rotation belongs to the system. Sixteen consecutive strictly lower candidate
+scores trigger a seed increment and a run of the current golden settings on that
+seed. That run establishes a new baseline, clears comparison ownership, and
+resets the counter. Any candidate promotion, including a tie, also resets it.
+Baseline runs and duplicate revisions do not count as unsuccessful candidates.
+
+`ExperimentState`, `ViewProposal`, and `ViewHistory` hold checkpoint data. The
+view configuration activity prepares settings context. `ViewPrompts` owns prompt
+presentation, and `RunComparisonImage` renders recorded per-view measurements
+for either one baseline or a golden/latest comparison. `ViewConversation` owns
+the inference response boundary and labels conversation stages explicitly, since
+both stages now include images. `ExperimentDb` persists checkpoints through the
+shared `DbMgr`; `ExperimentLoop` sequences their work. Submission intent, shuffled
+order, active view, golden evidence, and the failure counter survive restarts.
+See [Runtime Behaviour](/pages/runtime-behaviour).
 
 ## MariaDB
 

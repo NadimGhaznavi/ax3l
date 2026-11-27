@@ -16,16 +16,20 @@ class ViewPrompts:
             undefined=StrictUndefined, autoescape=False, keep_trailing_newline=True,
         )
 
-    def render(self, view: ExperimentView, context: dict, *, duplicate: bool = False) -> str:
-        prompt = self._templates.get_template(f"selections/{view.name}.md").render(**context)
-        submission = self._templates.get_template("selections/proposal-submission.md").render(
+    def render(self, view: ExperimentView, context: dict, *, no_history: bool = False,
+               duplicate: bool = False) -> list[dict]:
+        folder = "selections-no-history" if no_history else "selections"
+        prompt = self._templates.get_template(f"{folder}/{view.name}.md").render(**context)
+        submission = self._templates.get_template(f"{folder}/proposal-submission.md").render(
             hypothesis_max_length=DViewConversation.HYPOTHESIS_MAX_LENGTH,
         )
         prompt += "\n\n" + submission
         if duplicate:
-            notice = self._templates.get_template("selections/duplicate-configuration.md").render()
+            notice = self._templates.get_template("common/duplicate-configuration.md").render(**context)
             prompt = notice.strip() + "\n\n" + prompt
-        return prompt
+        image = run_comparison_image(view, context["reference_episodes"],
+                                     None if no_history else context["latest_episodes"])
+        return [dict(type="text", text=prompt), dict(type="image_url", image_url=dict(url=image))]
 
     def render_evaluation(self, view: ExperimentView, context: dict) -> list[dict]:
         prompt = self._templates.get_template(f"evaluations/{view.name}.md").render(

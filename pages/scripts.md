@@ -127,11 +127,12 @@ Start the continuous four-view experiment service with:
 .venv/bin/python -m ax3l.server.Ax3lServer
 ```
 
-Use `--cycles 1` to stop after one complete four-view experiment, excluding
-initial baseline creation or the synthetic first experiment and its evaluations.
-Edit the five startup files in `/opt/prod/ax3l/conf/synthetic/` before initializing
-a fresh history; upgrades preserve those edits. See
-[editable first experiment](runtime-behaviour.md#editable-first-experiment).
+Use `--cycles 1` to stop after one view's selection, simulation, and evaluation,
+or `--cycles 4` for four view turns. Initial and rotated-seed baselines do not
+count toward that limit. Each round shuffles the views; each turn starts from the
+current golden. Seed rotation is automatic after 16 consecutive strictly lower
+scores. Equal scores promote the candidate and reset that counter. See
+[runtime behavior](runtime-behaviour.md).
 `--llm-url http://HOST:51001` overrides the configured
 inference URL. The old optimization entry point and raw-output options remain
 removed. Fresh installations generate configuration without the retired

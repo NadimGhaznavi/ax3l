@@ -29,7 +29,7 @@ def conversation(process, name, stage, start=10, accepted=True, error=None, ende
                    observed_at=now + timedelta(seconds=5),
                    name=name, category=category, log_level='INFO', process_id=process,
                    parent_event_id=start - 1, parameter=parameter, content=content,
-                   prompt_type=None)
+                   prompt_type=None, source_name=stage)
         row.update(fields)
         rows.append(row)
     parameter = name
@@ -52,7 +52,7 @@ def conversation(process, name, stage, start=10, accepted=True, error=None, ende
 def status_data():
     baseline = SimulationConfiguration.defaults()
     state = ExperimentState('selection-cycle', 'choosing', deepcopy(baseline), order=list(reversed(VIEWS)),
-                            previous={name: ViewProposal('Previous tested hypothesis.', {}) for name in VIEWS},
+                            proposals={name: ViewProposal('Previous tested hypothesis.', {}) for name in VIEWS},
                             observations={name: 'Previous observations.' for name in VIEWS})
     return dict(state=state, events=[], selection_config=baseline, reference_config=baseline,
                 latest_config=apply_values(baseline, {'game.rewards.food': 12}), evaluation_id='evaluation-cycle')
@@ -198,15 +198,11 @@ class ExperimentStatusTests(unittest.TestCase):
         self.assertEqual(''.join(parsed.totals).strip(),
                          'Totals: Elapsed (00:03), tokens in (0), tokens out (—)')
 
-    def test_prior_evaluation_hypothesis_survives_selection_and_simulation_phases(self):
+    def test_evaluation_shows_the_active_views_proposal(self):
         data = status_data()
-        data['state'].proposals['reward-signals'] = ViewProposal('New hypothesis, not evaluated yet.', {})
-        for phase in ('choosing', 'ready', 'submitting', 'running', 'comparing'):
-            data['state'].phase = phase
-            self.assertEqual(experiment_sections(data)[0]['hypothesis'], 'Previous tested hypothesis.')
-        data['state'].phase = 'evaluating'
-        data['evaluation_id'] = data['state'].experiment_id
-        self.assertEqual(experiment_sections(data)[0]['hypothesis'], 'New hypothesis, not evaluated yet.')
+        data['state'].proposals = {'reward-signals': ViewProposal('Current tested hypothesis.', {})}
+        self.assertEqual(experiment_sections(data)[0]['hypothesis'], 'Current tested hypothesis.')
+        self.assertIsNone(experiment_sections(data)[1]['hypothesis'])
 
     def test_active_elapsed_uses_database_clock_without_adding_the_utc_offset(self):
         data = status_data()
@@ -232,20 +228,15 @@ class ExperimentStatusTests(unittest.TestCase):
             event['observed_at'] += timedelta(hours=5)
         self.assertEqual(experiment_sections(data)[0]['elapsed'], '00:03')
 
-    def test_shared_values_identify_the_view_that_saved_them(self):
+    def test_other_views_do_not_inherit_saved_choices_from_the_active_view(self):
         data = status_data()
-        data['state'].proposals['training'] = ViewProposal('A shared proposal.', {
-            'training.gamma': .95, 'training.sequence_length': 8, 'new seed': True,
-        })
-        before = deepcopy(data)
+        data['state'].proposals = {'training': ViewProposal('Training proposal.', {'training.gamma': .95})}
         sections = {s['id']: s for s in experiment_sections(data)}
-        self.assertEqual(data, before)
         gamma = next(row for row in sections['selection-reward-signals']['rows'] if row['label'] == 'Gamma')
         self.assertEqual(gamma['baseline'], '0.96')
-        self.assertEqual(gamma['choice'], '0.95')
-        self.assertTrue(gamma['saved'])
-        self.assertEqual(gamma['shared'], dict(id='selection-training', label='Training'))
-        self.assertIn('href="#selection-training"', render_status(data))
+        self.assertEqual(gamma['choice'], '—')
+        self.assertFalse(gamma['saved'])
+        self.assertIsNone(gamma['shared'])
 
     def test_pending_active_failed_and_retried_views_are_distinguished(self):
         data = status_data()
@@ -266,22 +257,14 @@ class ExperimentStatusTests(unittest.TestCase):
         self.assertEqual(section['status'], 'Saved')
         self.assertEqual(section['prompt_id'], 30)
 
-    def test_uninitialized_and_synthetic_panels_do_not_invent_model_requests(self):
+    def test_uninitialized_panels_do_not_invent_model_requests(self):
         empty = dict(state=None, events=[], selection_config=None, reference_config=None,
                      latest_config=None, evaluation_id=None)
         html = render_status(empty)
         self.assertEqual(len(PanelParser(html).panels), 8)
         self.assertEqual(html.count('Reasoning: —'), 4)
         self.assertEqual(html.count('Response (details): —'), 4)
-        data = status_data()
-        data['state'].synthetic = True
-        data['state'].proposals = {'reward-signals': ViewProposal('Startup hypothesis.', {'game.rewards.food': 12})}
-        section = next(s for s in experiment_sections(data) if s['id'] == 'selection-reward-signals')
-        self.assertEqual(section['status'], 'Synthetic startup')
-        self.assertIsNone(section['prompt_id'])
-        self.assertIsNone(section['input_tokens'])
-        self.assertFalse(section['saved'])
-        self.assertIn('Configuration and hypotheses loaded from startup files.', render_status(data))
+        self.assertNotIn('Synthetic startup', html)
 
     def test_invalid_response_is_reported_as_failure_with_missing_usage(self):
         data = status_data()
@@ -321,40 +304,31 @@ class ExperimentStatusDatabaseTests(unittest.TestCase):
             if row['name'] == 'prompt_sent':
                 content = json.dumps(dict(role='user', content=[dict(type='text', text='Evaluation'),
                     dict(type='image_url', image_url=dict(url='data:image/png;base64,LARGE_IMAGE'))]
-                    if stage == 'evaluation' else 'Select parameters.'))
+                    ))
             self.log.log(row['name'], row['category'], row['log_level'], content,
-                         process_id=process, parent_event_id=parent, parameter=name, source_name=name)
+                         process_id=process, parent_event_id=parent, parameter=name, source_name=stage)
 
-    def test_current_pass_and_preceding_evaluations_are_read_outside_recent_event_limit(self):
+    def test_current_experiment_uses_explicit_stages_for_multimodal_prompts(self):
         first, second = self.ids
         config = SimulationConfiguration.defaults()
-        state = ExperimentState(first, 'evaluating', deepcopy(config))
-        ExperimentDb(self.db).save(state)
+        ExperimentDb(self.db).save(ExperimentState(first, 'completed', deepcopy(config)))
         self.record(first, 'architecture', 'evaluation')
-        self.record(first, 'training', 'selection')  # Must not leak into the new selection pass.
         state = ExperimentState(second, 'choosing', deepcopy(config), order=list(VIEWS))
         ExperimentDb(self.db).save(state)
         self.record(second, 'reward-signals', 'selection')
+        self.record(second, 'reward-signals', 'evaluation')
         state.config['game']['rewards']['food'] = 12
         ExperimentDb(self.db).save(state)
-        for _ in range(501):
-            self.log.log('status_test', 'System', 'INFO', 'Unrelated event.', process_id=second)
         data = ExperimentStatusDb(self.db).read()
         self.assertEqual(data['state'], state)
-        self.assertEqual(data['evaluation_id'], first)
+        self.assertEqual(data['evaluation_id'], second)
         self.assertEqual(data['selection_config']['game']['rewards']['food'], 10)
         self.assertTrue(all('LARGE_IMAGE' not in (event['content'] or '') for event in data['events']))
         data.update(reference_config=config, latest_config=state.config)
         sections = {s['id']: s for s in experiment_sections(data)}
-        self.assertEqual(sections['evaluation-architecture']['status'], 'Saved')
+        self.assertEqual(sections['evaluation-reward-signals']['status'], 'Saved')
         self.assertEqual(sections['selection-reward-signals']['status'], 'Saved')
-        self.assertEqual(sections['selection-training']['status'], 'Waiting')
-        # A new evaluation pass starts pending instead of showing the preceding pass's saved views.
-        state.phase = 'evaluating'
-        ExperimentDb(self.db).save(state)
-        data = ExperimentStatusDb(self.db).read()
-        data.update(reference_config=config, latest_config=state.config)
-        self.assertTrue(all(s['status'] == 'Waiting' for s in experiment_sections(data)[:4]))
+        self.assertEqual(sections['evaluation-architecture']['status'], 'Waiting')
 
     def test_active_elapsed_uses_mariadb_time_in_a_non_utc_session(self):
         self.db.execute("SET time_zone = '-05:00'")
@@ -366,9 +340,9 @@ class ExperimentStatusDatabaseTests(unittest.TestCase):
         parent = self.log.log('conversation_started', 'Conversation', 'INFO', 'Evaluating.', process_id=process)
         self.log.log('prompt_sent', 'Conversation', 'INFO', json.dumps(dict(role='user', content=[
             dict(type='text', text='Evaluate results.')])), process_id=process,
-            parent_event_id=parent, parameter='reward-signals', source_name='reward-signals')
+            parent_event_id=parent, parameter='reward-signals', source_name='evaluation')
         request = self.log.log('llm_request_started', 'LLM', 'INFO', 'Evaluating.', process_id=process,
-                               parent_event_id=parent, parameter='reward-signals', source_name='reward-signals')
+                               parent_event_id=parent, parameter='reward-signals', source_name='evaluation')
         self.db.execute('''UPDATE events SET occurred_at = CURRENT_TIMESTAMP(6) - INTERVAL 246 SECOND
                            WHERE event_id = %s''', (request,))
         data = ExperimentStatusDb(self.db).read()

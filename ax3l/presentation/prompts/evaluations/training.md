@@ -22,6 +22,8 @@ Use the 'timer' tool to check how long you have been working on this task. The t
 
 ### Parameters
 
+The JSON below shows the changes that were made. Sometimes the hypothesis doesn't match what was actually run. In that case, evaluate the changes and ignore the hypothesis.
+
 ```json
 {{ previous_values | tojson(indent=2) }}
 ```

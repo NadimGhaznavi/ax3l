@@ -1,12 +1,33 @@
 {% macro metrics(values) -%}
 <span class="view-metrics"><span>Elapsed ({{ values.elapsed }})</span>, <span>tokens in ({{ '{:,}'.format(values.input_tokens) if values.input_tokens is not none else '—' }})</span>, <span>tokens out ({{ '{:,}'.format(values.output_tokens) if values.output_tokens is not none else '—' }})</span></span>
 {%- endmacro %}
+{% macro simulation_status(simulation) -%}
+<section class="view-simulation" aria-labelledby="simulation-status-title">
+  <div class="view-heading"><strong id="simulation-status-title">{{ 'Baseline simulation' if simulation.baseline else 'Simulation' }}</strong><span class="view-state{% if simulation.status in ('Failed', 'Cancelled') %} failed{% endif %}">{{ simulation.status }}</span></div>
+  <div class="view-scores">
+    {% if not simulation.baseline %}<span>Baseline high score: <strong>{{ '{:,}'.format(simulation.reference_score) if simulation.reference_score is not none else '—' }}</strong></span>{% endif %}
+    <span>{{ 'High score' if simulation.baseline else 'Candidate high score' }}: <strong>{{ '{:,}'.format(simulation.candidate_score) if simulation.candidate_score is not none else '—' }}</strong></span>
+  </div>
+  <p class="view-outcome" role="status">{{ simulation.outcome }}</p>
+  <div class="view-links">
+    {% if not simulation.baseline and simulation.reference_run_id %}<a href="/simulations/{{ simulation.reference_run_id }}">Baseline run</a>{% endif %}
+    {% if simulation.run_id %}<a href="/simulations/{{ simulation.run_id }}">{{ 'Baseline run' if simulation.baseline else 'Candidate run' }}</a>{% endif %}
+  </div>
+</section>
+{%- endmacro %}
+<div class="view-context" id="experiment-progress" role="status">
+  <strong>{{ experiment_summary.title }}</strong>
+  <span>{{ experiment_summary.phase }}</span>
+  {% if experiment_summary.seed is not none %}<span>Seed: {{ experiment_summary.seed }}</span>{% endif %}
+  {% if experiment_summary.failures is not none %}<span>Consecutive losses: {{ experiment_summary.failures }} / {{ experiment_summary.loss_limit }}</span>{% endif %}
+</div>
+{% if experiment_sections %}
 <div class="view-totals" id="experiment-totals" role="status" aria-label="Experiment totals">
   <strong>Totals:</strong> {{ metrics(experiment_totals) }}
 </div>
 {% for view in experiment_sections %}
 {% set evaluation = view.stage == 'evaluation' %}
-<details class="view-section" id="{{ view.id }}"{% if view.open %} open{% endif %}>
+<details class="view-section" id="{{ view.id }}" data-experiment-id="{{ experiment_id }}"{% if view.open %} open{% endif %}>
   <summary><span class="view-heading"><span>{{ view.title }}: {{ metrics(view) }}</span><span class="view-state{% if view.status == 'Failed' %} failed{% endif %}">{{ view.status }}</span></span></summary>
   <div class="view-body">
     <div class="view-links">
@@ -54,4 +75,8 @@
     </div>
   </div>
 </details>
+{% if view.stage == 'selection' %}{{ simulation_status(experiment_summary.simulation) }}{% endif %}
 {% endfor %}
+{% elif experiment_summary.simulation %}
+{{ simulation_status(experiment_summary.simulation) }}
+{% endif %}

@@ -23,6 +23,9 @@ class MemoryLog:
         self.events.append(event)
         return event['event_id']
 
+    def update_content(self, event_id, content):
+        self.events[event_id - 1]['content'] = content
+
 
 class MemoryStore:
     def __init__(self, log):
@@ -52,6 +55,9 @@ class MemoryEvents:
 
     def log(self, *args, **kwargs):
         return self._log.log(*args, **kwargs)
+
+    def update_content(self, event_id, content):
+        self._log.update_content(event_id, content)
 
     def current_golden_config(self):
         events = [e for e in self._log.events if e['name'] == 'golden_config_created']
@@ -123,6 +129,7 @@ class LocalLLM:
         self.requests = []
         self.status = 200
         self.respond = respond or self.proposal
+        self.stream_chunks = self.chunks
         fixture = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -130,12 +137,22 @@ class LocalLLM:
                 request = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
                 fixture.requests.append(request)
                 response = fixture.respond(request)
-                body = json.dumps(response).encode()
                 try:
                     self.send_response(fixture.status)
-                    self.send_header('Content-Length', str(len(body)))
-                    self.end_headers()
-                    self.wfile.write(body)
+                    if request.get('stream') and fixture.status < 400:
+                        self.send_header('Content-Type', 'text/event-stream')
+                        self.end_headers()
+                        for chunk in fixture.stream_chunks(response):
+                            self.wfile.write(b'data: ' + json.dumps(chunk, ensure_ascii=False).encode() + b'\n\n')
+                            self.wfile.flush()
+                        self.wfile.write(b'data: [DONE]\n\n')
+                        self.wfile.flush()
+                    else:
+                        body = json.dumps(response).encode()
+                        self.send_header('Content-Type', 'application/json')
+                        self.send_header('Content-Length', str(len(body)))
+                        self.end_headers()
+                        self.wfile.write(body)
                 except (BrokenPipeError, ConnectionResetError):
                     # A timed-out client can close before its fixture reply arrives.
                     pass
@@ -147,6 +164,23 @@ class LocalLLM:
         self.thread = Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
         self.llm = LLM(f'http://127.0.0.1:{self.server.server_port}')
+
+    @staticmethod
+    def chunks(response):
+        message = response['choices'][0]['message']
+        yield dict(choices=[dict(index=0, delta={key: value for key, value in message.items()
+                                                if key != 'tool_calls'})])
+        for index, call in enumerate(message.get('tool_calls', [])):
+            function = call['function']
+            yield dict(choices=[dict(index=0, delta=dict(tool_calls=[dict(
+                index=index, id=call['id'], type=call['type'],
+                function=dict(name=function['name'], arguments=''))]))])
+            for offset in range(0, len(function['arguments']), 17):
+                yield dict(choices=[dict(index=0, delta=dict(tool_calls=[dict(
+                    index=index, function=dict(arguments=function['arguments'][offset:offset + 17]))]))])
+        yield dict(choices=[dict(index=0, delta={}, finish_reason='tool_calls')])
+        if 'usage' in response:
+            yield dict(choices=[], usage=response['usage'])
 
     @staticmethod
     def proposal(request):
@@ -240,7 +274,10 @@ class FixtureLLM:
         self.requests = []
         self.respond = LocalLLM.proposal
 
-    def complete(self, payload):
+    def complete(self, payload, *, on_progress=None):
         request = json.loads(payload)
         self.requests.append(request)
-        return 200, '', json.dumps(self.respond(request)).encode()
+        response = self.respond(request)
+        if on_progress is not None:
+            on_progress(response)
+        return 200, '', json.dumps(response).encode()

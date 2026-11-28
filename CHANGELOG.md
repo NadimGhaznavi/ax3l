@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.14] - 2026-11-28 @ 06:32
+
+### Summary
+
+Preserve streamed inference output in the EventLog for diagnosing stalled or
+interrupted conversations.
+
+### Added
+
+- Stream inference replies into one `llm_response_captured` event per request,
+  retaining reasoning, assistant text, partial tool calls, capture status, and
+  the last received chunk's time. Commit periodic updates and flush on completion
+  or interruption before timeout recovery starts a fresh conversation.
+- Link captured output and reasoning from the EventLog and active conversation
+  sections, marking unfinished output incomplete while keeping completed replies
+  and tool execution unchanged.
+
+### Changed
+
+- Increased the HTTP timeout to 15 minutes.
+
 ## [0.5.13] - 2026-11-28 @ 04:12
 
 ### Summary

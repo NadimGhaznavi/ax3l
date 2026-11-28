@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Give every selection prompt five-minute pacing guidance and an advisory countdown tool.
+
+### Added
+
+- Add the argument-free `timer` tool to selection conversations. Start its
+  countdown when the first prompt is sent, using
+  `DViewConversation.SELECTION_TIMER_SECONDS` (300 seconds), and return signed
+  `MM:SS` readings after zero without interrupting the conversation. Timer calls
+  and submission corrections share the same countdown; a fresh selection resets it.
+- Show timer results in the EventLog without marking the selection as saved.
+
+### Changed
+
+- Apply the opening time-management and timer guidance from the architecture
+  prompt to all eight selection prompts, with and without history.
+
 ## [0.6.3] - 2026-11-28 @ 07:25
 
 ### Summary

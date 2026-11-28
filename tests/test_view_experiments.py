@@ -15,6 +15,7 @@ from ax3l.activity.ViewConfiguration import apply_values, other_parameters, para
 from ax3l.constants.DViewConversation import DViewConversation
 from ax3l.entities.ExperimentView import VIEWS
 from ax3l.entities.ExperimentState import ExperimentState
+from ax3l.interface.LLM import LLMTimeoutError
 from ax3l.interface.SimulationConfiguration import SCHEMA, SimulationConfiguration
 from ax3l.interface.ViewConversation import ViewConversation
 from experiment_fixture import ExperimentFixture
@@ -132,6 +133,103 @@ class ProposalBoundaryTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             ViewConversation(llm, log).evaluate(VIEWS['training'], [], 'experiment')
         llm.complete.assert_called_once()
+
+    def test_timer_counts_down_through_zero_and_keeps_the_submission_available(self):
+        llm, log = Mock(url='http://local'), MemoryLog()
+        elapsed = iter((0, 1, 60, 299, 300, 301, 365, 3901))
+        expected = ['05:00', '04:59', '04:00', '00:01', '00:00', '-00:01', '-01:05', '-60:01']
+        prompt = [dict(type='text', text='Tune training.'),
+                  dict(type='image_url', image_url=dict(url='data:image/png;base64,image'))]
+        with patch('ax3l.interface.ViewConversation.monotonic', return_value=1000) as clock:
+            def respond(payload, **kwargs):
+                messages = json.loads(payload)['messages']
+                if len(messages) == 1 + 2 * len(expected):
+                    return 200, '', self.response('submit_view', dict(
+                        hypothesis='Test gamma.', values={'training.gamma': .95}))
+                clock.return_value = 1000 + next(elapsed)
+                return 200, '', self.response('timer', {})
+            llm.complete.side_effect = respond
+            proposal = ViewConversation(llm, log).propose(VIEWS['training'], prompt, 'experiment')
+        self.assertEqual(proposal.hypothesis, 'Test gamma.')
+        requests = [json.loads(call.args[0]) for call in llm.complete.call_args_list]
+        self.assertEqual([tool['function']['name'] for tool in requests[0]['tools']], ['submit_view', 'timer'])
+        self.assertEqual(requests[0]['tools'][1]['function']['parameters'], {
+            'type': 'object', 'additionalProperties': False, 'properties': {},
+        })
+        self.assertEqual([request['messages'][-1]['content'] for request in requests[1:]], expected)
+        for index, request in enumerate(requests):
+            self.assertEqual(len(request['messages']), 1 + index * 2)
+            self.assertEqual(request['messages'][0], dict(role='user', content=prompt))
+            self.assertEqual(request['tools'], requests[0]['tools'])
+            self.assertEqual(request['tool_choice'], 'required')
+            self.assertFalse(request['parallel_tool_calls'])
+            if index:
+                assistant, feedback = request['messages'][-2:]
+                self.assertEqual(assistant['tool_calls'][0]['function']['name'], 'timer')
+                self.assertEqual(feedback['tool_call_id'], assistant['tool_calls'][0]['id'])
+        completed = [e['content'] for e in log.events if e['name'] == 'tool_execution_completed']
+        self.assertEqual([json.loads(content)['page'] for content in completed[:-1]], expected)
+        self.assertEqual(log.events[-1]['log_level'], 'INFO')
+
+    def test_timer_uses_the_constant_and_includes_reasoning_and_length_corrections(self):
+        llm, log = Mock(url='http://local'), MemoryLog()
+        with patch.object(DViewConversation, 'SELECTION_TIMER_SECONDS', 90), \
+                patch('ax3l.interface.ViewConversation.monotonic', return_value=1000) as clock:
+            def respond(payload, **kwargs):
+                step = len(json.loads(payload)['messages'])
+                clock.return_value = {1: 1040.9, 3: 1080, 5: 1091, 7: 1095}[step]
+                if step in (1, 5):
+                    return 200, '', self.response('timer', {})
+                return 200, '', self.response('submit_view', dict(
+                    hypothesis='x' * 281 if step == 3 else 'Test gamma.', values={'training.gamma': .95}))
+            llm.complete.side_effect = respond
+            ViewConversation(llm, log).propose(VIEWS['training'], 'Tune.', 'experiment')
+        requests = [json.loads(call.args[0]) for call in llm.complete.call_args_list]
+        self.assertEqual(requests[1]['messages'][-1]['content'], '00:50')
+        self.assertIn('281 characters', requests[2]['messages'][-1]['content'])
+        self.assertEqual(requests[3]['messages'][-1]['content'], '-00:01')
+        self.assertEqual(sum(e['name'] == 'tool_execution_failed' for e in log.events), 1)
+
+    def test_a_fresh_selection_resets_the_timer_after_a_timeout(self):
+        llm, log = Mock(url='http://local'), MemoryLog()
+        conversation = ViewConversation(llm, log)
+        with patch('ax3l.interface.ViewConversation.monotonic', return_value=0) as clock:
+            def respond(payload, **kwargs):
+                messages = json.loads(payload)['messages']
+                if len(messages) == 1:
+                    clock.return_value += 301 if clock.return_value == 0 else 10
+                    return 200, '', self.response('timer', {})
+                if clock.return_value == 301:
+                    raise LLMTimeoutError('Stalled after checking the timer.')
+                return 200, '', self.response('submit_view', dict(
+                    hypothesis='Test gamma.', values={'training.gamma': .95}))
+            llm.complete.side_effect = respond
+            with self.assertRaises(LLMTimeoutError):
+                conversation.propose(VIEWS['training'], 'Tune.', 'experiment')
+            clock.return_value = 1000
+            conversation.propose(VIEWS['training'], 'Tune.', 'experiment')
+        requests = [json.loads(call.args[0]) for call in llm.complete.call_args_list]
+        self.assertEqual([len(request['messages']) for request in requests], [1, 3, 1, 3])
+        self.assertEqual(requests[1]['messages'][-1]['content'], '-00:01')
+        self.assertEqual(requests[3]['messages'][-1]['content'], '04:50')
+
+    def test_timer_rejects_arguments_and_is_not_available_during_evaluation(self):
+        for arguments in ({'seconds': 300}, [], None):
+            with self.subTest(arguments=arguments):
+                llm, log = Mock(url='http://local'), MemoryLog()
+                llm.complete.return_value = 200, '', self.response('timer', arguments)
+                with self.assertRaises(ValidationError):
+                    ViewConversation(llm, log).propose(VIEWS['training'], 'Tune.', 'experiment')
+                llm.complete.assert_called_once()
+                self.assertEqual(log.events[-1]['log_level'], 'ERROR')
+        llm, log = Mock(url='http://local'), MemoryLog()
+        llm.complete.return_value = 200, '', self.response('timer', {})
+        with patch('ax3l.interface.ViewConversation.monotonic') as clock:
+            with self.assertRaises(ValidationError):
+                ViewConversation(llm, log).evaluate(VIEWS['training'], [], 'experiment')
+        clock.assert_not_called()
+        request = json.loads(llm.complete.call_args.args[0])
+        self.assertEqual([tool['function']['name'] for tool in request['tools']], ['submit_observations'])
 
     def test_invalid_tool_results_are_rejected_once_and_conversations_always_end(self):
         view = VIEWS['reward-signals']

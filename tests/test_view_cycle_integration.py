@@ -112,6 +112,29 @@ class ViewCycleIntegrationTests(unittest.TestCase):
         return [(requested_view(request), request['tools'][0]['function']['name'])
                 for request in self.model.requests]
 
+    def test_every_view_can_check_an_expired_timer_before_submitting(self):
+        self.scores = iter((10, 9, 9, 9, 9))
+        respond = self.model.respond
+        def check_timer_first(request):
+            if request['tools'][0]['function']['name'] == 'submit_view' and len(request['messages']) == 1:
+                return dict(choices=[dict(message=dict(role='assistant', content=None, tool_calls=[dict(
+                    id='timer', type='function', function=dict(name='timer', arguments='{}'),
+                )]))])
+            return respond(request)
+        self.model.respond = check_timer_first
+        with patch('ax3l.interface.ViewConversation.monotonic', side_effect=[1000, 1301] * 4):
+            self.assertEqual(self.service(cycles=4), 0)
+        self.assertEqual(len(self.model.requests), 12)
+        for index in range(0, 12, 3):
+            first, followup, evaluation = self.model.requests[index:index + 3]
+            self.assertEqual(first['messages'], followup['messages'][:1])
+            self.assertEqual(followup['messages'][-1], dict(role='tool', tool_call_id='timer', content='-00:01'))
+            self.assertEqual([tool['function']['name'] for tool in evaluation['tools']], ['submit_observations'])
+        self.assertEqual(self.count_events('tool_execution_completed'), 12)
+        self.assertEqual(self.count_events('tool_execution_failed'), 0)
+        self.assertEqual(self.count_events('conversation_ended'), 8)
+        self.assertEqual(self.count_events('simulation_submitted'), 5)
+
     def test_view_and_report_roll_over_across_rounds_and_service_restarts(self):
         orders = [list(VIEWS), list(reversed(VIEWS)), list(VIEWS)[1:] + list(VIEWS)[:1]]
         rounds = iter(orders)

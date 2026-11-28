@@ -69,6 +69,80 @@ class ClientDisconnectTests(unittest.TestCase):
                     handler(request, ('127.0.0.1', 1234), Mock())
 
 
+class CapturedOutputHttpTests(unittest.TestCase):
+    def setUp(self):
+        from datetime import datetime
+        from ax3l.server.ReportingServer import make_server
+
+        self.enterContext(patch('ax3l.server.ReportingServer.ReportBackground'))
+        reports = self.enterContext(patch('ax3l.server.ReportingServer.Reports')).return_value
+        self.payload = dict(choices=[], capture=dict(
+            status='in_progress', received_chunks=0, last_chunk_at=None))
+        self.event = dict(event_id=181, occurred_at=datetime.now(), category='LLM',
+                          name='llm_response_captured', log_level='INFO', parameter='exploration',
+                          content=json.dumps(self.payload))
+        reports.event.side_effect = lambda event_id: self.event if event_id == 181 else None
+        reports.recent.side_effect = lambda: dict(
+            events=[self.event], experiment=dict(state=None), current_run=None,
+            snake_lab_status='Idle', high_score=None, all_time_high_score=None,
+            experiment_cycles=0, simulations_submitted=0, games_played=0, moves_made=0)
+        server = make_server('127.0.0.1', 0)
+        thread = Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(thread.join)
+        self.addCleanup(server.shutdown)
+        self.base_url = f'http://127.0.0.1:{server.server_port}'
+
+    def get(self, path):
+        with urlopen(self.base_url + path, timeout=5) as response:
+            self.assertEqual(response.status, 200)
+            return response.read().decode()
+
+    def test_capture_opens_before_the_first_chunk_and_has_no_empty_reasoning_link(self):
+        page = self.get('/')
+        self.assertIn('href="/events/181">Captured output (in progress)</a>', page)
+        self.assertNotIn('href="/events/181/reason"', page)
+        page = self.get('/events/181')
+        self.assertIn('Captured output #181', page)
+        self.assertIn('Waiting for output from the LLM.', page)
+        self.assertIn('This output is incomplete.', page)
+
+    def test_capture_and_reasoning_links_open_during_streaming_and_after_it_ends(self):
+        self.payload['choices'] = [dict(message=dict(
+            reasoning_content='Inspect <script>unsafe</script> output.', content='Partial reply.'))]
+        for status in ('in_progress', 'interrupted', 'completed'):
+            with self.subTest(status=status):
+                self.payload['capture'].update(status=status, received_chunks=2,
+                                               last_chunk_at='2026-11-28T06:32:54+00:00')
+                self.event['content'] = json.dumps(self.payload)
+                page = self.get('/')
+                self.assertIn('href="/events/181/reason">Reasoning</a>', page)
+                page = self.get('/events/181')
+                self.assertIn('Inspect &lt;script&gt;unsafe&lt;/script&gt; output.', page)
+                self.assertIn('Partial reply.', page)
+                self.assertIn(status.replace('_', ' '), page)
+                for path in ('/events/181/reason', '/events/181/reason?preview=1'):
+                    page = self.get(path)
+                    self.assertIn('Inspect &lt;script&gt;unsafe&lt;/script&gt; output.', page)
+                    self.assertNotIn('Partial reply.', page)
+                    self.assertNotIn('<script>', page)
+                    self.assertIn('href="/events/181">Back to captured output</a>', page)
+
+    def test_other_event_categories_and_missing_events_remain_unavailable(self):
+        for category, name in (('Conversation', 'llm_response_captured'),
+                               ('LLM', 'llm_request_started'), ('Tool', 'tool_execution_failed')):
+            self.event.update(category=category, name=name)
+            for suffix in ('', '/reason'):
+                with self.subTest(category=category, name=name, suffix=suffix):
+                    with self.assertRaises(HTTPError) as caught:
+                        self.get('/events/181' + suffix)
+                    self.assertEqual(caught.exception.code, 404)
+        with self.assertRaises(HTTPError) as caught:
+            self.get('/events/0')
+        self.assertEqual(caught.exception.code, 404)
+
+
 class ExperimentStatusTests(unittest.TestCase):
     def test_all_time_score_includes_the_live_golden_when_reporting_totals_are_stale(self):
         from ax3l.server.ReportingServer import make_server

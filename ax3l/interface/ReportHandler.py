@@ -84,8 +84,10 @@ class ReportHandler(BaseHTTPRequestHandler):
             body = self.renderer.tool_result(event)
         elif match := re.fullmatch(r"/events/([0-9]{1,20})(/reason)?", path):
             event = self._found(self.reports.event(int(match[1])), "Event not found")
-            if event["category"] != Events.Conversation.CATEGORY or event["name"] not in (
-                    Events.Conversation.RESPONSE, Events.Conversation.PROMPT):
+            if (event["category"], event["name"]) not in (
+                    (Events.Conversation.CATEGORY, Events.Conversation.RESPONSE),
+                    (Events.Conversation.CATEGORY, Events.Conversation.PROMPT),
+                    (Events.LLM.CATEGORY, Events.LLM.RESPONSE_CAPTURED)):
                 raise ReportRequestError(404, "Event not found")
             body = self._found(self.renderer.event(event, reason=bool(match[2]), preview=query.get("preview") == ["1"]),
                                "Reason not found")

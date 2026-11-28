@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.15] - 2026-11-28 @ 06:38
+
+### Summary
+
+Fix captured-output drill-down links while inference is running or after it ends.
+
+### Fixed
+
+- Allow LLM capture events through the reporting HTTP detail and reasoning
+  routes, including previews. Previously their links returned 404 despite the
+  captured content being saved and rendered by the reporting layer.
+- Show a waiting message when opening a capture before the first output arrives,
+  or report that no output was received if the request has already ended.
+
 ## [0.5.14] - 2026-11-28 @ 06:32
 
 ### Summary

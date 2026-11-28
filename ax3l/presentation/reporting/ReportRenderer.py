@@ -93,6 +93,9 @@ class ReportRenderer:
         if event["name"] == Events.LLM.RESPONSE_CAPTURED:
             reply = reply_summary(event["content"]) if response["choices"] else ""
             text = "\n\n".join(filter(None, (reasoning_content(event["content"]), reply)))
+            if not text:
+                text = ("Waiting for output from the LLM." if response["capture"]["status"] == "in_progress"
+                        else "No output was received from the LLM.")
             return self._render("reply.html", event=event, reply_text=text, sections=sections,
                                 page_title=f"Captured output #{event['event_id']}",
                                 message_title="Captured reasoning and response", capture=response["capture"])

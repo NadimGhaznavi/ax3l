@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Clarify how evaluations handle hypotheses that differ from the executed changes.
+
+### Changed
+
+- Add guidance before the parameter JSON in all four evaluation prompts to
+  evaluate the actual changes and ignore the hypothesis when they differ.
+
 ## [0.6.5] - 2026-11-28 @ 08:09
 
 ### Summary

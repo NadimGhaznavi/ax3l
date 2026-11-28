@@ -57,26 +57,32 @@ class ExplorationProgressTests(unittest.TestCase):
 
 
 class RewardProgressTests(unittest.TestCase):
-    def test_weights_food_and_terminal_collisions_by_total_moves_in_epoch_order(self):
+    def test_weights_food_by_moves_and_terminal_collisions_by_episodes_in_epoch_order(self):
         episodes = [dict(episode=3, score=3, steps=60, outcome='max_moves'),
                     dict(episode=2, score=9, steps=90, outcome='snake'),
                     dict(episode=1, score=1, steps=10, outcome='wall')]
         original = deepcopy(episodes)
         self.assertEqual(reward_progress(episodes, window_size=2), [
-            dict(epoch=2, food=10, wall=1, snake=1),
+            dict(epoch=2, food=10, wall=.5, snake=.5),
             dict(epoch=3, food=5, wall=0, snake=0),
         ])
         self.assertEqual(episodes, original)
         self.assertEqual(reward_progress([]), [])
 
-    def test_missing_outcomes_leave_collision_gaps_and_zero_moves_leave_all_rate_gaps(self):
+    def test_collision_shares_include_move_limit_episodes_regardless_of_move_count(self):
+        episodes = [dict(episode=1, score=0, steps=0, outcome='wall'),
+                    dict(episode=2, score=0, steps=10, outcome='snake'),
+                    dict(episode=3, score=0, steps=990, outcome='max_moves')]
+        self.assertEqual(reward_progress(episodes), [dict(epoch=3, food=0, wall=1 / 3, snake=1 / 3)])
+
+    def test_missing_outcomes_leave_collision_gaps_and_zero_moves_only_leave_food_gaps(self):
         self.assertEqual(reward_progress([
             dict(episode=1, score=2, steps=20, outcome='wall'),
             dict(episode=2, score=2, steps=20, outcome=None),
             dict(episode=3, score=0, steps=0, outcome='snake'),
         ], window_size=2), [
             dict(epoch=2, food=10, wall=None, snake=None),
-            dict(epoch=3, food=None, wall=None, snake=None),
+            dict(epoch=3, food=None, wall=0, snake=1),
         ])
 
     def test_default_windows_cover_150_epochs_with_final_partial_window(self):
@@ -166,17 +172,18 @@ class RunComparisonImageTests(unittest.TestCase):
                     image.load()
                     self.assertEqual(image.format, 'PNG')
 
-    def test_reward_comparison_has_three_shared_rate_panels_and_both_score_percentiles(self):
+    def test_reward_comparison_has_episode_collision_percentages_and_both_score_percentiles(self):
         golden = [dict(episode=i, score=10, steps=100, outcome='wall') for i in range(1, 301)]
         latest = [dict(episode=i, score=20, steps=100, outcome='snake') for i in range(1, 451)]
         url = run_comparison_image(VIEWS['reward-signals'], golden, latest)
         with Image.open(BytesIO(b64decode(url.split(',')[1]))) as image:
             self.assertEqual(image.size, (1056, 1254))
-            # Food rates use the same ceiling of 20 as both collision panels.
+            # Food rates retain their ceiling of 20; collision panels span 0–100%.
             self.assertEqual(image.getpixel((709, 263)), (255, 189, 112))
             self.assertEqual(image.getpixel((1004, 178)), (77, 179, 255))
-            self.assertEqual(image.getpixel((709, 593)), (255, 189, 112))
-            self.assertEqual(image.getpixel((1004, 847)), (77, 179, 255))
+            self.assertEqual(image.getpixel((709, 432)), (255, 189, 112))
+            self.assertNotEqual(image.getpixel((900, 432)), (255, 189, 112))
+            self.assertEqual(image.getpixel((1004, 686)), (77, 179, 255))
             # Golden's score lines end at epoch 300; Latest reaches 450.
             self.assertEqual(image.getpixel((709, 1025)), (255, 189, 112))
             self.assertNotEqual(image.getpixel((900, 1025)), (255, 189, 112))
@@ -196,14 +203,27 @@ class RunComparisonImageTests(unittest.TestCase):
             self.assertTrue(any(color != (77, 179, 255) for color in dashed))
 
     def test_missing_reward_measurements_do_not_draw_false_zero_collision_rates(self):
-        for episodes in ([], [dict(episode=1, score=2, steps=20, outcome=None)],
-                         [dict(episode=1, score=0, steps=0, outcome='wall')]):
+        for episodes in ([], [dict(episode=1, score=2, steps=20, outcome=None)]):
             with self.subTest(episodes=episodes):
                 url = run_comparison_image(VIEWS['reward-signals'], [], episodes)
                 with Image.open(BytesIO(b64decode(url.split(',')[1]))) as image:
                     for top, bottom in ((432, 602), (686, 856)):
                         pixels = {color for _, color in image.crop((118, top, 1008, bottom + 4)).getcolors(200000)}
                         self.assertNotIn((77, 179, 255), pixels)
+
+    def test_zero_move_episodes_still_show_measured_collision_percentages(self):
+        episodes = [dict(episode=i, score=0, steps=0, outcome='wall' if i % 2 else 'snake')
+                    for i in range(1, 301)]
+        with patch.object(ImageDraw.ImageDraw, 'text', autospec=True,
+                          side_effect=ImageDraw.ImageDraw.text) as draw_text:
+            url = run_comparison_image(VIEWS['reward-signals'], [], episodes)
+        labels = [call.args[2] for call in draw_text.call_args_list]
+        self.assertEqual(labels.count('Episodes (%)'), 2)
+        self.assertEqual(labels.count('100%'), 2)
+        with Image.open(BytesIO(b64decode(url.split(',')[1]))) as image:
+            # Half the episodes end in each collision type, despite recording no moves.
+            for top, bottom in ((432, 602), (686, 856)):
+                self.assertEqual(image.getpixel((1004, (top + bottom) // 2)), (77, 179, 255))
 
     def test_training_losses_share_an_axis_above_one_and_stop_at_each_runs_last_epoch(self):
         golden = [dict(episode=i, score=i % 10, loss=4) for i in range(1, 301)]

@@ -59,13 +59,14 @@ def run_comparison_image(view: ExperimentView, reference_episodes: list[dict],
         panels.append(("Exploration", "", 1, .25, series))
     if rewards:
         rates = [(color, reward_progress(episodes, window_size)) for _, color, episodes in runs]
-        rate_maximum = max((point[field] for _, points in rates for point in points
-                            for field in ("food", "wall", "snake") if point[field] is not None), default=0)
+        rate_maximum = max((point["food"] for _, points in rates for point in points
+                            if point["food"] is not None), default=0)
         rate_ceiling, rate_step = _axis(rate_maximum)
         for field, title in (("food", "Food collected"), ("wall", "Wall collisions"), ("snake", "Snake collisions")):
             series = [(color, [(point["epoch"], point[field]) for point in points], False)
                       for color, points in rates]
-            panels.append((title, "Per 100 moves", rate_ceiling, rate_step, series))
+            panels.append((title, "Per 100 moves", rate_ceiling, rate_step, series) if field == "food" else
+                          (title, "Episodes (%)", 1, .2, series))
     if rewards or training:
         series = [(color, [(point["epoch"], point[field]) for point in points], field == "p25")
                   for color, points in scores for field in ("p90", "p25")]
@@ -93,7 +94,8 @@ def run_comparison_image(view: ExperimentView, reference_episodes: list[dict],
         if (rewards and index == 3) or (training and index == 0):
             _line_styles(draw, fonts, top, "90th percentile", "25th percentile")
         _panel(image, draw, fonts, top, bottom, last_epoch, limit, spacing, label,
-               series, percent=exploration and index == 0, epoch_labels=index == len(panels) - 1)
+               series, percent=(exploration and index == 0) or (rewards and index in (1, 2)),
+               epoch_labels=index == len(panels) - 1)
         missing = [name for name, _, episodes in runs if not episodes]
         if missing:
             draw.text((561, (top + bottom) / 2), "No recorded episodes: " + ", ".join(missing),
@@ -114,7 +116,7 @@ def run_comparison_image(view: ExperimentView, reference_episodes: list[dict],
 
     draw.text((561, height - 72), "Training epoch", anchor="mm", font=fonts[18], fill=FOREGROUND)
     note = ("Each point summarizes the preceding 150 epochs; mean loss excludes missing values."
-            if training else "Each point summarizes the preceding 150 epochs; rates = total events / total moves x 100."
+            if training else "Each point summarizes the preceding 150 epochs; food per 100 moves, collisions as % of episodes."
             if rewards else "Epsilon is sampled at checkpoints; overrides = total EpsilonNice moves / total moves in each window."
             if exploration else "Score percentiles summarize recorded episodes on shared epoch and score axes.")
     draw.text((118, height - 36), note, font=fonts[16], fill=MUTED)

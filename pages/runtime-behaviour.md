@@ -72,7 +72,10 @@ at most 280 characters through `submit_observations`.
 
 Inference connection and response-read timeouts, including HTTP 408 and 504,
 leave the server running in the pending selection or evaluation phase. Ax3l logs
-the failure, waits thirty seconds, and starts a fresh conversation for that stage.
+the failure, discards the timed-out conversation's assistant replies and tool
+feedback, and waits thirty seconds. It then rebuilds the stage's original prompt
+and sends a new HTTP request containing only that user message, including the
+original text and image. This also applies to timeouts during length correction.
 It does not resubmit the simulation, repeat its comparison, or advance the view
 until that stage succeeds.
 
@@ -81,8 +84,8 @@ Images use consecutive 150-epoch windows, retaining a shorter final window:
 - Architecture: 90th and 25th score percentiles on shared axes.
 - Exploration: checkpoint epsilon, observed EpsilonNice overrides per move after
   epsilon expiry, and the two score percentile panels.
-- Reward Signals: food collected and terminal wall/snake collisions per 100 moves,
-  plus the score percentiles.
+- Reward Signals: food collected per 100 moves, terminal wall/snake collisions as
+  percentages of episodes on 0–100% axes, plus the score percentiles.
 - Training: score percentiles and mean recorded training loss, preserving gaps
   where losses were not measured.
 

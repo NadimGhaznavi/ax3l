@@ -121,17 +121,22 @@ resolved before continuing. Comparison decisions store the resulting loss count,
 so replay after interruption neither increments it twice nor duplicates a
 committed promotion. Rotated baselines use the same recovery rules.
 
-The reporting homepage retains eight collapsible sections for the active
-experiment: four evaluations and four selections, with only the active view
-receiving conversations. Selection and evaluation events carry explicit stage
-labels because both now include images. Waiting views do not inherit another
-view's accepted settings or conversations from an older experiment.
+The reporting homepage shows the active view, current phase, seed, and consecutive
+losses out of sixteen. It has at most two collapsible conversation sections:
+Selection first, then Evaluation, both for that view. A simulation status block
+between them links to the baseline and candidate runs, shows their completed high
+scores, and identifies promotion, tie promotion, or retention of the golden.
+Default and rotated-seed baselines show simulation status without conversation
+sections. Duplicate revisions reuse the Selection section. Other views and older
+experiments do not contribute conversation sections or saved choices.
 
 Each section links to its recorded prompt and response, shows its hypothesis,
 observations where applicable, baseline and chosen values, and elapsed time and
 token usage in the title bar. The Totals box sums recorded conversation metrics.
-Automatic refresh retains expanded sections and horizontal table scroll. Tie
-promotions appear once in golden score history, and per-simulation LLM costs
+Automatic refresh retains expanded sections and horizontal table scroll within
+the same experiment, and uses the new experiment's initial panel state when the
+active experiment changes. Tie promotions appear once in golden score history,
+and per-simulation LLM costs
 include both its selection and evaluation.
 
 ## Running

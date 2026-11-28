@@ -3,6 +3,7 @@ from typing import Final
 
 class DAx3l:
     HTTP_TIMEOUT_SECONDS: Final[int] = 480
+    SEED_ROTATION_FAILURES: Final[int] = 16
 
     VERSION: Final[str] = "5.0.5"
     CMDB_SUBTYPE: Final[str] = "Lab Experiment"

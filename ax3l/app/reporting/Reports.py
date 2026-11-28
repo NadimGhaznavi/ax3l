@@ -45,11 +45,14 @@ class Reports:
             golden = log.current_golden_config()
             experiment = ExperimentStatusDb(db).read()
         state = experiment["state"]
-        configs = {run_id: self._snake.get_config(run_id)
-                   for run_id in dict.fromkeys((state.reference_run_id, state.latest_run_id))
-                   if run_id} if state else {}
-        experiment["reference_config"] = configs.get(state.reference_run_id) if state else None
-        experiment["latest_config"] = configs.get(state.latest_run_id) if state else None
+        runs = {run_id: self._snake.get_run_result(run_id)
+                for run_id in dict.fromkeys((state.reference_run_id, state.run_id))
+                if run_id} if state else {}
+        reference = runs.get(state.reference_run_id) if state else None
+        candidate = runs.get(state.run_id) if state else None
+        experiment.update(reference_run=reference, candidate_run=candidate,
+                          reference_config=reference["config"] if reference else None,
+                          latest_config=candidate["config"] if candidate else None)
         current = self._snake.get_run_summary(golden["process_id"]) if golden else None
         score = current["high_score"] if current else None
         with self._background_lock:

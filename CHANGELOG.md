@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-11-28 @ 06:57
+
 ### Summary
 
 Show the recorded epsilon decay clearly in exploration comparison images.

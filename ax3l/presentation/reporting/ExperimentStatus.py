@@ -115,8 +115,9 @@ def experiment_sections(data: dict) -> list[dict]:
                      if event["name"] in (Events.Conversation.RESPONSE, Events.LLM.RESPONSE_CAPTURED)]
         response = responses[-1] if responses else None
         ended = by_name.get(Events.Conversation.ENDED)
-        accepted = by_name.get(Events.Tool.COMPLETED)
-        submission = json.loads(accepted["content"]) if accepted else {}
+        completed = by_name.get(Events.Tool.COMPLETED)
+        submission = json.loads(completed["content"]) if completed else {}
+        accepted = submission.get("status") == "accepted"
         usage = response_usage(response["content"]) if response else {}
         proposal = state.proposals.get(name)
         selected = submission.get("values", {})

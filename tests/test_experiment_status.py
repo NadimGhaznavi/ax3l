@@ -119,6 +119,26 @@ class PanelParser(HTMLParser):
 
 
 class ExperimentStatusTests(unittest.TestCase):
+    def test_timer_checks_do_not_mark_a_selection_saved_and_have_readable_results(self):
+        data = status_data()
+        data['events'] = conversation('selection-cycle', 'reward-signals', 'selection', accepted=False, ended=False)
+        timer = dict(data['events'][-1], event_id=13, category='Tool', name='tool_execution_completed',
+                     content=json.dumps(dict(status='completed', page='-00:01')))
+        data['events'].append(timer)
+        selection = experiment_sections(data)[0]
+        self.assertEqual(selection['status'], 'In progress')
+        self.assertFalse(selection['saved'])
+        self.assertIsNone(selection['hypothesis'])
+        self.assertTrue(all(not row['saved'] for row in selection['rows']))
+        self.assertIn('Reward Signals Selection', render_status(data, [timer]))
+        self.assertIn('-00:01', ReportRenderer().tool_result(timer).decode())
+        accepted = dict(timer, event_id=14, content=json.dumps(dict(
+            status='accepted', hypothesis='Test food reward.', values={'game.rewards.food': 12})))
+        data['events'].append(accepted)
+        selection = experiment_sections(data)[0]
+        self.assertEqual(selection['status'], 'Saved')
+        self.assertEqual(selection['hypothesis'], 'Test food reward.')
+
     def test_partial_capture_replaces_an_earlier_reply_and_links_to_saved_reasoning(self):
         data = status_data()
         rows = conversation('selection-cycle', 'reward-signals', 'selection', accepted=False, ended=False)

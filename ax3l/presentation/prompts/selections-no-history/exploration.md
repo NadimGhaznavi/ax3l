@@ -3,6 +3,11 @@
 - Role: You are a data scientist tuning exploration settings in Patrick Loeber's Snake Lab.
 - Task: Your objective is to improve the Snake AI's high score by tuning exploration settings.
 
+This process shouldn't take more than 5 minutes. Once you decide on a hypothesis, don't second guess yourself. This is an iterative process, and the goal is to improve the Snake AI's
+high score, not to find the perfect exploration settings.
+
+Use the 'timer' tool to check how long you have been working on this task. The timer is there to help you manage your time. When it hits zero, it will just continue counting.
+
 ## Experiment Description
 
 - The Snake Lab server accepts a simulation configuration, executes it, and saves the results.

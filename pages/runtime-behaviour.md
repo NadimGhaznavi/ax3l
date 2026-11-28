@@ -49,8 +49,10 @@ characters and parameter values through the required native `submit_view`
 function. It may change several settings within the active view.
 
 Ax3l checks response format and view scope. SnakeLab owns simulation-configuration
-validation against its JSON schema. Ax3l does not add cross-field reward rules or
-repair malformed LLM responses with automatic retries.
+validation against its JSON schema. Ax3l does not add cross-field reward rules.
+If a hypothesis or observation exceeds its character limit, Ax3l returns a tool
+result explaining the actual length and limit, and asks Qwen to shorten and
+resubmit it in the same conversation. Other malformed submissions remain errors.
 
 Before submission, Ax3l checks for an existing run with all the same settings,
 including the seed. Duplicate candidates return to the same active view with the
@@ -67,6 +69,12 @@ view's evaluation. It receives that candidate's hypothesis, chosen settings,
 reference and candidate high scores, and a per-view image of recorded results.
 No other view evaluates that simulation. Qwen submits nonblank Observations of
 at most 280 characters through `submit_observations`.
+
+Inference connection and response-read timeouts, including HTTP 408 and 504,
+leave the server running in the pending selection or evaluation phase. Ax3l logs
+the failure, waits thirty seconds, and starts a fresh conversation for that stage.
+It does not resubmit the simulation, repeat its comparison, or advance the view
+until that stage succeeds.
 
 Images use consecutive 150-epoch windows, retaining a shorter final window:
 

@@ -174,6 +174,22 @@ Resolving a configuration must not mutate the caller's data or share mutable
 defaults between resolutions. Keep validation errors specific enough to
 identify the field that failed.
 
+## Preserve prompt language and conversation behavior
+
+Before making backend changes, check whether the work could affect the
+LLM/ax3l-server conversation, which is a particularly sensitive part of Ax3l.
+Preserve existing prompt wording and conversation behavior unless the requested
+change explicitly specifies otherwise, including model-visible context and
+images, tool descriptions and schemas, corrective feedback, and message
+sequencing.
+
+If the work touches the conversation and the intended change has not been
+specified, **stop the task and alert the user before proceeding**, describing
+the affected behavior and the missing specification.
+Do not infer new wording, rewrite prompts as incidental backend cleanup, or
+resume the task until the user has specified the intended change; review the
+final diff for unintended prompt or conversation changes.
+
 ## Refactor in reviewable steps
 
 Make one coherent structural change at a time. Preserve behavior when moving

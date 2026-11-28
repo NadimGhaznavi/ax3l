@@ -250,11 +250,11 @@
         const scrollY = window.scrollY;
         const scrollLeft = main.scrollLeft;
         const viewState = new Map(Array.from(viewStatus.querySelectorAll('.view-section'), section =>
-          [section.id, { open: section.open, scrollLeft: section.querySelector('.view-table-wrap').scrollLeft }]
+          [`${section.dataset.experimentId}:${section.id}`, { open: section.open, scrollLeft: section.querySelector('.view-table-wrap').scrollLeft }]
         ));
         viewStatus.replaceChildren(...page.querySelector('#view-conversations').childNodes);
         for (const section of viewStatus.querySelectorAll('.view-section')) {
-          const saved = viewState.get(section.id);
+          const saved = viewState.get(`${section.dataset.experimentId}:${section.id}`);
           if (saved) {
             section.open = saved.open;
             section.querySelector('.view-table-wrap').scrollLeft = saved.scrollLeft;

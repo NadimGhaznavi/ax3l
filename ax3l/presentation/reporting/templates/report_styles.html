@@ -72,6 +72,15 @@
     .view-metrics { color: var(--muted); }
     .view-metrics > span { white-space: nowrap; }
     .view-totals { padding: .65rem 1rem; border: 1px solid var(--border); background: #151f2b; }
+    .view-context, .view-scores { display: flex; flex-wrap: wrap; align-items: baseline; gap: .35rem 1.5rem; }
+    .view-context { margin-bottom: .6rem; }
+    .view-context > strong { font-size: 1.1rem; }
+    .view-context > span { color: var(--muted); }
+    .view-simulation { margin: .6rem 0 0; padding: .65rem 1rem; }
+    .view-simulation .view-heading { display: flex; width: 100%; }
+    .view-scores { margin-top: .4rem; }
+    .view-outcome { margin: .4rem 0; color: var(--text); }
+    .view-simulation .view-links { display: flex; flex-wrap: wrap; gap: .4rem 1.5rem; }
     .view-state { margin-left: auto; font-size: .85rem; color: var(--muted); }
     .view-state.failed, .view-error { color: #ffa4a4; }
     .view-body { padding: .75rem; }

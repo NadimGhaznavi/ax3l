@@ -13,7 +13,7 @@ from ax3l.constants.DAx3l import DAx3l
 from ax3l.constants.DEventCategory import DEventCategory as Events
 from ax3l.constants.DLabel import FIELD_TO_LABEL_MAP
 from ax3l.constants.DReportMgr import DReportMgr
-from ax3l.presentation.reporting.ExperimentStatus import experiment_sections, experiment_totals
+from ax3l.presentation.reporting.ExperimentStatus import experiment_sections, experiment_summary, experiment_totals
 from ax3l.presentation.reporting.MarkdownReport import markdown_html
 from ax3l.presentation.reporting.PromptReport import parts, summary
 from ax3l.presentation.reporting.ReplyReport import fields, reply_summary, reasoning_content
@@ -56,7 +56,10 @@ class ReportRenderer:
         return self._render("events.html", hostname=socket.gethostname(),
                             current_board_svg=board_svg(current.get("high_score_snapshot"))
                             if current else None, events=events,
-                            experiment_sections=sections, experiment_totals=experiment_totals(sections), **values)
+                            experiment_sections=sections, experiment_totals=experiment_totals(sections),
+                            experiment_summary=experiment_summary(data["experiment"], sections),
+                            experiment_id=data["experiment"]["state"].experiment_id
+                            if data["experiment"]["state"] else "", **values)
 
     def event(self, event: dict, *, reason: bool = False, preview: bool = False) -> bytes | None:
         if reason:

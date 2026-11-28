@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Align Experiment Status with the current single-view selection, simulation,
+comparison, and evaluation flow.
+
+### Changed
+
+- Show only the active view's Selection and Evaluation sections, in flow order,
+  with no prompt sections for default or rotated-seed baselines. Reuse Selection
+  for duplicate revisions and retain conversation links, settings, and costs.
+- Show the active view, phase, seed, and consecutive-loss count above the sections.
+  Place simulation status, baseline and candidate high scores, run links, and the
+  golden comparison outcome between Selection and Evaluation.
+- Read the actual candidate run during simulation and preserve expanded sections
+  and table scrolling only within the same experiment on refresh.
+
 ## [5.0.5] - 2026-11-27 @ 18:56
 
 ### Summary

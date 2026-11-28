@@ -27,8 +27,6 @@ from ax3l.presentation.ViewPrompts import ViewPrompts
 
 
 class ExperimentLoop:
-    SEED_ROTATION_FAILURES = 16
-
     def __init__(self, db: DbMgr, llm: LLM, snake: SnakeLab):
         self._snake = snake
         self._store = ExperimentDb(db)
@@ -120,7 +118,7 @@ class ExperimentLoop:
             shuffle(order)
             index = 0
         config = deepcopy(self._completed_result(previous.golden_run_id)["config"])
-        rotate = previous.failures >= self.SEED_ROTATION_FAILURES
+        rotate = previous.failures >= DAx3l.SEED_ROTATION_FAILURES
         if rotate:
             config["seed"] += 1
         state = ExperimentState(

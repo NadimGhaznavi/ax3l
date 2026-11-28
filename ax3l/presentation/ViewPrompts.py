@@ -20,10 +20,6 @@ class ViewPrompts:
                duplicate: bool = False) -> list[dict]:
         folder = "selections-no-history" if no_history else "selections"
         prompt = self._templates.get_template(f"{folder}/{view.name}.md").render(**context)
-        submission = self._templates.get_template(f"{folder}/proposal-submission.md").render(
-            hypothesis_max_length=DViewConversation.HYPOTHESIS_MAX_LENGTH,
-        )
-        prompt += "\n\n" + submission
         if duplicate:
             notice = self._templates.get_template("common/duplicate-configuration.md").render(**context)
             prompt = notice.strip() + "\n\n" + prompt

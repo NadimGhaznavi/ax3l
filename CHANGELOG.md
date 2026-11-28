@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-11-28 @ 07:12
+
+### Summary
+
+Protect prompt language and the LLM/ax3l-server conversation during development,
+and remove repeated submission guidance from selection prompts.
+
+### Changed
+
+- Require checking backend work for conversation impact, preserving specified
+  prompt wording and behavior, and stopping the task to alert the user when a
+  conversation change has not been specified.
+
+### Removed
+
+- Remove appended submission rules, the sample tool call, and the example
+  disclaimer from selection prompts, keeping the existing submission instruction
+  in each view's template.
+
 ## [0.6.1] - 2026-11-28 @ 06:57
 
 ### Summary

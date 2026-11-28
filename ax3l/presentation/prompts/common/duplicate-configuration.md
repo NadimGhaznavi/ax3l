@@ -1,4 +1,4 @@
-This configuration is a duplicate, please select different values.
+A simulation with this configuration has already been run, please select different values.
 
 ## Rejected proposal
 

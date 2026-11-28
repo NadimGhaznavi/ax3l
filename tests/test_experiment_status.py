@@ -119,25 +119,29 @@ class PanelParser(HTMLParser):
 
 
 class ExperimentStatusTests(unittest.TestCase):
-    def test_timer_checks_do_not_mark_a_selection_saved_and_have_readable_results(self):
-        data = status_data()
-        data['events'] = conversation('selection-cycle', 'reward-signals', 'selection', accepted=False, ended=False)
-        timer = dict(data['events'][-1], event_id=13, category='Tool', name='tool_execution_completed',
-                     content=json.dumps(dict(status='completed', page='-00:01')))
-        data['events'].append(timer)
-        selection = experiment_sections(data)[0]
-        self.assertEqual(selection['status'], 'In progress')
-        self.assertFalse(selection['saved'])
-        self.assertIsNone(selection['hypothesis'])
-        self.assertTrue(all(not row['saved'] for row in selection['rows']))
-        self.assertIn('Reward Signals Selection', render_status(data, [timer]))
-        self.assertIn('-00:01', ReportRenderer().tool_result(timer).decode())
-        accepted = dict(timer, event_id=14, content=json.dumps(dict(
-            status='accepted', hypothesis='Test food reward.', values={'game.rewards.food': 12})))
-        data['events'].append(accepted)
-        selection = experiment_sections(data)[0]
-        self.assertEqual(selection['status'], 'Saved')
-        self.assertEqual(selection['hypothesis'], 'Test food reward.')
+    def test_timer_checks_do_not_mark_a_conversation_saved_and_have_readable_results(self):
+        for index, stage in enumerate(('selection', 'evaluation')):
+            with self.subTest(stage=stage):
+                data = status_data(phase='choosing' if stage == 'selection' else 'evaluating')
+                data['events'] = conversation('selection-cycle', 'reward-signals', stage, accepted=False, ended=False)
+                timer = dict(data['events'][-1], event_id=13, category='Tool', name='tool_execution_completed',
+                             content=json.dumps(dict(status='completed', page='-00:01')))
+                data['events'].append(timer)
+                section = experiment_sections(data)[index]
+                self.assertEqual(section['status'], 'In progress')
+                self.assertFalse(section['saved'])
+                self.assertIsNone(section['hypothesis'])
+                self.assertIsNone(section['observations'])
+                self.assertTrue(all(not row['saved'] for row in section['rows']))
+                self.assertIn(f'Reward Signals {stage.capitalize()}', render_status(data, [timer]))
+                self.assertIn('-00:01', ReportRenderer().tool_result(timer).decode())
+                arguments = (dict(hypothesis='Test food reward.', values={'game.rewards.food': 12})
+                             if stage == 'selection' else dict(observations='Results support the hypothesis.'))
+                data['events'].append(dict(timer, event_id=14, content=json.dumps(dict(status='accepted', **arguments))))
+                section = experiment_sections(data)[index]
+                self.assertEqual(section['status'], 'Saved')
+                field = 'hypothesis' if stage == 'selection' else 'observations'
+                self.assertEqual(section[field], arguments[field])
 
     def test_partial_capture_replaces_an_earlier_reply_and_links_to_saved_reasoning(self):
         data = status_data()

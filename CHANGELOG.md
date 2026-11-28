@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Extend the advisory countdown to evaluation conversations and share the timer implementation.
+
+### Added
+
+- Give all four evaluation prompts five-minute pacing guidance and the `timer`
+  tool. Each evaluation starts a fresh countdown when its first prompt is sent
+  and can continue submitting observations after zero.
+
+### Changed
+
+- Extract the countdown state and signed readings into `ConversationTimer` and
+  share the tool-result continuation path with submission corrections.
+- Use `DViewConversation.TIMER_SECONDS` (300 seconds) for both selection and
+  evaluation conversations, preserving the deadline across timer calls and
+  length corrections and resetting it for fresh conversations.
+
 ## [0.6.4] - 2026-11-28 @ 08:01
 
 ### Summary

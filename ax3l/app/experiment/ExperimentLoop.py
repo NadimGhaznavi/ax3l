@@ -56,7 +56,8 @@ class ExperimentLoop:
                     else:
                         self._choose_view(state)
                 except LLMTimeoutError:
-                    logging.warning("LLM timed out while %s %s; retrying in %s seconds.",
+                    logging.warning("LLM timed out while %s %s; restarting the conversation "
+                                    "with its original prompt in %s seconds.",
                                     state.phase, state.view_name, DAx3l.LLM_TIMEOUT_RETRY_SECONDS)
                     sleep(DAx3l.LLM_TIMEOUT_RETRY_SECONDS)
             elif state.phase == "ready":

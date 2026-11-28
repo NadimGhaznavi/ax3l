@@ -21,15 +21,7 @@ The baseline is the current golden configuration.
 
 - Baseline simulation: {{ reference_run_id }} (high score: {{ reference_high_score }})
 
-The attached image shows the baseline run in orange, using consecutive
-150-epoch windows. The final window may be shorter. The two panels show the
-90th and 25th score percentiles on shared epoch and score axes. Curves end at
-the baseline run's last recorded epoch.
-
-Use the high score, learning progress, and lower-tail performance to inform
-your next hypothesis. These are training results from a single run, not
-independent validation. Report missing measurements shown in the chart instead
-of inventing results.
+The attached image shows the baseline run in orange.
 
 ## Parameters to tune
 

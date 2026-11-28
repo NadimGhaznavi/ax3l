@@ -21,21 +21,7 @@ The baseline is the current golden configuration.
 
 - Baseline simulation: {{ reference_run_id }} (high score: {{ reference_high_score }})
 
-The attached image shows the baseline run in orange, using consecutive
-150-epoch windows. The final window may be shorter. Each rate is total events
-divided by total moves in that window, multiplied by 100:
-
-- Food collected uses recorded episode scores as the number of food pickups.
-- Wall and snake collisions count episodes ending with the corresponding terminal
-  outcome. They are collision events per 100 moves, not percentages of episodes.
-  Windows with missing outcomes or no moves show gaps.
-- Score percentiles share the last panel: the solid line shows the 90th percentile;
-  the dashed line shows the 25th percentile. These are scores, not move rates.
-
-Use food collection, collision rates, the high score, and score progress to
-inform your next hypothesis. These are training results from a single run,
-not independent validation. Curves stop at the baseline run's final recorded
-epoch. Treat missing measurements as unavailable rather than zero.
+The attached image shows the baseline run in orange.
 
 ## Parameters to tune
 

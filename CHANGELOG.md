@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Keep image prompts brief across all experiment views.
+
+### Removed
+
+- Remove detailed chart explanations and repeated analysis advice from evaluation,
+  selection, and baseline prompts, leaving a brief cue identifying the runs shown.
+
 ## [5.0.8] - 2026-11-27 @ 19:41
 
 ### Summary

@@ -2,13 +2,13 @@ from typing import Final
 
 
 class DAx3l:
-    HTTP_TIMEOUT_SECONDS: Final[int] = 480
-    SEED_ROTATION_FAILURES: Final[int] = 16
+    HTTP_TIMEOUT_SECONDS: Final[int] = 1200
+    SEED_ROTATON_FAILURES: Final[int] = 16
 
-    VERSION: Final[str] = "5.0.6"
+    VERSION: Final[str] = "5.0.7"
     CMDB_SUBTYPE: Final[str] = "Lab Experiment"
     CMDB_SUPPLIER: Final[str] = "Nadim-Daniel"
-    CMDB_CODENAME: Final[str] = "Critic"
+    CMDB_CODENAME: Final[str] = "Decoder"
     CMDB_DATABASES: Final[tuple[tuple[str, str], ...]] = (("Ax3l", "ax3l"),)
 
     BASE_DIR: Final[str] = "/opt/prod/ax3l"

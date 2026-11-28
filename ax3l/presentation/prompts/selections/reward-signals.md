@@ -21,7 +21,7 @@
 
 {{ previous_hypothesis }}
 
-### Previous choices
+### Parameters
 
 ```json
 {{ previous_values | tojson(indent=2) }}

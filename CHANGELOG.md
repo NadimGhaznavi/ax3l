@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.0.11] - 2026-11-28 @ 02:57
+
 ### Summary
 
 Recover from overlong LLM text and inference timeouts while verifying four-view

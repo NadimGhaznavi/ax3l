@@ -13,7 +13,7 @@ from ax3l.constants.DEventCategory import DEventCategory as Events
 from ax3l.constants.DViewConversation import DViewConversation
 from ax3l.entities.ExperimentView import ExperimentView
 from ax3l.entities.ViewProposal import ViewProposal
-from ax3l.interface.LLM import LLM
+from ax3l.interface.LLM import LLM, LLMTimeoutError
 
 
 Result = TypeVar("Result")
@@ -21,6 +21,20 @@ Result = TypeVar("Result")
 
 def _nonfinite(value):
     raise ValueError(f"Nonfinite JSON number: {value}")
+
+
+def _validate_arguments(schema: dict, arguments: dict, tool_name: str) -> str | None:
+    """Validate the submission, returning feedback for overlong text only."""
+    errors = list(Draft202012Validator(schema).iter_errors(arguments))
+    for error in errors:
+        if error.validator != "maxLength":
+            raise error
+    if not errors:
+        return None
+    lengths = "; ".join(f"{'.'.join(error.path)} is {len(error.instance)} characters; "
+                        f"the maximum is {error.validator_value}" for error in errors)
+    return (f"Submission rejected: {lengths}. Shorten the text while preserving its meaning "
+            f"and any proposed parameter values, then call {tool_name} again.")
 
 
 class ViewConversation:
@@ -73,41 +87,53 @@ class ViewConversation:
         executing_tool = False
         try:
             message = dict(role="user", content=content)
-            log(Events.Conversation, Events.Conversation.PROMPT, json.dumps(message, ensure_ascii=False))
-            payload = json.dumps(dict(messages=[message], tools=[tool], tool_choice="required",
-                                      parallel_tool_calls=False, stream=False), allow_nan=False).encode()
-            log(Events.LLM, Events.LLM.REQUEST_STARTED, f"{action} {view.name}.")
-            status, _, body = self._llm.complete(payload)
-            if status >= 400:
-                raise RuntimeError(f"LLM HTTP {status}: {body.decode(errors='replace')}")
-            log(Events.Conversation, Events.Conversation.RESPONSE, body.decode(errors="backslashreplace"))
-            response = json.loads(body, parse_constant=_nonfinite)
-            envelope = {
-                "type": "object", "required": ["choices"], "properties": {
-                    "choices": {"type": "array", "minItems": 1, "maxItems": 1, "items": {
-                        "type": "object", "required": ["message"], "properties": {"message": {
-                            "type": "object", "required": ["tool_calls"], "properties": {"tool_calls": {
-                                "type": "array", "minItems": 1, "maxItems": 1, "items": {
-                                    "type": "object", "required": ["function"], "properties": {"function": {
-                                        "type": "object", "required": ["name", "arguments"], "properties": {
-                                            "name": {"const": tool_name}, "arguments": {"type": "string"},
-                                        },
-                                    }},
-                                },
+            messages = []
+            while True:
+                executing_tool = False
+                messages.append(message)
+                log(Events.Conversation, Events.Conversation.PROMPT, json.dumps(message, ensure_ascii=False))
+                payload = json.dumps(dict(messages=messages, tools=[tool], tool_choice="required",
+                                          parallel_tool_calls=False, stream=False), allow_nan=False).encode()
+                log(Events.LLM, Events.LLM.REQUEST_STARTED, f"{action} {view.name}.")
+                status, _, body = self._llm.complete(payload)
+                if status in (408, 504):
+                    raise LLMTimeoutError(f"LLM HTTP {status}: {body.decode(errors='replace')}")
+                if status >= 400:
+                    raise RuntimeError(f"LLM HTTP {status}: {body.decode(errors='replace')}")
+                log(Events.Conversation, Events.Conversation.RESPONSE, body.decode(errors="backslashreplace"))
+                response = json.loads(body, parse_constant=_nonfinite)
+                envelope = {
+                    "type": "object", "required": ["choices"], "properties": {
+                        "choices": {"type": "array", "minItems": 1, "maxItems": 1, "items": {
+                            "type": "object", "required": ["message"], "properties": {"message": {
+                                "type": "object", "required": ["tool_calls"], "properties": {"tool_calls": {
+                                    "type": "array", "minItems": 1, "maxItems": 1, "items": {
+                                        "type": "object", "required": ["function"], "properties": {"function": {
+                                            "type": "object", "required": ["name", "arguments"], "properties": {
+                                                "name": {"const": tool_name}, "arguments": {"type": "string"},
+                                            },
+                                        }},
+                                    },
+                                }},
                             }},
                         }},
-                    }},
-                },
-            }
-            Draft202012Validator(envelope).validate(response)
-            call = response["choices"][0]["message"]["tool_calls"][0]
-            log(Events.Tool, Events.Tool.STARTED, json.dumps(call))
-            executing_tool = True
-            arguments = json.loads(call["function"]["arguments"], parse_constant=_nonfinite)
-            Draft202012Validator(arguments_schema).validate(arguments)
-            result = accept(arguments)
-            log(Events.Tool, Events.Tool.COMPLETED, json.dumps(dict(status="accepted", **arguments), allow_nan=False))
-            return result
+                    },
+                }
+                Draft202012Validator(envelope).validate(response)
+                assistant = response["choices"][0]["message"]
+                call = assistant["tool_calls"][0]
+                log(Events.Tool, Events.Tool.STARTED, json.dumps(call))
+                executing_tool = True
+                arguments = json.loads(call["function"]["arguments"], parse_constant=_nonfinite)
+                feedback = _validate_arguments(arguments_schema, arguments, tool_name)
+                if feedback is not None:
+                    log(Events.Tool, Events.Tool.FAILED, feedback, "WARNING")
+                    messages.append(assistant)
+                    message = dict(role="tool", tool_call_id=call["id"], content=feedback)
+                    continue
+                result = accept(arguments)
+                log(Events.Tool, Events.Tool.COMPLETED, json.dumps(dict(status="accepted", **arguments), allow_nan=False))
+                return result
         except KeyboardInterrupt:
             outcome = "View conversation interrupted."
             raise

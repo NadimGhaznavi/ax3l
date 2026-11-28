@@ -36,13 +36,12 @@ def tool_name(request):
 
 class ProposalBoundaryTests(unittest.TestCase):
     def response(self, name, arguments):
-        return json.dumps(dict(choices=[dict(message=dict(tool_calls=[
-            dict(function=dict(name=name, arguments=json.dumps(arguments)))
+        return json.dumps(dict(choices=[dict(message=dict(role='assistant', content=None, tool_calls=[
+            dict(id='submission', type='function', function=dict(name=name, arguments=json.dumps(arguments)))
         ]))])).encode()
 
     def test_observations_are_required_short_text_and_cannot_propose_settings(self):
         for arguments in ({'observations': ''}, {'observations': '  '}, {'observations': 7}, {},
-                          {'observations': 'x' * (DViewConversation.OBSERVATIONS_MAX_LENGTH + 1)},
                           {'observations': 'Done.', 'values': {'seed': 12}}):
             with self.subTest(arguments=arguments):
                 llm, log = Mock(url='http://local'), MemoryLog()
@@ -65,6 +64,47 @@ class ProposalBoundaryTests(unittest.TestCase):
             hypothesis=hypothesis, values={'training.gamma': .95}))
         result = conversation.propose(VIEWS['training'], 'Tune training.', 'experiment')
         self.assertEqual(result.hypothesis, hypothesis)
+
+    def test_overlong_text_gets_tool_feedback_until_a_valid_submission(self):
+        for name, field in (('submit_view', 'hypothesis'), ('submit_observations', 'observations')):
+            with self.subTest(name=name):
+                arguments = {field: 'Short enough.'}
+                if name == 'submit_view':
+                    arguments['values'] = {'training.gamma': .95}
+                llm, log = Mock(url='http://local'), MemoryLog()
+                llm.complete.side_effect = [
+                    (200, '', self.response(name, dict(arguments, **{field: 'x' * length})))
+                    for length in (300, 281)
+                ] + [(200, '', self.response(name, arguments))]
+                conversation = ViewConversation(llm, log)
+                if name == 'submit_view':
+                    result = conversation.propose(VIEWS['training'], 'Tune.', 'experiment')
+                    self.assertEqual(result.hypothesis, arguments[field])
+                    self.assertEqual(result.values, arguments['values'])
+                else:
+                    self.assertEqual(conversation.evaluate(VIEWS['training'], [], 'experiment'), arguments[field])
+                requests = [json.loads(call.args[0]) for call in llm.complete.call_args_list]
+                self.assertEqual([len(request['messages']) for request in requests], [1, 3, 5])
+                for request, length in zip(requests[1:], (300, 281)):
+                    assistant, feedback = request['messages'][-2:]
+                    self.assertEqual(assistant['role'], 'assistant')
+                    self.assertEqual(feedback['role'], 'tool')
+                    self.assertEqual(feedback['tool_call_id'], assistant['tool_calls'][0]['id'])
+                    self.assertIn(field, feedback['content'])
+                    self.assertIn(str(length), feedback['content'])
+                    self.assertIn('280', feedback['content'])
+                    self.assertIn(name, feedback['content'])
+                self.assertEqual(sum(e['name'] == 'tool_execution_failed' for e in log.events), 2)
+                self.assertEqual(log.events[-1]['log_level'], 'INFO')
+
+    def test_length_feedback_does_not_hide_other_invalid_arguments(self):
+        llm, log = Mock(url='http://local'), MemoryLog()
+        llm.complete.return_value = 200, '', self.response('submit_observations', {
+            'observations': 'x' * 300, 'values': {'seed': 12},
+        })
+        with self.assertRaises(ValidationError):
+            ViewConversation(llm, log).evaluate(VIEWS['training'], [], 'experiment')
+        llm.complete.assert_called_once()
 
     def test_simulation_values_are_left_for_snakelab_to_validate(self):
         for values in (
@@ -99,7 +139,6 @@ class ProposalBoundaryTests(unittest.TestCase):
             dict(template, values={'game.rewards.food': float('nan')}),
             dict(template, values={'training.sequence_length': 8}),
             dict(template, hypothesis='  '),
-            dict(template, hypothesis='x' * (DViewConversation.HYPOTHESIS_MAX_LENGTH + 1)),
             dict(template, evaluation='Evaluation belongs in its own conversation.'),
             dict(template, values={}),
         ]

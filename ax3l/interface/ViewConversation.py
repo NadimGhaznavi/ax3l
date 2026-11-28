@@ -14,6 +14,7 @@ from ax3l.constants.DViewConversation import DViewConversation
 from ax3l.entities.ExperimentView import ExperimentView
 from ax3l.entities.ViewProposal import ViewProposal
 from ax3l.interface.LLM import LLM, LLMTimeoutError
+from ax3l.interface.LLMResponseCapture import LLMResponseCapture
 
 
 Result = TypeVar("Result")
@@ -93,13 +94,18 @@ class ViewConversation:
                 messages.append(message)
                 log(Events.Conversation, Events.Conversation.PROMPT, json.dumps(message, ensure_ascii=False))
                 payload = json.dumps(dict(messages=messages, tools=[tool], tool_choice="required",
-                                          parallel_tool_calls=False, stream=False), allow_nan=False).encode()
-                log(Events.LLM, Events.LLM.REQUEST_STARTED, f"{action} {view.name}.")
-                status, _, body = self._llm.complete(payload)
-                if status in (408, 504):
-                    raise LLMTimeoutError(f"LLM HTTP {status}: {body.decode(errors='replace')}")
-                if status >= 400:
-                    raise RuntimeError(f"LLM HTTP {status}: {body.decode(errors='replace')}")
+                                          parallel_tool_calls=False, stream=True,
+                                          stream_options=dict(include_usage=True)), allow_nan=False).encode()
+                request = log(Events.LLM, Events.LLM.REQUEST_STARTED, f"{action} {view.name}.")
+                with LLMResponseCapture(
+                        self._events, request, process_id=experiment_id, parent_event_id=conversation,
+                        parameter=view.name,
+                        source_name="selection" if tool_name == "submit_view" else "evaluation") as capture:
+                    status, _, body = self._llm.complete(payload, on_progress=capture.receive)
+                    if status in (408, 504):
+                        raise LLMTimeoutError(f"LLM HTTP {status}: {body.decode(errors='replace')}")
+                    if status >= 400:
+                        raise RuntimeError(f"LLM HTTP {status}: {body.decode(errors='replace')}")
                 log(Events.Conversation, Events.Conversation.RESPONSE, body.decode(errors="backslashreplace"))
                 response = json.loads(body, parse_constant=_nonfinite)
                 envelope = {

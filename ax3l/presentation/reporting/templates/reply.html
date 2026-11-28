@@ -10,6 +10,10 @@
 <body>
   <header><h1>{{ page_title | default('Reply #' ~ event.event_id) }}</h1><a href="{{ back_url | default('/') }}">{{ back_label | default('Back to event log') }}</a></header>
   <main>
+    {% if capture %}
+    <p>Capture status: <strong>{{ capture.status | replace('_', ' ') }}</strong>.{% if capture.status != 'completed' %} This output is incomplete.{% endif %}
+      Last received chunk: {{ capture.last_chunk_at or 'No output received.' }}</p>
+    {% endif %}
     <section><h2>{{ message_title | default('Assistant message') }}</h2><div id="message-content"{% if preview %} class="tool-result"{% endif %}>{% if preview %}{{ markdown_html(reply_text) | safe }}{% else %}<pre>{{ reply_text }}</pre>{% endif %}</div></section>
     <section>
       <h2>Event</h2>

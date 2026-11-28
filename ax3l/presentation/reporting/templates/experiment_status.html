@@ -39,7 +39,7 @@
     <p class="view-observations" role="status"><strong>Observations:</strong> {{ view.observations or view.status }}</p>
     <div class="view-links view-evaluation-links">
       <p>{% if view.response_id and view.has_reason %}<a href="/events/{{ view.response_id }}/reason">Reasoning</a>{% else %}Reasoning: —{% endif %}</p>
-      <p>{% if view.response_id %}<a href="/events/{{ view.response_id }}">Response (details)</a>{% else %}Response (details): —{% endif %}</p>
+      <p>{% if view.response_id %}<a href="/events/{{ view.response_id }}">{{ view.response_label }} (details)</a>{% else %}Response (details): —{% endif %}</p>
     </div>
     {% endif %}
     {% if view.error %}<p class="view-error" role="status">{{ view.error }}</p>{% endif %}
@@ -58,7 +58,7 @@
           <tr class="view-conversation">
             <td class="saved-cell"><input type="checkbox" disabled{% if view.saved %} checked{% endif %} aria-label="{{ view.title }} saved"></td>
             <td>Select parameters</td>
-            <td>{% if view.response_id %}<a href="/events/{{ view.response_id }}">Response</a>{% if view.has_reason %}<br><a href="/events/{{ view.response_id }}/reason">Reasoning</a>{% endif %}{% else %}—{% endif %}</td>
+            <td>{% if view.response_id %}<a href="/events/{{ view.response_id }}">{{ view.response_label }}</a>{% if view.has_reason %}<br><a href="/events/{{ view.response_id }}/reason">Reasoning</a>{% endif %}{% else %}—{% endif %}</td>
             <td>—</td>
             <td>{{ 'Hypothesis and parameters saved.' if view.saved else 'Awaiting LLM submission.' }}</td>
           </tr>

@@ -111,7 +111,9 @@ def experiment_sections(data: dict) -> list[dict]:
         events = latest.get(stage, [])
         by_name = {event["name"]: event for event in events}
         prompt = by_name.get(Events.Conversation.PROMPT)
-        response = by_name.get(Events.Conversation.RESPONSE)
+        responses = [event for event in events
+                     if event["name"] in (Events.Conversation.RESPONSE, Events.LLM.RESPONSE_CAPTURED)]
+        response = responses[-1] if responses else None
         ended = by_name.get(Events.Conversation.ENDED)
         accepted = by_name.get(Events.Tool.COMPLETED)
         submission = json.loads(accepted["content"]) if accepted else {}
@@ -157,6 +159,8 @@ def experiment_sections(data: dict) -> list[dict]:
             stage=stage, status=status, saved=bool(accepted),
             prompt_id=prompt["event_id"] if prompt else None,
             response_id=response["event_id"] if response else None,
+            response_label="Captured output" if response and response["name"] == Events.LLM.RESPONSE_CAPTURED
+                           else "Response",
             has_reason=bool(response and reasoning_content(response["content"])),
             elapsed=_elapsed(elapsed_seconds), elapsed_seconds=elapsed_seconds,
             input_tokens=usage.get("prompt_tokens"), output_tokens=usage.get("completion_tokens"),

@@ -21,9 +21,11 @@ class DEventCategory:
         CATEGORY = "LLM"
         REQUEST_STARTED = "llm_request_started"
         REQUEST_FAILED = "llm_request_failed"
+        RESPONSE_CAPTURED = "llm_response_captured"
         LABELS = {
             REQUEST_STARTED: "Request started",
             REQUEST_FAILED: "Request failed",
+            RESPONSE_CAPTURED: "Captured output",
         }
 
     class Tool(EventCategory):

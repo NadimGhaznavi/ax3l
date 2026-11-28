@@ -49,6 +49,10 @@ class ReportRenderer:
                     event["reply_text"] = reply_summary(event["content"])
                 elif event["name"] == Events.Conversation.PROMPT:
                     event["prompt_text"] = summary(json.loads(event["content"]))
+            elif event["category"] == Events.LLM.CATEGORY and event["name"] == Events.LLM.RESPONSE_CAPTURED:
+                capture = json.loads(event["content"])["capture"]
+                event["reply_text"] = f"Captured output ({capture['status'].replace('_', ' ')})"
+                event["has_reason"] = bool(reasoning_content(event["content"]))
             events.append(event)
         current = data["current_run"]
         values = {key: value for key, value in data.items() if key not in ("current_run", "events", "experiment")}
@@ -64,11 +68,14 @@ class ReportRenderer:
     def event(self, event: dict, *, reason: bool = False, preview: bool = False) -> bytes | None:
         if reason:
             text = reasoning_content(event["content"])
-            if event["name"] != Events.Conversation.RESPONSE or not text:
+            if event["name"] not in (Events.Conversation.RESPONSE, Events.LLM.RESPONSE_CAPTURED) or not text:
                 return None
+            captured = event["name"] == Events.LLM.RESPONSE_CAPTURED
             return self._render("reply.html", event=event, reply_text=text, sections=[],
                                 page_title=f"Reason #{event['event_id']}", message_title="Reason",
-                                back_url="/golden-configurations", back_label="Back to golden configurations",
+                                back_url=f"/events/{event['event_id']}" if captured else "/golden-configurations",
+                                back_label="Back to captured output" if captured else "Back to golden configurations",
+                                capture=json.loads(event["content"])["capture"] if captured else None,
                                 preview=preview, markdown_html=markdown_html)
         if event["name"] == Events.Conversation.PROMPT:
             return self._render("prompt.html", event=event, parts=parts(json.loads(event["content"])),
@@ -83,6 +90,12 @@ class ReportRenderer:
         groups = ("choices", "usage", "timings")
         sections = [("Response", fields({key: value for key, value in response.items() if key not in groups}))]
         sections.extend((key, fields(response[key], key)) for key in groups if key in response)
+        if event["name"] == Events.LLM.RESPONSE_CAPTURED:
+            reply = reply_summary(event["content"]) if response["choices"] else ""
+            text = "\n\n".join(filter(None, (reasoning_content(event["content"]), reply)))
+            return self._render("reply.html", event=event, reply_text=text, sections=sections,
+                                page_title=f"Captured output #{event['event_id']}",
+                                message_title="Captured reasoning and response", capture=response["capture"])
         return self._render("reply.html", event=event, reply_text=reply_summary(event["content"]), sections=sections)
 
     def tool_result(self, event: dict) -> bytes:

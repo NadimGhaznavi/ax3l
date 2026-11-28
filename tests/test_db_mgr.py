@@ -181,6 +181,33 @@ class DbMgrTests(unittest.TestCase):
             [],
         )
 
+    def test_live_capture_is_committed_before_request_completion_and_survives_reconnection(self):
+        import json
+        from ax3l.interface.database.DbMgr import DbMgr
+        from ax3l.interface.LLMResponseCapture import LLMResponseCapture
+
+        response = dict(choices=[dict(message=dict(reasoning_content="Inspect 🌳 while waiting."))])
+        with LLMResponseCapture(EventLogDb(self.db), 12, process_id=self.process_id,
+                                parent_event_id=self.event(), source_name='selection', parameter='training') as capture:
+            capture.receive(response)
+            reader = DbMgr(initialize_event_tables=False)
+            try:
+                rows = reader.query('''SELECT e.event_id, m.content FROM events e
+                    JOIN event_messages m USING (event_id)
+                    WHERE e.process_id=%s AND e.name='llm_response_captured' ''', (self.process_id,))
+                self.assertEqual(len(rows), 1)
+                event_id = rows[0]['event_id']
+                saved = json.loads(rows[0]['content'])
+                self.assertEqual(saved['choices'], response['choices'])
+                self.assertEqual(saved['capture']['status'], 'in_progress')
+            finally:
+                reader.close()
+        reader = DbMgr(initialize_event_tables=False)
+        try:
+            self.assertEqual(json.loads(EventLogDb(reader).get(event_id)['content'])['capture']['status'], 'completed')
+        finally:
+            reader.close()
+
     def test_duplicate_dictionary_key_rolls_back_whole_event(self):
         import pymysql
 

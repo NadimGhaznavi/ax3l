@@ -46,6 +46,9 @@ class EventLogDb:
                 )
         return event_id
 
+    def update_content(self, event_id: int, content: str) -> None:
+        """Commit the latest content of an existing in-flight capture event."""
+        self._db.execute("UPDATE event_messages SET content = %s WHERE event_id = %s", (content, event_id))
 
     def recent(self) -> list[dict[str, Any]]:
         """Return the latest 500 events, newest first."""

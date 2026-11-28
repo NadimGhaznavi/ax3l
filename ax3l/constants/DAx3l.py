@@ -2,7 +2,7 @@ from typing import Final
 
 
 class DAx3l:
-    HTTP_TIMEOUT_SECONDS: Final[int] = 1200
+    HTTP_TIMEOUT_SECONDS: Final[int] = 1800
     LLM_TIMEOUT_RETRY_SECONDS: Final[int] = 30
     SEED_ROTATION_FAILURES: Final[int] = 16
 

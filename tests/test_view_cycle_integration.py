@@ -279,6 +279,67 @@ class ViewCycleIntegrationTests(unittest.TestCase):
         self.assertEqual(self.count_events('simulation_submitted'), 5)
         self.assertEqual(self.count_events('configuration_compared'), 4)
 
+    def test_streamed_reasoning_and_partial_tools_survive_timeout_before_each_stage_retries(self):
+        attempts = Counter()
+        gates = []
+        respond = self.model.respond
+        normal_chunks = self.model.stream_chunks
+        def response(request):
+            stage = requested_view(request), request['tools'][0]['function']['name']
+            attempts[stage] += 1
+            reply = respond(request)
+            reply['stall'] = attempts[stage] == 1
+            return reply
+        def stream_chunks(reply):
+            if not reply.pop('stall'):
+                yield from normal_chunks(reply)
+                return
+            gate = Event()
+            gates.append(gate)
+            self.addCleanup(gate.set)
+            yield dict(choices=[dict(index=0, delta=dict(role='assistant', reasoning_content='Investigate 🌳.'))])
+            call = reply['choices'][0]['message']['tool_calls'][0]
+            yield dict(choices=[dict(index=0, delta=dict(tool_calls=[dict(
+                index=0, id=call['id'], type='function', function=dict(
+                    name=call['function']['name'], arguments='{"unfinished":'))]))])
+            gate.wait(5)
+        persisted = []
+        def inspect_before_retry(seconds):
+            from ax3l.interface.database.EventLogDb import EventLogDb
+            rows = self.db.query('''SELECT event_id FROM events
+                WHERE event_id > %s AND name='llm_response_captured' ORDER BY event_id DESC LIMIT 1''',
+                (self.start_event,))
+            event = EventLogDb(self.db).get(rows[0]['event_id'])
+            capture = json.loads(event['content'])
+            self.assertEqual(capture['capture']['status'], 'interrupted')
+            self.assertEqual(capture['capture']['received_chunks'], 2)
+            self.assertIn('LLMTimeoutError', capture['capture']['error'])
+            self.assertEqual(capture['choices'][0]['message']['reasoning_content'], 'Investigate 🌳.')
+            self.assertEqual(capture['choices'][0]['message']['tool_calls'][0]['function']['arguments'],
+                             '{"unfinished":')
+            self.assertIsNotNone(event['parent_event_id'])
+            persisted.append((event['parameter'], event['source_name']))
+            gates[-1].set()
+        self.model.respond, self.model.stream_chunks = response, stream_chunks
+        self.scores = iter((10, 11, 12, 13, 14))
+        with patch.object(DAx3l, 'HTTP_TIMEOUT_SECONDS', .1), \
+                patch('ax3l.app.experiment.ExperimentLoop.sleep', side_effect=inspect_before_retry), \
+                self.assertLogs(level='WARNING'):
+            self.assertEqual(self.service(cycles=4), 0)
+        self.assertEqual(set(persisted), {(name, stage) for name in VIEWS for stage in ('selection', 'evaluation')})
+        self.assertEqual(len(persisted), 8)
+        self.assertEqual(self.count_events('llm_response_captured'), 16)
+        self.assertEqual(self.count_events('reply_received'), 8)
+        self.assertEqual(self.count_events('tool_execution_started'), 8)
+        self.assertEqual(self.count_events('simulation_submitted'), 5)
+        self.assertEqual(self.count_events('configuration_compared'), 4)
+        self.assertTrue(all(request['stream'] and request['stream_options']['include_usage']
+                            for request in self.model.requests))
+        captures = self.db.query('''SELECT m.content FROM events e JOIN event_messages m USING (event_id)
+            WHERE e.event_id > %s AND e.name='llm_response_captured' ''', (self.start_event,))
+        self.assertEqual(Counter(json.loads(row['content'])['capture']['status'] for row in captures),
+                         Counter(completed=8, interrupted=8))
+
     def test_timeout_during_length_correction_can_stop_and_resume_without_repeating_the_run(self):
         respond = self.model.respond
         attempts = Counter()

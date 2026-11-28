@@ -8,7 +8,9 @@ from random import shuffle
 from time import sleep
 from uuid import uuid4
 
-from ax3l.activity.ViewConfiguration import apply_values, editable_parameters, other_parameters, parameter_comparison
+from ax3l.activity.ViewConfiguration import (
+    apply_values, editable_parameters, historical_values, other_parameters, parameter_comparison,
+)
 from ax3l.app.experiment.ConfigurationLog import ConfigurationLog
 from ax3l.interface.database.DbMgr import DbMgr
 from ax3l.interface.database.EventLogDb import EventLogDb
@@ -183,7 +185,9 @@ class ExperimentLoop:
             proposal = state.proposals[name]
             context.update(rejected_hypothesis=proposal.hypothesis, rejected_values=proposal.values)
         context.update(parameters=editable_parameters(view, state.config),
-                       other_parameters=other_parameters(view, state.config))
+                       other_parameters=other_parameters(view, state.config),
+                       historical_simulation_data=historical_values(
+                           view, self._snake.get_scored_runs(state.config["seed"])))
         prompt = self._prompts.render(view, context, no_history=no_history, duplicate=revising)
         proposal = self._conversation.propose(view, prompt, state.experiment_id)
         if revising:

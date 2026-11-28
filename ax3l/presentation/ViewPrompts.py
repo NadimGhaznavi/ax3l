@@ -1,5 +1,6 @@
 """Render separate result evaluation and configuration prompts for each view."""
 
+import json
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
@@ -19,7 +20,10 @@ class ViewPrompts:
     def render(self, view: ExperimentView, context: dict, *, no_history: bool = False,
                duplicate: bool = False) -> list[dict]:
         folder = "selections-no-history" if no_history else "selections"
-        prompt = self._templates.get_template(f"{folder}/{view.name}.md").render(**context)
+        prompt = self._templates.get_template(f"{folder}/{view.name}.md").render(
+            **context, historical_simulation_json=json.dumps(
+                context["historical_simulation_data"], indent=2, allow_nan=False),
+        )
         if duplicate:
             notice = self._templates.get_template("common/duplicate-configuration.md").render(**context)
             prompt = notice.strip() + "\n\n" + prompt

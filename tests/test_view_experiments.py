@@ -332,7 +332,8 @@ class ViewCycleTests(ExperimentFixture):
         self.shuffle.assert_called_once()
         for index, name in enumerate(reversed(VIEWS)):
             request = self.model.requests[index * 2]
-            parameters, readonly = blocks(request)
+            history, parameters, readonly = blocks(request)
+            self.assertEqual(sum(len(runs) for runs in history.values()), index + 1)
             self.assertEqual(set(parameters), set(VIEWS[name].parameters))
             self.assertNotIn('new seed', parameters)
             self.assertIn('Baseline Results', prompt_text(request))
@@ -418,7 +419,7 @@ class ViewCycleTests(ExperimentFixture):
             reference_score = list(self.snake.results.values())[index]['high_score']
             self.assertIn(f'- Baseline high score: {reference_score}', prompt_text(request))
             if index == 2:  # Architecture follows Training and can tune sequence_length again.
-                self.assertEqual(blocks(request)[0]['training.sequence_length']['value'],
+                self.assertEqual(blocks(request)[1]['training.sequence_length']['value'],
                                  prior['training']['sequence_length'])
                 self.assertIn('training.sequence_length', request['tools'][0]['function'][
                     'parameters']['properties']['values']['properties'])

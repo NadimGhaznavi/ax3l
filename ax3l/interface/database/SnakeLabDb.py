@@ -68,6 +68,16 @@ class SnakeLabDb:
             "SELECT id, high_score FROM simulation_runs ORDER BY id"
         )}
 
+    def get_scored_runs(self, seed: int) -> list[dict]:
+        """Return all scored configurations for a seed in submission order."""
+        rows = self._db.query(
+            "SELECT r.high_score, c.* FROM simulation_runs r "
+            "JOIN configurations c ON c.run_id = r.run_id "
+            "WHERE c.seed = %s AND r.high_score IS NOT NULL ORDER BY r.id",
+            (seed,),
+        )
+        return [dict(high_score=row["high_score"], config=_config_from_row(row)) for row in rows]
+
     def get_episode_scores(self, run_id: str) -> list[dict]:
         """Return one run's training scores in epoch order."""
         return self._db.query(

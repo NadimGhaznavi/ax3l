@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.0.10] - 2026-11-27 @ 19:51
+
+### Summary
+
+Keep simulation identifiers out of model-facing image prompts.
+
+### Removed
+
+- Remove baseline, golden, and latest run IDs from evaluation and selection
+  prompts while retaining their high scores.
+
 ## [5.0.9] - 2026-11-27 @ 19:48
 
 ### Summary

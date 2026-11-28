@@ -70,9 +70,9 @@ def complete_candidate(data, score=12, phase='evaluating'):
                 latest_config=state.config)
 
 
-def render_status(data):
+def render_status(data, events=()):
     return ReportRenderer().recent(dict(
-        experiment=data, events=[], current_run=None, current_board_gif_url=None,
+        experiment=data, events=events, current_run=None, current_board_gif_url=None,
         snake_lab_status='Idle', high_score=None, all_time_high_score=None,
         experiment_cycles=0, simulations_submitted=0, games_played=0, moves_made=0,
     )).decode()
@@ -119,6 +119,41 @@ class PanelParser(HTMLParser):
 
 
 class ExperimentStatusTests(unittest.TestCase):
+    def test_partial_capture_replaces_an_earlier_reply_and_links_to_saved_reasoning(self):
+        data = status_data()
+        rows = conversation('selection-cycle', 'reward-signals', 'selection', accepted=False, ended=False)
+        capture = dict(rows[-1], event_id=14, category='LLM', name='llm_response_captured', content=json.dumps(dict(
+            choices=[dict(message=dict(reasoning_content='Still thinking <script>unsafe</script>',
+                                       tool_calls=[dict(function=dict(name='submit_view', arguments='{"hypothesis":'))]))],
+            capture=dict(status='in_progress', received_chunks=3, last_chunk_at='2026-11-28T12:00:00+00:00'))))
+        data['events'] = [*rows, capture]
+        section = experiment_sections(data)[0]
+        self.assertEqual(section['response_id'], 14)
+        self.assertEqual(section['response_label'], 'Captured output')
+        self.assertEqual(section['status'], 'In progress')
+        self.assertIsNone(section['input_tokens'])
+        html = render_status(data, [capture])
+        self.assertIn('Captured output (in progress)', html)
+        self.assertIn('href="/events/14">Captured output</a>', html)
+        self.assertIn('href="/events/14/reason">Reasoning</a>', html)
+        self.assertEqual(html.count('Captured output (in progress)'), 2)  # Link and title, one event row.
+        renderer = ReportRenderer()
+        page = renderer.event(capture).decode()
+        self.assertIn('This output is incomplete.', page)
+        self.assertIn('Still thinking &lt;script&gt;unsafe&lt;/script&gt;', page)
+        self.assertIn('capture.last_chunk_at', page)
+        self.assertNotIn('<script>', page)
+        reason = renderer.event(capture, reason=True).decode()
+        self.assertIn('Still thinking &lt;script&gt;unsafe&lt;/script&gt;', reason)
+        self.assertNotIn('submit_view', reason)
+        self.assertIn('This output is incomplete.', reason)
+        self.assertIn('href="/events/14">Back to captured output</a>', reason)
+
+        data['events'].append(dict(rows[-1], event_id=15))
+        section = experiment_sections(data)[0]
+        self.assertEqual((section['response_id'], section['response_label']), (15, 'Response'))
+        self.assertEqual((section['input_tokens'], section['output_tokens']), (2241, 578))
+
     def test_two_sections_follow_the_flow_and_retain_conversation_details(self):
         data = status_data()
         complete_candidate(data, phase='completed')

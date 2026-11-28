@@ -30,6 +30,8 @@ and their validated results use the Tool category.
 | `conversation_ended` | Conversation |
 | `prompt_sent` | Conversation |
 | `reply_received` | Conversation |
+| `llm_request_started` | LLM |
+| `llm_response_captured` | LLM |
 | `llm_request_failed` | LLM |
 | `tool_execution_started` | Tool |
 | `tool_request_received` | Tool |
@@ -46,6 +48,20 @@ and their validated results use the Tool category.
 | `proposal_accepted` | Configuration |
 | `configuration_compared` | Configuration |
 | `golden_config_created` | Configuration |
+
+Each inference request creates one `llm_response_captured` event, shown as
+**Captured output**. Its JSON message holds the accumulated streamed reasoning,
+assistant text, and tool-call fragments, plus the request event ID, capture
+status, received-chunk count, and UTC time of the last chunk. The first chunk is
+committed immediately; later chunks update that event at most every five seconds.
+Completion, timeout, connection failure, or a handled interruption flushes the
+latest received output and marks the capture completed or interrupted. An abrupt
+process termination preserves the last committed snapshot, which can remain
+marked in progress and may omit the most recent five seconds of output.
+
+The event links to its captured output and, when available, Reasoning. Selection
+and Evaluation show the current capture until a complete `reply_received` event
+is saved. Incomplete tool calls are retained for diagnosis and never executed.
 
 `golden_config_created` is recorded through `ConfigurationLog.golden_config_created`.
 Its message is the supplied reason, for example `Parameter x: 2 > 4`.

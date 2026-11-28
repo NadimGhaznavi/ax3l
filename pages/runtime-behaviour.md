@@ -70,12 +70,23 @@ reference and candidate high scores, and a per-view image of recorded results.
 No other view evaluates that simulation. Qwen submits nonblank Observations of
 at most 280 characters through `submit_observations`.
 
+Inference responses stream into a durable **Captured output** event in the
+EventLog. Reasoning, assistant text, and tool-call fragments are saved as they
+arrive, with updates every five seconds and a final flush when the request
+completes or fails. The capture records the last received chunk's time and
+whether the response completed or was interrupted. A hard process termination
+retains the last committed snapshot, possibly missing the latest five seconds.
+Only a fully received response can proceed to submission validation and tool
+execution. See the [event reference](events.md) for capture fields and links.
+
 Inference connection and response-read timeouts, including HTTP 408 and 504,
 leave the server running in the pending selection or evaluation phase. Ax3l logs
 the failure, discards the timed-out conversation's assistant replies and tool
-feedback, and waits thirty seconds. It then rebuilds the stage's original prompt
-and sends a new HTTP request containing only that user message, including the
-original text and image. This also applies to timeouts during length correction.
+feedback from the retry's context, and waits thirty seconds. Captured output and
+earlier conversation events remain available for diagnosis. It then rebuilds the
+stage's original prompt and sends a new HTTP request containing only that user
+message, including the original text and image. This also applies to timeouts
+during length correction.
 It does not resubmit the simulation, repeat its comparison, or advance the view
 until that stage succeeds.
 

@@ -106,7 +106,7 @@
           {% elif event.prompt_text is defined %}
           <td class="content" title="{{ event.prompt_text }}"><a href="/events/{{ event.event_id }}">{{ event.prompt_text }}</a></td>
           {% elif event.reply_text is defined %}
-          <td class="content" title="{{ event.reply_text }}"><a href="/events/{{ event.event_id }}">{{ event.reply_text }}</a></td>
+          <td class="content" title="{{ event.reply_text }}"><a href="/events/{{ event.event_id }}">{{ event.reply_text }}</a>{% if event.has_reason %} · <a href="/events/{{ event.event_id }}/reason">Reasoning</a>{% endif %}</td>
           {% else %}
           <td class="content" title="{{ event.content if event.content is not none else '' }}">{{ event.content if event.content is not none else '' }}</td>
           {% endif %}

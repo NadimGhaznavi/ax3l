@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Show the recorded epsilon decay clearly in exploration comparison images.
+
+### Fixed
+
+- Plot every epoch's recorded epsilon on its own 0–1 panel, preserving early
+  decay, missing values, and the zero tail instead of sampling every 150 epochs.
+  Keep score percentiles in 150-epoch windows.
+
+### Removed
+
+- Remove the EpsilonNice override series and its legend from exploration images.
+
 ## [0.5.15] - 2026-11-28 @ 06:38
 
 ### Summary

@@ -90,11 +90,13 @@ during length correction.
 It does not resubmit the simulation, repeat its comparison, or advance the view
 until that stage succeeds.
 
-Images use consecutive 150-epoch windows, retaining a shorter final window:
+Score percentiles and aggregated rates use consecutive 150-epoch windows,
+retaining a shorter final window. Epsilon uses every recorded epoch:
 
 - Architecture: 90th and 25th score percentiles on shared axes.
-- Exploration: checkpoint epsilon, observed EpsilonNice overrides per move after
-  epsilon expiry, and the two score percentile panels.
+- Exploration: recorded epsilon values on a separate 0–1 panel, including early
+  decay and the zero tail, and the two score percentile panels. EpsilonNice
+  overrides are omitted from the image.
 - Reward Signals: food collected per 100 moves, terminal wall/snake collisions as
   percentages of episodes on 0–100% axes, plus the score percentiles.
 - Training: score percentiles and mean recorded training loss, preserving gaps

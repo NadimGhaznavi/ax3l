@@ -37,8 +37,9 @@ def run_comparison_image(view: ExperimentView, reference_episodes: list[dict],
     if latest_episodes is None:
         title = f"{view.name.replace('-', ' ').title()} baseline results"
     draw.text((118, 20), title, font=fonts[40], fill=FOREGROUND)
-    draw.text((118, 74), f"Recorded results per {window_size}-epoch window (final window may be shorter)",
-              font=fonts[16], fill=MUTED)
+    subtitle = (f"Epsilon per epoch; scores per {window_size}-epoch window (final window may be shorter)"
+                if exploration else f"Recorded results per {window_size}-epoch window (final window may be shorter)")
+    draw.text((118, 74), subtitle, font=fonts[16], fill=MUTED)
     for (name, color, _), x in zip(runs, (770, 902)):
         draw.line((x, 112, x + 32, 112), fill=color, width=4)
         draw.text((x + 42, 112), name, anchor="lm", font=fonts[18], fill=FOREGROUND)
@@ -49,14 +50,9 @@ def run_comparison_image(view: ExperimentView, reference_episodes: list[dict],
 
     panels = []
     if exploration:
-        series = []
-        for _, color, episodes in runs:
-            points = exploration_progress(episodes, window_size)
-            end = next((index + 1 for index, point in enumerate(points) if point["epsilon"] == 0), len(points))
-            series.append((color, [(point["epoch"], point["epsilon"]) for point in points[:end]], False))
-            series.append((color, [(point["epoch"], point["epsilon_nice_rate"])
-                                   for point in points if point["post_epsilon"]], True))
-        panels.append(("Exploration", "", 1, .25, series))
+        series = [(color, [(point["epoch"], point["epsilon"]) for point in exploration_progress(episodes)], False)
+                  for _, color, episodes in runs]
+        panels.append(("Epsilon", "Value", 1, .25, series))
     if rewards:
         rates = [(color, reward_progress(episodes, window_size)) for _, color, episodes in runs]
         rate_maximum = max((point["food"] for _, points in rates for point in points
@@ -89,12 +85,10 @@ def run_comparison_image(view: ExperimentView, reference_episodes: list[dict],
         top = 178 + index * (254 if len(panels) > 2 else 274)
         bottom = top + (170 if len(panels) > 2 else 200)
         draw.text((118, top - 36), title, font=fonts[24], fill=FOREGROUND)
-        if exploration and index == 0:
-            _line_styles(draw, fonts, top, "Epsilon probability", "Moves overridden by EpsilonNice")
         if (rewards and index == 3) or (training and index == 0):
             _line_styles(draw, fonts, top, "90th percentile", "25th percentile")
         _panel(image, draw, fonts, top, bottom, last_epoch, limit, spacing, label,
-               series, percent=(exploration and index == 0) or (rewards and index in (1, 2)),
+               series, percent=rewards and index in (1, 2),
                epoch_labels=index == len(panels) - 1)
         missing = [name for name, _, episodes in runs if not episodes]
         if missing:
@@ -117,7 +111,7 @@ def run_comparison_image(view: ExperimentView, reference_episodes: list[dict],
     draw.text((561, height - 72), "Training epoch", anchor="mm", font=fonts[18], fill=FOREGROUND)
     note = ("Each point summarizes the preceding 150 epochs; mean loss excludes missing values."
             if training else "Each point summarizes the preceding 150 epochs; food per 100 moves, collisions as % of episodes."
-            if rewards else "Epsilon is sampled at checkpoints; overrides = total EpsilonNice moves / total moves in each window."
+            if rewards else "Epsilon uses recorded values for every epoch; score percentiles summarize 150-epoch windows."
             if exploration else "Score percentiles summarize recorded episodes on shared epoch and score axes.")
     draw.text((118, height - 36), note, font=fonts[16], fill=MUTED)
     output = BytesIO()

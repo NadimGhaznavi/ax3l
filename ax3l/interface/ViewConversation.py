@@ -3,6 +3,8 @@
 from collections.abc import Callable
 from copy import deepcopy
 import json
+from math import ceil
+from time import monotonic
 from typing import TypeVar
 
 from jsonschema import Draft202012Validator
@@ -76,6 +78,14 @@ class ViewConversation:
         tool = dict(type="function", function=dict(
             name=tool_name, description=description, parameters=schema,
         ))
+        tools = [tool]
+        timer_schema = dict(type="object", additionalProperties=False, properties={})
+        if tool_name == "submit_view":
+            tools.append(dict(type="function", function=dict(
+                name="timer", description="Check the selection countdown (MM:SS). Negative values show time past zero.",
+                parameters=timer_schema,
+            )))
+        timer_deadline = None
         conversation = self._events.log(Events.Conversation.STARTED, Events.Conversation.CATEGORY, "INFO",
                                     f"{action} {view.name} with {self._llm.url}.", process_id=experiment_id)
 
@@ -93,7 +103,7 @@ class ViewConversation:
                 executing_tool = False
                 messages.append(message)
                 log(Events.Conversation, Events.Conversation.PROMPT, json.dumps(message, ensure_ascii=False))
-                payload = json.dumps(dict(messages=messages, tools=[tool], tool_choice="required",
+                payload = json.dumps(dict(messages=messages, tools=tools, tool_choice="required",
                                           parallel_tool_calls=False, stream=True,
                                           stream_options=dict(include_usage=True)), allow_nan=False).encode()
                 request = log(Events.LLM, Events.LLM.REQUEST_STARTED, f"{action} {view.name}.")
@@ -101,6 +111,8 @@ class ViewConversation:
                         self._events, request, process_id=experiment_id, parent_event_id=conversation,
                         parameter=view.name,
                         source_name="selection" if tool_name == "submit_view" else "evaluation") as capture:
+                    if timer_deadline is None and tool_name == "submit_view":
+                        timer_deadline = monotonic() + DViewConversation.SELECTION_TIMER_SECONDS
                     status, _, body = self._llm.complete(payload, on_progress=capture.receive)
                     if status in (408, 504):
                         raise LLMTimeoutError(f"LLM HTTP {status}: {body.decode(errors='replace')}")
@@ -116,7 +128,8 @@ class ViewConversation:
                                     "type": "array", "minItems": 1, "maxItems": 1, "items": {
                                         "type": "object", "required": ["function"], "properties": {"function": {
                                             "type": "object", "required": ["name", "arguments"], "properties": {
-                                                "name": {"const": tool_name}, "arguments": {"type": "string"},
+                                                "name": {"enum": [t["function"]["name"] for t in tools]},
+                                                "arguments": {"type": "string"},
                                             },
                                         }},
                                     },
@@ -131,6 +144,15 @@ class ViewConversation:
                 log(Events.Tool, Events.Tool.STARTED, json.dumps(call))
                 executing_tool = True
                 arguments = json.loads(call["function"]["arguments"], parse_constant=_nonfinite)
+                if call["function"]["name"] == "timer":
+                    Draft202012Validator(timer_schema).validate(arguments)
+                    seconds = ceil(timer_deadline - monotonic())
+                    minutes, seconds_part = divmod(abs(seconds), 60)
+                    remaining = f"{'-' if seconds < 0 else ''}{minutes:02d}:{seconds_part:02d}"
+                    log(Events.Tool, Events.Tool.COMPLETED, json.dumps(dict(status="completed", page=remaining)))
+                    messages.append(assistant)
+                    message = dict(role="tool", tool_call_id=call["id"], content=remaining)
+                    continue
                 feedback = _validate_arguments(arguments_schema, arguments, tool_name)
                 if feedback is not None:
                     log(Events.Tool, Events.Tool.FAILED, feedback, "WARNING")

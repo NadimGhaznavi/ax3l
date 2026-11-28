@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.5] - 2026-11-28 @ 08:09
+
 ### Summary
 
 Extend the advisory countdown to evaluation conversations and share the timer implementation.

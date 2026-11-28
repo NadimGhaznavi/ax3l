@@ -222,6 +222,7 @@ for view in VIEWS.values():
         latest_episodes=[{'episode': 1, 'score': 4, 'epsilon': 0, 'steps': 10, 'epsilon_nice_injections': 2, 'outcome': 'snake', 'loss': .4}],
         reference_high_score=0, latest_high_score=4,
         parameters={},
+        historical_simulation_data={},
         other_parameters={'seed': 1971, 'model': {'layers': '2 (draft)'}},
     )
     content = ViewPrompts().render(view, context)

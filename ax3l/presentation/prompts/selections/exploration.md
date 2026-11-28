@@ -43,6 +43,12 @@ Use the 'timer' tool to check how long you have been working on this task. The t
 
 The attached image compares Golden (orange) and Latest (blue).
 
+## Historical Simulation Data
+
+```json
+{{ historical_simulation_json }}
+```
+
 ## Parameters to tune
 
 ```json

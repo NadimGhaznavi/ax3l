@@ -95,6 +95,10 @@ class FakeSnake:
     def get_num_sims(self):
         return len(self.results)
 
+    def get_scored_runs(self, seed):
+        return [deepcopy(result) for result in self.results.values()
+                if result['config']['seed'] == seed and result['high_score'] is not None]
+
     def find_config_run(self, config):
         return next((key for key in reversed(self.results) if self.results[key]['config'] == config), None)
 

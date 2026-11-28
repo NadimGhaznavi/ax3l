@@ -172,7 +172,7 @@ class SnakeLabDbTests(unittest.TestCase):
 
     def configuration_db(self):
         db = DbMgr(initialize_event_tables=False)
-        self.addCleanup(db.close)
+        self.addCleanup(lambda: db.close() if db._connection.open else None)
         db.execute("""CREATE TEMPORARY TABLE simulation_runs (
             id INT AUTO_INCREMENT PRIMARY KEY, run_id CHAR(36),
             status VARCHAR(16), high_score INT NULL)""")
@@ -235,6 +235,28 @@ class SnakeLabDbTests(unittest.TestCase):
         self.assertEqual(dal.get_config(ids[-1]), config)
         self.assertIsInstance(dal.get_config(ids[-1])['game']['rewards']['food'], float)
         self.assertIsNone(dal.get_config(str(uuid4())))
+
+    def test_scored_runs_include_all_same_seed_configurations_and_close_the_connection(self):
+        from ax3l.interface.database.SnakeLabDb import SnakeLabDb
+        db = self.configuration_db()
+        config = SimulationConfiguration.defaults()
+        self.assertEqual(SnakeLabDb(db).get_scored_runs(config['seed']), [])
+        foreign = deepcopy(config)
+        foreign['seed'] += 1
+        self.insert_config(db, foreign, score=999)
+        self.insert_config(db, config, status='queued', score=None)
+        expected = []
+        for batch_size, status, score in ((64, 'completed', 9), (32, 'completed', 33),
+                                          (16, 'failed', 33), (8, 'cancelled', 0),
+                                          (4, 'running', 5), (64, 'completed', 9)):
+            values = deepcopy(config)
+            values['training']['batch_size'] = batch_size
+            self.insert_config(db, values, status=status, score=score)
+            expected.append(dict(high_score=score, config=values))
+        with patch('ax3l.interface.SnakeLab.DbMgr', return_value=db) as factory:
+            self.assertEqual(SnakeLab().get_scored_runs(config['seed']), expected)
+        factory.assert_called_once_with(database='snakelab', initialize_event_tables=False)
+        self.assertFalse(db._connection.open)
 
 
 

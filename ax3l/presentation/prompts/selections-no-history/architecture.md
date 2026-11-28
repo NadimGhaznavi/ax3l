@@ -28,6 +28,12 @@ The baseline is the current golden configuration.
 
 The attached image shows the baseline run in orange.
 
+## Historical Simulation Data
+
+```json
+{{ historical_simulation_json }}
+```
+
 ## Parameters to tune
 
 ```json

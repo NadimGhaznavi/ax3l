@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.14] - 2026-11-28 @ 06:32
+
 ### Summary
 
 Preserve streamed inference output in the EventLog for diagnosing stalled or

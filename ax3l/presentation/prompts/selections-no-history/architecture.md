@@ -19,7 +19,7 @@
 
 The baseline is the current golden configuration.
 
-- Baseline simulation: {{ reference_run_id }} (high score: {{ reference_high_score }})
+- Baseline high score: {{ reference_high_score }}
 
 The attached image shows the baseline run in orange.
 

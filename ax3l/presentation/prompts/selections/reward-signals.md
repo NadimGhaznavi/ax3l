@@ -34,8 +34,8 @@
 
 ## Results Comparison
 
-- Golden reference: {{ reference_run_id }} (high score: {{ reference_high_score }})
-- Latest simulation: {{ latest_run_id }} (high score: {{ latest_high_score }})
+- Golden high score: {{ reference_high_score }}
+- Latest high score: {{ latest_high_score }}
 
 The attached image compares Golden (orange) and Latest (blue).
 

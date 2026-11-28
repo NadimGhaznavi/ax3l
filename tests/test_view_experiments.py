@@ -182,8 +182,12 @@ class ViewCycleTests(ExperimentFixture):
         self.assertEqual(history.view, 'exploration')
         owner_request = self.model.requests[8]
         self.assertIn('Previous hypothesis', prompt_text(owner_request))
-        self.assertIn(history.reference_run_id, prompt_text(owner_request))
-        self.assertIn(history.latest_run_id, prompt_text(owner_request))
+        reference_score = self.snake.results[history.reference_run_id]['high_score']
+        latest_score = self.snake.results[history.latest_run_id]['high_score']
+        self.assertIn(f'- Golden high score: {reference_score}', prompt_text(owner_request))
+        self.assertIn(f'- Latest high score: {latest_score}', prompt_text(owner_request))
+        self.assertNotIn(history.reference_run_id, prompt_text(owner_request))
+        self.assertNotIn(history.latest_run_id, prompt_text(owner_request))
         self.assertIn(history.observations, prompt_text(owner_request))
         for index in (2, 4, 6):
             self.assertIn('Baseline Results', prompt_text(self.model.requests[index]))
@@ -211,7 +215,8 @@ class ViewCycleTests(ExperimentFixture):
             prior = self.snake.submissions[index]
             current = self.snake.submissions[index + 1]
             request = self.model.requests[2 * index]
-            self.assertIn(list(self.snake.results)[index], prompt_text(request))
+            reference_score = list(self.snake.results.values())[index]['high_score']
+            self.assertIn(f'- Baseline high score: {reference_score}', prompt_text(request))
             if index == 2:  # Architecture follows Training and can tune sequence_length again.
                 self.assertEqual(blocks(request)[0]['training.sequence_length']['value'],
                                  prior['training']['sequence_length'])
@@ -224,7 +229,8 @@ class ViewCycleTests(ExperimentFixture):
         self.log.log('golden_config_created', 'Configuration', 'INFO', 'Existing.', process_id=run_id)
         self.loop().run(cycles=1)
         self.assertEqual(len(self.snake.submissions), 2)
-        self.assertIn(run_id, prompt_text(self.model.requests[0]))
+        self.assertIn('- Baseline high score: 10', prompt_text(self.model.requests[0]))
+        self.assertNotIn(run_id, prompt_text(self.model.requests[0]))
         self.assertEqual(tool_name(self.model.requests[0]), 'submit_view')
 
     def test_old_snakelab_history_does_not_replace_the_default_baseline(self):
@@ -232,7 +238,8 @@ class ViewCycleTests(ExperimentFixture):
         self.snake.results[old]['high_score'] = 999
         self.loop().run(cycles=1)
         self.assertEqual(self.snake.submissions[1], SimulationConfiguration.defaults())
-        self.assertNotIn(old, prompt_text(self.model.requests[0]))
+        baseline_score = list(self.snake.results.values())[1]['high_score']
+        self.assertIn(f'- Baseline high score: {baseline_score}', prompt_text(self.model.requests[0]))
 
     def test_restarts_keep_order_and_do_not_repeat_accepted_selection_or_evaluation(self):
         save = self.store.save

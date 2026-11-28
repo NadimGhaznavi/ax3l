@@ -76,9 +76,9 @@ class SnakeLabDb:
         )
 
     def get_exploration_episodes(self, run_id: str) -> list[dict]:
-        """Return recorded exploration probabilities, move counts, and scores."""
+        """Return recorded epsilon values and scores for the exploration chart."""
         return self._db.query(
-            "SELECT episode, score, epsilon, steps, epsilon_nice_injections "
+            "SELECT episode, score, epsilon "
             "FROM simulation_episodes WHERE run_id = %s ORDER BY episode", (run_id,),
         )
 

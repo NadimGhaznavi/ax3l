@@ -34,26 +34,28 @@ class ScorePercentilesTests(unittest.TestCase):
 
 
 class ExplorationProgressTests(unittest.TestCase):
-    def test_uses_recorded_checkpoint_epsilon_and_move_weighted_override_rate(self):
-        episodes = [dict(episode=3, epsilon=0, steps=0, epsilon_nice_injections=0),
-                    dict(episode=2, epsilon=0, steps=90, epsilon_nice_injections=9),
-                    dict(episode=1, epsilon=.7, steps=10, epsilon_nice_injections=0)]
+    def test_keeps_each_recorded_epsilon_in_epoch_order_including_zero_and_missing_values(self):
+        episodes = [dict(episode=4, epsilon=None), dict(episode=3, epsilon=0),
+                    dict(episode=2, epsilon=.4), dict(episode=1, epsilon=.96)]
         original = deepcopy(episodes)
-        self.assertEqual(exploration_progress(episodes, window_size=2), [
-            dict(epoch=2, epsilon=0, epsilon_nice_rate=.09, post_epsilon=True),
-            dict(epoch=3, epsilon=0, epsilon_nice_rate=None, post_epsilon=True),
+        self.assertEqual(exploration_progress(episodes), [
+            dict(epoch=1, epsilon=.96), dict(epoch=2, epsilon=.4),
+            dict(epoch=3, epsilon=0), dict(epoch=4, epsilon=None),
         ])
         self.assertEqual(episodes, original)
         self.assertEqual(exploration_progress([]), [])
 
-    def test_default_150_epoch_windows_retain_partial_window_and_post_epsilon_transition(self):
-        episodes = [dict(episode=i, epsilon=.4 if i <= 150 else 0, steps=10,
-                         epsilon_nice_injections=0 if i <= 150 else 2) for i in range(1, 322)]
-        self.assertEqual(exploration_progress(episodes), [
-            dict(epoch=150, epsilon=.4, epsilon_nice_rate=0, post_epsilon=False),
-            dict(epoch=300, epsilon=0, epsilon_nice_rate=.2, post_epsilon=True),
-            dict(epoch=321, epsilon=0, epsilon_nice_rate=.2, post_epsilon=True),
-        ])
+    def test_decay_before_the_first_score_window_and_full_zero_tail_are_retained(self):
+        episodes = [dict(episode=i, epsilon=.96 * .97 ** (i - 1) if i <= 50 else 0)
+                    for i in range(1, 322)]
+        points = exploration_progress(episodes)
+        self.assertEqual(len(points), 321)
+        self.assertEqual(points[0], dict(epoch=1, epsilon=.96))
+        self.assertAlmostEqual(points[1]['epsilon'], .9312)
+        self.assertGreater(points[49]['epsilon'], 0)
+        self.assertEqual(points[50], dict(epoch=51, epsilon=0))
+        self.assertEqual(points[149], dict(epoch=150, epsilon=0))
+        self.assertEqual(points[-1], dict(epoch=321, epsilon=0))
 
 
 class RewardProgressTests(unittest.TestCase):
@@ -147,30 +149,59 @@ class RunComparisonImageTests(unittest.TestCase):
                 # Latest retains its final partial window, ending at epoch 321.
                 self.assertEqual(image.getpixel((1004, top)), (77, 179, 255))
 
-    def test_exploration_panel_shows_sampled_epsilon_and_dashed_observed_overrides(self):
-        episodes = [dict(episode=i, score=i % 20, epsilon=.8 if i <= 150 else 0,
-                         steps=10, epsilon_nice_injections=2 if i > 150 else 0)
+    def test_exploration_panel_shows_early_epsilon_decay_and_zero_tail_without_overrides(self):
+        episodes = [dict(episode=i, score=i % 20, epsilon=.96 * .97 ** (i - 1) if i <= 100 else 0,
+                         steps=10, epsilon_nice_injections=8)
                     for i in range(1, 601)]
-        url = run_comparison_image(VIEWS['exploration'], [], episodes)
+        with patch.object(ImageDraw.ImageDraw, 'text', autospec=True,
+                          side_effect=ImageDraw.ImageDraw.text) as draw_text:
+            url = run_comparison_image(VIEWS['exploration'], [], episodes)
+        labels = [call.args[2] for call in draw_text.call_args_list]
+        self.assertIn('Epsilon', labels)
+        self.assertIn('Value', labels)
+        self.assertIn('0.25', labels)
+        self.assertFalse(any('EpsilonNice' in label or 'checkpoints' in label for label in labels))
         with Image.open(BytesIO(b64decode(url.split(',')[1]))) as image:
             self.assertEqual(image.size, (1056, 1000))
-            # Epsilon .8 at epoch 150, then zero at 300, where the solid line ends.
-            self.assertEqual(image.getpixel((339, 212)), (77, 179, 255))
-            self.assertEqual(image.getpixel((561, 348)), (77, 179, 255))
-            self.assertNotEqual(image.getpixel((900, 348)), (77, 179, 255))
-            # Observed overrides stay at 20%, using dashed segments after expiry.
-            self.assertEqual(image.getpixel((1004, 314)), (77, 179, 255))
-            pixels = [image.getpixel((x, 314)) for x in range(600, 900)]
-            self.assertIn((77, 179, 255), pixels)
-            self.assertTrue(any(color != (77, 179, 255) for color in pixels))
+            # The first score checkpoint is 150; epsilon must show its earlier decay.
+            for epoch in (1, 25, 50, 100):
+                x = int(118 + 886 * epoch / 600)
+                y = int(348 - 170 * episodes[epoch - 1]['epsilon'])
+                self.assertEqual(image.getpixel((x, y)), (77, 179, 255))
+            # Zero remains a solid line through the last epoch, with no 80% override line.
+            self.assertTrue(all(image.getpixel((x, 348)) == (77, 179, 255) for x in range(600, 1005)))
+            pixels = {color for _, color in image.crop((600, 178, 1008, 344)).getcolors(200000)}
+            self.assertNotIn((77, 179, 255), pixels)
 
-    def test_empty_exploration_and_zero_move_windows_still_produce_readable_pngs(self):
-        for episodes in ([], [dict(episode=1, score=0, epsilon=0, steps=0, epsilon_nice_injections=0)]):
+    def test_epsilon_comparisons_use_shared_axes_and_end_at_each_runs_last_recorded_epoch(self):
+        golden = [dict(episode=i, score=10, epsilon=.8) for i in range(1, 215)]
+        latest = [dict(episode=i, score=20, epsilon=.4) for i in range(1, 322)]
+        url = run_comparison_image(VIEWS['exploration'], golden, latest)
+        with Image.open(BytesIO(b64decode(url.split(',')[1]))) as image:
+            self.assertEqual(image.getpixel((120, 212)), (255, 189, 112))
+            self.assertEqual(image.getpixel((709, 212)), (255, 189, 112))
+            self.assertNotEqual(image.getpixel((900, 212)), (255, 189, 112))
+            self.assertEqual(image.getpixel((1004, 280)), (77, 179, 255))
+
+    def test_missing_epsilon_leaves_a_gap_without_hiding_a_measured_zero(self):
+        episodes = [dict(episode=epoch, score=0, epsilon=epsilon) for epoch, epsilon in
+                    ((1, .96), (150, .6), (300, None), (450, 0), (600, 0))]
+        url = run_comparison_image(VIEWS['exploration'], [], episodes)
+        with Image.open(BytesIO(b64decode(url.split(',')[1]))) as image:
+            self.assertEqual(image.getpixel((339, 246)), (77, 179, 255))
+            pixels = {color for _, color in image.crop((500, 178, 700, 352)).getcolors(200000)}
+            self.assertNotIn((77, 179, 255), pixels)
+            self.assertEqual(image.getpixel((900, 348)), (77, 179, 255))
+
+    def test_empty_exploration_and_unmeasured_epsilon_do_not_draw_false_zero_values(self):
+        for episodes in ([], [dict(episode=1, score=0, epsilon=None)]):
             with self.subTest(episodes=episodes):
                 url = run_comparison_image(VIEWS['exploration'], [], episodes)
                 with Image.open(BytesIO(b64decode(url.split(',')[1]))) as image:
                     image.load()
                     self.assertEqual(image.format, 'PNG')
+                    pixels = {color for _, color in image.crop((118, 178, 1008, 352)).getcolors(200000)}
+                    self.assertNotIn((77, 179, 255), pixels)
 
     def test_reward_comparison_has_episode_collision_percentages_and_both_score_percentiles(self):
         golden = [dict(episode=i, score=10, steps=100, outcome='wall') for i in range(1, 301)]

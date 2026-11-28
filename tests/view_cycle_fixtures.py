@@ -65,6 +65,12 @@ def episodes():
                 ((0, .9, None, 'wall'), (2, .5, .8, 'snake'), (4, 0, .4, 'max_moves')), 1)]
 
 
+def requested_view(request):
+    text = request['messages'][0]['content'][0]['text']
+    title = next(line for line in text.splitlines() if line.startswith('## Task: '))
+    return title.removeprefix('## Task: ').rsplit(' ', 1)[0].lower().replace(' ', '-')
+
+
 class FakeSnake:
     def __init__(self, scores=(10, 9, 12, 7)):
         self.scores = iter(scores)
@@ -115,6 +121,7 @@ class FakeSnake:
 class LocalLLM:
     def __init__(self, respond=None):
         self.requests = []
+        self.status = 200
         self.respond = respond or self.proposal
         fixture = self
 
@@ -124,10 +131,14 @@ class LocalLLM:
                 fixture.requests.append(request)
                 response = fixture.respond(request)
                 body = json.dumps(response).encode()
-                self.send_response(200)
-                self.send_header('Content-Length', str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
+                try:
+                    self.send_response(fixture.status)
+                    self.send_header('Content-Length', str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                except (BrokenPipeError, ConnectionResetError):
+                    # A timed-out client can close before its fixture reply arrives.
+                    pass
 
             def log_message(self, *args):
                 pass

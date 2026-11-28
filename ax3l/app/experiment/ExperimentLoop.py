@@ -3,6 +3,7 @@
 from collections.abc import Callable
 from copy import deepcopy
 import json
+import logging
 from random import shuffle
 from time import sleep
 from uuid import uuid4
@@ -19,7 +20,7 @@ from ax3l.entities.ExperimentState import ExperimentState
 from ax3l.entities.ExperimentView import VIEWS
 from ax3l.entities.ViewHistory import ViewHistory
 from ax3l.entities.ViewProposal import ViewProposal
-from ax3l.interface.LLM import LLM
+from ax3l.interface.LLM import LLM, LLMTimeoutError
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 from ax3l.interface.SnakeLab import SnakeLab
 from ax3l.interface.ViewConversation import ViewConversation
@@ -47,8 +48,17 @@ class ExperimentLoop:
             check()
             if state.phase == "completed":
                 state = self._next_cycle(state)
-            elif state.phase in ("choosing", "revising"):
-                self._choose_view(state)
+            elif state.phase in ("choosing", "revising", "evaluating"):
+                try:
+                    if state.phase == "evaluating":
+                        self._evaluate_view(state)
+                        completed += 1
+                    else:
+                        self._choose_view(state)
+                except LLMTimeoutError:
+                    logging.warning("LLM timed out while %s %s; retrying in %s seconds.",
+                                    state.phase, state.view_name, DAx3l.LLM_TIMEOUT_RETRY_SECONDS)
+                    sleep(DAx3l.LLM_TIMEOUT_RETRY_SECONDS)
             elif state.phase == "ready":
                 state.preceding_match = self._snake.find_config_run(state.config)
                 if state.preceding_match and not (state.baseline or state.seed_baseline):
@@ -86,9 +96,6 @@ class ExperimentLoop:
                     sleep(DSnakeLab.STATUS_POLL_SECONDS)
             elif state.phase == "comparing":
                 self._finish(state)
-            elif state.phase == "evaluating":
-                self._evaluate_view(state)
-                completed += 1
             else:
                 raise ValueError(f"Unknown experiment phase: {state.phase}")
 

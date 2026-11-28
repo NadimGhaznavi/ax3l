@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.0.11] - 2026-11-28 @ 02:57
+
+### Summary
+
+Recover from overlong LLM text and inference timeouts while verifying four-view
+transitions through real persistence and local service fixtures.
+
+### Fixed
+
+- Return corrective tool feedback for hypotheses and observations exceeding 280
+  characters, preserving conversation context until Qwen submits valid text.
+- Keep the server running after inference connection/read timeouts or HTTP
+  408/504 responses, retrying the pending stage after thirty seconds without
+  resubmitting simulations or advancing the active view.
+
+### Added
+
+- End-to-end checks using disposable MariaDB and HTTP/ZeroMQ fixtures for
+  shuffled rounds, report view changes, service restarts, length corrections,
+  inference timeout recovery, and seed rotation after sixteen losses.
+
 ## [5.0.10] - 2026-11-27 @ 19:51
 
 ### Summary

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-11-28 @ 08:01
+
 ### Summary
 
 Give every selection prompt five-minute pacing guidance and an advisory countdown tool.

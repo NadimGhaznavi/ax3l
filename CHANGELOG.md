@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.6] - 2026-11-28 @ 08:26
+
 ### Summary
 
 Clarify how evaluations handle hypotheses that differ from the executed changes.

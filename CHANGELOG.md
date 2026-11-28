@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- HTTP timeout increased to 1,200 seconds to accommodate longer SnakeLab simulations.
+
 ## [5.0.6] - 2026-11-27 @ 19:23
 
 ### Summary

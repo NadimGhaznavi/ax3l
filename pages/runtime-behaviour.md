@@ -48,15 +48,6 @@ has a fresh conversation. Qwen submits a nonblank hypothesis of at most 280
 characters and parameter values through the required native `submit_view`
 function. It may change several settings within the active view.
 
-All eight selection prompts ask Qwen to aim for five minutes and use the
-argument-free `timer` tool to check its progress. The countdown starts when the
-first selection prompt is sent, using
-`DViewConversation.SELECTION_TIMER_SECONDS` (300 seconds). It returns `MM:SS`,
-reaches `00:00`, and continues as negative time such as `-00:01`. Expiry is
-advisory: Qwen can keep checking the timer and submit its proposal afterward.
-Timer calls and submission corrections keep the original countdown; each fresh
-selection conversation, including after a timeout or restart, starts a new one.
-
 Ax3l checks response format and view scope. SnakeLab owns simulation-configuration
 validation against its JSON schema. Ax3l does not add cross-field reward rules.
 If a hypothesis or observation exceeds its character limit, Ax3l returns a tool
@@ -78,6 +69,15 @@ view's evaluation. It receives that candidate's hypothesis, chosen settings,
 reference and candidate high scores, and a per-view image of recorded results.
 No other view evaluates that simulation. Qwen submits nonblank Observations of
 at most 280 characters through `submit_observations`.
+
+All eight selection prompts and all four evaluation prompts ask Qwen to aim for
+five minutes and use the argument-free `timer` tool to check its progress. Each
+conversation starts its own countdown when its first prompt is sent, using
+`DViewConversation.TIMER_SECONDS` (300 seconds). It returns `MM:SS`, reaches
+`00:00`, and continues as negative time such as `-00:01`. Expiry is advisory:
+Qwen can keep checking the timer and submit its proposal or observations afterward.
+Timer calls and submission corrections keep the original countdown; each fresh
+conversation, including after a timeout or restart, starts a new one.
 
 Inference responses stream into a durable **Captured output** event in the
 EventLog. Reasoning, assistant text, and tool-call fragments are saved as they

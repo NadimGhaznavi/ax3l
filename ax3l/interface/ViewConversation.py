@@ -3,7 +3,6 @@
 from collections.abc import Callable
 from copy import deepcopy
 import json
-from math import ceil
 from time import monotonic
 from typing import TypeVar
 
@@ -13,6 +12,7 @@ from ax3l.activity.ViewConfiguration import parameter_schema
 from ax3l.interface.database.EventLogDb import EventLogDb
 from ax3l.constants.DEventCategory import DEventCategory as Events
 from ax3l.constants.DViewConversation import DViewConversation
+from ax3l.entities.ConversationTimer import ConversationTimer
 from ax3l.entities.ExperimentView import ExperimentView
 from ax3l.entities.ViewProposal import ViewProposal
 from ax3l.interface.LLM import LLM, LLMTimeoutError
@@ -78,21 +78,20 @@ class ViewConversation:
         tool = dict(type="function", function=dict(
             name=tool_name, description=description, parameters=schema,
         ))
-        tools = [tool]
+        stage = "selection" if tool_name == "submit_view" else "evaluation"
         timer_schema = dict(type="object", additionalProperties=False, properties={})
-        if tool_name == "submit_view":
-            tools.append(dict(type="function", function=dict(
-                name="timer", description="Check the selection countdown (MM:SS). Negative values show time past zero.",
-                parameters=timer_schema,
-            )))
-        timer_deadline = None
+        tools = [tool, dict(type="function", function=dict(
+            name="timer", description=f"Check the {stage} countdown (MM:SS). Negative values show time past zero.",
+            parameters=timer_schema,
+        ))]
+        timer = None
         conversation = self._events.log(Events.Conversation.STARTED, Events.Conversation.CATEGORY, "INFO",
                                     f"{action} {view.name} with {self._llm.url}.", process_id=experiment_id)
 
         def log(category, name, content, level="INFO"):
             return self._events.log(name, category.CATEGORY, level, content, process_id=experiment_id,
                                 parent_event_id=conversation, parameter=view.name,
-                                source_name="selection" if tool_name == "submit_view" else "evaluation")
+                                source_name=stage)
 
         outcome, level = "View submission accepted.", "INFO"
         executing_tool = False
@@ -110,9 +109,9 @@ class ViewConversation:
                 with LLMResponseCapture(
                         self._events, request, process_id=experiment_id, parent_event_id=conversation,
                         parameter=view.name,
-                        source_name="selection" if tool_name == "submit_view" else "evaluation") as capture:
-                    if timer_deadline is None and tool_name == "submit_view":
-                        timer_deadline = monotonic() + DViewConversation.SELECTION_TIMER_SECONDS
+                        source_name=stage) as capture:
+                    if timer is None:
+                        timer = ConversationTimer(monotonic() + DViewConversation.TIMER_SECONDS)
                     status, _, body = self._llm.complete(payload, on_progress=capture.receive)
                     if status in (408, 504):
                         raise LLMTimeoutError(f"LLM HTTP {status}: {body.decode(errors='replace')}")
@@ -146,22 +145,18 @@ class ViewConversation:
                 arguments = json.loads(call["function"]["arguments"], parse_constant=_nonfinite)
                 if call["function"]["name"] == "timer":
                     Draft202012Validator(timer_schema).validate(arguments)
-                    seconds = ceil(timer_deadline - monotonic())
-                    minutes, seconds_part = divmod(abs(seconds), 60)
-                    remaining = f"{'-' if seconds < 0 else ''}{minutes:02d}:{seconds_part:02d}"
-                    log(Events.Tool, Events.Tool.COMPLETED, json.dumps(dict(status="completed", page=remaining)))
-                    messages.append(assistant)
-                    message = dict(role="tool", tool_call_id=call["id"], content=remaining)
-                    continue
-                feedback = _validate_arguments(arguments_schema, arguments, tool_name)
-                if feedback is not None:
+                    feedback = timer.remaining(monotonic())
+                    log(Events.Tool, Events.Tool.COMPLETED, json.dumps(dict(status="completed", page=feedback)))
+                else:
+                    feedback = _validate_arguments(arguments_schema, arguments, tool_name)
+                    if feedback is None:
+                        result = accept(arguments)
+                        log(Events.Tool, Events.Tool.COMPLETED,
+                            json.dumps(dict(status="accepted", **arguments), allow_nan=False))
+                        return result
                     log(Events.Tool, Events.Tool.FAILED, feedback, "WARNING")
-                    messages.append(assistant)
-                    message = dict(role="tool", tool_call_id=call["id"], content=feedback)
-                    continue
-                result = accept(arguments)
-                log(Events.Tool, Events.Tool.COMPLETED, json.dumps(dict(status="accepted", **arguments), allow_nan=False))
-                return result
+                messages.append(assistant)
+                message = dict(role="tool", tool_call_id=call["id"], content=feedback)
         except KeyboardInterrupt:
             outcome = "View conversation interrupted."
             raise

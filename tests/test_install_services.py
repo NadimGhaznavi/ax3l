@@ -176,7 +176,7 @@ exec /usr/bin/systemd-analyze "$@"
                                'presentation/reporting/PresentationValues.py', 'app/reporting/ReportBackground.py',
                                'app/experiment/ExperimentLoop.py', 'interface/database/ExperimentDb.py',
                                'interface/ViewConversation.py', 'entities/ExperimentState.py',
-                               'entities/ExperimentView.py', 'entities/ViewProposal.py',
+                               'entities/ExperimentView.py', 'entities/ViewProposal.py', 'entities/ConversationTimer.py',
                                'presentation/ViewPrompts.py',
                                'presentation/RunComparisonImage.py', 'activity/ScorePercentiles.py',
                                'activity/ExplorationProgress.py', 'activity/RewardProgress.py', 'activity/TrainingProgress.py',

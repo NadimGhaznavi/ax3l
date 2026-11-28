@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.13] - 2026-11-28 @ 04:12
+
 ### Summary
 
 Restart a pending conversation with a freshly rendered prompt and image while

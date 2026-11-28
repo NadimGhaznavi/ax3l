@@ -8,6 +8,8 @@ from random import shuffle
 from time import sleep
 from uuid import uuid4
 
+from jsonschema import ValidationError
+
 from ax3l.activity.ViewConfiguration import (
     apply_values, editable_parameters, historical_values, other_parameters, parameter_comparison,
 )
@@ -40,6 +42,8 @@ class ExperimentLoop:
 
     def run(self, *, cycles: int | None = None, check: Callable[[], None] = lambda: None) -> None:
         state = self._store.load()
+        if state is not None:
+            self._recover_invalid_proposal(state)
         if state is None:
             while self._snake.is_simulation_running():
                 check()
@@ -50,7 +54,7 @@ class ExperimentLoop:
             check()
             if state.phase == "completed":
                 state = self._next_cycle(state)
-            elif state.phase in ("choosing", "revising", "evaluating"):
+            elif state.phase in ("choosing", "revising", "correcting", "evaluating"):
                 try:
                     if state.phase == "evaluating":
                         self._evaluate_view(state)
@@ -101,6 +105,21 @@ class ExperimentLoop:
                 self._finish(state)
             else:
                 raise ValueError(f"Unknown experiment phase: {state.phase}")
+
+    def _recover_invalid_proposal(self, state: ExperimentState) -> None:
+        """Recheck unsent proposals saved before parameter validation was enforced."""
+        if state.phase not in ("ready", "submitting", "revising") or state.baseline or state.seed_baseline:
+            return
+        try:
+            SimulationConfiguration.validate_values(state.proposals[state.view_name].values,
+                                                    VIEWS[state.view_name].parameters)
+        except ValidationError:
+            if state.phase == "submitting" and self._snake.find_config_run(state.config) is not None:
+                return
+            state.config = deepcopy(self._completed_result(state.golden_run_id)["config"])
+            state.phase = "correcting"
+            self._store.save(state)
+            logging.warning("Returning invalid saved %s proposal for correction.", state.view_name)
 
     def _initialize(self) -> ExperimentState:
         golden = self._events.current_golden_config()
@@ -173,6 +192,7 @@ class ExperimentLoop:
         name = state.view_name
         view = VIEWS[name]
         revising = state.phase == "revising"
+        correcting = state.phase == "correcting"
         history = state.golden_history
         no_history = history is None or history.view != name
         context = self._result_context(name, state.golden_run_id) if no_history else self._result_context(
@@ -181,14 +201,15 @@ class ExperimentLoop:
             context.update(previous_hypothesis=history.proposal.hypothesis,
                            previous_values=parameter_comparison(context["reference_config"], history.proposal.values),
                            previous_observations=history.observations)
-        if revising:
+        if revising or correcting:
             proposal = state.proposals[name]
             context.update(rejected_hypothesis=proposal.hypothesis, rejected_values=proposal.values)
         context.update(parameters=editable_parameters(view, state.config),
                        other_parameters=other_parameters(view, state.config),
                        historical_simulation_data=historical_values(
                            view, self._snake.get_scored_runs(state.config["seed"])))
-        prompt = self._prompts.render(view, context, no_history=no_history, duplicate=revising)
+        prompt = self._prompts.render(view, context, no_history=no_history, duplicate=revising,
+                                      invalid=correcting)
         proposal = self._conversation.propose(view, prompt, state.experiment_id)
         if revising:
             proposal = ViewProposal(proposal.hypothesis, {**state.proposals[name].values, **proposal.values})

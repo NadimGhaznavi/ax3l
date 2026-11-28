@@ -15,12 +15,14 @@ from uuid import uuid4
 
 from ax3l.interface.database.DbMgr import DbMgr
 from ax3l.interface.database.ExperimentDb import ExperimentDb
+from ax3l.interface.database.EventLogDb import EventLogDb
 from ax3l.interface.database.ExperimentStatusDb import ExperimentStatusDb
 from ax3l.interface.database.SnakeLabDb import CONFIGURATION_FIELDS, CONFIGURATION_COLUMNS, _config_values
 from ax3l.constants.DSnakeLab import DSnakeLab
 from ax3l.constants.DAx3l import DAx3l
 from ax3l.entities.ExperimentState import ExperimentState
 from ax3l.entities.ExperimentView import VIEWS
+from ax3l.entities.ViewProposal import ViewProposal
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 from ax3l.interface.SnakeLab import SnakeLab
 from ax3l.presentation.reporting.ExperimentStatus import experiment_sections
@@ -222,6 +224,75 @@ class ViewCycleIntegrationTests(unittest.TestCase):
         data = ExperimentStatusDb(self.db).read()
         data['latest_config'] = data['state'].config
         self.assertEqual([section['status'] for section in experiment_sections(data)], ['Saved', 'Saved'])
+
+    def test_invalid_parameter_proposals_are_corrected_before_any_simulation_submission(self):
+        invalid = {'reward-signals': {'game.rewards.food': 21},
+                   'architecture': {'model.hidden_size': 65},
+                   'training': {'training.gamma': .9999999999999999},
+                   'exploration': {'epsilon_nice.probability': 0}}
+        respond = self.model.respond
+        def invalid_first(request):
+            response = respond(request)
+            if request['tools'][0]['function']['name'] == 'submit_view' and len(request['messages']) == 1:
+                function = response['choices'][0]['message']['tool_calls'][0]['function']
+                arguments = json.loads(function['arguments'])
+                arguments['values'].update(invalid[requested_view(request)])
+                function['arguments'] = json.dumps(arguments)
+            elif request['tools'][0]['function']['name'] == 'submit_view':
+                self.assertEqual(ExperimentDb(self.db).load().phase, 'choosing')
+                self.assertIn('## Rejected proposal', request['messages'][-1]['content'])
+            return response
+        self.model.respond = invalid_first
+        self.scores = iter((10, 11, 12, 13, 14))
+        with patch('ax3l.app.experiment.ExperimentLoop.shuffle', side_effect=lambda names: names.reverse()):
+            self.assertEqual(self.service(cycles=4), 0)
+        self.assertEqual(len(self.model.requests), 12)
+        for index in range(0, 12, 3):
+            original, corrected, evaluation = self.model.requests[index:index + 3]
+            self.assertEqual([len(request['messages']) for request in (original, corrected, evaluation)], [1, 3, 1])
+            self.assertEqual(corrected['messages'][0], original['messages'][0])
+            self.assertEqual(corrected['tools'], original['tools'])
+            self.assertEqual(corrected['messages'][-1]['tool_call_id'],
+                             corrected['messages'][-2]['tool_calls'][0]['id'])
+        self.assertEqual(self.count_events('tool_execution_failed'), 4)
+        self.assertEqual(self.count_events('tool_execution_completed'), 8)
+        self.assertEqual(self.count_events('conversation_started'), 8)
+        self.assertEqual(self.count_events('simulation_submitted'), 5)
+        self.assertEqual(self.db.query('SELECT COUNT(*) AS n FROM simulation_runs')[0]['n'], 5)
+        self.assertEqual(self.db.query('SELECT COUNT(*) AS n FROM configurations WHERE training_gamma > .99')[0]['n'], 0)
+
+    def test_invalid_saved_submission_recovers_and_survives_a_restart_during_correction(self):
+        config = SimulationConfiguration.defaults()
+        config['training']['gamma'] = .99
+        golden = self.handle_control('simulation.submit', dict(config=config))['run_id']
+        EventLogDb(self.db).log('golden_config_created', 'Configuration', 'INFO', 'Existing golden.', process_id=golden)
+        rejected = deepcopy(config)
+        rejected['training']['gamma'] = .9999999999999999
+        store = ExperimentDb(self.db)
+        store.save(ExperimentState(str(uuid4()), 'submitting', rejected,
+                   golden_run_id=golden, reference_run_id=golden, latest_run_id=golden,
+                   order=list(VIEWS), view_index=list(VIEWS).index('training'), failures=3,
+                   proposals={'training': ViewProposal('Rejected hypothesis.', {'training.gamma': .9999999999999999})}))
+        # Interrupt the service after the durable recovery checkpoint is saved.
+        with patch('ax3l.interface.LLM.LLM.complete', side_effect=KeyboardInterrupt()):
+            self.assertEqual(self.service(), 130)
+        state = store.load()
+        self.assertEqual(state.phase, 'correcting')
+        self.assertEqual(state.config, config)
+        self.assertEqual(state.golden_run_id, golden)
+        self.assertEqual(state.failures, 3)
+        self.assertEqual(self.model.requests, [])
+        self.assertEqual(self.service(), 0)
+        prompt = self.model.requests[0]['messages'][0]['content'][0]['text']
+        self.assertTrue(prompt.startswith('The parameters supplied'))
+        self.assertIn('## Rejected proposal', prompt)
+        self.assertIn('Rejected hypothesis.', prompt)
+        self.assertIn('0.9999999999999999', prompt)
+        self.assertEqual(store.load().phase, 'completed')
+        self.assertEqual(store.load().golden_run_id, golden)
+        self.assertEqual(store.load().failures, 4)
+        self.assertEqual(self.db.query('SELECT COUNT(*) AS n FROM simulation_runs')[0]['n'], 2)
+        self.assertEqual(self.db.query('SELECT COUNT(*) AS n FROM configurations WHERE training_gamma > .99')[0]['n'], 0)
 
     def test_socket_timeout_discards_corrections_and_restarts_each_view_conversation(self):
         stages = [(name, tool) for name in VIEWS for tool in ('submit_view', 'submit_observations')]

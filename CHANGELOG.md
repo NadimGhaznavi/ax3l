@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.8] - 2026-11-28 @ 14:11
+
 ### Summary
 
 Reject invalid parameter proposals before simulation submission and allow the LLM to correct them.

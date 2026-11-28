@@ -6,7 +6,7 @@ import json
 from time import monotonic
 from typing import TypeVar
 
-from jsonschema import Draft202012Validator
+from jsonschema import Draft202012Validator, ValidationError
 
 from ax3l.activity.ViewConfiguration import parameter_schema
 from ax3l.interface.database.EventLogDb import EventLogDb
@@ -17,6 +17,8 @@ from ax3l.entities.ExperimentView import ExperimentView
 from ax3l.entities.ViewProposal import ViewProposal
 from ax3l.interface.LLM import LLM, LLMTimeoutError
 from ax3l.interface.LLMResponseCapture import LLMResponseCapture
+from ax3l.interface.SimulationConfiguration import SimulationConfiguration
+from ax3l.presentation.ViewPrompts import ViewPrompts
 
 
 Result = TypeVar("Result")
@@ -44,6 +46,7 @@ class ViewConversation:
     def __init__(self, llm: LLM, events: EventLogDb):
         self._llm = llm
         self._events = events
+        self._prompts = ViewPrompts()
 
     def propose(self, view: ExperimentView, prompt: str | list[dict],
                 experiment_id: str) -> ViewProposal:
@@ -57,7 +60,9 @@ class ViewConversation:
         })
 
         arguments_schema = deepcopy(schema)
-        arguments_schema["properties"]["values"]["properties"] = {name: {} for name in view.parameters}
+        # Validate parameter values through SimulationConfiguration so violations
+        # can be returned as tool feedback without accepting the proposal.
+        arguments_schema["properties"]["values"] = {}
 
         return self._request(view, prompt, schema, "submit_view", "Tuning",
                              "Record your next hypothesis and proposed parameter values.", experiment_id,
@@ -149,6 +154,12 @@ class ViewConversation:
                     log(Events.Tool, Events.Tool.COMPLETED, json.dumps(dict(status="completed", page=feedback)))
                 else:
                     feedback = _validate_arguments(arguments_schema, arguments, tool_name)
+                    if feedback is None and tool_name == "submit_view":
+                        try:
+                            SimulationConfiguration.validate_values(arguments["values"], view.parameters)
+                        except ValidationError:
+                            feedback = self._prompts.render_invalid_proposal(
+                                arguments["hypothesis"], arguments["values"])
                     if feedback is None:
                         result = accept(arguments)
                         log(Events.Tool, Events.Tool.COMPLETED,

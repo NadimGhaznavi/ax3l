@@ -119,6 +119,16 @@ class PanelParser(HTMLParser):
 
 
 class ExperimentStatusTests(unittest.TestCase):
+    def test_invalid_saved_proposals_are_shown_as_awaiting_correction(self):
+        data = status_data(phase='correcting')
+        data['events'] = conversation('selection-cycle', 'reward-signals', 'selection')
+        sections = experiment_sections(data)
+        self.assertEqual(sections[0]['status'], 'Revision required')
+        summary = experiment_summary(data, sections)
+        self.assertEqual(summary['phase'], 'Correcting invalid parameters')
+        self.assertEqual(summary['simulation']['status'], 'Awaiting selection')
+        self.assertIn('Correcting invalid parameters', render_status(data))
+
     def test_timer_checks_do_not_mark_a_conversation_saved_and_have_readable_results(self):
         for index, stage in enumerate(('selection', 'evaluation')):
             with self.subTest(stage=stage):

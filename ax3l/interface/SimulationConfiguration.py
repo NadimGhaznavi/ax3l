@@ -3,6 +3,8 @@
 import json
 from pathlib import Path
 
+from jsonschema import Draft202012Validator
+
 
 SCHEMA = json.loads((Path(__file__).with_name("schemas") / "simulation-config-v2.schema.json").read_text())
 
@@ -20,6 +22,13 @@ class SimulationConfiguration:
         for key in path:
             field = field["properties"][key]
         return field
+
+    @staticmethod
+    def validate_values(values: object, parameters: tuple[str, ...]) -> None:
+        """Validate proposed values using the same field rules supplied to the LLM."""
+        Draft202012Validator(dict(type="object", minProperties=1, additionalProperties=False, properties={
+            name: SimulationConfiguration.field(tuple(name.split("."))) for name in parameters
+        })).validate(values)
 
     @staticmethod
     def defaults() -> dict:

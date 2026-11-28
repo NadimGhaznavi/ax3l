@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Show baseline and latest parameter values together in experiment prompts.
+
+### Changed
+
+- Compare each submitted parameter's baseline and latest values in evaluation
+  prompts and recalled experiment history across all four views, using the
+  heading “Parameters”.
+
 ## [0.6.2] - 2026-11-28 @ 07:12
 
 ### Summary

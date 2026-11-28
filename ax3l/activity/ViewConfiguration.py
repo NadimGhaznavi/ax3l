@@ -15,6 +15,14 @@ def view_values(view: ExperimentView, config: dict) -> dict:
             for name in view.parameters}
 
 
+def parameter_comparison(baseline: dict, values: dict[str, int | float | bool]) -> dict:
+    return {
+        name: {"baseline": SimulationConfiguration.value_at(baseline, tuple(name.split("."))),
+               "latest": value}
+        for name, value in values.items()
+    }
+
+
 def apply_values(config: dict, values: dict[str, int | float | bool]) -> dict:
     result = deepcopy(config)
     for name, value in values.items():

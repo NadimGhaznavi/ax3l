@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 from jsonschema import ValidationError
 from jinja2 import ChoiceLoader, DictLoader, FileSystemLoader
 
-from ax3l.activity.ViewConfiguration import apply_values, other_parameters
+from ax3l.activity.ViewConfiguration import apply_values, other_parameters, parameter_comparison
 from ax3l.constants.DViewConversation import DViewConversation
 from ax3l.entities.ExperimentView import VIEWS
 from ax3l.entities.ExperimentState import ExperimentState
@@ -171,6 +171,17 @@ class ProposalBoundaryTests(unittest.TestCase):
 
 
 class ViewConfigurationTests(unittest.TestCase):
+    def test_parameter_comparison_keeps_baseline_and_latest_values(self):
+        baseline = SimulationConfiguration.defaults()
+        original = deepcopy(baseline)
+        values = {'epsilon.decay': .95, 'epsilon_nice.steps': 30}
+        self.assertEqual(parameter_comparison(baseline, values), {
+            'epsilon.decay': {'baseline': .97, 'latest': .95},
+            'epsilon_nice.steps': {'baseline': 20, 'latest': 30},
+        })
+        self.assertEqual(baseline, original)
+        self.assertEqual(values, {'epsilon.decay': .95, 'epsilon_nice.steps': 30})
+
     def test_views_cover_tunable_fields_and_share_only_sequence_length_and_gamma(self):
         def fields(schema, prefix=''):
             for key, value in schema['properties'].items():
@@ -216,6 +227,32 @@ class ViewCycleTests(ExperimentFixture):
         self.assertEqual(self.shuffle.call_count, 2)
         self.assertEqual(self.store.load().view_index, 0)
 
+    def test_promoted_evaluations_keep_the_original_parameter_baseline_for_every_view(self):
+        self.snake = FakeSnake((10, 11, 12, 13, 14))
+        self.loop().run(cycles=4)
+        expected = {
+            'exploration': {'epsilon.initial': {'baseline': .96, 'latest': .9}},
+            'training': {
+                'training.learning_rate': {'baseline': .001, 'latest': .002},
+                'training.sequence_length': {'baseline': 4, 'latest': 8},
+                'training.gamma': {'baseline': .96, 'latest': .95},
+            },
+            'architecture': {
+                'model.hidden_size': {'baseline': 64, 'latest': 72},
+                'training.sequence_length': {'baseline': 8, 'latest': 8},
+            },
+            'reward-signals': {
+                'game.rewards.food': {'baseline': 10, 'latest': 12},
+                'training.gamma': {'baseline': .95, 'latest': .95},
+            },
+        }
+        for index, name in enumerate(reversed(VIEWS)):
+            with self.subTest(view=name):
+                evaluation = self.model.requests[index * 2 + 1]
+                self.assertEqual(blocks(evaluation), [expected[name]])
+                self.assertIn('### Parameters\n', prompt_text(evaluation))
+                self.assertNotIn('### Parameter choices', prompt_text(evaluation))
+
     def test_only_current_golden_owner_gets_history_even_after_a_losing_attempt(self):
         self.snake = FakeSnake((10, 12, 9, 9, 9, 9, 12, 9, 9, 9))
         self.loop().run(cycles=5)
@@ -230,6 +267,9 @@ class ViewCycleTests(ExperimentFixture):
         self.assertNotIn(history.reference_run_id, prompt_text(owner_request))
         self.assertNotIn(history.latest_run_id, prompt_text(owner_request))
         self.assertIn(history.observations, prompt_text(owner_request))
+        self.assertIn('### Parameters\n', prompt_text(owner_request))
+        self.assertEqual(blocks(owner_request)[0], {'epsilon.initial': {'baseline': .96, 'latest': .9}})
+        self.assertEqual(blocks(owner_request)[0], blocks(self.model.requests[1])[0])
         for index in (2, 4, 6):
             self.assertIn('Baseline Results', prompt_text(self.model.requests[index]))
         # Training ties the golden and takes ownership; Exploration loses its history.

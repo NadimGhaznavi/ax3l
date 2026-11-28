@@ -8,7 +8,7 @@ from random import shuffle
 from time import sleep
 from uuid import uuid4
 
-from ax3l.activity.ViewConfiguration import apply_values, editable_parameters, other_parameters
+from ax3l.activity.ViewConfiguration import apply_values, editable_parameters, other_parameters, parameter_comparison
 from ax3l.app.experiment.ConfigurationLog import ConfigurationLog
 from ax3l.interface.database.DbMgr import DbMgr
 from ax3l.interface.database.EventLogDb import EventLogDb
@@ -144,8 +144,9 @@ class ExperimentLoop:
                     "exploration": self._snake.get_exploration_episodes,
                     "reward-signals": self._snake.get_reward_episodes,
                     "training": self._snake.get_training_episodes}[name]
+        reference = self._completed_result(reference_id)
         context = dict(reference_run_id=reference_id, reference_episodes=episodes(reference_id),
-                       reference_high_score=self._completed_result(reference_id)["high_score"])
+                       reference_high_score=reference["high_score"], reference_config=reference["config"])
         if latest_id is not None:
             context.update(latest_run_id=latest_id, latest_episodes=episodes(latest_id),
                            latest_high_score=self._completed_result(latest_id)["high_score"])
@@ -155,7 +156,8 @@ class ExperimentLoop:
         name = state.view_name
         proposal = state.proposals[name]
         context = self._result_context(name, state.reference_run_id, state.latest_run_id)
-        context.update(previous_hypothesis=proposal.hypothesis, previous_values=proposal.values)
+        context.update(previous_hypothesis=proposal.hypothesis,
+                       previous_values=parameter_comparison(context["reference_config"], proposal.values))
         content = self._prompts.render_evaluation(VIEWS[name], context)
         observation = self._conversation.evaluate(VIEWS[name], content, state.experiment_id)
         state.observations[name] = observation
@@ -175,7 +177,8 @@ class ExperimentLoop:
             name, history.reference_run_id, history.latest_run_id)
         if not no_history:
             context.update(previous_hypothesis=history.proposal.hypothesis,
-                           previous_values=history.proposal.values, previous_observations=history.observations)
+                           previous_values=parameter_comparison(context["reference_config"], history.proposal.values),
+                           previous_observations=history.observations)
         if revising:
             proposal = state.proposals[name]
             context.update(rejected_hypothesis=proposal.hypothesis, rejected_values=proposal.values)

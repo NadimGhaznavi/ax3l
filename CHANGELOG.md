@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Make inference timeout recovery explicit and verify that it resets conversation
+history and restarts the original prompt. Report reward collisions as percentages
+of episodes.
+
+### Changed
+
+- Clarify timeout logs and runtime documentation: restart the pending stage from
+  its original prompt after thirty seconds, discarding assistant replies and
+  corrective tool feedback.
+- Strengthen end-to-end coverage to verify automatic conversation resets after
+  socket timeouts during length correction, for selection and evaluation across
+  all four views, without repeating simulations or comparisons.
+
+### Fixed
+
+- Plot Reward Signals wall and snake collisions as percentages of episodes on
+  0–100% axes, retaining the existing line styling, food rates, and score panels.
+
 ## [5.0.11] - 2026-11-28 @ 02:57
 
 ### Summary

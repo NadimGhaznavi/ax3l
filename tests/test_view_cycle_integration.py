@@ -194,7 +194,7 @@ class ViewCycleIntegrationTests(unittest.TestCase):
         data['latest_config'] = data['state'].config
         self.assertEqual([section['status'] for section in experiment_sections(data)], ['Saved', 'Saved'])
 
-    def test_socket_timeouts_retry_the_same_stage_for_every_view(self):
+    def test_socket_timeout_discards_corrections_and_restarts_each_view_conversation(self):
         stages = [(name, tool) for name in VIEWS for tool in ('submit_view', 'submit_observations')]
         gates = {stage: Event() for stage in stages}
         for gate in gates.values():
@@ -209,11 +209,18 @@ class ViewCycleIntegrationTests(unittest.TestCase):
         def stalled(request):
             stage = requested_view(request), request['tools'][0]['function']['name']
             attempts[stage] += 1
-            if attempts[stage] == 1:
+            response = respond(request)
+            if attempts[stage] == 2:
                 gates[stage].wait(5)
-            else:
+            elif attempts[stage] == 3:
                 gates[stage].set()
-            return respond(request)
+            if attempts[stage] == 1:
+                function = response['choices'][0]['message']['tool_calls'][0]['function']
+                arguments = json.loads(function['arguments'])
+                field = 'hypothesis' if stage[1] == 'submit_view' else 'observations'
+                arguments[field] = 'x' * 300
+                function['arguments'] = json.dumps(arguments)
+            return response
         self.model.respond = stalled
         self.scores = iter((10, 11, 12, 13, 14))
         with patch.object(DAx3l, 'HTTP_TIMEOUT_SECONDS', .1), \
@@ -221,13 +228,28 @@ class ViewCycleIntegrationTests(unittest.TestCase):
                 patch('ax3l.app.experiment.ExperimentLoop.shuffle', side_effect=lambda names: names.reverse()), \
                 self.assertLogs(level='WARNING'):
             self.assertEqual(self.service(cycles=4), 0)
-        self.assertEqual(attempts, Counter({stage: 2 for stage in stages}))
+        self.assertEqual(attempts, Counter({stage: 3 for stage in stages}))
         self.assertEqual(waiting, [(name, phase) for name in reversed(VIEWS)
                          for phase in ('choosing', 'evaluating')])
         self.assertEqual(delay.call_args_list, [call(DAx3l.LLM_TIMEOUT_RETRY_SECONDS)] * 8)
         self.assertEqual(self.request_steps(), [(name, tool) for name in reversed(VIEWS)
-                         for tool in ('submit_view', 'submit_observations') for _ in range(2)])
+                         for tool in ('submit_view', 'submit_observations') for _ in range(3)])
+        for original, correction, restarted in zip(self.model.requests[::3], self.model.requests[1::3],
+                                                    self.model.requests[2::3]):
+            self.assertEqual(len(correction['messages']), 3)
+            self.assertEqual(correction['messages'][-1]['role'], 'tool')
+            self.assertEqual(len(restarted['messages']), 1)
+            self.assertEqual(restarted, original)
+        prompts = self.db.query('''SELECT parent_event_id, process_id, parameter, source_name
+            FROM events WHERE name='prompt_sent' AND event_id > %s ORDER BY event_id''', (self.start_event,))
+        for original, correction, restarted in zip(prompts[::3], prompts[1::3], prompts[2::3]):
+            self.assertEqual(original['parent_event_id'], correction['parent_event_id'])
+            self.assertNotEqual(original['parent_event_id'], restarted['parent_event_id'])
+            for field in ('process_id', 'parameter', 'source_name'):
+                self.assertEqual(original[field], restarted[field])
         self.assertEqual(self.count_events('llm_request_failed'), 8)
+        self.assertEqual(self.count_events('tool_execution_failed'), 8)
+        self.assertEqual(self.count_events('conversation_started'), 16)
         self.assertEqual(self.count_events('conversation_ended'), 16)
         self.assertEqual(self.count_events('simulation_submitted'), 5)
         self.assertEqual(self.count_events('configuration_compared'), 4)

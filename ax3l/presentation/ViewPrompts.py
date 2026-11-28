@@ -18,18 +18,26 @@ class ViewPrompts:
         )
 
     def render(self, view: ExperimentView, context: dict, *, no_history: bool = False,
-               duplicate: bool = False) -> list[dict]:
+               duplicate: bool = False, invalid: bool = False) -> list[dict]:
         folder = "selections-no-history" if no_history else "selections"
         prompt = self._templates.get_template(f"{folder}/{view.name}.md").render(
             **context, historical_simulation_json=json.dumps(
                 context["historical_simulation_data"], indent=2, allow_nan=False),
         )
-        if duplicate:
+        if invalid:
+            notice = self.render_invalid_proposal(context["rejected_hypothesis"], context["rejected_values"])
+            prompt = notice + "\n\n" + prompt
+        elif duplicate:
             notice = self._templates.get_template("common/duplicate-configuration.md").render(**context)
             prompt = notice.strip() + "\n\n" + prompt
         image = run_comparison_image(view, context["reference_episodes"],
                                      None if no_history else context["latest_episodes"])
         return [dict(type="text", text=prompt), dict(type="image_url", image_url=dict(url=image))]
+
+    def render_invalid_proposal(self, hypothesis: str, values: object) -> str:
+        return self._templates.get_template("common/invalid-configuration.md").render(
+            rejected_hypothesis=hypothesis, rejected_values=values,
+        ).strip()
 
     def render_evaluation(self, view: ExperimentView, context: dict) -> list[dict]:
         prompt = self._templates.get_template(f"evaluations/{view.name}.md").render(

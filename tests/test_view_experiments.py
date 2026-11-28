@@ -109,13 +109,11 @@ class ProposalBoundaryTests(unittest.TestCase):
             ViewConversation(llm, log).evaluate(VIEWS['training'], [], 'experiment')
         llm.complete.assert_called_once()
 
-    def test_simulation_values_are_left_for_snakelab_to_validate(self):
+    def test_valid_partial_simulation_values_are_accepted(self):
         for values in (
             {'game.rewards.closer_to_food': 5, 'game.rewards.further_from_food': -1},
             {'game.rewards.closer_to_food': 5},
             {'game.rewards.further_from_food': 0},
-            {'game.rewards.food': 21},
-            {'game.rewards.food': True},
         ):
             with self.subTest(values=values):
                 llm, log = Mock(url='http://local'), MemoryLog()
@@ -125,6 +123,76 @@ class ProposalBoundaryTests(unittest.TestCase):
                 self.assertEqual(result.values, values)
                 self.assertEqual(log.events[-1]['log_level'], 'INFO')
                 llm.complete.assert_called_once()
+
+    def test_invalid_parameter_values_receive_the_rejected_proposal_until_corrected(self):
+        cases = (
+            ('reward-signals', {'game.rewards.food': 21}),
+            ('reward-signals', {'game.rewards.food': True}),
+            ('reward-signals', {'game.rewards.wall': 1}),
+            ('architecture', {'model.hidden_size': 65}),
+            ('architecture', {'model.layers': 4}),
+            ('architecture', {'model.dropout': .015}),
+            ('training', {'training.gamma': .9999999999999999}),
+            ('training', {'training.gamma': .89}),
+            ('training', {'training.gamma': '0.99'}),
+            ('training', {'training.learning_rate': 0}),
+            ('training', {'training.batch_size': 9}),
+            ('training', {'training.sequence_length': 6}),
+            ('exploration', {'epsilon.initial': 1}),
+            ('exploration', {'epsilon_nice.probability': 0}),
+            ('exploration', {'epsilon_nice.steps': 41}),
+            ('reward-signals', {'training.sequence_length': 8}),
+            ('training', {'seed': 1971}),
+            ('training', {}),
+            ('training', None),
+            ('training', []),
+            ('training', '0.99'),
+        )
+        for name, values in cases:
+            with self.subTest(view=name, values=values):
+                llm, log = Mock(url='http://local'), MemoryLog()
+                rejected = dict(hypothesis='Rejected hypothesis.', values=values)
+                path = VIEWS[name].parameters[0]
+                valid = dict(hypothesis='Corrected hypothesis.', values={path: SimulationConfiguration.value_at(
+                    SimulationConfiguration.defaults(), tuple(path.split('.')))})
+                llm.complete.side_effect = [
+                    (200, '', self.response('submit_view', arguments))
+                    for arguments in (rejected, rejected, valid)
+                ]
+                prompt = [dict(type='text', text='Tune parameters.'),
+                          dict(type='image_url', image_url=dict(url='data:image/png;base64,image'))]
+                result = ViewConversation(llm, log).propose(VIEWS[name], prompt, 'experiment')
+                self.assertEqual(result.values, valid['values'])
+                self.assertEqual(result.hypothesis, valid['hypothesis'])
+                requests = [json.loads(call.args[0]) for call in llm.complete.call_args_list]
+                self.assertEqual([len(request['messages']) for request in requests], [1, 3, 5])
+                notice = (Path(__file__).resolve().parents[1] /
+                          'ax3l/presentation/prompts/common/invalid-configuration.md').read_text().splitlines()[0]
+                expected = (notice + '\n\n## Rejected proposal\n\nRejected hypothesis.\n\n```json\n'
+                            + json.dumps(values, sort_keys=True, indent=2) + '\n```')
+                for request in requests[1:]:
+                    self.assertEqual(request['messages'][0], dict(role='user', content=prompt))
+                    self.assertEqual(request['tools'], requests[0]['tools'])
+                    assistant, feedback = request['messages'][-2:]
+                    self.assertEqual(feedback, dict(role='tool', tool_call_id=assistant['tool_calls'][0]['id'],
+                                                    content=expected))
+                self.assertEqual(sum(e['name'] == 'tool_execution_failed' for e in log.events), 2)
+                self.assertEqual(sum(e['name'] == 'tool_execution_completed' for e in log.events), 1)
+                self.assertEqual(log.events[-1]['log_level'], 'INFO')
+
+    def test_invalid_parameter_feedback_keeps_the_existing_timer(self):
+        llm, log = Mock(url='http://local'), MemoryLog()
+        llm.complete.side_effect = [
+            (200, '', self.response('submit_view', dict(hypothesis='Test gamma.', values={'training.gamma': 1}))),
+            (200, '', self.response('timer', {})),
+            (200, '', self.response('submit_view', dict(hypothesis='Test gamma.', values={'training.gamma': .99}))),
+        ]
+        with patch('ax3l.interface.ViewConversation.monotonic', side_effect=(1000, 1301)):
+            result = ViewConversation(llm, log).propose(VIEWS['training'], 'Tune training.', 'experiment')
+        self.assertEqual(result.values, {'training.gamma': .99})
+        requests = [json.loads(call.args[0]) for call in llm.complete.call_args_list]
+        self.assertEqual([len(request['messages']) for request in requests], [1, 3, 5])
+        self.assertEqual(requests[2]['messages'][-1]['content'], '-00:01')
 
     def test_evaluation_rejects_a_configuration_submission(self):
         llm, log = Mock(url='http://local'), MemoryLog()
@@ -258,10 +326,8 @@ class ProposalBoundaryTests(unittest.TestCase):
                         values={'game.rewards.food': 12})
         cases = [
             dict(template, values={'game.rewards.food': float('nan')}),
-            dict(template, values={'training.sequence_length': 8}),
             dict(template, hypothesis='  '),
             dict(template, evaluation='Evaluation belongs in its own conversation.'),
-            dict(template, values={}),
         ]
         for arguments in cases:
             with self.subTest(arguments=arguments):

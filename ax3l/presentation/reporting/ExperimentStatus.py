@@ -48,6 +48,7 @@ def experiment_summary(data: dict, sections: list[dict]) -> dict:
              else VIEW_LABELS[state.view_name])
     phase = {
         "choosing": "Selecting parameters", "revising": "Revising duplicate configuration",
+        "correcting": "Correcting invalid parameters",
         "ready": "Ready to submit simulation", "submitting": "Submitting simulation",
         "running": "Running simulation", "comparing": "Comparing results",
         "evaluating": "Evaluating results", "completed": "Completed",
@@ -58,7 +59,7 @@ def experiment_summary(data: dict, sections: list[dict]) -> dict:
     reference, candidate = data["reference_run"], data["candidate_run"]
     simulation_status = (candidate["status"].capitalize() if candidate else
                          "Submitting" if state.phase == "submitting" else
-                         "Awaiting selection" if state.phase in ("choosing", "revising") else
+                         "Awaiting selection" if state.phase in ("choosing", "revising", "correcting") else
                          "Awaiting submission")
     if candidate and candidate["status"] in ("failed", "cancelled"):
         phase = f"Simulation {candidate['status']}"
@@ -131,7 +132,7 @@ def experiment_sections(data: dict) -> list[dict]:
 
         if not prompt and stage == "evaluation" and state.phase not in ("evaluating", "completed"):
             status = "Awaiting simulation results"
-        elif stage == "selection" and state.phase == "revising" and accepted:
+        elif stage == "selection" and state.phase in ("revising", "correcting") and accepted:
             status = "Revision required"
 
         baseline = data["selection_config"]

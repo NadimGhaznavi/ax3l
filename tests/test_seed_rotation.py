@@ -4,8 +4,6 @@ from copy import deepcopy
 import json
 from unittest.mock import Mock, patch
 
-from jsonschema import ValidationError
-
 from ax3l.entities.ExperimentView import VIEWS
 from ax3l.interface.SimulationConfiguration import SimulationConfiguration
 from ax3l.interface.ViewConversation import ViewConversation
@@ -113,12 +111,18 @@ class SeedRotationTests(ExperimentFixture):
         self.loop().run(cycles=1)
         self.assertEqual(len(self.snake.submissions), 4)
 
-    def test_llm_cannot_request_or_edit_a_seed(self):
+    def test_seed_changes_are_rejected_with_feedback_before_accepting_valid_values(self):
         for values in ({'new seed': True}, {'seed': 1971}):
             llm = Mock(url='http://fixture')
             arguments = json.dumps(dict(hypothesis='Change the seed.', values=values))
-            response = dict(choices=[dict(message=dict(tool_calls=[dict(function=dict(
+            response = dict(choices=[dict(message=dict(tool_calls=[dict(id='proposal', function=dict(
                 name='submit_view', arguments=arguments))]))])
-            llm.complete.return_value = 200, '', json.dumps(response).encode()
-            with self.assertRaises(ValidationError):
-                ViewConversation(llm, MemoryLog()).propose(VIEWS['training'], 'Tune.', 'seed-test')
+            corrected = deepcopy(response)
+            corrected['choices'][0]['message']['tool_calls'][0]['function']['arguments'] = json.dumps(
+                dict(hypothesis='Keep the seed.', values={'training.gamma': .95}))
+            llm.complete.side_effect = [(200, '', json.dumps(reply).encode()) for reply in (response, corrected)]
+            result = ViewConversation(llm, MemoryLog()).propose(VIEWS['training'], 'Tune.', 'seed-test')
+            self.assertEqual(result.values, {'training.gamma': .95})
+            self.assertEqual(llm.complete.call_count, 2)
+            feedback = json.loads(llm.complete.call_args.args[0])['messages'][-1]
+            self.assertIn('## Rejected proposal', feedback['content'])

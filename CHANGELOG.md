@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.8] - 2026-11-28 @ 14:11
+
+### Summary
+
+Reject invalid parameter proposals before simulation submission and allow the LLM to correct them.
+
+### Fixed
+
+- Validate proposed values against the parameter rules already supplied to the
+  LLM. Return the invalid-parameters notice, rejected hypothesis, and values as
+  tool feedback within the same conversation.
+- Recover invalid, unsubmitted proposals saved by earlier versions, including
+  the stuck submitting checkpoint, without losing the golden run or retrying
+  valid submissions with an unknown outcome.
+
 ## [0.5.7] - 2026-11-28 @ 13:50
 
 ### Summary

@@ -285,6 +285,12 @@ class ExperimentStatusTests(unittest.TestCase):
                 complete_candidate(data, phase='completed')
                 self.assertIn('Golden baseline established.', render_status(data))
 
+    def test_summary_includes_loss_limit_before_initialization(self):
+        summary = experiment_summary(dict(state=None), [])
+        self.assertEqual(summary['loss_limit'], 16)
+        self.assertIsNone(summary['seed'])
+        self.assertIsNone(summary['failures'])
+
     def test_summary_shows_view_phase_seed_and_loss_count(self):
         data = status_data('exploration', 'running')
         data['state'].failures = 15
@@ -292,6 +298,7 @@ class ExperimentStatusTests(unittest.TestCase):
         self.assertEqual(summary['title'], 'Exploration')
         self.assertEqual(summary['phase'], 'Running simulation')
         self.assertEqual(summary['seed'], data['state'].config['seed'])
+        self.assertEqual(summary['loss_limit'], 16)
         self.assertIn('Consecutive losses: 15 / 16', render_status(data))
         for phase, label in (('ready', 'Ready to submit simulation'), ('submitting', 'Submitting simulation'),
                              ('comparing', 'Comparing results'), ('evaluating', 'Evaluating results'),

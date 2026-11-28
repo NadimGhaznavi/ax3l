@@ -3,11 +3,13 @@
 from collections import Counter
 from copy import deepcopy
 import json
+from pathlib import Path
 import re
 import unittest
 from unittest.mock import Mock, patch
 
 from jsonschema import ValidationError
+from jinja2 import ChoiceLoader, DictLoader, FileSystemLoader
 
 from ax3l.activity.ViewConfiguration import apply_values, other_parameters
 from ax3l.constants.DViewConversation import DViewConversation
@@ -298,6 +300,65 @@ class ViewCycleTests(ExperimentFixture):
         self.assertEqual(self.store.load().order, order)
         self.assertEqual(self.store.load().view_index, 1)
         self.shuffle.assert_called_once()
+
+    def assert_fresh_conversation_after_restart(self, tool):
+        self.shuffle.side_effect = lambda names: None
+        respond = self.model.respond
+        def interrupt_correction(request):
+            response = respond(request)
+            if tool_name(request) == tool:
+                if len(request['messages']) > 1:
+                    raise KeyboardInterrupt()
+                function = response['choices'][0]['message']['tool_calls'][0]['function']
+                arguments = json.loads(function['arguments'])
+                field = 'hypothesis' if tool == 'submit_view' else 'observations'
+                arguments[field] = 'x' * 300
+                function['arguments'] = json.dumps(arguments)
+            return response
+        self.model.respond = interrupt_correction
+        with self.assertRaises(KeyboardInterrupt):
+            self.loop().run(cycles=1)
+        before = self.store.load()
+        self.assertEqual(before.view_name, 'reward-signals')
+        self.assertEqual(before.phase, 'choosing' if tool == 'submit_view' else 'evaluating')
+        original = self.model.requests[-1]
+        self.assertEqual(len(original['messages']), 3)
+        submissions = len(self.snake.submissions)
+        comparisons = self.event_count('configuration_compared')
+        template_dir = Path(__file__).resolve().parents[1] / 'ax3l/presentation/prompts'
+        folder = 'selections-no-history' if tool == 'submit_view' else 'evaluations'
+        template_name = f'{folder}/reward-signals.md'
+        template = (template_dir / template_name).read_text() + '\nFreshly deployed prompt.\n'
+        loader = ChoiceLoader([DictLoader({template_name: template}), FileSystemLoader(template_dir)])
+        updated_episodes = self.snake.get_reward_episodes(before.golden_run_id)
+        for row in updated_episodes:
+            row['outcome'] = 'wall'
+        self.model.respond = Mock(side_effect=KeyboardInterrupt())
+        with patch('ax3l.presentation.ViewPrompts.FileSystemLoader', return_value=loader), \
+                patch.object(self.snake, 'get_reward_episodes', return_value=updated_episodes) as read:
+            with self.assertRaises(KeyboardInterrupt):
+                self.loop().run(cycles=1)
+        restarted = self.model.requests[-1]
+        self.assertEqual(tool_name(restarted), tool)
+        self.assertEqual(len(restarted['messages']), 1)
+        self.assertIn('Freshly deployed prompt.', prompt_text(restarted))
+        self.assertNotIn('Freshly deployed prompt.', prompt_text(original))
+        old_image = original['messages'][0]['content'][1]['image_url']['url']
+        new_image = restarted['messages'][0]['content'][1]['image_url']['url']
+        self.assertTrue(new_image.startswith('data:image/png;base64,'))
+        self.assertNotEqual(new_image, old_image)
+        self.assertEqual([call.args[0] for call in read.call_args_list],
+                         [before.golden_run_id] if tool == 'submit_view' else
+                         [before.reference_run_id, before.latest_run_id])
+        self.assertEqual(self.store.load(), before)
+        self.assertEqual(len(self.snake.submissions), submissions)
+        self.assertEqual(self.event_count('configuration_compared'), comparisons)
+
+    def test_selection_restart_rebuilds_prompt_and_image_without_old_corrections(self):
+        self.assert_fresh_conversation_after_restart('submit_view')
+
+    def test_evaluation_restart_rebuilds_prompt_and_image_without_repeating_simulations(self):
+        self.assert_fresh_conversation_after_restart('submit_observations')
 
     def test_comparison_replay_does_not_count_failure_or_promote_twice(self):
         for score in (9, 10, 11):

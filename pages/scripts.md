@@ -23,6 +23,7 @@ service. Ax3l's helpers manage only `ax3l-server.service`,
 | `upgrade.sh` | Updates modules and service units, preserving the database, credentials, and accounts. | `sudo scripts/upgrade.sh` |
 | `install-services.sh` | Copies modules, installs three systemd units, and starts Ax3l services. | `sudo scripts/install-services.sh` |
 | `restart.sh` | Validates configuration, regenerates service units, and restarts Ax3l services. | `sudo scripts/restart.sh` |
+| `reset-conversation.sh` | Restarts the pending conversation with a fresh prompt and image from the saved stage. | `sudo scripts/reset-conversation.sh` |
 | `services.sh` | Starts or stops Ax3l services in dependency order. | `sudo scripts/services.sh start` or `sudo scripts/services.sh stop` |
 | `uninstall.sh` | Removes Ax3l service units, installation, credentials, database/account, and Linux account/group. **Deletes Ax3l data.** | `sudo scripts/uninstall.sh` |
 | `backup-db.sh` | Dumps the configured Ax3l database to a private timestamped file. | `sudo scripts/backup-db.sh` |
@@ -51,6 +52,28 @@ sudo scripts/install-services.sh
 
 The fresh-installation entry point refuses resources already created by that
 partial installation. Resuming service installation preserves those resources.
+
+## Restart the current conversation
+
+To discard an in-flight LLM conversation and regenerate both its prompt and image:
+
+```sh
+sudo scripts/reset-conversation.sh
+```
+
+The helper restarts only `ax3l-server.service`, temporarily pausing a running
+watchdog and restoring it afterward, including if the restart fails. The saved
+selection, duplicate revision, or evaluation stage rebuilds its prompt from the
+installed templates and renders a new plot from the recorded run data. Previous
+assistant replies and corrective tool feedback are discarded for the new request.
+Experiment progress, completed simulations, and past conversation logs are
+preserved. Reporting, SnakeLab, and LlamaSrv keep running. Outside a conversation
+stage, Ax3l resumes its saved workflow normally.
+
+Deploy prompt or plot changes before resetting; this helper uses the installed
+application and does not copy code from the checkout or install dependencies.
+Use `sudo scripts/upgrade.sh` to update the local installation; an upgrade also
+restarts Ax3l and rebuilds a pending conversation.
 
 ## Network configuration
 

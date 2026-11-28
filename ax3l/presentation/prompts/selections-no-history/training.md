@@ -21,21 +21,7 @@ The baseline is the current golden configuration.
 
 - Baseline simulation: {{ reference_run_id }} (high score: {{ reference_high_score }})
 
-The attached image shows the baseline run in orange, using consecutive
-150-epoch windows. The final window may be shorter:
-
-- Score percentiles: the solid line shows the 90th percentile; the dashed line
-  shows the 25th percentile on the same score axis.
-- Training loss: each point is the arithmetic mean of the recorded episode
-  losses in that window. Missing loss values are excluded, and a window with
-  no recorded loss is left as a gap. A measured zero loss is included. The
-  loss axis scales to the recorded values.
-
-Use the high score, score progress, lower-tail performance, and loss trends
-together to inform your next hypothesis. Lower training loss alone does not
-establish better game performance. These are training results from a single run,
-not independent validation. Curves stop at the baseline run's final recorded
-epoch. Treat missing measurements as unavailable rather than zero.
+The attached image shows the baseline run in orange.
 
 ## Parameters to tune
 

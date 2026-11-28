@@ -36,16 +36,7 @@
 - Golden reference: {{ reference_run_id }} (high score: {{ reference_high_score }})
 - Latest simulation: {{ latest_run_id }} (high score: {{ latest_high_score }})
 
-The attached image compares the recorded 90th and 25th score percentiles for
-Golden (orange) and Latest (blue), using consecutive 150-epoch windows. The final
-window may be shorter. Both runs share epoch and score axes; curves end at each
-run's last recorded epoch.
-
-Judge the hypothesis using the high scores, learning progress, and lower-tail
-performance. These are training results from individual runs, not independent
-validation. If both run IDs match, this is a baseline self-comparison, not evidence
-of improvement. Report missing measurements shown in the chart instead of
-inventing results.
+The attached image compares Golden (orange) and Latest (blue).
 
 ## Parameters to tune
 

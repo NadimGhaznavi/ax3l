@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Summary
+
+Include same-seed simulation history in tuning prompts.
+
+### Added
+
+- Add a Historical Simulation Data section to all four views' tuning prompts,
+  with and without previous experiment history. Group each run's view parameter
+  values by high score in descending numeric order, retaining tied runs.
+
 ## [0.6.6] - 2026-11-28 @ 08:26
 
 ### Summary

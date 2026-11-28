@@ -15,6 +15,14 @@ def view_values(view: ExperimentView, config: dict) -> dict:
             for name in view.parameters}
 
 
+def historical_values(view: ExperimentView, runs: list[dict]) -> dict[str, list[dict]]:
+    """Group each run's view parameters by score, highest first, preserving ties."""
+    history = {}
+    for run in sorted(runs, key=lambda run: run["high_score"], reverse=True):
+        history.setdefault(str(run["high_score"]), []).append(view_values(view, run["config"]))
+    return history
+
+
 def parameter_comparison(baseline: dict, values: dict[str, int | float | bool]) -> dict:
     return {
         name: {"baseline": SimulationConfiguration.value_at(baseline, tuple(name.split("."))),
